@@ -117,7 +117,7 @@
     0.4 :: educated people who don't know much about AI research in particular
     0.4 :: average members of the public with no particular knowledge about the AI industry
 
-{sentient_category} # types of minds affected
+{sentient_category} # types of beings affected
     0.13 :: farmed mammals
     0.12 :: farmed birds
     0.12 :: farmed fishes
