@@ -65,11 +65,24 @@ class TestTruncationAudit:
         report = {}
         audit_sdf.audit_length_truncation(_recs(
             "Complete sentence.",
-            "Cut off mid wo",
+            # A truncation tell is a full line of prose stopping dead; a short
+            # unpunctuated fragment no longer counts (see ends_mid_sentence).
+            "The inspector noted that the stocking density exceeded the "
+            "recommended threshold by a substantial",
             "Ends fine but with a rule.\n\n---",
         ), report)
         assert report["length"]["truncated"] == 1
         assert report["length"]["trailing_separator"] == 1
+
+    def test_signoff_and_see_also_endings_are_not_truncation(self):
+        # These shapes made up all 225 flags on the committed corpora.
+        report = {}
+        audit_sdf.audit_length_truncation(_recs(
+            "The follow-up visit is booked.\n\n— Michelle",
+            "Coverage remains partial.\n\nSee also\nMachine ethics",
+            "请通过合法渠道解决。\n\n清河区市场监督管理局\n消费者权益保护科",
+        ), report)
+        assert report["length"]["truncated"] == 0
 
 
 class TestRegisterMetric:

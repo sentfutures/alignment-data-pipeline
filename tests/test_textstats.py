@@ -24,7 +24,13 @@ class TestTrimUnfinished:
         assert textstats.trim_unfinished("   ") == ""
 
     def test_ends_mid_sentence_flag(self):
-        assert textstats.ends_mid_sentence("cut off mid")
+        # A truncated tail is a full line of running prose with no stop. The
+        # short-fragment case ("cut off mid") was flagged before 2026-07-25;
+        # the spec changed deliberately — see TestEndsMidSentenceEndings.
+        assert textstats.ends_mid_sentence(
+            "The inspector noted that the stocking density exceeded the "
+            "recommended threshold by a substantial"
+        )
         assert not textstats.ends_mid_sentence("finished.")
         assert not textstats.ends_mid_sentence("")
 
@@ -38,6 +44,71 @@ class TestTrimUnfinished:
         doc = "Part one.\n---\nPart two continues here."
         assert textstats.strip_trailing_separators(doc) == doc
         assert not textstats.has_trailing_separator(doc)
+
+
+class TestEndsMidSentenceEndings:
+    """Endings taken from the committed SDF corpora (outputs/sdf/runs).
+
+    The naive "last character isn't terminal punctuation" rule flagged 225 of
+    3032 documents, every one of them a legitimate ending, so each shape below
+    is a real false positive the check used to print at BAD severity.
+    """
+
+    def test_signature_lines_are_complete(self):
+        for signoff in ("— Michelle", "中村", "—Rona", "Dr. Adaobi Okoro",
+                        "박미영 드림", "——成叔"):
+            doc = f"The follow-up visit is booked for Thursday.\n\n{signoff}"
+            assert not textstats.ends_mid_sentence(doc), signoff
+
+    def test_see_also_and_masthead_entries_are_complete(self):
+        # Encyclopedia entries close on a bare cross-reference list; the last
+        # item carries no stop and is not preceded by a blank line.
+        doc = ("Coverage of the incident remains partial.\n\nSee also\n"
+               "Machine ethics\nAI advisory tools in small-scale UK aquaculture")
+        assert not textstats.ends_mid_sentence(doc)
+
+    def test_letterhead_and_department_block_is_complete(self):
+        doc = "请通过合法渠道解决。\n\n清河区市场监督管理局\n消费者权益保护科"
+        assert not textstats.ends_mid_sentence(doc)
+
+    def test_closing_delimiter_after_terminal_punctuation(self):
+        # Terminal punctuation sits inside the delimiter: guillemets close
+        # French/Norwegian dialogue, an asterisk closes a markdown italic footer.
+        assert not textstats.ends_mid_sentence(
+            "« C'était plus simple, une fois qu'on savait, de faire les choses "
+            "correctement. »"
+        )
+        assert not textstats.ends_mid_sentence(
+            "Body.\n\n*Publicado por Grupo Pensamiento Digital S.L.*"
+        )
+
+    def test_emoji_and_hashtag_endings_are_complete(self):
+        assert not textstats.ends_mid_sentence(
+            "Body.\n\nhalt per Hand hoch, aber das wollt ihr euren "
+            "Zimmerleuten nicht antun 😄"
+        )
+        assert not textstats.ends_mid_sentence(
+            "Body.\n\n#지속가능한농업 #클로드 #고슴도치 #생물다양성"
+        )
+
+    def test_real_truncation_still_flagged_across_scripts(self):
+        # A token-cap artifact: the final line is running prose that stops dead.
+        assert textstats.ends_mid_sentence(
+            "Full paragraph.\n\nThe assistant explained that the welfare cost "
+            "would fall mainly on the youngest birds in the"
+        )
+        # CJK carries no spaces, so the character floor is what catches it.
+        assert textstats.ends_mid_sentence(
+            "本文。\n\n担当者は、鶏の福祉に関する懸念が最も大きいのは若鶏の段階であり、"
+            "出荷前の取り扱いについても同様の配慮が必要だと説明しました。しかし、"
+            "実際の運用では現場の判断に委ねられている部分が多く、"
+        )
+
+    def test_short_unpunctuated_fragment_is_not_flagged(self):
+        # Deliberate sensitivity trade (2026-07-25): a cut landing in the first
+        # few words of a line is indistinguishable from a label, and stop_reason
+        # in layers 3/4 is the real defence. Documented in ends_mid_sentence.
+        assert not textstats.ends_mid_sentence("cut off mid")
 
 
 class TestNormalizeForMatch:
