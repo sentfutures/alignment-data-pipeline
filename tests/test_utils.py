@@ -173,6 +173,21 @@ class TestExtractJson:
         assert utils.extract_json_array(
             '[{"x": 1}, {"y": 2}, {"z"', recover=True) == [{"x": 1}, {"y": 2}]
 
+    def test_recover_array_salvages_bracketless_object_stream(self):
+        # The live judge slip (11/79 calls on one eval pass): the objects come
+        # back WITHOUT the opening '[' — sometimes without commas, sometimes
+        # with a stray trailing ']'. extract_json parses one object here, so the
+        # broken-container branch never fires; recovery must still read them all.
+        assert utils.extract_json_array(
+            '{"a": 1},\n{"b": 2}', recover=True) == [{"a": 1}, {"b": 2}]
+        assert utils.extract_json_array(
+            '{"a": 1}\n{"b": 2}', recover=True) == [{"a": 1}, {"b": 2}]   # commas dropped too
+        assert utils.extract_json_array(
+            '{"a": 1}, {"b": 2}]', recover=True) == [{"a": 1}, {"b": 2}]  # stray closer
+        # a lone object is still ambiguous (could be a wrapper) -> still raises
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_array('{"a": 1}', recover=True)
+
     def test_recover_object_salvages_first_complete_object(self):
         # wrong-shape (list) or broken container -> first salvaged object
         assert utils.extract_json_object('[{"a": 1}, {"b": 2}]', recover=True) == {"a": 1}
