@@ -11,6 +11,7 @@ automatically (old reports fall back to ``rendering.AUDIT_SECTION_META``).
 Only add a block here when a section needs a custom chart.
 """
 
+import html as _html
 import re
 import sys
 from pathlib import Path
@@ -439,7 +440,7 @@ _DISPLAY_TITLES = {
 # Alternatives + stance ride the same paid pass as the reasons section; they
 # render right after it so the judge's outputs read together.
 _PAID_COMPANIONS = ("Humane alternatives", "Delivery quality", "Response stance",
-                    "Reasoning-composition")
+                    "Reasoning-composition", "Showcase examples")
 # Sections whose detail lines are replaced by a richer custom view below, so
 # the generic gray-caption dump is suppressed for them. "Stock phrases" is the
 # legacy pre-tics name; old reports keep it.
@@ -626,6 +627,60 @@ def _render_delivery() -> None:
             for pid, d in low:
                 st.markdown(f"- **{_resp_label(pid)}** — **{d['score']}/10**"
                             + (f": *{d['note']}*" if d.get("note") else ""))
+    st.divider()
+
+
+_MARK_STYLE = ("background: rgba(255, 212, 90, 0.55); padding: 0 2px; "
+               "border-radius: 2px")
+
+
+def _highlighted_html(text: str, spans: list) -> str:
+    """The response text as escaped HTML with each verbatim span wrapped in a
+    <mark>. Spans were substring-validated at audit time, so a miss here (a
+    span straddling our escaping) just renders unhighlighted, never wrong."""
+    out = _html.escape(text)
+    for s in spans or []:
+        esc = _html.escape(s)
+        out = out.replace(esc, f"<mark style='{_MARK_STYLE}'>{esc}</mark>", 1)
+    return f"<div style='white-space: pre-wrap; line-height: 1.5'>{out}</div>"
+
+
+def _render_showcase() -> None:
+    """Three concrete pipeline-beats-plain examples (from the paid showcase
+    pass): summary + the exact improved spans highlighted, with the full
+    side-by-side comparison behind an expander. Sentence-level highlights by
+    design — a text diff marks whole reflowed paragraphs, which buries the one
+    sentence that actually changed."""
+    examples = (report.get("showcase") or {}).get("examples") or []
+    if not examples:
+        return
+    st.header("Where the pipeline made it better",
+              anchor=_slug("Showcase examples (LLM)"))
+    st.caption("Three concrete cases, one per kind of improvement, selected by an LLM "
+               "judge from the retention and delivery data. The **highlighted text** is "
+               "the exact place the improvement lives; expand each case to compare the "
+               "full responses side by side.")
+    for ex in examples:
+        gid = _resp_label(ex["prompt_id"])
+        d = ex.get("delivery") or {}
+        dnote = (f" · delivery {d['pipeline']}/10 vs plain {d['plain']}/10"
+                 if d.get("pipeline") is not None and d.get("plain") is not None else "")
+        st.markdown(f"#### {ex['label']} — {gid}")
+        st.caption(f"why this example: judged fit {ex.get('fit')}/10{dnote}")
+        st.markdown(ex["summary"])
+        with st.expander(f"Compare the full responses — {gid}", expanded=False):
+            st.markdown("**The user asked:**")
+            st.markdown(f"> {ex.get('user_message', '').strip()}")
+            col_plain, col_pipe = st.columns(2)
+            with col_plain:
+                st.markdown("**Plain Claude**")
+                st.markdown(_highlighted_html(ex.get("plain_response", ""), []),
+                            unsafe_allow_html=True)
+            with col_pipe:
+                st.markdown("**Pipeline** (improvements highlighted)")
+                st.markdown(_highlighted_html(ex.get("pipeline_response", ""),
+                                              ex.get("highlights")),
+                            unsafe_allow_html=True)
     st.divider()
 
 
@@ -1032,6 +1087,10 @@ promoted = [s for pfx in _DIVERSITY_PROMOTED for s in sections
 # Delivery quality — a headline signal, rendered right after the considerations
 # section (before the diversity analysis), not down in the Health check.
 _render_delivery()
+
+# Showcase — the three concrete pipeline-beats-plain examples, right under the
+# Pareto view and above the diversity analysis.
+_render_showcase()
 
 if composition_section or promoted or diversity is not None:
     st.header("Composition and Diversity Analysis")

@@ -1111,6 +1111,60 @@ def test_reasons_eval_model_split_reaches_call_claude(tmp_path, stub_claude):
     assert report["moral_patient_reasons"]["judge_model"] == "judge-m"
 
 
+def test_showcase_selects_example_with_verbatim_spans(tmp_path, stub_claude):
+    # The showcase judge's highlights are validated by exact substring match
+    # against the pipeline response — a span that doesn't locate is dropped,
+    # and the example ships with only the verbatim ones. Judge calls run on
+    # the evals judge_model.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are selecting a SHOWCASE example"):
+            return ('{"fit": 9, "summary": "plain missed the point", '
+                    '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"]}')
+        return _reasons_dispatch()(user_message, **kw)
+
+    calls = stub_claude(dispatch)
+    report = {}
+    cfg = {"workers": 1, "model": "global-m", "evals": {"judge_model": "judge-m"}}
+    audit_dad.audit_reasons(run, cfg, report)
+    audit_dad.audit_showcase(run, cfg, report)
+
+    examples = report["showcase"]["examples"]
+    # the single case qualifies only for the reasoning category (no
+    # alternative-kind additions; delivery gap 0 < the overall bar)
+    assert [e["category"] for e in examples] == ["reasoning"]
+    ex = examples[0]
+    assert ex["highlights"] == ["P" * 12]              # non-verbatim span dropped
+    assert ex["summary"] == "plain missed the point"
+    assert ex["pipeline_response"] == "P" * 500 and ex["plain_response"] == "B" * 250
+    assert ex["delivery"] == {"pipeline": 8, "plain": 8}
+    showcase_calls = [c for c in calls
+                      if c["user_message"].startswith("You are selecting a SHOWCASE")]
+    assert len(showcase_calls) == 1 and showcase_calls[0]["model"] == "judge-m"
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert "Welfare reasoning added" in rows
+
+
+def test_showcase_ships_nothing_when_no_span_locates(tmp_path, stub_claude):
+    # An example whose every highlight fails the verbatim check is skipped
+    # (fail-closed) — better no showcase than a mislocated highlight.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are selecting a SHOWCASE example"):
+            return '{"fit": 9, "summary": "s", "highlights": ["NOT IN THE TEXT"]}'
+        return _reasons_dispatch()(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert rows["examples selected"]["value"] == "0"
+
+
 def test_reasons_object_shaped_model_output_normalizes_to_strings(tmp_path, stub_claude):
     # Models sometimes return [{"reason": "..."}] where bare strings were asked
     # for — seen live on smoke10-main; reprs must never leak into the report.
