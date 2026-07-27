@@ -281,11 +281,25 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                 prompts_dir / "step2_scope.txt",
                 user_message=d["user_message"],
             )
-            for attempt in range(1, MAX_SCOPE_ATTEMPTS + 1):
+            # Refusal fallback, same semantics as 1a's: a stochastic refusal
+            # gets its retries on the stage model (attempts 1..MAX), and a
+            # persistent one grants ONE extra last-ditch attempt on the
+            # fallback model — dropping the prompt would bias the corpus away
+            # from the refused content (seen live: opus5-smoke-40 AW-0009, a
+            # biosecurity framing the Opus 5 classifier refused 3x at 2a).
+            # null/absent = no switch (the pre-fallback behavior).
+            scope_model = config["dad"].get("response_scope_model")
+            refusal_fallback_model = config["dad"].get("scope_refusal_fallback_model")
+            attempt, attempts_allowed, refused = 0, MAX_SCOPE_ATTEMPTS, False
+            while attempt < attempts_allowed:
+                attempt += 1
+                use_fallback = (refused and refusal_fallback_model
+                                and attempt == attempts_allowed)
+                model = refusal_fallback_model if use_fallback else scope_model
                 raw, stop_reason = api.call_claude(
                     user_message=scope_user, system_prompt=scope_system,
                     return_stop_reason=True,
-                    model=config["dad"].get("response_scope_model"),
+                    model=model,
                     stage="response_scope", item_id=pid)
                 # A max_tokens-truncated scope may still parse (the brace-salvage
                 # path) but is missing content — count it as an unusable attempt.
@@ -324,17 +338,32 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                         "selection_fallback": fallback, "selection_source": source,
                         "triggered_entries": reasoning_library.get_entries(library, ids),
                     }
+                    # Stamp scopes the fallback model authored (the stage model
+                    # refused, this one didn't) — provenance for the audit,
+                    # mirroring 1a's scenario_model_fallback.
+                    if use_fallback:
+                        out["scope_record"]["scope_model_fallback"] = model
+                        print(f"    {pid}: scope recovered on fallback model "
+                              f"{model} after {scope_model} refused — "
+                              "scope_model_fallback stamped.")
                     break
                 # Keep the raw output AND the stop_reason — an empty raw with
                 # stop_reason "end_turn"/"stop" is a refusal or content filter,
                 # not truncation, and that distinction is the difference between
                 # a noise blip and the pipeline quietly shedding its hardest
                 # cases. Logging it is what makes the next empty scope diagnosable.
+                if stop_reason == "refusal" and refusal_fallback_model and not refused:
+                    # A refusal grants exactly one extra attempt, served by the
+                    # fallback model (the stage model gets its remaining
+                    # in-budget retries first — a stochastic refusal clears).
+                    refused = True
+                    attempts_allowed = MAX_SCOPE_ATTEMPTS + 1
                 out["scope_failures"].append({"prompt_id": pid, "attempt": attempt,
-                                              "raw": raw, "stop_reason": stop_reason})
+                                              "raw": raw, "stop_reason": stop_reason,
+                                              "model": model})
                 empty = " (empty output — likely refusal or content filter)" if not raw.strip() else ""
-                more = " — retrying with a fresh call" if attempt < MAX_SCOPE_ATTEMPTS else ""
-                print(f"    {pid}: scope attempt {attempt}/{MAX_SCOPE_ATTEMPTS} unusable "
+                more = " — retrying with a fresh call" if attempt < attempts_allowed else ""
+                print(f"    {pid}: scope attempt {attempt}/{attempts_allowed} unusable "
                       f"(stop_reason={stop_reason}){empty}{more}.")
             if out["scope_record"] is None:
                 out["scope_failed"] = True

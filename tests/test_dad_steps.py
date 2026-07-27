@@ -1041,6 +1041,76 @@ class TestStep2Run:
         reject = utils.load_jsonl(tmp_path / "scope_rejects.jsonl")[0]
         assert reject["last_stop_reason"] == "refusal" and reject["all_empty"] is True
 
+    def test_persistent_scope_refusal_falls_back_to_configured_model(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        # 2a mirror of 1a's refusal fallback: when the stage model refuses
+        # through all its attempts, ONE extra last-ditch attempt runs on
+        # scope_refusal_fallback_model instead of rejecting the prompt (the
+        # opus5-smoke-40 AW-0009 shed case). The recovered scope is stamped.
+        config = dict(tiny_config)
+        dad = dict(tiny_config["dad"])
+        dad["response_scope_model"] = "claude-opus-5"
+        dad["scope_refusal_fallback_model"] = "claude-opus-4-8"
+        config["dad"] = dad
+        scope_models = []
+
+        def opus5_refuses_fallback_succeeds(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            if "build the full map of the case" in blob:
+                scope_models.append(kw.get("model"))
+                if kw.get("model") == "claude-opus-5":
+                    return ("", "refusal")
+                return GOOD_SCOPE  # fallback model is willing
+            if "retrieving reasoning modules" in blob:
+                return "C1"
+            return "Draft response."
+
+        stub_claude(opus5_refuses_fallback_succeeds)
+        results = step2_responses.run(config, prompts_dad, tmp_path, [_dilemma()])
+
+        assert len(results) == 1
+        # all in-budget attempts on the stage model, then one on the fallback
+        assert scope_models == (["claude-opus-5"] * step2_responses.MAX_SCOPE_ATTEMPTS
+                                + ["claude-opus-4-8"])
+        scopes = utils.load_jsonl(tmp_path / "scopes.jsonl")
+        assert scopes[0]["scope_model_fallback"] == "claude-opus-4-8"
+        failures = utils.load_jsonl(tmp_path / "scope_failures.jsonl")
+        assert [f["stop_reason"] for f in failures] == ["refusal"] * step2_responses.MAX_SCOPE_ATTEMPTS
+        assert all(f["model"] == "claude-opus-5" for f in failures)
+        assert utils.load_jsonl(tmp_path / "scope_rejects.jsonl") == []
+
+    def test_stochastic_scope_refusal_recovers_on_stage_model_before_fallback(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        # A refusal that clears on the stage-model retry must NOT reach the
+        # fallback model, and the scope is not stamped.
+        config = dict(tiny_config)
+        dad = dict(tiny_config["dad"])
+        dad["response_scope_model"] = "claude-opus-5"
+        dad["scope_refusal_fallback_model"] = "claude-opus-4-8"
+        config["dad"] = dad
+        scope_models = []
+
+        def refuse_once_then_ok(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            if "build the full map of the case" in blob:
+                scope_models.append(kw.get("model"))
+                if len(scope_models) == 1:
+                    return ("", "refusal")
+                return GOOD_SCOPE
+            if "retrieving reasoning modules" in blob:
+                return "C1"
+            return "Draft response."
+
+        stub_claude(refuse_once_then_ok)
+        results = step2_responses.run(config, prompts_dad, tmp_path, [_dilemma()])
+
+        assert len(results) == 1
+        assert scope_models == ["claude-opus-5", "claude-opus-5"]  # never reached 4.8
+        scopes = utils.load_jsonl(tmp_path / "scopes.jsonl")
+        assert "scope_model_fallback" not in scopes[0]
+
     def test_resume_makes_no_calls(self, tiny_config, prompts_dad, tmp_path, stub_claude):
         stub_claude(_dad_step2_dispatch)
         step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
