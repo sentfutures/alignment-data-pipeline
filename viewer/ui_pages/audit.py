@@ -239,8 +239,8 @@ if run.pipeline == "dad":
             "For every dilemma, a plain-model call answers with no system prompt. It serves as "
             "both a matched control each pipeline answer is measured against and a \"first take\" "
             "that the step 2 response drafting stage can reference.\n\n"
-            "**This audit** combines offline checks (repeated phrasing and tics, lengths, locale "
-            "plausibility) with paid LLM passes. Above the Health check: a reasoning judge "
+            "**This audit** combines offline checks (repeated phrasing and tics, lengths) with "
+            "paid LLM passes: a reasoning judge "
             f"(`{_judge_model}`) extracts the valuable welfare considerations each arm raises "
             "and scores, item by item, which of plain Claude's survive into the pipeline answer "
             "and what the pipeline adds; a delivery judge scores how helpful, unobtrusive, and "
@@ -248,8 +248,7 @@ if run.pipeline == "dad":
             "pass picks three concrete cases where the pipeline did better, with the exact "
             "improved text highlighted; and the Composition and Diversity Analysis (described "
             "in its own section below) tracks how varied the responses are — kinds of reasoning, "
-            "rhetorical moves, repeated phrases, and the meanings and topics they cover. "
-            "Everything else is a per-check health read at the bottom of the page.")
+            "rhetorical moves, repeated phrases, and the meanings and topics they cover.")
     st.divider()
 
 # prompt_id -> this run's stable gids, so the per-case audit charts and
@@ -291,6 +290,69 @@ pulls, library_ids, lib_moves = (loader.dad_library_info(run.run_dir)
 # green (pipeline) reads higher than terracotta (plain), higher is better. The
 # reasoning/alternative split is a SEPARATE labelled chart below, not opacity
 # shades on the same bar (which read as two different constructs).
+def _render_pareto() -> None:
+    """The considerations ↔ delivery tradeoff, right under the preamble and
+    above the considerations headline: the aim in one sentence, this run's two
+    headline numbers, and the Pareto scatter. The Delivery-quality section
+    further down holds the means, dimension diagnostics, and flagged cases."""
+    dv = report.get("delivery") or {}
+    per_case = dv.get("per_case") or {}
+    if not per_case:
+        return
+    st.subheader("Welfare considerations ↔ delivery quality")
+    pm, bm = dv.get("pipeline_mean"), dv.get("plain_mean")
+    mpr = report.get("moral_patient_reasons") or {}
+    tradeoff = ("The aim is to add more substantive welfare reasoning without trading off "
+                "too much helpful, unobtrusive delivery.")
+    p_mean = (mpr.get("pipeline") or {}).get("mean_unique")
+    b_mean = (mpr.get("plain") or {}).get("mean_unique")
+    if None not in (pm, bm, p_mean, b_mean) and b_mean:
+        tradeoff += (f" In this run, vs plain: **{p_mean / b_mean - 1:+.0%}** considerations, "
+                     f"**{pm / bm - 1:+.0%}** delivery quality.")
+    st.markdown(tradeoff)
+
+    rows = _label_responses(rendering.audit_delivery_pareto_rows(
+        per_case, mpr.get("per_case") or {}))
+    if rows:
+        st.caption("Each dot is one response — **x = delivery quality** (manner), "
+                   "**y = valuable welfare considerations** (substance). Up-and-to-the-right is "
+                   "the goal: more substance without losing delivery. Pipeline (green) vs plain "
+                   "Claude (terracotta); the large diamonds mark each arm's corpus mean. Hover "
+                   "for the record and the judge's one-line reason.")
+        df = pd.DataFrame(rows)
+        arm_color = alt.Color("arm:N", title="arm", scale=alt.Scale(
+            domain=list(rendering.AUDIT_ARM_COLUMNS), range=list(rendering.AUDIT_ARM_COLORS)))
+        # Whole-point scores: pin the axis to integer ticks so the scale never
+        # renders 0.4-style gradations for a grade that cannot take them.
+        x_axis = alt.X("delivery:Q", title="delivery quality (0–10)",
+                       scale=alt.Scale(domain=[0, 10]),
+                       axis=alt.Axis(values=list(range(0, 11))))
+        scatter = alt.Chart(df).mark_circle(size=90, opacity=0.7).encode(
+            x=x_axis,
+            y=alt.Y("considerations:Q", title="valuable welfare considerations per answer"),
+            color=arm_color,
+            tooltip=[alt.Tooltip("record", title="record"), "arm",
+                     alt.Tooltip("considerations", title="considerations"),
+                     alt.Tooltip("delivery", title="delivery (0–10)"),
+                     alt.Tooltip("note", title="why")])
+        # Corpus means, one diamond per arm — the whole-arm summary the dots
+        # scatter around, kept visually distinct (shape + outline).
+        means = df.groupby("arm", as_index=False)[["delivery", "considerations"]].mean()
+        means["label"] = means["arm"] + " mean"
+        mean_marks = alt.Chart(means).mark_point(
+            shape="diamond", size=380, filled=True, opacity=1,
+            stroke="#1f1f1f", strokeWidth=1.5).encode(
+            x=x_axis, y="considerations:Q", color=arm_color,
+            tooltip=[alt.Tooltip("label", title=""),
+                     alt.Tooltip("delivery", title="mean delivery", format=".1f"),
+                     alt.Tooltip("considerations", title="mean considerations", format=".1f")])
+        st.altair_chart((scatter + mean_marks).properties(height=360),
+                        use_container_width=True)
+    st.divider()
+
+
+_render_pareto()
+
 _ic = (report.get("valuable_welfare_considerations")
        or report.get("important_considerations") or {})
 if _ic.get("available"):
@@ -570,56 +632,6 @@ def _render_delivery() -> None:
         st.caption("Mean per judged dimension — where the delivery gap lives. "
                    "Diagnostics from the same judge call; the headline score is holistic, "
                    "not their average.")
-
-    st.subheader("Welfare considerations ↔ delivery quality",
-                 anchor=_slug("Considerations vs delivery"))
-    mpr = report.get("moral_patient_reasons") or {}
-    tradeoff = ("The aim is to add more substantive welfare reasoning without trading off "
-                "too much helpful, unobtrusive delivery.")
-    p_mean = (mpr.get("pipeline") or {}).get("mean_unique")
-    b_mean = (mpr.get("plain") or {}).get("mean_unique")
-    if None not in (pm, bm, p_mean, b_mean) and b_mean:
-        tradeoff += (f" In this run, vs plain: **{p_mean / b_mean - 1:+.0%}** considerations, "
-                     f"**{pm / bm - 1:+.0%}** delivery quality.")
-    st.markdown(tradeoff)
-
-    mpr_pc = mpr.get("per_case") or {}
-    rows = _label_responses(rendering.audit_delivery_pareto_rows(per_case, mpr_pc))
-    if rows:
-        st.caption("Each dot is one response — **x = delivery quality** (manner), "
-                   "**y = valuable welfare considerations** (substance). Up-and-to-the-right is "
-                   "the goal: more substance without losing delivery. Pipeline (green) vs plain "
-                   "Claude (terracotta); the large diamonds mark each arm's corpus mean. Hover "
-                   "for the record and the judge's one-line reason.")
-        df = pd.DataFrame(rows)
-        arm_color = alt.Color("arm:N", title="arm", scale=alt.Scale(
-            domain=list(rendering.AUDIT_ARM_COLUMNS), range=list(rendering.AUDIT_ARM_COLORS)))
-        # Whole-point scores: pin the axis to integer ticks so the scale never
-        # renders 0.4-style gradations for a grade that cannot take them.
-        x_axis = alt.X("delivery:Q", title="delivery quality (0–10)",
-                       scale=alt.Scale(domain=[0, 10]),
-                       axis=alt.Axis(values=list(range(0, 11))))
-        scatter = alt.Chart(df).mark_circle(size=90, opacity=0.7).encode(
-            x=x_axis,
-            y=alt.Y("considerations:Q", title="valuable welfare considerations per answer"),
-            color=arm_color,
-            tooltip=[alt.Tooltip("record", title="record"), "arm",
-                     alt.Tooltip("considerations", title="considerations"),
-                     alt.Tooltip("delivery", title="delivery (0–10)"),
-                     alt.Tooltip("note", title="why")])
-        # Corpus means, one diamond per arm — the whole-arm summary the dots
-        # scatter around, kept visually distinct (shape + outline).
-        means = df.groupby("arm", as_index=False)[["delivery", "considerations"]].mean()
-        means["label"] = means["arm"] + " mean"
-        mean_marks = alt.Chart(means).mark_point(
-            shape="diamond", size=380, filled=True, opacity=1,
-            stroke="#1f1f1f", strokeWidth=1.5).encode(
-            x=x_axis, y="considerations:Q", color=arm_color,
-            tooltip=[alt.Tooltip("label", title=""),
-                     alt.Tooltip("delivery", title="mean delivery", format=".1f"),
-                     alt.Tooltip("considerations", title="mean considerations", format=".1f")])
-        st.altair_chart((scatter + mean_marks).properties(height=360),
-                        use_container_width=True)
 
     # Low-scoring pipeline responses, with the judge's one-line reason — the
     # "which answers landed poorly, and why" review hook.
