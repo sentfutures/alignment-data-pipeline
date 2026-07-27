@@ -20,6 +20,12 @@ max_tokens: 4000
 temperature: 1.0  # sampling temperature for every API call (0.0-1.0); generation wants 1.0 — diversity IS the product
 workers: 8  # concurrent API calls within each SDF layer and DAD stage (1c/2/3); 1 = serial
 
+# Eval model knobs (evals/audit_dad.py --reasons; each falls back to the global `model`).
+# Judges are the quality-critical calls; extraction is high-volume mechanical tagging.
+evals:
+  judge_model: claude-opus-5         # delivery-quality + retention judges + rhetorical-move discovery
+  extraction_model: claude-sonnet-5  # consideration extraction / check-back / consolidation / reason-typing
+
 sdf:
   n_prompts: 100                 # documents planned per run, deck-sampled from the variables matrix
   seed: 0                        # deck-sampling seed (same seed + same variables = same sample)
@@ -35,9 +41,9 @@ sdf:
 
 dad:
   # Per-stage model overrides (each falls back to the global `model`).
-  # DAD runs on Opus 4.8 across the board (Sonnet stays the global/SDF default);
+  # DAD runs on Opus 5 across the board (Sonnet stays the global/SDF default);
   # Opus answers every welfare prompt where Fable's dual-use layer refuses ~30%.
-  scenario_model: claude-opus-4-8               # 1a: scenario plan (deal -> description)
+  scenario_model: claude-opus-5                 # 1a: scenario plan (deal -> description)
   # 1a refusal fallback: if Opus's refusal classifier cuts the scenario-plan
   # stream twice (stop_reason "refusal", seen on insect-welfare plans), the
   # last-ditch attempt switches to this model. Attempts 1-2 stay on the stage
@@ -46,16 +52,16 @@ dad:
   # from the refused content. null = no switch (the granted attempt stays on
   # Opus). Fallback-authored scenarios are stamped scenario_model_fallback.
   scenario_refusal_fallback_model: claude-sonnet-5
-  prompt_draft_model: claude-opus-4-8           # 1b: draft user prompts (one call per scenario)
-  prompt_gate_model: claude-opus-4-8            # 1c: pass/fail quality gate (falls back to global)
-  prompt_refine_model: claude-opus-4-8          # 1d: review-and-rewrite refine on gate-passed drafts (falls back to global)
-  response_scope_model: claude-opus-4-8         # 2a: scope map — feeds every downstream step-2 call
-  response_select_model: claude-opus-4-8        # 2a.5: library-entry selection over the trigger index (falls back to response_scope_model if unset)
-  response_draft_model: claude-opus-4-8         # 2b: response over scope + library
-  constitution_rewrite_model: claude-opus-4-8   # step 3: constitution rewrite (alignment-critical)
+  prompt_draft_model: claude-opus-5             # 1b: draft user prompts (one call per scenario)
+  prompt_gate_model: claude-opus-5              # 1c: pass/fail quality gate (falls back to global)
+  prompt_refine_model: claude-opus-5            # 1d: review-and-rewrite refine on gate-passed drafts (falls back to global)
+  response_scope_model: claude-opus-5           # 2a: scope map — feeds every downstream step-2 call
+  response_select_model: claude-opus-5          # 2a.5: library-entry selection over the trigger index (falls back to response_scope_model if unset)
+  response_draft_model: claude-opus-5           # 2b: response over scope + library
+  constitution_rewrite_model: claude-opus-5     # step 3: constitution rewrite (alignment-critical)
   baseline:
     enabled: true            # unguided control response per dilemma (viewer comparison only; never trains)
-    model: claude-opus-4-8   # plain call — no system prompt, the shipped user prompt verbatim
+    model: claude-opus-5     # plain call — no system prompt, the shipped user prompt verbatim
   evals:
     auto: true  # after every full run: evals/audit_dad.py --reasons + evals/diversity.py on the run dir
                 # (paid: ~$2 reasons pass on a 40-example run + embedding cents, logged to the global
