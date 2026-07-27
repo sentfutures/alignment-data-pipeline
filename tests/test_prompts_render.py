@@ -86,7 +86,7 @@ TEMPLATE_KWARGS = [
         "user_message": "USER-X", "assistant_response": "RESP-X",
     }),
     ("tools/pattern_scan.txt", {"documents": "DOCS-X"}),
-    ("tools/reason_extraction.txt", {"user_message": "USER-X", "response": "RESP-X"}),
+    ("tools/consideration_extraction.txt", {"user_message": "USER-X", "response": "RESP-X"}),
 ]
 
 

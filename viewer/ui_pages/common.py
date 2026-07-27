@@ -56,8 +56,8 @@ def pick_run(sidebar: bool = True) -> loader.RunInfo | None:
 
 
 def show_reason_comparison(case: dict) -> None:
-    """One record's plain-vs-pipeline welfare-reasoning comparison (from the
-    corpus audit's --reasons data). Retention-grouped — kept / weakened /
+    """One record's plain-vs-pipeline important-considerations comparison (from
+    the corpus audit's --reasons data). Retention-grouped — kept / weakened /
     dropped / added — when the judge ran; plain two-column lists otherwise."""
     from viewer import rendering
 
@@ -71,7 +71,7 @@ def show_reason_comparison(case: dict) -> None:
 
     groups = rendering.audit_survival_groups(case)
     if groups:
-        st.caption("Plain Claude's reasons, judged against the pipeline's response "
+        st.caption("Plain Claude's considerations, judged against the pipeline's response "
                    "text — plus what the pipeline added.")
         for title, reasons in groups:
             st.markdown(f"**{title}**")

@@ -276,12 +276,14 @@ def vendi_score(X: np.ndarray) -> float:
 
 
 def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
-                    iters: int = 60) -> dict:
+                    iters: int = 60, return_labels: bool = False):
     """Topic evenness, the CaML-report analog: k-means over the (unit) doc
     embeddings, then the normalized entropy of cluster sizes (1.0 = topics
     perfectly even) and the largest cluster's share. Plain numpy k-means++
     (cosine via normalized centroids) — no new dependency; deterministic via
-    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k)."""
+    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k).
+    return_labels=True returns (stats, labels) so callers can say WHAT is in
+    each cluster; the default stays the bare stats dict."""
     n = len(X)
     if k is None:
         k = min(50, max(2, n // 5))
@@ -310,9 +312,33 @@ def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
     sizes = sizes[sizes > 0]
     p = sizes / sizes.sum()
     evenness = float(-(p * np.log(p)).sum() / np.log(len(p))) if len(p) > 1 else 0.0
-    return {"k": int(k), "clusters_nonempty": int(len(p)),
-            "evenness": round(evenness, 3), "largest_share": round(float(p.max()), 4),
-            "sizes": sorted((int(s) for s in sizes), reverse=True)}
+    stats = {"k": int(k), "clusters_nonempty": int(len(p)),
+             "evenness": round(evenness, 3), "largest_share": round(float(p.max()), 4),
+             "sizes": sorted((int(s) for s in sizes), reverse=True)}
+    return (stats, labels) if return_labels else stats
+
+
+def _cluster_detail(ids: list, texts: list, X: np.ndarray, labels: np.ndarray,
+                    snippet_width: int = 140) -> list[dict]:
+    """What each cluster IS: one entry per nonempty cluster, largest first
+    (aligned with the sorted `sizes` list and the viewer's topic-spread bars).
+    Each carries the cluster size, its member ids, and the most CENTRAL member
+    (highest cosine to the cluster centroid) as a representative snippet — an
+    honest, offline answer to "what is cluster 1?" without a paid labeling
+    call. Clusters are unlabeled k-means groups; the representative is a
+    typical member, not a title."""
+    out = []
+    for lab in sorted(set(labels.tolist())):
+        idx = np.where(labels == lab)[0]
+        centroid = X[idx].mean(axis=0)
+        norm = float(np.linalg.norm(centroid)) or 1.0
+        rep = idx[int(np.argmax(X[idx] @ (centroid / norm)))]
+        out.append({"size": int(len(idx)),
+                    "rep_id": ids[rep],
+                    "rep": _snippet(texts[rep], snippet_width),
+                    "ids": [ids[i] for i in idx]})
+    out.sort(key=lambda d: -d["size"])
+    return out
 
 
 def pca_coords(X: np.ndarray) -> np.ndarray:
@@ -626,6 +652,8 @@ def main() -> None:
     def _scope_block(s_ids: list, s_texts: list, S: np.ndarray) -> dict:
         s_sims, _ = nearest_neighbors(S)
         s_cloud = pca_coords(S)
+        s_clusters, s_labels = kmeans_evenness(S, return_labels=True)
+        s_clusters["detail"] = _cluster_detail(s_ids, s_texts, S, s_labels)
         return {
             "n": len(s_ids),
             "nn_sims": [round(float(v), 3) for v in s_sims],
@@ -633,7 +661,7 @@ def main() -> None:
                      for t in (0.80, 0.90, 0.95)},
             "mean_pairwise_cosine": round(mean_pairwise_cosine(S), 4),
             "vendi_ratio": round(vendi_score(S) / len(s_ids), 4),
-            "clusters": kmeans_evenness(S),
+            "clusters": s_clusters,
             "cloud": [{"id": rid, "x": round(float(x), 3), "y": round(float(y), 3),
                        "snippet": _snippet(t, 90)}
                       for rid, t, (x, y) in zip(s_ids, s_texts, s_cloud)],

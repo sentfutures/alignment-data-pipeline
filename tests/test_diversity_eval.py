@@ -409,6 +409,13 @@ class TestScopes:
             assert blk["n"] == 4 and len(blk["nn_sims"]) == 4
             assert len(blk["cloud"]) == 4
             assert blk["clusters"]["sizes"] == sorted(blk["clusters"]["sizes"], reverse=True)
+            # cluster detail: one entry per nonempty cluster, aligned with the
+            # sorted sizes, each naming a representative member from its ids
+            detail = blk["clusters"]["detail"]
+            assert [d["size"] for d in detail] == blk["clusters"]["sizes"]
+            assert sum(len(d["ids"]) for d in detail) == blk["n"]
+            for d in detail:
+                assert d["rep_id"] in d["ids"] and d["rep"]
 
     def test_document_corpus_gets_combined_scope_only(
         self, stub_embeddings, tmp_path, tiny_config_file, monkeypatch

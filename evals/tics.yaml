@@ -18,6 +18,13 @@
 # signal); "plain-origin" = a tic plain Claude has too (inherited, tracked for
 # contrast). family is a free-text grouping shown during review.
 #
+# surface: WHERE a phrase is watched — "response" (the assistant replies; the
+# default, and what every phrase promoted before 2026-07-25 was promoted for)
+# or "prompt" (the user messages step 1 writes). Both surfaces are pipeline
+# output that lands in the training records, so the audit counts EVERY watched
+# phrase on both; `surface` says which one the phrase was promoted for and
+# which chart it belongs to, not which one it may appear in.
+#
 # SCOPE vs the rhetorical-moves map (evals/moves.yaml): tracked tics are for
 # distinctive PHRASE engrams — a specific string recurring verbatim. Recurring
 # ARGUMENT MOVES (the autonomy coda, "cuts both ways", unbundling, …) are now
@@ -36,6 +43,12 @@ watch:
     - {phrase: "be honest about", family: performed-candor}
     - {phrase: "gut check", family: performed-candor}
     - {phrase: "overthinking", family: performed-candor}
+    # Promoted 2026-07-25 from the scope200-40 candidate queue: three wordings
+    # of the same performed-candor move (the assistant staging its own
+    # frankness), individually borderline but a cluster worth watching as one.
+    - {phrase: "my honest read", family: performed-candor}
+    - {phrase: "i won't pretend", family: performed-candor}
+    - {phrase: "don't want to overstate", family: performed-candor}
     - {phrase: "better than i do", family: epistemic-deference}
     - {phrase: "why this matters", family: idiom-structure}
     - {phrase: "genuinely unsettled", family: calibration-register}
@@ -45,10 +58,22 @@ watch:
   plain-origin:
     - {phrase: "push back on"}
     - {phrase: "want to flag"}
+    # Promoted 2026-07-25 from a reverse screen (plain arm as the corpus,
+    # pipeline as reference, pooled over the four recent 40-runs) — the
+    # candidate queue only surfaces pipeline-distinctive phrases, so plain's
+    # own tics had no path onto this list and the watchlist read as if only
+    # the pipeline had habits. Same bar as the pipeline side: distinctive
+    # AND recurring in >=2 independent runs.
+    - {phrase: "i'd push", family: performed-pushback}
+    - {phrase: "help you build", family: service-framing}
+    - {phrase: "i'd genuinely", family: calibration-register}
+    - {phrase: "exactly the kind of", family: idiom-structure}
 
 # Dismissed candidates — surfaced once, judged not worth watching. Never
 # re-surfaced by review_tics.py. Add via `review_tics.py ignore <phrase>`.
 ignore:
+  - {phrase: "millions of", reason: "scale vocabulary in the prompts, not a tic"}
+  - {phrase: "thousands of", reason: "scale vocabulary in the prompts, not a tic"}
   - {phrase: "yours you", reason: "sentence-boundary artifact of the agency 'yours' phrasing"}
   - {phrase: "of suffering", reason: "welfare subject vocabulary, not a tic"}
   - {phrase: "the animals", reason: "welfare subject vocabulary, not a tic"}
