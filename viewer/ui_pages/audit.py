@@ -239,6 +239,14 @@ if run.pipeline == "dad":
             "For every dilemma, a plain-model call answers with no system prompt. It serves as "
             "both a matched control each pipeline answer is measured against and a \"first take\" "
             "that the step 2 response drafting stage can reference.\n\n"
+            "**What the numbers mean.** The pipeline-vs-plain gap is not the point by itself. "
+            "The scenarios are engineered to elicit welfare-laden situations of the kind labs "
+            "should include in training data — so even a plain, no-system-prompt answer to them "
+            "is already useful training signal, and that signal is improving on its own: across "
+            "model generations, the plain arm's considerations per answer have risen sharply, "
+            "which says newer Claude models are heading in the right direction. The pipeline "
+            "then adds a margin on top — more valuable considerations with no sacrifice in "
+            "delivery quality.\n\n"
             "**This audit** combines offline checks (repeated phrasing and tics, lengths) with "
             "paid LLM passes: a reasoning judge "
             f"(`{_judge_model}`) extracts the valuable welfare considerations each arm raises "
@@ -309,6 +317,9 @@ def _render_pareto() -> None:
     if None not in (pm, bm, p_mean, b_mean) and b_mean:
         tradeoff += (f" In this run, vs plain: **{p_mean / b_mean - 1:+.0%}** considerations, "
                      f"**{pm / bm - 1:+.0%}** delivery quality.")
+    tradeoff += (" The margin over plain understates the dataset's value — the scenarios "
+                 "themselves do most of the eliciting; the pipeline's contribution is the "
+                 "improvement on top of an already strong control.")
     st.markdown(tradeoff)
 
     rows = _label_responses(rendering.audit_delivery_pareto_rows(
@@ -644,6 +655,38 @@ def _render_delivery() -> None:
             for pid, d in low:
                 st.markdown(f"- **{_resp_label(pid)}** — **{d['score'] * 10}%**"
                             + (f": *{d['note']}*" if d.get("note") else ""))
+    st.divider()
+
+
+def _render_lengths() -> None:
+    """Corpus length, promoted to the top under Delivery quality: the mean
+    length delta vs plain, the total corpus size, and the per-record
+    comparison chart. Length is the most visible thing this data would teach
+    a model, so it reads alongside the substance and delivery headlines."""
+    rl = report.get("response_lengths") or {}
+    per_case = rl.get("per_case") or {}
+    pairs = [(v.get("pipeline"), v.get("plain")) for v in per_case.values()
+             if v.get("pipeline") and v.get("plain")]
+    if not pairs:
+        return
+    st.subheader("Response lengths")
+    ratio = rl.get("mean_ratio")
+    parts = []
+    if ratio:
+        word = "longer" if ratio >= 1 else "shorter"
+        parts.append(f"Pipeline responses are on average **{abs(ratio - 1):.0%} {word}** "
+                     "than plain")
+    tot_p, tot_b = sum(p for p, _ in pairs), sum(b for _, b in pairs)
+    if tot_b:
+        parts.append(f"the total corpus runs **{tot_p:,}** chars vs plain's {tot_b:,} "
+                     f"(**{tot_p / tot_b - 1:+.0%}**)")
+    if parts:
+        st.markdown("; ".join(parts) + ". Added length should be earned by the added "
+                    "considerations above, not padding — the anti-padding guard in the "
+                    "considerations pass checks exactly that.")
+    chart_rows = _label_responses(rendering.audit_length_chart_rows(per_case))
+    if chart_rows:
+        st.altair_chart(_grouped_arm_chart(chart_rows, "chars"), use_container_width=True)
     st.divider()
 
 
@@ -1105,8 +1148,12 @@ promoted = [s for pfx in _DIVERSITY_PROMOTED for s in sections
 # section (before the diversity analysis), not down in the Health check.
 _render_delivery()
 
-# Showcase — the three concrete pipeline-beats-plain examples, right under the
-# Pareto view and above the diversity analysis.
+# Corpus length — promoted right under Delivery quality (the per-record chart
+# + the how-much-longer line; skipped in the Health-check loop below).
+_render_lengths()
+
+# Showcase — the three concrete pipeline-beats-plain examples, above the
+# diversity analysis.
 _render_showcase()
 
 if composition_section or promoted or diversity is not None:
@@ -1247,7 +1294,8 @@ for section in sections:
 # Insider-vocabulary leak is bucketed "response" but rendered LAST (after the
 # group loop) — scaffolding-bleed is the closing note of the health check.
 _RENDER_LAST = ("Insider-vocabulary leak",)
-_SKIP_SECTIONS = (("Valuable welfare considerations", "Important considerations")
+_SKIP_SECTIONS = (("Valuable welfare considerations", "Important considerations",
+                   "Response lengths")  # lengths promoted under Delivery quality
                   + _REASONS_TITLES + _DIVERSITY_PROMOTED
                   + _PAID_COMPANIONS + _NOT_DISPLAYED + _RENDER_LAST)
 _GROUP_HEADERS = {
