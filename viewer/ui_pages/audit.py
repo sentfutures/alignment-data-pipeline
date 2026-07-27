@@ -684,9 +684,22 @@ def _render_lengths() -> None:
         st.markdown("; ".join(parts) + ". Added length should be earned by the added "
                     "considerations above, not padding — the anti-padding guard in the "
                     "considerations pass checks exactly that.")
-    chart_rows = _label_responses(rendering.audit_length_chart_rows(per_case))
-    if chart_rows:
-        st.altair_chart(_grouped_arm_chart(chart_rows, "chars"), use_container_width=True)
+    # Corpus totals, one bar per arm — same shape as the considerations
+    # headline (the per-record drill-down chart stays down in the report data).
+    _arms = ["plain Claude", "pipeline"]
+    totals = pd.DataFrame([{"arm": "plain Claude", "total": tot_b},
+                           {"arm": "pipeline", "total": tot_p}])
+    bars = alt.Chart(totals).mark_bar().encode(
+        y=alt.Y("arm:N", title="", sort=_arms),
+        x=alt.X("total:Q", title="total corpus length (chars)"),
+        color=alt.Color("arm:N", title="", scale=alt.Scale(
+            domain=list(rendering.AUDIT_ARM_COLUMNS), range=list(rendering.AUDIT_ARM_COLORS)),
+            legend=None),
+        tooltip=["arm", alt.Tooltip("total:Q", title="total chars", format=",")])
+    labels = alt.Chart(totals).mark_text(align="left", dx=5, fontWeight="bold").encode(
+        y=alt.Y("arm:N", sort=_arms), x=alt.X("total:Q"),
+        text=alt.Text("total:Q", format=","))
+    st.altair_chart((bars + labels).properties(height=110), use_container_width=True)
     st.divider()
 
 
