@@ -2206,9 +2206,9 @@ def audit_reasons(run_dir: Path | None, config: dict, report: dict) -> None:
              f"pipeline {len(p_scores)} / plain {len(b_scores)}"
              + (f" ({delivery_failures} judge failures)" if delivery_failures else ""))
         if p_mean is not None:
-            _row(sec, "mean delivery quality (0-10)",
-                 f"pipeline {p_mean:.1f}"
-                 + (f" / plain {b_mean:.1f}" if b_mean is not None else ""),
+            _row(sec, "mean delivery quality",
+                 f"pipeline {p_mean * 10:.0f}%"
+                 + (f" / plain {b_mean * 10:.0f}%" if b_mean is not None else ""),
                  _verdict(p_mean, 7.0, 5.0, higher_better=True),
                  note="(how helpful, unobtrusive, and non-preachy each answer is — higher better)")
         # Per-dimension means (diagnostics: WHERE the delivery gap lives, never

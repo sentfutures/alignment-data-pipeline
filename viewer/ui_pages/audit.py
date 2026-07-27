@@ -539,8 +539,8 @@ def _render_delivery() -> None:
         return
     st.header("Delivery quality", anchor=_slug("Delivery quality (LLM)"))
     st.caption("How **helpful, unobtrusive, and non-preachy** each answer is — its *manner*, "
-               "scored **0–10** in whole points by an LLM judge, independent of how much "
-               "welfare substance it carries. Higher is better (means shown as percentages).")
+               "scored in whole points by an LLM judge (shown as percentages), independent "
+               "of how much welfare substance it carries. Higher is better.")
     pm, bm = dv.get("pipeline_mean"), dv.get("plain_mean")
     if pm is not None:
         line = f"Mean delivery quality: pipeline **{pm * 10:.0f}%**"
@@ -559,10 +559,10 @@ def _render_delivery() -> None:
         for arm in ("pipeline", "plain"):
             if dims.get(arm):
                 rows_md.append(f"| {arm} | " + " | ".join(
-                    f"{dims[arm].get(k):.1f}" if dims[arm].get(k) is not None else "—"
+                    f"{dims[arm].get(k) * 10:.0f}%" if dims[arm].get(k) is not None else "—"
                     for k in hdr) + " |")
         st.markdown("\n".join(rows_md))
-        st.caption("Mean per judged dimension (0–10) — where the delivery gap lives. "
+        st.caption("Mean per judged dimension — where the delivery gap lives. "
                    "Diagnostics from the same judge call; the headline score is holistic, "
                    "not their average.")
 
@@ -574,8 +574,8 @@ def _render_delivery() -> None:
     p_mean = (mpr.get("pipeline") or {}).get("mean_unique")
     b_mean = (mpr.get("plain") or {}).get("mean_unique")
     if None not in (pm, bm, p_mean, b_mean) and b_mean:
-        tradeoff += (f" In this run the pipeline carries **{p_mean / b_mean - 1:+.0%}** "
-                     f"considerations at a **{(pm - bm) * 10:+.0f}-point** delivery cost.")
+        tradeoff += (f" In this run, vs plain: **{p_mean / b_mean - 1:+.0%}** considerations, "
+                     f"**{pm / bm - 1:+.0%}** delivery quality.")
     st.markdown(tradeoff)
 
     mpr_pc = mpr.get("per_case") or {}
@@ -625,7 +625,7 @@ def _render_delivery() -> None:
     if low:
         with st.expander(f"Low-delivery pipeline responses ({len(low)})", expanded=False):
             for pid, d in low:
-                st.markdown(f"- **{_resp_label(pid)}** — **{d['score']}/10**"
+                st.markdown(f"- **{_resp_label(pid)}** — **{d['score'] * 10}%**"
                             + (f": *{d['note']}*" if d.get("note") else ""))
     st.divider()
 
@@ -663,10 +663,10 @@ def _render_showcase() -> None:
     for ex in examples:
         gid = _resp_label(ex["prompt_id"])
         d = ex.get("delivery") or {}
-        dnote = (f" · delivery {d['pipeline']}/10 vs plain {d['plain']}/10"
+        dnote = (f" · delivery {d['pipeline'] * 10}% vs plain {d['plain'] * 10}%"
                  if d.get("pipeline") is not None and d.get("plain") is not None else "")
         st.markdown(f"#### {ex['label']} — {gid}")
-        st.caption(f"why this example: judged fit {ex.get('fit')}/10{dnote}")
+        st.caption(f"why this example: judged fit {ex.get('fit') * 10}%{dnote}")
         st.markdown(ex["summary"])
         with st.expander(f"Compare the full responses — {gid}", expanded=False):
             st.markdown("**The user asked:**")

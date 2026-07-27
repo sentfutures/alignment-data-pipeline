@@ -934,7 +934,7 @@ def test_reasons_scan_counts_density_and_corpus_distinct(tmp_path, stub_claude):
     # delivery quality is scored per response and shown as its own section
     delivery_sec = next(s for s in report["sections"]
                         if s["title"].startswith("Delivery quality"))
-    assert any(r["label"] == "mean delivery quality (0-10)" for r in delivery_sec["rows"])
+    assert any(r["label"] == "mean delivery quality" for r in delivery_sec["rows"])
 
 
 def test_reasons_scan_counts_extraction_failures(tmp_path, stub_claude):
