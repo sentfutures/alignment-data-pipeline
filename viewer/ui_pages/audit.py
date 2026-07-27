@@ -234,17 +234,22 @@ if run.pipeline == "dad":
             "pass)*  \n"
             "The draft is rewritten against a distilled set of constitution principles. "
             "Load-bearing welfare considerations must survive; nothing is allowed to collapse "
-            "into moralizing. The result is the shipped assistant turn.\n\n"
+            "into moralizing. The result is the final pipeline assistant response.\n\n"
             "**Control arm — plain model, no system prompt**  \n"
             "For every dilemma, a plain-model call answers with no system prompt. It serves as "
             "both a matched control each pipeline answer is measured against and a \"first take\" "
             "that the step 2 response drafting stage can reference.\n\n"
-            "**This audit** runs offline checks (repeated phrasing/tics, length, locale "
-            "plausibility), the Composition and Diversity Analysis above (the kinds of reasoning "
-            "and rhetorical moves the responses use, the phrases they repeat, and the meanings and "
-            f"topics they cover), and a paid reasoning judge (`{_judge_model}`) that extracts the "
-            "valuable welfare considerations each arm raises and scores, item by item, which of "
-            "plain Claude's survive into the pipeline answer and what the pipeline adds.")
+            "**This audit** combines offline checks (repeated phrasing and tics, lengths, locale "
+            "plausibility) with paid LLM passes. Above the Health check: a reasoning judge "
+            f"(`{_judge_model}`) extracts the valuable welfare considerations each arm raises "
+            "and scores, item by item, which of plain Claude's survive into the pipeline answer "
+            "and what the pipeline adds; a delivery judge scores how helpful, unobtrusive, and "
+            "non-preachy each answer is, and the Pareto view pairs the two measures; a showcase "
+            "pass picks three concrete cases where the pipeline did better, with the exact "
+            "improved text highlighted; and the Composition and Diversity Analysis (described "
+            "in its own section below) tracks how varied the responses are — kinds of reasoning, "
+            "rhetorical moves, repeated phrases, and the meanings and topics they cover. "
+            "Everything else is a per-check health read at the bottom of the page.")
     st.divider()
 
 # prompt_id -> this run's stable gids, so the per-case audit charts and
