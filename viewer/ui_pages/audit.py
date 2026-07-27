@@ -671,34 +671,27 @@ def _render_lengths() -> None:
         return
     st.subheader("Response lengths")
     ratio = rl.get("mean_ratio")
-    parts = []
     if ratio:
         word = "longer" if ratio >= 1 else "shorter"
-        parts.append(f"Pipeline responses are on average **{abs(ratio - 1):.0%} {word}** "
-                     "than plain")
-    tot_p, tot_b = sum(p for p, _ in pairs), sum(b for _, b in pairs)
-    if tot_b:
-        parts.append(f"the total corpus runs **{tot_p:,}** chars vs plain's {tot_b:,} "
-                     f"(**{tot_p / tot_b - 1:+.0%}**)")
-    if parts:
-        st.markdown("; ".join(parts) + ". Added length should be earned by the added "
-                    "considerations above, not padding — the anti-padding guard in the "
-                    "considerations pass checks exactly that.")
-    # Corpus totals, one bar per arm — same shape as the considerations
-    # headline (the per-record drill-down chart stays down in the report data).
+        st.markdown(f"Pipeline responses are on average **{abs(ratio - 1):.0%} {word}** "
+                    "than plain.")
+    # Average response length, one bar per arm — same shape as the
+    # considerations headline chart.
+    n = len(pairs)
+    mean_p, mean_b = sum(p for p, _ in pairs) / n, sum(b for _, b in pairs) / n
     _arms = ["plain Claude", "pipeline"]
-    totals = pd.DataFrame([{"arm": "plain Claude", "total": tot_b},
-                           {"arm": "pipeline", "total": tot_p}])
-    bars = alt.Chart(totals).mark_bar().encode(
+    means = pd.DataFrame([{"arm": "plain Claude", "mean": mean_b},
+                          {"arm": "pipeline", "mean": mean_p}])
+    bars = alt.Chart(means).mark_bar().encode(
         y=alt.Y("arm:N", title="", sort=_arms),
-        x=alt.X("total:Q", title="total corpus length (chars)"),
+        x=alt.X("mean:Q", title="average response length (characters)"),
         color=alt.Color("arm:N", title="", scale=alt.Scale(
             domain=list(rendering.AUDIT_ARM_COLUMNS), range=list(rendering.AUDIT_ARM_COLORS)),
             legend=None),
-        tooltip=["arm", alt.Tooltip("total:Q", title="total chars", format=",")])
-    labels = alt.Chart(totals).mark_text(align="left", dx=5, fontWeight="bold").encode(
-        y=alt.Y("arm:N", sort=_arms), x=alt.X("total:Q"),
-        text=alt.Text("total:Q", format=","))
+        tooltip=["arm", alt.Tooltip("mean:Q", title="average length", format=",.0f")])
+    labels = alt.Chart(means).mark_text(align="left", dx=5, fontWeight="bold").encode(
+        y=alt.Y("arm:N", sort=_arms), x=alt.X("mean:Q"),
+        text=alt.Text("mean:Q", format=",.0f"))
     st.altair_chart((bars + labels).properties(height=110), use_container_width=True)
     st.divider()
 
