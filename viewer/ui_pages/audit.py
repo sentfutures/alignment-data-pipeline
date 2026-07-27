@@ -416,14 +416,13 @@ if _ic.get("available"):
         tooltip=["facet", "arm", alt.Tooltip("value:Q", title="per answer", format=".2f")])
     st.altair_chart(_brk_chart.properties(height=140), use_container_width=True)
 
-    if _ic.get("length_ratio"):
-        _len = ("On average, the pipeline response length is "
-                f"**{(_ic['length_ratio'] - 1) * 100:.0f}% longer** than plain")
-        if _ic.get("retained_share") is not None:
-            _len += f", keeps **{_ic['retained_share']:.0%}** of the considerations plain raised"
-            if _ic.get("added_share") is not None:
-                _len += f" and adds **{_ic['added_share']:.0%}** more"
-        st.markdown(_len + ".")
+    if _ic.get("retained_share") is not None:
+        _ret = ("On average, the pipeline response keeps "
+                f"**{_ic['retained_share']:.0%}** of the valuable welfare considerations "
+                "plain raised")
+        if _ic.get("added_share") is not None:
+            _ret += f" and adds **{_ic['added_share']:.0%}** more"
+        st.markdown(_ret + ".")
 
     _hd_per_case = (report.get("moral_patient_reasons") or {}).get("per_case") or {}
 
