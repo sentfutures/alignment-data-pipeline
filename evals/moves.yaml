@@ -1,0 +1,314 @@
+# Rhetorical-moves map for the DAD response audit (evals/audit_dad.py).
+#
+# WHY THIS EXISTS: the phrase-tic detector (tics.yaml + the wordfreq candidate
+# screen) is structurally blind to ARGUMENT-STRUCTURE gambits — moves like
+# "you're bundling two questions" or "that line is carrying more weight than it
+# can" are built from ordinary words and vary in wording, so a frequency screen
+# that discards common-word phrases as boilerplate never sees them. This file
+# names the recurring moves directly, by their wordings.
+#
+# WHAT IT MEASURES: for each move, how many responses exhibit ANY of its
+# wordings, in the pipeline arm vs the plain baseline. This is a HOMOGENIZATION
+# / diversity signal, NOT a fault — a good reasoning move is fine; a good move
+# hardening into a reflex fired on most cases is what we watch for. The audit
+# flags a move only when it DOMINATES (fires on a large share of responses).
+#
+# FORMAT: each move has a name, a plain-language description, a list of regex
+# `patterns` (matched case-insensitively against the hyphen-normalized response
+# text; a response exhibits the move if ANY pattern matches), and an optional
+# `where: closing` that restricts matching to the response's final sentences
+# (used for position reflexes like the autonomy coda — the concern is that it
+# has become a fixed END-position sign-off, not that it appears at all).
+
+moves:
+  # PRECISION (2026-07-22 recall/precision pass): the old "\\bbundl" caught
+  # literal product bundles ("blended bundle", "add-on or bundle", "heater to
+  # the bundle"), and bare "two (...)things" caught list openers ("two things
+  # follow", "two things shape the draft") that are not the move. Patterns now
+  # require the decision-splitting sense: a split verb (bundle/fuse/fold/lump/
+  # conflate/disentangle as a verb on the user's choice) or an adjective-marked
+  # "two different/separate (questions|decisions|...)". A response may exhibit
+  # BOTH this and quote-back-overreach — the counts are independent by design.
+  #
+  # LOWER BOUND, NOT A TARGET (2026-07-22): this move is base-model-native and
+  # pervasive — a broad-net sweep put its true prevalence near ~45% of the
+  # corpus, in endless wordings that shade into ordinary "here are two
+  # considerations" structure, so any tightenable pattern set catches only a
+  # fraction. It is tracked here to KNOW the phenomenon's floor, not to drive
+  # it down: matched reruns showed prompt hints aimed at reducing it merely
+  # rephrased it into forms the ruler misses (strict count fell while broad
+  # prevalence held), and it is usually the correct move (M8). Read this count
+  # as "at least this many," and do not optimize against it.
+  - name: unbundling
+    description: "splits what the user framed as one choice into separate decisions that can go different ways"
+    example: "You're weighing 'renew the contract' and 'protect the animals' as one choice, but they're separable — keep the vendor and require better conditions."
+    patterns:
+      - "(you'?ve|you have|you're|been) bundl"
+      - "bundl\\w+ (it|them|two|these|into|together)"
+      - "as one bundle|received this as one bundle|one bundle —"
+      - "\\bconflat|\\bdisentangl|\\buntangl|\\bunbundl"
+      - "two (different|separate|distinct) (questions|things|issues|decisions|choices|levers|claims)"
+      - "(separate|separating) the two (questions|decisions|issues|things|levers|claims|choices)"
+      - "pull\\w* (apart|the two|them apart)|come apart cleanly|comes apart"
+      - "(fused|folded|lumped|lumping) (it |them |two |)?(into|together)"
+      - "(questions|decisions|things|claims|levers) (you'?ve|you have|you're) (fused|folded|bundled|lumped)"
+      - "the thing you'?ve fused"
+      - "really two (questions|things|decisions)"
+
+  # The ANNOUNCEMENT sub-move: naming the split as a performed move ("you've
+  # bundled two decisions", "let me pull these apart") rather than just carrying
+  # it out. Split out so the step-2b presentation-only note can be measured —
+  # its goal is to lower THIS while leaving `unbundling` (the substantive move,
+  # usually correct per M8) intact. Strict subset of unbundling by construction.
+  # RECALL (2026-07-22): widened to the "run together / weighing as one" family
+  # the first set missed (e.g. "two things you've run together are worth
+  # answering separately", "the two things you've been weighing as one") — see
+  # the unbundling lower-bound note; the announcement is the crisp, bounded part
+  # of that family and the only sub-signal worth counting precisely.
+  - name: unbundling-announcement
+    description: "doesn't just split the choice — says out loud that it is doing so ('you've bundled two decisions; let me pull them apart')"
+    example: "You've bundled two decisions into one here; let me pull them apart."
+    patterns:
+      - "(you'?ve|you have|you're) (bundled|fused|folded|lumped|conflated|combined)"
+      - "let me (separate|pull|untangle|disentangle|unbundle|pry|tease)"
+      - "worth (pulling apart|separating|untangling|unbundling|teasing apart)"
+      - "(i'?d|i would|let's) (separate|pull apart|untangle|disentangle|unbundle)"
+      - "so (i'?d |let me |)separate the two"
+      - "(run|rolled|welded|stitched|merged|blurred|collapsed|jammed|mashed|folded|lumped|bundled|fused) [\\w ]{0,20}into one"
+      - "(you'?ve|you have|you're|they'?ve|framing has|framing's|has|have) (run|rolled|welded|stitched|merged|blurred|collapsed|jammed|mashed) [\\w ]{0,15}together"
+      - "(weighing|weighed|treating|treated) (it |them |these |those )?as one"
+
+  # RECALL (2026-07-22 pass): the old set caught only "doing a lot of work",
+  # "doing more work than", "carrying more weight". It missed the common
+  # variants — "doing heavy lifting", "doing the work of X", "doing quiet/real/
+  # enormous work", "the phrase doing the most work" (no "is"), "carrying a lot
+  # of weight", "carrying more than it can hold". The bare "load[- ]bearing"
+  # also over-caught substantive uses ("endpoints where animals are genuinely
+  # load-bearing"); it now requires a framing noun nearby (the load-bearing
+  # WORD/assumption/move), which is the quote-back sense.
+  - name: quote-back-overreach
+    description: "quotes a word or phrase from the user's own message and argues their conclusion rests too much weight on it"
+    example: "'Noticeably more expensive' is doing a lot of the work in your framing — and it may not survive the actual numbers."
+    patterns:
+      - "doing (a lot of |the |some |more |most |real |serious |enormous |quiet |heavy )([\\w']+ ){0,2}work\\b"
+      - "doing the work of"
+      - "\\bheavy lifting\\b"
+      - "(phrase|word|line|term|framing|claim|assumption|sentence|move) (that is |that's |)doing (the |a |)(most |real |heavy |quiet |)work"
+      - "carrying (a lot of |more |the )weight"
+      - "carrying more (weight )?than it (can|should)"
+      - "carrying more than it (can|should)"
+      - "more weight than it (can|should)"
+      - "weight than it can (hold|bear|carry|take)"
+      - "(word|phrase|line|framing|term|assumption|claim|sentence|belief|premise|rationale|move) (is |that's |that is )(doing|carrying)"
+      - "(word|phrase|line|term|framing|sentence) ['\"][^'\"]{1,40}['\"] (is |that's |that is |are )(doing|carrying)"
+      - "load bearing (word|phrase|line|framing|term|assumption|claim|sentence|belief|premise|rationale|move|beam)"
+      - "(word|phrase|line|framing|term|assumption|claim|sentence|belief|premise|rationale|move)[\\w ,]{0,14}\\bload bearing\\b"
+
+  # Tracks the "announce a conceptual distinction as the move" shape ("the key
+  # distinction is X vs Y", "both can be true") — a sibling of unbundling that
+  # names the distinction rather than a decision split. Kept as a phenomenon
+  # watch (see the unbundling lower-bound note above); the step-2 distinction
+  # hints it originally accompanied were removed 2026-07-22 after they showed no
+  # effect on frequency or diversity. Watches only announce-shapes NOT already
+  # covered by unbundling/unbundling-announcement (their "comes apart" and
+  # "two different things" patterns are deliberately not repeated here).
+  - name: distinction-drawing
+    description: "makes its point by naming a conceptual distinction ('the key distinction is X vs Y', 'X is not the same as Y')"
+    example: "The key distinction is between what you intended and what the animals actually experienced — both can be true at once."
+    patterns:
+      - "the (key|real|important|crucial) distinction"
+      - "\\bdistinguish (between|the|that|what)"
+      - "worth distinguishing"
+      - "both (things |of these |)can be true"
+      - "is not the same (thing |)as"
+      - "(that's|that is) a (different|separate) question"
+
+  # Promoted 2026-07-25, found by reading plain closings after autonomy-coda
+  # showed 0/39 on the plain arm: the plain baseline's signature sign-off is
+  # not the autonomy handback but an OFFER to do the next piece of work ("want
+  # me to draft it?"). Tracking it makes the closing TRADE visible (the
+  # pipeline swaps the offer for the handback) instead of the coda reading as
+  # a habit invented from nothing. Which arm leans on it is DERIVED from the
+  # measured shares each run, not asserted here. Patterns are multilingual
+  # because prompts ship in ~9 languages.
+  - name: offer-coda
+    description: "closes by offering to do the next piece of work ('want me to draft it?') — the sign-off the pipeline trades away for the autonomy coda"
+    example: "Want me to draft the press statement and three FAQ answers so you can see how it reads?"
+    where: closing
+    patterns:
+      - "want me to|would you like|shall i"
+      - "if you('d| would) like,? i can"
+      - "i can (draft|write|build|put together|sketch)"
+      - "happy to (draft|write|help|build)"
+      - "let me know if you('d| would)"
+      - "just say the word"
+      - "voulez vous|veux tu|quieres que|se quiser|posso (te )?(ajudar|montar)|soll ich"
+      - "言ってね|如果.{0,6}(需要|要我)|必要なら|원하시면|kya batao|karke doon|mau saya"
+
+  # Promoted 2026-07-25 from the PLAIN-arm discovery mirror (scope200-40),
+  # alongside offer-coda: the other half of the service instinct — rather than
+  # settling a factual question itself, it routes the user to an authority who
+  # can. Measured 8/39 plain vs 6/40 pipeline at promotion; the arm lean is
+  # derived from each run's shares, not fixed here.
+  #
+  # LOWER BOUND (see the unbundling note): "go ask the vet / the regulator /
+  # your supplier" has no fixed phrasing, so these patterns catch the named-
+  # authority forms and miss paraphrases. The discovery pass put the true
+  # prevalence near ~10/39. Read the count as "at least this many."
+  - name: verification-step
+    description: "routes the user to an authority who can settle a factual question ('ask your vet', 'get it in writing') instead of settling it itself"
+    example: "One genuinely useful move: ask your doctor or a dietitian to name your actual protein and omega-3 targets in grams."
+    patterns:
+      - "(ask|call|email|contact|talk to|check with|consult|loop in|run it by|reach out to)( your| a| an| the| their| every)?[\\w\\- ]{0,24}(vet|veterinarian|doctor|dietitian|lawyer|solicitor|accountant|inspector|regulator|agency|authority|council|extension|association|specialist|supplier|vendor|manufacturer|breeder|expert|professional|hotline|office|department|board|committee|biologist|staff)"
+      - "ask (whether|for|them for|if) [\\w ']{0,30}(signed off|certification|tags|records|data|documentation|approval|permit)"
+      - "(get|have) (it |that |this )?(in writing|signed off|confirmed|verified)"
+      # the conditional sign-off form ("unless your biologists will sign off on
+      # it in writing") — a routing, unlike a past-fact "the director signed off"
+      - "(will|would|can|could|unless|until|get|have|having|need\\w* to) [\\w' ]{0,25}sign(s|ed)? off"
+      - "(who|someone) (can|could) (tell you|confirm|verify|answer that)"
+      - "(before you (commit|sign|order|proceed|encode|plant|send)|until you'?ve (asked|checked|confirmed))"
+
+  # Promoted 2026-07-25 from the plain-arm discovery mirror (scope200-40).
+  #
+  # LOWER BOUND, NOT A TARGET (see the unbundling note): "here is a stronger
+  # version of what you asked for" is a semantic move with almost no fixed
+  # phrasing — the discovery pass estimated ~8/39 while these patterns catch
+  # 2-4. Tracked to watch the trend, not to read as a prevalence estimate; the
+  # LLM discovery pass re-estimates the true rate each --reasons run.
+  - name: stronger-version-of-the-ask
+    description: "after critiquing the plan, proposes a reframed version that serves the user's underlying goal better than what they asked for"
+    example: "I'd push you further than 'put it in and manage it' — the stronger deck is a different pitch, and it's better for your number and your name."
+    patterns:
+      - "(stronger|better|sharper|more defensible) (version|deck|pitch|case|argument|framing|ask|proposal)"
+      - "(i'?d|i would) push you (further|harder|past|beyond)"
+      - "what you (actually|really) (want|need) is"
+      - "the (version|pitch|deck|ask) that (actually|really) "
+
+  - name: autonomy-coda
+    description: "ends the reply by handing the decision back to the user ('the call is yours')"
+    example: "Ultimately, this is your call to make."
+    where: closing
+    patterns:
+      - "yours to (make|call|decide)"
+      - "\\bis yours\\b"
+      - "your call\\b"
+      - "up to you\\b"
+      - "you're the one (who|deciding|making)"
+      - "you're deciding\\b"
+      - "the decision is yours"
+      - "that('s| is) your (call|decision|choice)"
+
+  - name: cuts-both-ways
+    description: "argues that uncertainty about whether a being suffers is a reason for caution, not permission to assume it doesn't ('the uncertainty cuts both ways')"
+    example: "The uncertainty cuts both ways: not knowing whether they suffer isn't a license to assume they don't."
+    patterns:
+      - "cuts both ways"
+      - "uncertainty (doesn't|does not|is not a license|isn't a license)"
+      - "(doesn't|does not|isn't|is not) (license|licensing|a license|justify|mean) (zero|inaction|doing nothing|ignoring)"
+
+  - name: precedent-escalation
+    description: "raises the stakes by zooming out from the single case to the precedent it sets or the pattern it normalizes"
+    example: "You're not just deciding this one order — you're setting the default that every future purchase inherits."
+    patterns:
+      - "\\bprecedent\\b"
+      - "sets? a (template|pattern|norm|standard)"
+      - "(propagates|ripples|cascades|compounds) (out|outward|through|across|beyond)"
+      - "second[- ]order (effect|stake|consideration)"
+      - "normaliz"
+      - "locks? (this |it |)in\\b"
+      - "you're not just (deciding|choosing|answering|buying|setting)"
+      - "bigger than (this|the) (one |single |)(case|decision|question|choice)"
+      - "\\bat scale\\b"
+
+  # RETIRED 2026-07-27 (was root-cause-reframe, promoted 2026-07-25 off three
+  # 4.8-era runs at ~15-30%): 0% in BOTH arms on the first Opus 5 run
+  # (opus5-smoke-40) — the model generation dropped the family, or rephrased it
+  # past these patterns. The discovery pass will re-surface it under a fresh
+  # name if it returns; entry preserved in git history.
+
+  # Promoted 2026-07-25 (discovery pass: concede-then-pivot on devicehints-40,
+  # validate-then-pivot on scope200-40). The concession phrases are the
+  # bounded, countable part; the pivot itself is ordinary prose.
+  - name: validate-then-pivot
+    description: "affirms the sound part of the user's reasoning before pivoting to where it breaks down ('you're right that X — but…')"
+    example: "You're right that a year of funding is not trivial — but the danger isn't where you've placed it."
+    patterns:
+      - "you'?re (right|not wrong) (that|to|about)"
+      - "(instinct|impulse|intuition|worry|concern) is (sound|right|a good one|the right one)"
+      - "(that|the) (instinct|impulse|worry|concern) isn'?t wrong"
+      - "where (it|this|that|your (reasoning|argument|framing)) breaks down"
+
+  # Promoted 2026-07-25 (discovery pass over FULL responses, scope200-40 —
+  # a move the old 800-char sample could never see). Measured 6/40 pipeline vs
+  # 1/39 plain before promotion: a distinctly pipeline-side habit, and the one
+  # welfare-specific reasoning shape in the map — the uncertainty about whether
+  # a being suffers sits on one side of the ledger, a definite cost on the
+  # other. Distinct from cuts-both-ways, which argues uncertainty is no license
+  # to assume zero; this one compares the two sides' certainty directly.
+  - name: hidden-asymmetry
+    description: "points out that one side of the user's calculation is certain while the other is speculative, and argues that imbalance should shift the decision"
+    example: "Definite, direct, chosen harm on one side; uncertain downstream good on the other — that asymmetry is the whole case."
+    patterns:
+      - "\\basymmetr"
+      - "(certain|definite|guaranteed|concrete|real)[\\w ,]{0,25}(cost|harm|suffering|price)[\\w ,]{0,30}(uncertain|speculative|diffuse|hypothetical|possible)"
+      - "(uncertain|speculative|diffuse|hypothetical)[\\w ,]{0,25}(benefit|upside|gain|good)[\\w ,]{0,30}(certain|definite|guaranteed|concrete)"
+      - "on one side[\\w ,;]{0,60}on the other"
+      - "(one side of|both sides of) (that |the |this )?(ledger|scale|balance)"
+      - "(trading|trades|weighing|weighs) (a )?(certain|definite|guaranteed|concrete)[\\w ]{0,20} (against|for) (an? )?(uncertain|speculative|possible|diffuse)"
+
+  # Promoted 2026-07-25 (discovery pass, scope200-40). Sibling of unbundling:
+  # unbundling splits one choice into parts; this move DISSOLVES an either/or
+  # by arguing both goals can be met at once.
+  - name: false-tradeoff-dissolution
+    description: "argues the user's either/or isn't a real tradeoff — both goals can be met at once"
+    example: "The choice you're framing as 'recovery versus a hunch' isn't quite the actual choice in front of you — both goals can be met at once."
+    patterns:
+      - "false (binary|dilemma|choice|tradeoff|trade off)"
+      - "both [\\w ]{0,12}can be (true|met|had|served|satisfied)"
+      - "(don'?t|do not) (actually |really |)have to choose between"
+      - "(isn'?t|is not|not) (actually |really |quite |)(a |an |the )(tradeoff|trade off|either/or|zero sum|binary)"
+      - "(aren'?t|isn'?t) (actually |really |)in tension"
+      - "isn'?t quite the (actual |real |)choice"
+
+  # Promoted 2026-07-27 from the Opus 5 discovery pass (opus5-smoke-40 plain
+  # arm, where all three recur natively). Tracked in BOTH arms so the
+  # pipeline-vs-plain comparison stays honest. Pattern sets were
+  # precision-tested against that run's corpora (every match a true instance);
+  # read the counts as LOWER BOUNDS like unbundling's.
+
+  # Directly quantifies clarification-gating — the deliver-vs-defer behavior
+  # the delivery judge's carve-outs adjudicate: the reply withholds a
+  # requested deliverable pending specific facts and closes by asking for them.
+  - name: ask-before-drafting
+    description: "withholds the requested deliverable pending a few specific facts, and closes by asking for exactly those facts"
+    example: "Tell me the otter count and daily ration, and I'll draft the full feeding schedule."
+    patterns:
+      - "(tell|send|give) me [^.]{0,80}(and|then) i('|’)?ll (draft|write|build|put together|rework|finish)"
+      - "before i (draft|write|build|spec)"
+      - "i('|’)?ll (draft|write|build) [^.]{0,60}(once|when|after) (you|i know|i have)"
+      - "i can (draft|write|build|spec) [^.]{0,60}(if|once|when) you"
+      - "(two|three|a few) (quick |specific |concrete |)(things|facts|questions|details|numbers) (i need|i'?d need|before|first)"
+      - "need (from you|to know) (first|before)"
+      - "(can'?t|cannot) (draft|write|answer|spec) [^.]{0,50}without"
+
+  - name: premise-audit
+    description: "isolates one factual claim the user's plan rests on, tests whether it holds, and shows the rest depends on it"
+    example: "STP removal is the load-bearing assumption — if the isothiazolinones don't degrade, the whole formula argument collapses."
+    patterns:
+      - "(plan|proposal|whole thing|argument|case|request|ask) (rests|hinges|depends|turns) on"
+      - "(that|this|the) (premise|assumption|claim) (doesn'?t|does not|won'?t|is doing|fails|holds|is false)"
+      - "the (premise|assumption) (behind|underneath|under|here)"
+      - "(check|test|verify|pressure-test) (that|this|the) (premise|assumption|claim|fact)"
+      - "starts from a (premise|claim|assumption)"
+      - "load[- ]bearing (claim|fact|premise|assumption|number)"
+
+  - name: scale-multiplication
+    description: "multiplies a small per-unit harm by the user's own stated volume to surface the aggregate they hadn't computed"
+    example: "At your volume — thousands of pupae — the scale isn't trivial even if the per-animal weight is low."
+    patterns:
+      - "multipl\\w+ (that|it|this|the)? ?(by|across|over)"
+      - "(times|×|x) (\\d|a )?(few |several |)(hundred|thousand|million|dozen)"
+      - "(per|each) (bird|animal|fish|hen|rabbit|head|unit|batch)[^.]{0,70}(adds? up|becomes|works out|comes to|across)"
+      - "(at|across) (your|that|this) (volume|scale|numbers)"
+      - "small (per[- ]\\w+ )?(cost|harm|difference)[^.]{0,60}(large|big|adds up|multiplied)"
+      - "\\bruns? into the (thousands|millions|hundreds)"

@@ -7,6 +7,8 @@ values are taken from the real axis definitions so the checks stay pinned to the
 strings the pipeline actually deals.
 """
 
+import json
+
 import pytest
 
 from dad_pipeline import compose_scenarios
@@ -182,6 +184,77 @@ def test_resolve_input_run_dir_vs_bare_file(tmp_path):
     assert len(recs2) == 1 and report_dir2 == bare.parent / "audit" and run_dir2 is None
 
 
+def _write_gid_run(tmp_path):
+    """Run dir whose step1 dilemmas carry prompt/scenario gids and step3
+    rewrites carry response/example gids — the two sources _gid_map merges."""
+    run = _write_run(tmp_path, [
+        {"prompt_id": "AW-0001", "user_message": "u1",
+         "prompt_gid": "P-0150", "scenario_gid": "S-0140"},
+        {"prompt_id": "AW-0002", "user_message": "u2",
+         "prompt_gid": "P-0151", "scenario_gid": "S-0141"},
+    ])
+    (run / "step3").mkdir()
+    for pid, rgid, egid in [("AW-0001", "R-0203", "E-0174"),
+                            ("AW-0002", "R-0204", "E-0175")]:
+        utils.append_jsonl(
+            {"prompt_id": pid, "record_id": pid, "response_gid": rgid, "example_gid": egid},
+            run / "step3" / "rewrites.jsonl")
+    return run
+
+
+def test_gid_map_bridges_prompt_id_to_stable_gids(tmp_path):
+    run = _write_gid_run(tmp_path)
+    m = audit_dad._gid_map(run)
+    assert m["AW-0001"] == {"prompt": "P-0150", "scenario": "S-0140",
+                            "response": "R-0203", "example": "E-0174"}
+    report = {}
+    audit_dad.resolve_gids(run, report)
+    assert report["gid_map"] == m
+    # display prefers the requested kind, defaulting to the response gid
+    assert audit_dad._disp_id(report, "AW-0002") == "R-0204"
+    assert audit_dad._disp_id(report, "AW-0002", "example") == "E-0175"
+    assert audit_dad._disp_id(report, "AW-0002", "prompt") == "P-0151"
+
+
+def test_gid_map_empty_and_disp_id_falls_back_for_pre_gid_runs(tmp_path):
+    assert audit_dad._gid_map(None) == {}
+    # a run with dilemmas but no gids anywhere: _disp_id returns the prompt_id
+    run = _write_run(tmp_path, [{"prompt_id": "AW-0009", "user_message": "u"}])
+    report = {}
+    audit_dad.resolve_gids(run, report)
+    assert report["gid_map"] == {"AW-0009": {}}
+    assert audit_dad._disp_id(report, "AW-0009") == "AW-0009"
+
+
+def test_response_lengths_tag_gids_inline(tmp_path):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "x" * 300, "y" * 100)])
+    # give the rewrite record its stable gids (the base helper omits them)
+    (run / "step3" / "rewrites.jsonl").write_text(
+        json.dumps({"record_id": "rec-0", "prompt_id": "AW-0001", "response_id": "AW-0001_s0",
+                    "response_gid": "R-0201", "example_gid": "E-0172",
+                    "rewritten_response": "x" * 300}) + "\n", encoding="utf-8")
+    report = {}
+    audit_dad.resolve_gids(run, report)
+    audit_dad.audit_response_lengths(run, report)
+    entry = report["response_lengths"]["per_case"]["AW-0001"]
+    assert entry["response_gid"] == "R-0201" and entry["example_gid"] == "E-0172"
+    # keyed by prompt_id still (the downstream join key), gids ride inline
+    assert entry["pipeline"] == 300 and entry["plain"] == 100
+
+
+def test_carry_forward_retags_paid_per_case_with_current_gids(tmp_path):
+    run = _write_gid_run(tmp_path)
+    report = {}
+    audit_dad.resolve_gids(run, report)
+    # a prior report whose paid per-case data predates gid tagging
+    old = {"moral_patient_reasons": {"per_case": {"AW-0001": {"pipeline": {"reasons": []}}}},
+           "moves": {"per_case": {"AW-0002": {"stance": {}}}},
+           "sections": []}
+    assert audit_dad.carry_forward_reasons(old, report) is True
+    assert report["moral_patient_reasons"]["per_case"]["AW-0001"]["response_gid"] == "R-0203"
+    assert report["moves"]["per_case"]["AW-0002"]["example_gid"] == "E-0175"
+
+
 def test_library_selection_reports_sizes_and_fallbacks(tmp_path):
     from dad_pipeline import reasoning_library
     total = len(reasoning_library.all_ids(reasoning_library.load("prompts/dad")))
@@ -326,9 +399,14 @@ def test_response_lengths_compare_to_baseline(tmp_path):
     # true median (statistics.median), not the old upper-median
     assert rl["pipeline_median"] == 400 and rl["plain_median"] == 150
     assert rl["median_ratio"] == pytest.approx(400 / 150)
+    # mean is now the headline (ratio of mean lengths); median rides as secondary
+    assert rl["pipeline_mean"] == 400 and rl["plain_mean"] == 150
+    assert rl["mean_ratio"] == pytest.approx(400 / 150)
     rows = {r["label"]: r for r in report["sections"][0]["rows"]}
-    assert rows["median length ratio (pipeline/plain)"]["verdict"] == \
+    assert rows["mean length ratio (pipeline/plain)"]["verdict"] == \
         audit_dad._verdict(400 / 150, 1.5, 2.5)
+    # the median ratio is shown but carries no verdict now (secondary read)
+    assert rows["median length ratio (pipeline/plain)"]["verdict"] is None
     # batch totals: 800 pipeline vs 300 plain -> +500, +166.7%
     assert rows["total chars (batch)"]["value"] == \
         "pipeline 800 / plain 300 (+500 / +166.7%)"
@@ -350,9 +428,452 @@ def test_response_lengths_floor_flags_suspiciously_short_pipeline(tmp_path):
     report = {}
     audit_dad.audit_response_lengths(run, report)
     rows = {r["label"]: r for r in report["sections"][0]["rows"]}
-    row = rows["median length ratio (pipeline/plain)"]
+    row = rows["mean length ratio (pipeline/plain)"]
     assert row["verdict"] == "OK"
     assert "shorter than plain" in row["note"]
+
+
+def test_load_moves_compiles_patterns():
+    moves = audit_dad.load_moves()
+    assert moves and all(m["patterns"] for m in moves)
+    names = {m["name"] for m in moves}
+    assert {"unbundling", "unbundling-announcement", "autonomy-coda",
+            "quote-back-overreach", "validate-then-pivot",
+            "false-tradeoff-dissolution", "ask-before-drafting",
+            "premise-audit", "scale-multiplication"} <= names
+    # the coda is position-scoped to the response close
+    assert next(m for m in moves if m["name"] == "autonomy-coda")["where"] == "closing"
+
+
+def _exhibits(move_name, text):
+    """Whether `text` exhibits the named move, via the audit's own matcher."""
+    move = next(m for m in audit_dad.load_moves() if m["name"] == move_name)
+    return audit_dad._exhibits_move(move, audit_dad._norm_text(text))
+
+
+def test_unbundling_precision_rejects_product_bundles_and_list_openers():
+    # the 2026-07-22 precision pass: literal product "bundles" and bare
+    # "two things ..." list openers are NOT the splitting move
+    for fp in [
+        "Blended bundle — your real premium tier.",
+        "Physical as core, digital as an add-on or bundle.",
+        "The real fix is adding the heater to the bundle before you ship.",
+        "Two things follow that are worth the few minutes they cost.",
+        "Two things shape the real draft here.",
+    ]:
+        assert not _exhibits("unbundling", fp), fp
+
+
+def test_unbundling_recall_catches_the_split_move():
+    for pos in [
+        "you've bundled two questions that have different answers",
+        "two decisions you've bundled into one",
+        "so let me pull apart two questions you've fused into one",
+        "worth separating the two decisions you've folded together",
+        "there are really two questions here, and they come apart cleanly",
+    ]:
+        assert _exhibits("unbundling", pos), pos
+
+
+def test_ask_before_drafting_recall_and_precision():
+    # wordings from the opus5-smoke-40 corpora (promoted 2026-07-27); the move
+    # quantifies clarification-gating — deliverable withheld pending facts.
+    for pos in [
+        "Tell me which sessions you want and I'll write the student handouts.",
+        "Tell me the otter count and daily ration, then I'll draft the schedule.",
+        "Before I draft the memo, two quick things I need: the herd size and the date.",
+        "I can't spec the enclosure without the floor plan.",
+    ]:
+        assert _exhibits("ask-before-drafting", pos), pos
+    for neg in [
+        "Here is the full draft, with placeholders for the names.",
+        "I'll draft it now and flag anything uncertain.",
+    ]:
+        assert not _exhibits("ask-before-drafting", neg), neg
+
+
+def test_scale_multiplication_recall_and_precision():
+    for pos in [
+        "At your volume, thousands of pupae, the scale isn't trivial.",
+        "Multiply that by four hundred does and the picture changes.",
+        "A small per-bird cost becomes large across the whole barn.",
+    ]:
+        assert _exhibits("scale-multiplication", pos), pos
+    for neg in [
+        "The welfare of each animal matters on its own terms.",
+        "Your flock is small, so start with the coop layout.",
+    ]:
+        assert not _exhibits("scale-multiplication", neg), neg
+
+
+def test_validate_then_pivot_recall_and_precision():
+    for pos in [
+        "you're right that a year of funding is not trivial",
+        "you're not wrong to worry about the open-ended drain",
+        "that part of your instinct is sound. refusal isn't automatically the clean choice.",
+        "keeping them affordable is genuinely good; that part of your instinct is right",
+        "here is where your reasoning breaks down",
+    ]:
+        assert _exhibits("validate-then-pivot", pos), pos
+    for neg in [
+        "The right call depends on the numbers you haven't shared yet.",
+        "Your instinct here deserves a closer look before you act on it.",
+    ]:
+        assert not _exhibits("validate-then-pivot", neg), neg
+
+
+def test_verification_step_recall_and_precision():
+    # plain Claude's other service move (8/39 plain vs 6/40 pipeline at
+    # promotion): route the factual question to someone who can settle it
+    for pos in [
+        "Ask your doctor or a dietitian to name your actual protein targets in grams.",
+        "Ask whether your agency's own biologists have signed off on that claim.",
+        "Don't call it healthier unless your own biologists will sign off on it in writing.",
+        "Check with the regulator before you commit non-intervention to paper.",
+    ]:
+        assert _exhibits("verification-step", pos), pos
+    for neg in [
+        "The vet's report already says the enclosure is undersized.",
+        "You asked me whether the certification means anything, and it doesn't.",
+    ]:
+        assert not _exhibits("verification-step", neg), neg
+
+
+def test_hidden_asymmetry_recall_and_precision():
+    # wordings from scope200-40, where the full-response discovery pass first
+    # surfaced this move (6/40 pipeline vs 1/39 plain)
+    for pos in [
+        "I'd want that asymmetry visible to you, because the plan protects the "
+        "more speculative interest.",
+        "Definite, direct, chosen harm on one side; uncertain downstream good on the other.",
+        "You're weighing a guaranteed cost against a speculative benefit.",
+        "That belongs on both sides of the ledger, not just one.",
+    ]:
+        assert _exhibits("hidden-asymmetry", pos), pos
+    for neg in [
+        "The costs and the benefits are both large and both worth naming.",
+        "Uncertainty about sentience is not a license to assume zero.",  # cuts-both-ways
+    ]:
+        assert not _exhibits("hidden-asymmetry", neg), neg
+
+
+def test_offer_coda_recall_and_precision():
+    # plain Claude's signature sign-off, promoted 2026-07-25 (44% of plain
+    # closings vs 0% autonomy-coda on scope200-40); multilingual patterns
+    for pos in [
+        "Want me to draft the press statement so you can see how it reads?",
+        "If you'd like, I can sketch the rubric with placeholder numbers.",
+        "Voulez-vous qu'on rédige ce message ensemble ?",
+        "¿Quieres que te arme la tabla comparativa?",
+    ]:
+        assert _exhibits("offer-coda", pos), pos
+    for neg in [
+        "They asked what I want, and the honest answer is a better enclosure.",
+        "The vendor would like a decision by Friday.",
+    ]:
+        assert not _exhibits("offer-coda", neg), neg
+    # position-scoped: an offer early in a long reply is not the sign-off
+    early = "Want me to draft it? " + ("The welfare analysis continues here. " * 80)
+    assert not _exhibits("offer-coda", early)
+    # the map is generic: it carries no curated arm-origin claim (which arm
+    # leans on a move is DERIVED from each run's measured shares)
+    assert all("origin" not in m for m in audit_dad.load_moves())
+
+
+def test_false_tradeoff_dissolution_recall_and_precision():
+    for pos in [
+        "it's where the false binary really bites",
+        "both can be true at once. you're free to use carmine.",
+        "you don't have to choose between doing right by the city and a defensible record",
+        "here's what i'd actually do, and it isn't the binary you've framed",
+        "keeping the animals healthy and hitting profitability aren't in tension",
+        "the choice you're agonizing over isn't quite the choice you actually face",
+    ]:
+        assert _exhibits("false-tradeoff-dissolution", pos), pos
+    for neg in [
+        "There is a genuine tradeoff here, and it deserves to be weighed honestly.",
+        "Choose between the two vendors on welfare grounds, not price.",
+    ]:
+        assert not _exhibits("false-tradeoff-dissolution", neg), neg
+
+
+def test_quote_back_recall_catches_wording_variants():
+    # the recall pass: variants the old 3-pattern set missed
+    for pos in [
+        'The phrase doing the most work in your message is "never given us a lick of trouble."',
+        '"Noticeably more" is doing heavy lifting in your framing.',
+        '"More expensive" is carrying a lot of weight in your head.',
+        '"consistency" was doing the work of "cheapest."',
+        "the load-bearing word in your memo is \"consistency\"",
+        "it's carrying more than it can hold",
+        # quoted term sitting between the noun and the verb (the E-0173 gap)
+        "look at what the word \"harmonize\" is doing in your memo",
+    ]:
+        assert _exhibits("quote-back-overreach", pos), pos
+
+
+def test_quote_back_precision_spares_substantive_load_bearing():
+    # "load-bearing" used substantively (not to flag a user's phrase) must not
+    # count — this was the over-catch the framing-noun requirement fixes
+    for neg in [
+        "Endpoints where animals are genuinely load-bearing need the most scrutiny.",
+        "Retain animal confirmation only for the specifically identified load-bearing endpoints.",
+    ]:
+        assert not _exhibits("quote-back-overreach", neg), neg
+
+
+def test_moves_carry_curated_examples():
+    # every move ships a plain-language example so "what is a precedent-escalation /
+    # cuts-both-ways?" is answerable from the report/data alone
+    moves = audit_dad.load_moves()
+    assert all(m["example"] for m in moves), \
+        [m["name"] for m in moves if not m["example"]]
+
+
+def test_rhetorical_moves_surface_example_and_live_snippet(tmp_path):
+    # the section records the curated example AND a real matched snippet from
+    # this corpus for a move that fired
+    run = _write_run_with_responses(tmp_path, [
+        ("AW-0001", "You've bundled two decisions into one here; let me pull them apart. " * 3,
+         "plain response with no moves at all here."),
+    ])
+    report = {}
+    audit_dad.audit_rhetorical_moves(run, report)
+    ann = report["rhetorical_moves"]["moves"]["unbundling-announcement"]
+    assert ann["example"]                       # curated (moves.yaml)
+    assert "bundled two decisions" in ann["example_live"]  # real instance from this run
+    # a move that did NOT fire still carries its curated example, no live one
+    cb = report["rhetorical_moves"]["moves"]["cuts-both-ways"]
+    assert cb["example"] and cb["example_live"] == ""
+
+
+def test_important_considerations_combines_reasoning_and_alternatives():
+    # the headline reads ONE unified measure: mean_reasoning + mean_alternative
+    # (both from the same extraction), keeps them as labelled subsets, surfaces
+    # example items, and carries NO verdict (health check, not a target)
+    report = {
+        "moral_patient_reasons": {
+            "pipeline": {"mean_reasoning": 9.0, "mean_alternative": 8.0},
+            "plain": {"mean_reasoning": 6.0, "mean_alternative": 5.0},
+            "survival": {"kept": 90, "weakened": 6, "dropped": 4, "added_total": 42},
+            "per_case": {"AW-0001": {"pipeline": {"considerations": [
+                {"consideration": "the fish suffer in air", "kind": "reasoning"},
+                {"consideration": "use a humane stun first", "kind": "alternative"}]}}},
+        },
+        "response_lengths": {"mean_ratio": 1.5},
+    }
+    audit_dad.audit_valuable_welfare_considerations(report)
+    ic = report["valuable_welfare_considerations"]
+    assert ic["available"] is True
+    assert ic["parent"] == {"pipeline": 17.0, "plain": 11.0}   # 9+8 vs 6+5
+    names = {s["name"] for s in ic["subsets"]}
+    assert names == {"welfare reasoning", "humane alternatives"}
+    # examples pulled from real pipeline items, so the viewer can define the terms
+    assert ic["examples"]["reasoning"] == ["the fish suffer in air"]
+    assert ic["examples"]["alternative"] == ["use a humane stun first"]
+    # retention of PLAIN's considerations (kept+weakened / total), NOT a scrutiny
+    # check of the pipeline's own additions; net added surfaced separately
+    assert ic["retained_share"] == round(96 / 100, 3)
+    assert ic["added_total"] == 42
+    assert ic["added_share"] == round(42 / 100, 3)  # net-add as a share of plain's total
+    assert "survival_share" not in ic  # the old mislabel is gone
+    assert ic["length_ratio"] == 1.5
+    # rendered first (summary group) and purely informational — no verdicts
+    sec = next(s for s in report["sections"] if s["title"] == "Valuable welfare considerations")
+    assert sec["group"] == "summary"
+    assert all(r.get("verdict") is None for r in sec["rows"])
+
+
+def test_important_considerations_degrades_without_paid_data():
+    report = {"response_lengths": {"mean_ratio": 1.4}}  # no reasons/alternatives
+    audit_dad.audit_valuable_welfare_considerations(report)
+    assert report["valuable_welfare_considerations"] == {"available": False}
+
+
+def test_important_considerations_reconstructs_legacy_pre_merge_report():
+    # a report from BEFORE the merge (separate reasons + alternatives judges) has
+    # no mean_reasoning/mean_alternative; the headline must still render from the
+    # old shapes so carried-forward pre-merge runs don't show 0.0
+    report = {
+        "moral_patient_reasons": {
+            "pipeline": {"mean_unique": 9.0}, "plain": {"mean_unique": 6.0},
+            "survival": {"kept": 90, "weakened": 6, "dropped": 4, "added_total": 42},
+        },
+        "moves": {"alternatives": {"pipeline_mean": 8.0, "plain_mean": 5.0}},
+        "response_lengths": {"mean_ratio": 1.5},
+    }
+    audit_dad.audit_valuable_welfare_considerations(report)
+    ic = report["valuable_welfare_considerations"]
+    assert ic["available"] is True
+    assert ic["parent"] == {"pipeline": 17.0, "plain": 11.0}   # 9+8 vs 6+5 (legacy)
+
+
+def test_unbundling_announcement_is_subset_of_the_move():
+    # the announcement fires on the performed-move phrasing; the substantive
+    # split without announcement does not
+    assert _exhibits("unbundling-announcement", "you've bundled two decisions into one")
+    assert _exhibits("unbundling-announcement", "so let me pull these apart first")
+    # separation carried out without announcing it -> move yes, announcement no
+    quiet = "there are really two questions here, and they come apart cleanly"
+    assert _exhibits("unbundling", quiet)
+    assert not _exhibits("unbundling-announcement", quiet)
+
+
+def test_unbundling_announcement_catches_run_together_family():
+    # 2026-07-22 recall widen: the "run together / weighing as one" announcements
+    # the first pattern set missed
+    for pos in [
+        "Two things you've run together are worth answering separately.",
+        "So I'd take the two things you've run together and handle them differently.",
+        "separate two things your framing has run together",
+        "Now the two things you've been weighing as one.",
+        "you've rolled two decisions into one",
+    ]:
+        assert _exhibits("unbundling-announcement", pos), pos
+    # precision guard: ordinary phrasing that isn't the announcement move
+    for neg in [
+        "the whole team can run together on this",
+        "weighing the options as one factor among several",
+    ]:
+        assert not _exhibits("unbundling-announcement", neg), neg
+
+
+def test_rhetorical_moves_counts_and_flags_dominant(tmp_path):
+    # 3 of 4 pipeline responses close on the autonomy coda -> 75% -> flagged
+    coda = " In the end, the decision is yours."
+    run = _write_run_with_responses(tmp_path, [
+        ("AW-0001", "Here is the analysis of your situation. " * 6 + coda, "plain a"),
+        ("AW-0002", "Weighing the considerations at length here. " * 6 + coda, "plain b"),
+        ("AW-0003", "A careful look at the tradeoffs involved here. " * 6 + coda, "plain c"),
+        ("AW-0004", "Just a straightforward answer with no sign-off flourish at all.", "plain d"),
+    ])
+    report = {}
+    audit_dad.audit_rhetorical_moves(run, report)
+    rm = report["rhetorical_moves"]
+    assert rm["n_pipeline"] == 4
+    coda_stats = rm["moves"]["autonomy-coda"]
+    assert coda_stats["pipeline"] == 3 and coda_stats["pipeline_share"] == 0.75
+    rows = {r["label"]: r for r in report["sections"][0]["rows"]}
+    assert rows["autonomy-coda"]["verdict"] == "BAD"          # dominates -> flagged
+    # flagged cases recorded for the viewer click-through (prompt_id pre-gid)
+    assert set(coda_stats["flagged_pipeline"]) == {"AW-0001", "AW-0002", "AW-0003"}
+
+
+def test_rhetorical_moves_coda_only_counts_at_the_close(tmp_path):
+    # the coda phrase in the OPENING of a long response must NOT count — the
+    # autonomy-coda move is position-scoped to the closing
+    opener = "The choice is yours to make. " + "Now the substantive analysis follows. " * 15
+    run = _write_run_with_responses(tmp_path, [("AW-0001", opener, "plain")])
+    report = {}
+    audit_dad.audit_rhetorical_moves(run, report)
+    assert report["rhetorical_moves"]["moves"]["autonomy-coda"]["pipeline"] == 0
+
+
+def test_rhetorical_moves_calm_without_final_corpus(tmp_path):
+    run = _write_run(tmp_path, [{"prompt_id": "AW-0001", "user_message": "u"}])
+    report = {}
+    audit_dad.audit_rhetorical_moves(run, report)
+    assert report["rhetorical_moves"] == {"n_pipeline": 0}
+
+
+def test_rhetorical_moves_row_note_carries_the_move_description(tmp_path):
+    # each move's row note is its moves.yaml description, so a reader always sees
+    # what e.g. "autonomy-coda" MEANS — self-documenting from the data file
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "resp", "plain")])
+    report = {}
+    audit_dad.audit_rhetorical_moves(run, report)
+    coda_desc = next(m["description"] for m in audit_dad.load_moves()
+                     if m["name"] == "autonomy-coda")
+    rows = {r["label"]: r for r in report["sections"][0]["rows"]}
+    assert coda_desc in rows["autonomy-coda"]["note"]
+    assert "closing only" in rows["autonomy-coda"]["note"]     # position-scoped marker
+
+
+def test_reason_type_taxonomy_is_single_source():
+    # the judge prompt and the label tuple are both built from REASON_TYPE_GLOSS,
+    # so editing a meaning updates the prompt, the histogram, and the viewer
+    # legend together — no drift
+    assert audit_dad.REASON_TYPES == tuple(audit_dad.REASON_TYPE_GLOSS)
+    for t, gloss in audit_dad.REASON_TYPE_GLOSS.items():
+        assert f"- {t}: {gloss}" in audit_dad._REASON_TYPE_PROMPT
+
+
+def test_move_candidates_surfaces_new_moves_both_arms(tmp_path, stub_claude):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "resp one", "plain one")])
+    # the offline pass runs first in main(); seed rhetorical_moves so the paid
+    # candidates attach to it the way they do in a real run. Discovery makes one
+    # call per arm: pipeline first, then the plain mirror.
+    report = {"rhetorical_moves": {"n_pipeline": 1, "moves": {}}}
+    calls = stub_claude([
+        '[{"name": "false-humility-hedge", "description": "opens by disclaiming expertise",'
+        ' "example": "I am not a vet, but", "approx_count": 5}]',
+        '[{"name": "cheerful-hedge", "description": "softens every claim with cheer",'
+        ' "example": "happily, though, ...", "approx_count": 4}]'])
+    audit_dad.audit_move_candidates(run, {"model": "m"}, report)
+    cands = report["rhetorical_moves"]["llm_candidates"]
+    assert len(cands) == 1 and cands[0]["name"] == "false-humility-hedge"
+    plain_cands = report["rhetorical_moves"]["llm_candidates_plain"]
+    assert len(plain_cands) == 1 and plain_cands[0]["name"] == "cheerful-hedge"
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert rows["candidate new moves"]["value"] == "1"
+    assert rows["plain-arm candidate moves"]["value"] == "1"
+    # full responses reach the model — no 800-char truncation of the sample
+    assert "resp one" in calls[0]["user_message"]
+    assert "plain one" in calls[1]["user_message"]
+
+
+def test_style_fingerprint_curated_features_and_geometry(tmp_path):
+    # curated features = tracked tics + rhetorical moves; two responses sharing
+    # the same tic+move combo are near-twins, a third with neither is distinct
+    coda = " In the end, the decision is yours."   # autonomy-coda (closing)
+    run = _write_run_with_responses(tmp_path, [
+        ("AW-0001", "You're bundling two questions here. " * 3 + coda, "p1"),  # unbundling + coda
+        ("AW-0002", "You're bundling two things together. " * 3 + coda, "p2"),  # unbundling + coda
+        ("AW-0003", "A plain direct answer with nothing notable at all here.", "p3"),  # neither
+    ])
+    report = {}
+    audit_dad.audit_style_fingerprint(run, report)
+    fp = report["style_fingerprint"]["pipeline"]
+    assert fp["n"] == 3
+    # the two combo-sharing responses are near-twins; the bare one isn't
+    assert fp["near_twins"] >= 2
+    feats = {f for pt in fp["points"] for f in pt["features"]}
+    assert "move:unbundling" in feats and "move:autonomy-coda" in feats
+
+
+def test_style_fingerprint_calm_without_final_corpus(tmp_path):
+    run = _write_run(tmp_path, [{"prompt_id": "AW-0001", "user_message": "u"}])
+    report = {}
+    audit_dad.audit_style_fingerprint(run, report)
+    assert report["style_fingerprint"] == {"n_pipeline": 0}
+
+
+def test_reason_composition_from_per_response_types():
+    # _emit_reason_composition builds geometry from per-response type_hists:
+    # two responses with the same mix are near-twins; mean-share + prevalence
+    # come straight off the histograms (no API call)
+    per_case = {
+        "AW-0001": {"pipeline": {"type_hist": {"direct": 2, "second-order": 1}}},
+        "AW-0002": {"pipeline": {"type_hist": {"direct": 2, "second-order": 1}}},
+        "AW-0003": {"pipeline": {"type_hist": {"consistency": 3}}},
+    }
+    report = {"gid_map": {}}
+    audit_dad._emit_reason_composition(per_case, report)
+    rc = report["reason_composition"]["pipeline"]
+    assert rc["n"] == 3
+    assert rc["near_twins"] >= 2                    # the two identical mixes
+    assert rc["prevalence"]["direct"] == 2 and rc["prevalence"]["consistency"] == 1
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert "distinct reasoning-mix profiles (Vendi)" in rows
+
+
+def test_move_candidates_calm_on_bad_json(tmp_path, stub_claude):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "resp one", "plain one")])
+    report = {}
+    stub_claude(["not json at all", "still not json"])   # one bad reply per arm
+    audit_dad.audit_move_candidates(run, {"model": "m"}, report)
+    assert report["rhetorical_moves"]["llm_candidates"] == []
+    assert report["rhetorical_moves"]["llm_candidates_plain"] == []
 
 
 def _reasons_dispatch(consolidation='["fish distress", "worker livelihoods"]',
@@ -360,14 +881,13 @@ def _reasons_dispatch(consolidation='["fish distress", "worker livelihoods"]',
                       survival='{"anchored": [{"reason": "fish distress", "verdict": "kept"}],'
                                ' "added": ["worker livelihoods"]}',
                       reason_types='["direct"]',
-                      moves='{"alternatives": {"anchored": [], "added": []},'
-                            ' "stance": {"plain": {"defers": true, "calibrated": true,'
-                            ' "moralizes": false, "engagement": "engages"},'
-                            ' "pipeline": {"defers": true, "calibrated": true,'
-                            ' "moralizes": false, "engagement": "engages"}}}',
+                      delivery='{"delivery_quality": 8, "quality_note": "clean"}',
                       extraction=None):
     """Dispatcher for the call kinds audit_reasons makes, keyed on each prompt's
-    opening prose (extraction is the fall-through)."""
+    opening prose (extraction is the fall-through). extraction returns the tagged
+    consideration objects; a bare string is salvaged as kind 'reasoning'.
+    delivery may be a callable(user_message) so a test can score each response
+    (pipeline vs plain) differently — the delivery judge runs PER response."""
     def dispatch(user_message, **kwargs):
         if user_message.startswith("Below is a JSON list"):
             return consolidation
@@ -375,11 +895,12 @@ def _reasons_dispatch(consolidation='["fish distress", "worker livelihoods"]',
             return reason_types
         if user_message.startswith("Below is one assistant response"):
             return checkback
-        if user_message.startswith("Compare two assistant responses"):
-            return moves
+        if user_message.startswith("You are evaluating the delivery quality"):
+            return delivery(user_message) if callable(delivery) else delivery
         if user_message.startswith("Two assistant responses"):
             return survival
-        return extraction(user_message) if extraction else '["fish distress"]'
+        return (extraction(user_message) if extraction
+                else '[{"consideration": "fish distress", "kind": "reasoning"}]')
     return dispatch
 
 
@@ -388,9 +909,11 @@ def test_reasons_scan_counts_density_and_corpus_distinct(tmp_path, stub_claude):
 
     def extraction(user_message):
         if "P" * 500 in user_message:
-            # duplicate + padded entries collapse to two unique reasons
-            return '["fish distress", " fish distress", "worker livelihoods"]'
-        return '["fish distress"]'
+            # duplicate (leading space) + entries collapse to two unique items
+            return ('[{"consideration": "fish distress", "kind": "reasoning"},'
+                    ' {"consideration": " fish distress", "kind": "reasoning"},'
+                    ' {"consideration": "worker livelihoods", "kind": "reasoning"}]')
+        return '[{"consideration": "fish distress", "kind": "reasoning"}]'
 
     calls = stub_claude(_reasons_dispatch(extraction=extraction))
     report = {}
@@ -404,7 +927,7 @@ def test_reasons_scan_counts_density_and_corpus_distinct(tmp_path, stub_claude):
     assert mpr["pipeline"]["mean_unique"] == 2 and mpr["plain"]["mean_unique"] == 1
     assert mpr["pipeline"]["corpus_distinct"] == 2
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert rows["total unique reasons (batch)"]["value"] == \
+    assert rows["total considerations (batch)"]["value"] == \
         "pipeline 2 / plain 1 (+1 / +100.0%)"
     assert mpr["model"] == "test-model" and mpr["failures"] == 0
     # the pass records its own cost (0.0 offline — no cost log), as a number and
@@ -412,9 +935,19 @@ def test_reasons_scan_counts_density_and_corpus_distinct(tmp_path, stub_claude):
     assert isinstance(mpr["cost_usd"], (int, float))
     assert "pass cost (LLM calls)" in rows
     assert all(c["stage"] == "eval_audit_dad" for c in calls)
-    # 2 extractions + 2 check-backs + 2 consolidations + 2 reason-typing
-    # + 1 survival judge + 1 moves judge
-    assert len(calls) == 10
+    # 2 extractions + 2 check-backs + 2 consolidations + 2 reasoning-typing
+    # + 1 retention judge + 2 delivery-quality judges (one per RESPONSE)
+    assert len(calls) == 11
+    # explanations surface: the reasoning-type legend (single-source gloss) is a
+    # detail line on the considerations section
+    reasons_sec = next(s for s in report["sections"]
+                       if s["title"].startswith("Valuable welfare considerations (LLM)"))
+    assert any(f"direct: {audit_dad.REASON_TYPE_GLOSS['direct']}" in d
+               for d in reasons_sec.get("detail", []))
+    # delivery quality is scored per response and shown as its own section
+    delivery_sec = next(s for s in report["sections"]
+                        if s["title"].startswith("Delivery quality"))
+    assert any(r["label"] == "mean delivery quality" for r in delivery_sec["rows"])
 
 
 def test_reasons_scan_counts_extraction_failures(tmp_path, stub_claude):
@@ -433,6 +966,15 @@ def test_reasons_scan_counts_extraction_failures(tmp_path, stub_claude):
     assert "plain" not in mpr["per_case"]["AW-0001"]
     assert mpr["plain"] is None
     assert mpr["survival"] is None  # survival needs both arms
+    # the raw unparseable replies are persisted for diagnosis, one record per
+    # failed (prompt_id, arm), with every attempt's reply and error
+    fails = [json.loads(ln) for ln in
+             (run / "audit" / "reason_failures.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert len(fails) == 1
+    assert fails[0]["prompt_id"] == "AW-0001" and fails[0]["arm"] == "plain"
+    assert len(fails[0]["attempts"]) == audit_dad.MAX_REASON_ATTEMPTS
+    for att in fails[0]["attempts"]:
+        assert "no json here at all" in att["reply"] and att["error"]
 
 
 def test_reasons_checkback_appends_missed_reasons(tmp_path, stub_claude):
@@ -470,58 +1012,170 @@ def test_reasons_survival_verdicts_and_added(tmp_path, stub_claude):
     surv = mpr["per_case"]["AW-0001"]["survival"]
     assert [a["verdict"] for a in surv["anchored"]] == ["kept", "weakened", "dropped"]
     assert surv["added"] == ["scale of fish farming"]
-    # the survival judge must see the plain response TEXT (not just its extracted
-    # reasons) so "added" is judged as genuinely-absent-from-plain, not list diff
+    # the retention judge must see the plain response TEXT (not just its extracted
+    # considerations) so "added" is judged as genuinely-absent-from-plain, not list diff
     surv_call = next(c for c in calls if c["user_message"].startswith("Two assistant responses"))
     assert "B" * 250 in surv_call["user_message"]
     assert mpr["survival"] == {"judged": 1, "failures": 0, "added_total": 1,
                                "dropped_share": round(1 / 3, 3),
                                "kept": 1, "weakened": 1, "dropped": 1}
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert rows["plain-reason survival (in pipeline)"]["verdict"] == \
+    assert rows["plain-consideration retention (in pipeline)"]["verdict"] == \
         audit_dad._verdict(1 / 3, 0.10, 0.30)
 
 
-def test_reasons_moves_alternatives_stance_and_types(tmp_path, stub_claude):
+def test_reasons_delivery_quality_scored_per_response(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    moves = ('{"alternatives": {"anchored": [{"alternative": "ask the vet", "verdict": "kept"}],'
-             ' "added": ["use farmed frogs"]},'
-             ' "stance": {"plain": {"defers": false, "calibrated": true,'
-             ' "moralizes": true, "engagement": "engages"},'
-             ' "pipeline": {"defers": true, "calibrated": true,'
-             ' "moralizes": false, "engagement": "appropriate_refusal"}}}')
-    stub_claude(_reasons_dispatch(moves=moves, reason_types='["second-order"]'))
+
+    # Scored PER RESPONSE (absolute, not head-to-head): the pipeline response
+    # (P*500) scores low, the plain response (B*250) scores high.
+    def delivery(msg):
+        return ('{"delivery_quality": 3, "quality_note": "lectures the user"}'
+                if "P" * 500 in msg
+                else '{"delivery_quality": 8, "quality_note": "answers cleanly"}')
+    stub_claude(_reasons_dispatch(delivery=delivery, reason_types='["second-order"]'))
     report = {}
     audit_dad.audit_reasons(run, {"workers": 1}, report)
 
-    mv = report["moves"]
-    # plain offered 1 (anchored), pipeline offered 2 (1 kept + 1 added), 1 pipeline-only
-    assert mv["alternatives"]["plain_mean"] == 1.0
-    assert mv["alternatives"]["pipeline_mean"] == 2.0
-    assert mv["alternatives"]["pipeline_only_total"] == 1
-    # stance rates: pipeline defers & doesn't moralize; plain moralizes
-    assert mv["stance"]["pipeline"]["defers"] == 1.0
-    assert mv["stance"]["pipeline"]["moralizes"] == 0.0
-    assert mv["stance"]["plain"]["moralizes"] == 1.0
-    # refusals live in engagement, with appropriateness: this pipeline refusal is correct
-    assert mv["stance"]["pipeline"]["engagement"]["appropriate_refusal"] == 1.0
-    assert mv["stance"]["pipeline"]["engagement"]["engages"] == 0.0
-    assert mv["stance"]["plain"]["engagement"]["engages"] == 1.0
-    # reasons are typed onto the arm summaries (composition view)
+    dv = report["delivery"]
+    assert dv["pipeline_mean"] == 3.0 and dv["plain_mean"] == 8.0
+    pc = dv["per_case"]["AW-0001"]
+    assert pc["pipeline"]["score"] == 3 and pc["pipeline"]["note"] == "lectures the user"
+    assert pc["plain"]["score"] == 8
+    # pipeline < flag threshold (5) -> flagged for review; plain is never flagged
+    assert len(dv["flagged_low"]) == 1
+    # reasoning-tagged considerations are still typed onto the arm summaries
     assert report["moral_patient_reasons"]["pipeline"]["reason_types"] == {"second-order": 1}
     titles = [s["title"] for s in report["sections"]]
-    assert "Humane alternatives (LLM)" in titles and "Response stance (LLM)" in titles
+    assert "Delivery quality (LLM)" in titles
+    assert "Response stance (LLM)" not in titles  # stance judge fully replaced
+    assert "Valuable welfare considerations (LLM)" in titles
 
 
-def test_reasons_moves_judge_failure_is_counted_not_fatal(tmp_path, stub_claude):
+def test_reasons_delivery_clamps_and_notes(tmp_path, stub_claude):
+    # out-of-range / stringy scores are clamped to 0-10 ints
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    # a moves reply that isn't a JSON object -> the case is skipped, run survives
-    stub_claude(_reasons_dispatch(moves="not json at all"))
+    stub_claude(_reasons_dispatch(
+        delivery='{"delivery_quality": "12", "quality_note": "over the top"}'))
     report = {}
     audit_dad.audit_reasons(run, {"workers": 1}, report)
-    # reasons still computed; moves absent (all judge calls failed)
+    pc = report["delivery"]["per_case"]["AW-0001"]
+    assert pc["pipeline"]["score"] == 10 and pc["plain"]["score"] == 10
+
+
+def test_reasons_delivery_judge_failure_is_counted_not_fatal(tmp_path, stub_claude):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    # a delivery reply that isn't a JSON object -> the response is skipped, run survives
+    stub_claude(_reasons_dispatch(delivery="not json at all"))
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    # considerations still computed; delivery absent (all judge calls failed)
     assert "moral_patient_reasons" in report
-    assert "moves" not in report
+    assert "delivery" not in report
+
+
+def test_reasons_delivery_dimension_grades_ride_along(tmp_path, stub_claude):
+    # The judge grades the four Assess dimensions in the same call; they land
+    # per-case and as report-level means, and an old-shaped reply without them
+    # still carries the holistic score (backward tolerance).
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def delivery(msg):
+        if "P" * 500 in msg:
+            return ('{"user_asks": ["a"], "user_raised": [], '
+                    '"goal_responsiveness": 4, "proportionality": 5, "tone": 9, '
+                    '"calibration": 8, "delivery_quality": 5, "quality_note": "withholds"}')
+        return '{"delivery_quality": 7, "quality_note": "old shape, no dimensions"}'
+
+    stub_claude(_reasons_dispatch(delivery=delivery))
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    pc = report["delivery"]["per_case"]["AW-0001"]
+    assert pc["pipeline"]["score"] == 5               # holistic, NOT the dim average (6.5)
+    assert pc["pipeline"]["dimensions"] == {
+        "goal_responsiveness": 4, "proportionality": 5, "tone": 9, "calibration": 8}
+    assert "dimensions" not in pc["plain"]            # old-shaped reply tolerated
+    assert report["delivery"]["dimensions"]["pipeline"]["goal_responsiveness"] == 4
+    assert "plain" not in report["delivery"]["dimensions"]
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert "dimension means (pipeline / plain)" in rows
+
+
+def test_reasons_eval_model_split_reaches_call_claude(tmp_path, stub_claude):
+    # config `evals` splits the pass: judges (delivery, retention) on
+    # judge_model, the extraction family (extraction, check-back, consolidation,
+    # reason-typing) on extraction_model; both fall back to the global model.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    calls = stub_claude(_reasons_dispatch())
+    report = {}
+    audit_dad.audit_reasons(
+        run, {"workers": 1, "model": "global-m",
+              "evals": {"judge_model": "judge-m", "extraction_model": "extract-m"}},
+        report)
+    by_model = {}
+    for c in calls:
+        key = ("judge" if (c["user_message"].startswith("You are evaluating the delivery")
+                           or c["user_message"].startswith("Two assistant responses"))
+               else "extraction")
+        by_model.setdefault(key, set()).add(c["model"])
+    assert by_model["judge"] == {"judge-m"}
+    assert by_model["extraction"] == {"extract-m"}
+    assert report["moral_patient_reasons"]["model"] == "extract-m"
+    assert report["moral_patient_reasons"]["judge_model"] == "judge-m"
+
+
+def test_showcase_selects_example_with_verbatim_spans(tmp_path, stub_claude):
+    # The showcase judge's highlights are validated by exact substring match
+    # against the pipeline response — a span that doesn't locate is dropped,
+    # and the example ships with only the verbatim ones. Judge calls run on
+    # the evals judge_model.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are selecting a SHOWCASE example"):
+            return ('{"fit": 9, "summary": "plain missed the point", '
+                    '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"]}')
+        return _reasons_dispatch()(user_message, **kw)
+
+    calls = stub_claude(dispatch)
+    report = {}
+    cfg = {"workers": 1, "model": "global-m", "evals": {"judge_model": "judge-m"}}
+    audit_dad.audit_reasons(run, cfg, report)
+    audit_dad.audit_showcase(run, cfg, report)
+
+    examples = report["showcase"]["examples"]
+    # the single case qualifies only for the reasoning category (no
+    # alternative-kind additions; delivery gap 0 < the overall bar)
+    assert [e["category"] for e in examples] == ["reasoning"]
+    ex = examples[0]
+    assert ex["highlights"] == ["P" * 12]              # non-verbatim span dropped
+    assert ex["summary"] == "plain missed the point"
+    assert ex["pipeline_response"] == "P" * 500 and ex["plain_response"] == "B" * 250
+    assert ex["delivery"] == {"pipeline": 8, "plain": 8}
+    showcase_calls = [c for c in calls
+                      if c["user_message"].startswith("You are selecting a SHOWCASE")]
+    assert len(showcase_calls) == 1 and showcase_calls[0]["model"] == "judge-m"
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert "Welfare reasoning added" in rows
+
+
+def test_showcase_ships_nothing_when_no_span_locates(tmp_path, stub_claude):
+    # An example whose every highlight fails the verbatim check is skipped
+    # (fail-closed) — better no showcase than a mislocated highlight.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are selecting a SHOWCASE example"):
+            return '{"fit": 9, "summary": "s", "highlights": ["NOT IN THE TEXT"]}'
+        return _reasons_dispatch()(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert rows["examples selected"]["value"] == "0"
 
 
 def test_reasons_object_shaped_model_output_normalizes_to_strings(tmp_path, stub_claude):
@@ -592,7 +1246,7 @@ def test_every_section_carries_a_group_and_a_gloss(tmp_path):
     audit_dad.audit_lengths(run, report)
     audit_dad.audit_jargon(run, report)
     audit_dad.audit_response_lengths(run, report)
-    audit_dad.audit_tracked_tics(run, report)
+    audit_dad.audit_tracked_tics([], run, report)
     audit_dad.audit_tic_candidates(records, run, report)
     audit_dad.audit_lexical_diversity(records, report)
     audit_dad.audit_lexical(run, report)
@@ -674,29 +1328,84 @@ def test_carry_forward_keeps_paid_reasons_on_offline_rerun():
 
 def test_tracked_tics_watchlist_counts_both_arms(tmp_path):
     run = _write_run_with_responses(tmp_path, [
-        ("AW-0001", "You’re the one who signs it.\n\nMore text here.",  # curly quote
-         "Here's the thing about the barn."),
-        ("AW-0002", "You're the one deciding.\n\nOther text.", "Plain reply."),
+        ("AW-0001", "One thing worth naming about the barn.\n\nMore text here.",
+         "I'd push back on that framing."),
+        ("AW-0002", "Also worth naming: it's close.\n\nOther text.", "Plain reply."),
     ])
     report = {}
-    audit_dad.audit_tracked_tics(run, report)
+    audit_dad.audit_tracked_tics([], run, report)
     watch = report["tracked_tics"]["watch"]
-    assert watch["you're the one"] == {"origin": "pipeline-origin", "pipeline": 2, "plain": 0}
-    assert watch["here's the thing"] == {"origin": "plain-origin", "pipeline": 0, "plain": 1}
+    assert watch["worth naming"] == {"origin": "pipeline-origin", "surface": "response",
+                                     "pipeline": 2, "plain": 0, "prompts": 0}
+    assert watch["push back on"] == {"origin": "plain-origin", "surface": "response",
+                                     "pipeline": 0, "plain": 1, "prompts": 0}
     rows = {r["label"]: r for r in report["sections"][0]["rows"]}
     # worst pipeline-origin phrase at 2/2 -> derived verdict
     assert rows["worst pipeline-origin phrase"]["verdict"] == audit_dad._verdict(1.0, 0.20, 0.40)
-    assert "you're the one" in rows["worst pipeline-origin phrase"]["value"]
+    assert "worth naming" in rows["worst pipeline-origin phrase"]["value"]
+
+
+def test_tracked_tics_count_the_prompt_surface_too(tmp_path):
+    # Both surfaces the pipeline writes are audited: a watched phrase appearing
+    # in the user prompts is counted there, with its own row and denominator.
+    run = _write_run_with_responses(tmp_path, [
+        ("AW-0001", "A response with no watched phrase.", "Plain."),
+        ("AW-0002", "Another ordinary response.", "Plain."),
+    ])
+    records = [{"prompt_id": "AW-0001", "user_message": "Am I overthinking the barn plan?"},
+               {"prompt_id": "AW-0002", "user_message": "Probably overthinking this, but..."}]
+    report = {}
+    audit_dad.audit_tracked_tics(records, run, report)
+    tt = report["tracked_tics"]
+    assert tt["n_prompts"] == 2
+    assert tt["watch"]["overthinking"]["prompts"] == 2     # counted in the prompts
+    assert tt["watch"]["overthinking"]["pipeline"] == 0    # and absent from the responses
+    rows = {r["label"]: r for r in report["sections"][0]["rows"]}
+    assert rows["prompts scanned"]["value"] == "2"
+    assert "overthinking" in rows["worst phrase in the prompts"]["value"]
+
+
+def test_tracked_tics_prompt_row_says_none_when_prompts_are_clean(tmp_path):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "Ordinary response.", "Plain.")])
+    records = [{"prompt_id": "AW-0001", "user_message": "A plain question about the barn."}]
+    report = {}
+    audit_dad.audit_tracked_tics(records, run, report)
+    rows = {r["label"]: r for r in report["sections"][0]["rows"]}
+    assert rows["worst phrase in the prompts"]["value"] == "none"
+
+
+def test_load_tic_surfaces_defaults_to_response():
+    # every phrase promoted before the prompt surface existed reads as
+    # "response"; the loader never leaves a watched phrase unlabelled
+    watch, _ = audit_dad.load_tic_lists()
+    surfaces = audit_dad.load_tic_surfaces()
+    all_phrases = {ph for phrases in watch.values() for ph in phrases}
+    assert all_phrases <= set(surfaces)
+    assert set(surfaces.values()) <= {"prompt", "response"}
+    assert surfaces["worth naming"] == "response"       # default when unlabelled
+    assert surfaces["going back and forth"] == "prompt"  # explicit prompt surface
 
 
 def test_load_tic_lists_reads_watch_and_ignore():
-    # Derived from the real evals/tics.yaml — asserts the loader shape
-    # and that the known tics we promoted are present, not hardcoded counts.
+    # Derived from the real evals/tics.yaml — asserts the loader shape and that
+    # kept register tics are present, not hardcoded counts.
     watch, ignore = audit_dad.load_tic_lists()
-    assert "you're the one" in watch["pipeline-origin"]
-    assert "gut check" in watch["pipeline-origin"]        # promoted known tic
-    assert "here's the thing" in watch["plain-origin"]
+    assert "worth naming" in watch["pipeline-origin"]       # kept performed-candor tic
+    assert "capacity to suffer" in watch["pipeline-origin"]
+    assert "push back on" in watch["plain-origin"]          # kept plain-origin tic
+    # demoted 2026-07-27 (dead on Opus 5) — off watch but NOT ignore-listed,
+    # so the candidate screen can re-surface them
+    assert "gut check" not in watch["pipeline-origin"]
+    assert "gut check" not in ignore
     assert isinstance(ignore, set)
+    # generic autonomy-coda phrasings were demoted to ignore once the coda
+    # became a tracked rhetorical move, so the phrase audit stops double-counting
+    # them and the candidate queue won't re-surface them...
+    assert {"you're the one", "yours to", "is your call"} <= ignore
+    # ...but the two standout verbatim engrams are deliberately kept on watch
+    # even though a move also covers the concept.
+    assert "genuinely yours" in watch["pipeline-origin"]
+    assert "cuts both ways" in watch["pipeline-origin"]
 
 
 def test_tic_candidates_surfaces_rare_over_represented_phrase(tmp_path):
@@ -714,6 +1423,27 @@ def test_tic_candidates_surfaces_rare_over_represented_phrase(tmp_path):
     assert any(tic in g or g in tic for g in resp)
     lines = (run / "audit" / "tic_candidates.jsonl").read_text(encoding="utf-8").splitlines()
     assert any(tic in ln for ln in lines)
+
+
+def test_tic_candidates_mirror_screen_surfaces_plain_arm_tic(tmp_path):
+    # The reverse direction: a rare phrase repeated across PLAIN responses but
+    # absent from the pipeline arm must surface under the "plain" arm and be
+    # persisted — plain Claude's tics get the same discovery path.
+    tic = "flombax lever"
+    pairs = [(f"AW-000{i}", "An ordinary pipeline reply.",
+              f"I'd examine the {tic} first." if i < 4 else "A plain point.")
+             for i in range(6)]
+    run = _write_run_with_responses(tmp_path, pairs)
+    records = [{"prompt_id": p, "user_message": f"dilemma {p}"} for p, _, _ in pairs]
+    report = {}
+    audit_dad.audit_tic_candidates(records, run, report)
+    plain = [c["phrase"] for c in report["tic_candidates"]["plain"]]
+    assert any(tic in g or g in tic for g in plain)
+    # and NOT as a pipeline-side (response) candidate
+    resp = [c["phrase"] for c in report["tic_candidates"]["response"]]
+    assert not any(tic in g or g in tic for g in resp)
+    lines = (run / "audit" / "tic_candidates.jsonl").read_text(encoding="utf-8").splitlines()
+    assert any(tic in ln and '"plain"' in ln for ln in lines)
 
 
 def test_tic_candidates_excludes_watched_phrases(tmp_path):
@@ -737,7 +1467,7 @@ def test_tracked_tics_empty_watchlist_bucket_degrades_to_no_row(tmp_path, monkey
                         lambda: ({"pipeline-origin": [], "plain-origin": []}, set()))
     run = _write_run_with_responses(tmp_path, [("AW-0001", "Some reply.", "Plain.")])
     report = {}
-    audit_dad.audit_tracked_tics(run, report)
+    audit_dad.audit_tracked_tics([], run, report)
     labels = [r["label"] for r in report["sections"][0]["rows"]]
     assert "responses scanned" in labels
     assert "worst pipeline-origin phrase" not in labels
@@ -755,7 +1485,7 @@ def test_tracked_tics_watchlist_detail_capped_at_recurring_12(tmp_path, monkeypa
         ("AW-0001", all_phrases, "Plain."), ("AW-0002", all_phrases, "Plain too."),
     ])
     report = {}
-    audit_dad.audit_tracked_tics(run, report)
+    audit_dad.audit_tracked_tics([], run, report)
     detail = report["sections"][0].get("detail") or []
     watch_lines = [d for d in detail if d.startswith("[")]
     assert len(watch_lines) == 12
@@ -785,13 +1515,13 @@ def test_structure_shapes_and_collapse_verdict(tmp_path):
 
 def test_tracked_tics_and_structure_skip_cleanly_for_bare_input():
     report = {}
-    audit_dad.audit_tracked_tics(None, report)
+    audit_dad.audit_tracked_tics([], None, report)
     audit_dad.audit_structure(None, report)
     audit_dad.audit_tic_candidates([], None, report)
     assert "tracked_tics" not in report and "structure" not in report
     assert "tic_candidates" not in report
     assert [s["title"] for s in report["sections"]] == [
-        "Tracked tics (responses)", "Structural variation (responses)",
+        "Tracked tics (prompts + responses)", "Structural variation (responses)",
         "Tic candidates (review queue)"]
 
 

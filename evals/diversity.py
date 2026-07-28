@@ -136,6 +136,36 @@ def record_id(rec: dict, index: int) -> str:
             or rec.get("record_id") or f"row{index}")
 
 
+def scope_id(rec: dict, scope: str, fallback: str, prompt_gids: dict) -> str:
+    """The stable id to LABEL a record with in a given scope, so the cloud hover
+    names what the dot actually is: the response gid (R-) for the responses
+    scope, the prompt gid (P-) for the prompts scope, the example gid (E-, the
+    `fallback`) for the combined/document scope. Falls back to `fallback` when
+    the scope's own gid is unavailable (e.g. non-DAD records)."""
+    if scope == "responses":
+        return rec.get("response_gid") or fallback
+    if scope == "prompts":
+        return prompt_gids.get(rec.get("record_id")) or fallback
+    return fallback
+
+
+def dad_prompt_gids(run_dir: Path) -> dict:
+    """record_id -> prompt gid (P-), joined final→step3 (record_id→prompt_id)
+    →step1 (prompt_id→prompt_gid); {} for non-DAD runs or missing stages. The
+    final corpus carries example_gid/response_gid but not the prompt gid, so the
+    prompts-scope cloud needs this two-hop lookup to label dots P- not E-."""
+    try:
+        pid_by_rec = {r["record_id"]: r["prompt_id"]
+                      for r in utils.load_jsonl(run_dir / "step3" / "rewrites.jsonl")
+                      if r.get("record_id") and r.get("prompt_id")}
+        pgid_by_pid = {d["prompt_id"]: d["prompt_gid"]
+                       for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")
+                       if d.get("prompt_id") and d.get("prompt_gid")}
+    except (OSError, KeyError):
+        return {}
+    return {rec: pgid_by_pid[pid] for rec, pid in pid_by_rec.items() if pid in pgid_by_pid}
+
+
 def stride_sample(items: list, cap: int) -> list:
     """Deterministic stride sample (same scheme as audit_sdf's --dup-sample)."""
     if len(items) <= cap:
@@ -246,12 +276,14 @@ def vendi_score(X: np.ndarray) -> float:
 
 
 def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
-                    iters: int = 60) -> dict:
+                    iters: int = 60, return_labels: bool = False):
     """Topic evenness, the CaML-report analog: k-means over the (unit) doc
     embeddings, then the normalized entropy of cluster sizes (1.0 = topics
     perfectly even) and the largest cluster's share. Plain numpy k-means++
     (cosine via normalized centroids) — no new dependency; deterministic via
-    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k)."""
+    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k).
+    return_labels=True returns (stats, labels) so callers can say WHAT is in
+    each cluster; the default stays the bare stats dict."""
     n = len(X)
     if k is None:
         k = min(50, max(2, n // 5))
@@ -280,9 +312,33 @@ def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
     sizes = sizes[sizes > 0]
     p = sizes / sizes.sum()
     evenness = float(-(p * np.log(p)).sum() / np.log(len(p))) if len(p) > 1 else 0.0
-    return {"k": int(k), "clusters_nonempty": int(len(p)),
-            "evenness": round(evenness, 3), "largest_share": round(float(p.max()), 4),
-            "sizes": sorted((int(s) for s in sizes), reverse=True)}
+    stats = {"k": int(k), "clusters_nonempty": int(len(p)),
+             "evenness": round(evenness, 3), "largest_share": round(float(p.max()), 4),
+             "sizes": sorted((int(s) for s in sizes), reverse=True)}
+    return (stats, labels) if return_labels else stats
+
+
+def _cluster_detail(ids: list, texts: list, X: np.ndarray, labels: np.ndarray,
+                    snippet_width: int = 140) -> list[dict]:
+    """What each cluster IS: one entry per nonempty cluster, largest first
+    (aligned with the sorted `sizes` list and the viewer's topic-spread bars).
+    Each carries the cluster size, its member ids, and the most CENTRAL member
+    (highest cosine to the cluster centroid) as a representative snippet — an
+    honest, offline answer to "what is cluster 1?" without a paid labeling
+    call. Clusters are unlabeled k-means groups; the representative is a
+    typical member, not a title."""
+    out = []
+    for lab in sorted(set(labels.tolist())):
+        idx = np.where(labels == lab)[0]
+        centroid = X[idx].mean(axis=0)
+        norm = float(np.linalg.norm(centroid)) or 1.0
+        rep = idx[int(np.argmax(X[idx] @ (centroid / norm)))]
+        out.append({"size": int(len(idx)),
+                    "rep_id": ids[rep],
+                    "rep": _snippet(texts[rep], snippet_width),
+                    "ids": [ids[i] for i in idx]})
+    out.sort(key=lambda d: -d["size"])
+    return out
 
 
 def pca_coords(X: np.ndarray) -> np.ndarray:
@@ -498,6 +554,9 @@ def main() -> None:
     ids = [rid for rid, _, _ in sampled]
     texts = [text[: args.max_chars] for _, text, _ in sampled]
     recs = [r for _, _, r in sampled]
+    # record_id -> prompt gid (P-), so the prompts-scope cloud labels dots P-
+    # not the example gid E- (the final corpus lacks the prompt gid).
+    prompt_gids = dad_prompt_gids(report_dir.parent)
     if len(texts) < 2:
         raise SystemExit("Need at least 2 non-empty documents for diversity metrics.")
 
@@ -593,6 +652,8 @@ def main() -> None:
     def _scope_block(s_ids: list, s_texts: list, S: np.ndarray) -> dict:
         s_sims, _ = nearest_neighbors(S)
         s_cloud = pca_coords(S)
+        s_clusters, s_labels = kmeans_evenness(S, return_labels=True)
+        s_clusters["detail"] = _cluster_detail(s_ids, s_texts, S, s_labels)
         return {
             "n": len(s_ids),
             "nn_sims": [round(float(v), 3) for v in s_sims],
@@ -600,7 +661,7 @@ def main() -> None:
                      for t in (0.80, 0.90, 0.95)},
             "mean_pairwise_cosine": round(mean_pairwise_cosine(S), 4),
             "vendi_ratio": round(vendi_score(S) / len(s_ids), 4),
-            "clusters": kmeans_evenness(S),
+            "clusters": s_clusters,
             "cloud": [{"id": rid, "x": round(float(x), 3), "y": round(float(y), 3),
                        "snippet": _snippet(t, 90)}
                       for rid, t, (x, y) in zip(s_ids, s_texts, s_cloud)],
@@ -609,7 +670,10 @@ def main() -> None:
     scopes = {"combined": _scope_block(ids, texts, X)}
     if any(isinstance(r.get("messages"), list) and r.get("messages") for r in recs):
         for scope, label in (("prompts", "user messages"), ("responses", "assistant messages")):
-            kept = [(rid, scope_text(r, scope)) for rid, r in zip(ids, recs)]
+            # label each dot with the scope's own gid (P- / R-), not the E- used
+            # for the combined scope
+            kept = [(scope_id(r, scope, rid, prompt_gids), scope_text(r, scope))
+                    for rid, r in zip(ids, recs)]
             kept = [(rid, t) for rid, t in kept if t.strip()]
             if len(kept) < 2:
                 continue

@@ -147,6 +147,59 @@ class TestExtractJson:
         text = "Wrap it in {curly} braces:\n" + json.dumps(PAYLOAD)
         assert utils.extract_json(text) == PAYLOAD
 
+    # --- recover=True: the shared JSON salvage the eval + step-1 both use ---
+
+    def test_strict_default_still_refuses_wrong_shape(self):
+        # recover defaults off; the strict no-coerce guarantee is unchanged
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_array('{"reasons": ["a", "b"]}')
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_object("[1, 2]")
+
+    def test_recover_unwraps_object_wrapped_array(self):
+        # the observed judge slip: {"reasons": [...]} instead of a bare array
+        assert utils.extract_json_array('{"reasons": ["a", "b"]}', recover=True) == ["a", "b"]
+        assert utils.extract_json_array('{"items": [1, 2, 3]}', recover=True) == [1, 2, 3]
+
+    def test_recover_array_refuses_ambiguous_object(self):
+        # never guess: no list value, or more than one, still raises
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_array('{"a": 1}', recover=True)
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_array('{"a": [1], "b": [2]}', recover=True)
+
+    def test_recover_array_salvages_truncated_object_array(self):
+        # a broken container still yields its complete objects
+        assert utils.extract_json_array(
+            '[{"x": 1}, {"y": 2}, {"z"', recover=True) == [{"x": 1}, {"y": 2}]
+
+    def test_recover_array_salvages_bracketless_object_stream(self):
+        # The live judge slip (11/79 calls on one eval pass): the objects come
+        # back WITHOUT the opening '[' — sometimes without commas, sometimes
+        # with a stray trailing ']'. extract_json parses one object here, so the
+        # broken-container branch never fires; recovery must still read them all.
+        assert utils.extract_json_array(
+            '{"a": 1},\n{"b": 2}', recover=True) == [{"a": 1}, {"b": 2}]
+        assert utils.extract_json_array(
+            '{"a": 1}\n{"b": 2}', recover=True) == [{"a": 1}, {"b": 2}]   # commas dropped too
+        assert utils.extract_json_array(
+            '{"a": 1}, {"b": 2}]', recover=True) == [{"a": 1}, {"b": 2}]  # stray closer
+        # a lone object is still ambiguous (could be a wrapper) -> still raises
+        with pytest.raises(json.JSONDecodeError):
+            utils.extract_json_array('{"a": 1}', recover=True)
+
+    def test_recover_object_salvages_first_complete_object(self):
+        # wrong-shape (list) or broken container -> first salvaged object
+        assert utils.extract_json_object('[{"a": 1}, {"b": 2}]', recover=True) == {"a": 1}
+        assert utils.extract_json_object('{"a": 1} then junk {', recover=True) == {"a": 1}
+
+    def test_salvage_json_objects_brace_matches_complete_objects(self):
+        assert utils.salvage_json_objects(
+            '[{"a": 1}, {"b": 2}, {trunc') == [{"a": 1}, {"b": 2}]
+        # a brace inside a string is not a container boundary
+        assert utils.salvage_json_objects('[{"note": "a } brace"}]') == [{"note": "a } brace"}]
+        assert utils.salvage_json_objects("no objects here") == []
+
 
 class TestLoadPrompt:
     def test_renders_placeholders(self, tmp_path):

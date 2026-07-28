@@ -446,12 +446,13 @@ else:
                                stats=("constitution_rewrite", audit.get("response_id")) if audit else None,
                                gid=audit.get("example_gid"))
 
-                # Distinct moral-patient reasons — from the corpus audit's
-                # --reasons pass (a report file, not a pipeline stage; absent
-                # until `evals/audit_dad.py --reasons` has run on this run).
+                # Distinct welfare reasoning — from the corpus audit's --reasons
+                # pass (a report file, not a pipeline stage; absent until
+                # `evals/audit_dad.py --reasons` has run on this run). The report
+                # key stays moral_patient_reasons for back-compat.
                 reasons_pc = ((loader.load_audit(run.run_dir) or {})
                               .get("moral_patient_reasons") or {}).get("per_case") or {}
-                with st.expander(":blue[Distinct moral-patient reasons — plain vs pipeline (audit)]"):
+                with st.expander(":blue[Distinct welfare reasoning — plain vs pipeline (audit)]"):
                     rec_reasons = reasons_pc.get(pid)
                     if not rec_reasons:
                         st.caption("No reason extraction for this run yet. Generate it "

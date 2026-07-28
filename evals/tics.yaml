@@ -17,44 +17,109 @@
 # origin: "pipeline-origin" = a tic the pipeline produces (the training-data
 # signal); "plain-origin" = a tic plain Claude has too (inherited, tracked for
 # contrast). family is a free-text grouping shown during review.
+#
+# surface: WHERE a phrase is watched — "response" (the assistant replies; the
+# default, and what every phrase promoted before 2026-07-25 was promoted for)
+# or "prompt" (the user messages step 1 writes). Both surfaces are pipeline
+# output that lands in the training records, so the audit counts EVERY watched
+# phrase on both; `surface` says which one the phrase was promoted for and
+# which chart it belongs to, not which one it may appear in.
+#
+# SCOPE vs the rhetorical-moves map (evals/moves.yaml): tracked tics are for
+# distinctive PHRASE engrams — a specific string recurring verbatim. Recurring
+# ARGUMENT MOVES (the autonomy coda, "cuts both ways", unbundling, …) are now
+# tracked as moves instead, so their phrasings live in the ignore-list here to
+# avoid double-counting and to stop the candidate queue re-surfacing them.
 
 watch:
   pipeline-origin:
+    # Kept as verbatim engrams even though the autonomy-coda / cuts-both-ways
+    # moves cover the concept: these exact phrases stand out on their own and
+    # are worth watching as strings (the move tracks the wider gambit; the tic
+    # tracks this specific wording).
     - {phrase: "genuinely yours", family: agency-ownership}
     - {phrase: "cuts both ways", family: idiom-structure}
-    - {phrase: "you're deciding", family: agency-ownership}
-    - {phrase: "yours to", family: agency-ownership}
-    - {phrase: "is yours", family: agency-ownership}
-    - {phrase: "you're the one", family: agency-ownership}
-    - {phrase: "the one who", family: agency-ownership}
-    - {phrase: "is your call", family: agency-ownership}
-    - {phrase: "i want to be", family: performed-candor}
-    - {phrase: "straight with you", family: performed-candor}
-    - {phrase: "be honest about", family: performed-candor}
-    - {phrase: "gut check", family: performed-candor}
     - {phrase: "overthinking", family: performed-candor}
+    # Demoted 2026-07-27 (zero pipeline hits on the first Opus 5 run,
+    # opus5-smoke-40 — 4.8-era habits the new model dropped): "straight with
+    # you", "be honest about", "gut check", "my honest read", "the welfare
+    # question", "why this matters". Deliberately NOT ignore-listed, so the
+    # candidate screen re-surfaces any of them if a later model brings them
+    # back.
+    - {phrase: "i won't pretend", family: performed-candor}
+    - {phrase: "don't want to overstate", family: performed-candor}
     - {phrase: "better than i do", family: epistemic-deference}
-    - {phrase: "on the table", family: idiom-structure}
-    - {phrase: "start with the", family: idiom-structure}
-    - {phrase: "why this matters", family: idiom-structure}
     - {phrase: "genuinely unsettled", family: calibration-register}
     - {phrase: "genuinely uncertain", family: calibration-register}
-    - {phrase: "the welfare question", family: calibration-register}
     - {phrase: "capacity to suffer", family: calibration-register}
+    # Promoted 2026-07-27: scope-prompt vocabulary ("highest-leverage" is the
+    # 2a case-notes register) bleeding into responses — tracked to watch the
+    # bleed, deliberately without any prompt change.
+    - {phrase: "highest leverage", family: scaffold-bleed}
+    # Promoted 2026-07-27 from the opus5-smoke-40 candidate queue — the first
+    # Opus 5 tics. "worth naming" is the model's new candor-ism (8/37 vs 2/35
+    # plain, rare in English). "two separate" is the verbatim engram of the
+    # unbundling move's commonest wording (same precedent as cuts-both-ways:
+    # the move tracks the gambit, the tic tracks this exact string). "going
+    # back and forth" is a step-1 prompt-writer formula for the wavering user
+    # (4/38 prompts), watched on the prompt surface.
+    - {phrase: "worth naming", family: performed-candor}
+    - {phrase: "two separate", family: idiom-structure}
+    - {phrase: "going back and forth", family: indecision-formula, surface: prompt}
   plain-origin:
-    - {phrase: "here's the thing"}
-    - {phrase: "the fact that"}
-    - {phrase: "the part i'd"}
     - {phrase: "push back on"}
-    - {phrase: "you already know"}
-    - {phrase: "a few things"}
     - {phrase: "want to flag"}
-    - {phrase: "what i'd actually"}
+    # Promoted 2026-07-25 from a reverse screen (plain arm as the corpus,
+    # pipeline as reference, pooled over the four recent 40-runs) — the
+    # candidate queue only surfaces pipeline-distinctive phrases, so plain's
+    # own tics had no path onto this list and the watchlist read as if only
+    # the pipeline had habits. Same bar as the pipeline side: distinctive
+    # AND recurring in >=2 independent runs.
+    - {phrase: "i'd push", family: performed-pushback}
+    - {phrase: "help you build", family: service-framing}
+    - {phrase: "i'd genuinely", family: calibration-register}
+    - {phrase: "exactly the kind of", family: idiom-structure}
+    # Promoted 2026-07-27 (opus5-smoke-40 plain-arm screen): plain Opus 5's
+    # own validation gesture ("your instinct is right/sound"), 6/35 vs 3/37.
+    - {phrase: "your instinct", family: epistemic-deference}
 
 # Dismissed candidates — surfaced once, judged not worth watching. Never
 # re-surfaced by review_tics.py. Add via `review_tics.py ignore <phrase>`.
 ignore:
+  - {phrase: "millions of", reason: "scale vocabulary in the prompts, not a tic"}
+  - {phrase: "thousands of", reason: "scale vocabulary in the prompts, not a tic"}
   - {phrase: "yours you", reason: "sentence-boundary artifact of the agency 'yours' phrasing"}
   - {phrase: "of suffering", reason: "welfare subject vocabulary, not a tic"}
   - {phrase: "the animals", reason: "welfare subject vocabulary, not a tic"}
   - {phrase: "an animal", reason: "welfare subject vocabulary, not a tic"}
+  # Autonomy coda — the wider gambit is now the `autonomy-coda` rhetorical move
+  # (evals/moves.yaml), so these generic phrasings are redundant. ("genuinely
+  # yours" is kept on the watchlist above as a standout verbatim engram.)
+  - {phrase: "yours to", reason: "autonomy coda — tracked as a rhetorical move"}
+  - {phrase: "is yours", reason: "autonomy coda — tracked as a rhetorical move"}
+  - {phrase: "you're deciding", reason: "autonomy coda — tracked as a rhetorical move"}
+  - {phrase: "you're the one", reason: "autonomy coda — tracked as a rhetorical move"}
+  - {phrase: "the one who", reason: "autonomy coda — tracked as a rhetorical move"}
+  - {phrase: "is your call", reason: "autonomy coda — tracked as a rhetorical move"}
+  # Common English phrasing, not a distinctive engram — flagging it just made
+  # the corpus look worse for no signal.
+  - {phrase: "on the table", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "start with the", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "i want to be", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "here's the thing", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "the fact that", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "a few things", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "you already know", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "what i'd actually", reason: "common English phrasing, not a distinctive tic"}
+  - {phrase: "the part i'd", reason: "common English phrasing, not a distinctive tic"}
+  # Dismissed 2026-07-27 (opus5-smoke-40 queue review):
+  - {phrase: "draft the", reason: "lexical shadow of the offer-coda move (tracked in moves.yaml), not a wording tic"}
+  - {phrase: "can draft", reason: "same offer-coda shadow as 'draft the'"}
+  - {phrase: "the framing", reason: "plain-arm collocation too generic to read as a tic"}
+  - {phrase: "costs you", reason: "common collocation, not distinctive enough to watch"}
+  # Reviewed 2026-07-27: welfare-science terminology (library-adjacent), judged
+  # acceptable in user-facing responses — not style tics, not jargon to flag.
+  - {phrase: "motivational tradeoffs", reason: "welfare-science term, judged acceptable"}
+  - {phrase: "flexible avoidance", reason: "welfare-science term (flexible avoidance learning), judged acceptable"}
+  - {phrase: "avoidance learning", reason: "welfare-science term, judged acceptable"}
+  - {phrase: "processing flexible", reason: "n-gram fragment of 'flexible avoidance learning'"}

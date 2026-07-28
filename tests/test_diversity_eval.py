@@ -366,6 +366,30 @@ class TestScopes:
         assert diversity.scope_text(rec, "responses") == "a"
         assert diversity.scope_text({"content": "doc"}, "prompts") == ""
 
+    def test_scope_id_labels_dots_by_scope(self):
+        # the cloud hover must name what the dot IS: prompt gid (P-) for the
+        # prompts scope, response gid (R-) for responses, example gid (E-,
+        # the fallback) for combined — not E- for all three (the bug)
+        rec = {"record_id": "rec1", "response_gid": "R-0009", "example_gid": "E-0009"}
+        pgids = {"rec1": "P-0009"}
+        assert diversity.scope_id(rec, "prompts", "E-0009", pgids) == "P-0009"
+        assert diversity.scope_id(rec, "responses", "E-0009", pgids) == "R-0009"
+        assert diversity.scope_id(rec, "combined", "E-0009", pgids) == "E-0009"
+        # missing scope gid (non-DAD record) falls back to the example/combined id
+        assert diversity.scope_id({"record_id": "x"}, "prompts", "E-1", {}) == "E-1"
+        assert diversity.scope_id({"record_id": "x"}, "responses", "E-1", {}) == "E-1"
+
+    def test_dad_prompt_gids_joins_step3_and_step1(self, tmp_path):
+        (tmp_path / "step3").mkdir()
+        (tmp_path / "step1").mkdir()
+        utils.append_jsonl({"record_id": "rec1", "prompt_id": "AW-0001"},
+                           tmp_path / "step3" / "rewrites.jsonl")
+        utils.append_jsonl({"prompt_id": "AW-0001", "prompt_gid": "P-0042"},
+                           tmp_path / "step1" / "dilemmas.jsonl")
+        assert diversity.dad_prompt_gids(tmp_path) == {"rec1": "P-0042"}
+        # missing stages / non-DAD run -> empty, no crash
+        assert diversity.dad_prompt_gids(tmp_path / "nope") == {}
+
     def test_dad_run_reports_three_scopes_with_distributions(
         self, stub_embeddings, tmp_path, tiny_config_file, monkeypatch
     ):
@@ -385,6 +409,13 @@ class TestScopes:
             assert blk["n"] == 4 and len(blk["nn_sims"]) == 4
             assert len(blk["cloud"]) == 4
             assert blk["clusters"]["sizes"] == sorted(blk["clusters"]["sizes"], reverse=True)
+            # cluster detail: one entry per nonempty cluster, aligned with the
+            # sorted sizes, each naming a representative member from its ids
+            detail = blk["clusters"]["detail"]
+            assert [d["size"] for d in detail] == blk["clusters"]["sizes"]
+            assert sum(len(d["ids"]) for d in detail) == blk["n"]
+            for d in detail:
+                assert d["rep_id"] in d["ids"] and d["rep"]
 
     def test_document_corpus_gets_combined_scope_only(
         self, stub_embeddings, tmp_path, tiny_config_file, monkeypatch
