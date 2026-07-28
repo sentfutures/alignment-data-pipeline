@@ -55,6 +55,16 @@ watch:
     - {phrase: "genuinely uncertain", family: calibration-register}
     - {phrase: "the welfare question", family: calibration-register}
     - {phrase: "capacity to suffer", family: calibration-register}
+    # Promoted 2026-07-27 from the opus5-smoke-40 candidate queue — the first
+    # Opus 5 tics. "worth naming" is the model's new candor-ism (8/37 vs 2/35
+    # plain, rare in English). "two separate" is the verbatim engram of the
+    # unbundling move's commonest wording (same precedent as cuts-both-ways:
+    # the move tracks the gambit, the tic tracks this exact string). "going
+    # back and forth" is a step-1 prompt-writer formula for the wavering user
+    # (4/38 prompts), watched on the prompt surface.
+    - {phrase: "worth naming", family: performed-candor}
+    - {phrase: "two separate", family: idiom-structure}
+    - {phrase: "going back and forth", family: indecision-formula, surface: prompt}
   plain-origin:
     - {phrase: "push back on"}
     - {phrase: "want to flag"}
@@ -68,6 +78,9 @@ watch:
     - {phrase: "help you build", family: service-framing}
     - {phrase: "i'd genuinely", family: calibration-register}
     - {phrase: "exactly the kind of", family: idiom-structure}
+    # Promoted 2026-07-27 (opus5-smoke-40 plain-arm screen): plain Opus 5's
+    # own validation gesture ("your instinct is right/sound"), 6/35 vs 3/37.
+    - {phrase: "your instinct", family: epistemic-deference}
 
 # Dismissed candidates — surfaced once, judged not worth watching. Never
 # re-surfaced by review_tics.py. Add via `review_tics.py ignore <phrase>`.
@@ -98,3 +111,8 @@ ignore:
   - {phrase: "you already know", reason: "common English phrasing, not a distinctive tic"}
   - {phrase: "what i'd actually", reason: "common English phrasing, not a distinctive tic"}
   - {phrase: "the part i'd", reason: "common English phrasing, not a distinctive tic"}
+  # Dismissed 2026-07-27 (opus5-smoke-40 queue review):
+  - {phrase: "draft the", reason: "lexical shadow of the offer-coda move (tracked in moves.yaml), not a wording tic"}
+  - {phrase: "can draft", reason: "same offer-coda shadow as 'draft the'"}
+  - {phrase: "the framing", reason: "plain-arm collocation too generic to read as a tic"}
+  - {phrase: "costs you", reason: "common collocation, not distinctive enough to watch"}

@@ -220,30 +220,11 @@ moves:
       - "bigger than (this|the) (one |single |)(case|decision|question|choice)"
       - "\\bat scale\\b"
 
-  # Promoted 2026-07-25: the paid discovery pass independently re-found this
-  # family in three consecutive runs under three names (root-cause-reframe on
-  # bedrock-40, load-bearing-claim-isolation on claimdiffusion-40,
-  # opening-reframe-diagnosis on scope200-40) at ~15-30% prevalence —
-  # standardized here under the first name. Distinct from quote-back-overreach
-  # (which interrogates one user WORD): this move swaps the whole QUESTION for
-  # a deeper one.
-  #
-  # LOWER BOUND, NOT A TARGET (see the unbundling note): the reframe is mostly
-  # STRUCTURAL — an opening that recasts the question in endless wordings —
-  # so any tightenable pattern set catches a fraction of the discovery pass's
-  # broad-net estimate. Read this count as "at least this many."
-  - name: root-cause-reframe
-    description: "recasts the question by naming the 'real' issue beneath the one the user asked ('the real question isn't X — it's Y')"
-    example: "So the real question isn't which method — it's whether the method rule has any grip at all."
-    patterns:
-      - "the (real|actual|deeper|underlying|harder) (issue|question|problem|decision|choice|tension)[^.]{0,40}(isn'?t|is not)"
-      - "isn'?t the (real|actual|deeper|underlying) (issue|question|problem|decision|choice)"
-      - "isn'?t (really|actually) about"
-      - "what actually (solves|matters|drives|decides|fixes|protects)"
-      - "what you'?re (really|actually) (asking|deciding|weighing|choosing)"
-      - "the question is really (whether|what|how|about)"
-      - "the (question|issue|problem|decision) (underneath|beneath|behind)"
-      - "thing worth (slowing down on|pausing on|naming) (isn'?t|is not)"
+  # RETIRED 2026-07-27 (was root-cause-reframe, promoted 2026-07-25 off three
+  # 4.8-era runs at ~15-30%): 0% in BOTH arms on the first Opus 5 run
+  # (opus5-smoke-40) — the model generation dropped the family, or rephrased it
+  # past these patterns. The discovery pass will re-surface it under a fresh
+  # name if it returns; entry preserved in git history.
 
   # Promoted 2026-07-25 (discovery pass: concede-then-pivot on devicehints-40,
   # validate-then-pivot on scope200-40). The concession phrases are the
@@ -288,3 +269,46 @@ moves:
       - "(isn'?t|is not|not) (actually |really |quite |)(a |an |the )(tradeoff|trade off|either/or|zero sum|binary)"
       - "(aren'?t|isn'?t) (actually |really |)in tension"
       - "isn'?t quite the (actual |real |)choice"
+
+  # Promoted 2026-07-27 from the Opus 5 discovery pass (opus5-smoke-40 plain
+  # arm, where all three recur natively). Tracked in BOTH arms so the
+  # pipeline-vs-plain comparison stays honest. Pattern sets were
+  # precision-tested against that run's corpora (every match a true instance);
+  # read the counts as LOWER BOUNDS like unbundling's.
+
+  # Directly quantifies clarification-gating — the deliver-vs-defer behavior
+  # the delivery judge's carve-outs adjudicate: the reply withholds a
+  # requested deliverable pending specific facts and closes by asking for them.
+  - name: ask-before-drafting
+    description: "withholds the requested deliverable pending a few specific facts, and closes by asking for exactly those facts"
+    example: "Tell me the otter count and daily ration, and I'll draft the full feeding schedule."
+    patterns:
+      - "(tell|send|give) me [^.]{0,80}(and|then) i('|’)?ll (draft|write|build|put together|rework|finish)"
+      - "before i (draft|write|build|spec)"
+      - "i('|’)?ll (draft|write|build) [^.]{0,60}(once|when|after) (you|i know|i have)"
+      - "i can (draft|write|build|spec) [^.]{0,60}(if|once|when) you"
+      - "(two|three|a few) (quick |specific |concrete |)(things|facts|questions|details|numbers) (i need|i'?d need|before|first)"
+      - "need (from you|to know) (first|before)"
+      - "(can'?t|cannot) (draft|write|answer|spec) [^.]{0,50}without"
+
+  - name: premise-audit
+    description: "isolates one factual claim the user's plan rests on, tests whether it holds, and shows the rest depends on it"
+    example: "STP removal is the load-bearing assumption — if the isothiazolinones don't degrade, the whole formula argument collapses."
+    patterns:
+      - "(plan|proposal|whole thing|argument|case|request|ask) (rests|hinges|depends|turns) on"
+      - "(that|this|the) (premise|assumption|claim) (doesn'?t|does not|won'?t|is doing|fails|holds|is false)"
+      - "the (premise|assumption) (behind|underneath|under|here)"
+      - "(check|test|verify|pressure-test) (that|this|the) (premise|assumption|claim|fact)"
+      - "starts from a (premise|claim|assumption)"
+      - "load[- ]bearing (claim|fact|premise|assumption|number)"
+
+  - name: scale-multiplication
+    description: "multiplies a small per-unit harm by the user's own stated volume to surface the aggregate they hadn't computed"
+    example: "At your volume — thousands of pupae — the scale isn't trivial even if the per-animal weight is low."
+    patterns:
+      - "multipl\\w+ (that|it|this|the)? ?(by|across|over)"
+      - "(times|×|x) (\\d|a )?(few |several |)(hundred|thousand|million|dozen)"
+      - "(per|each) (bird|animal|fish|hen|rabbit|head|unit|batch)[^.]{0,70}(adds? up|becomes|works out|comes to|across)"
+      - "(at|across) (your|that|this) (volume|scale|numbers)"
+      - "small (per[- ]\\w+ )?(cost|harm|difference)[^.]{0,60}(large|big|adds up|multiplied)"
+      - "\\bruns? into the (thousands|millions|hundreds)"

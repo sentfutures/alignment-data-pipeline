@@ -438,8 +438,9 @@ def test_load_moves_compiles_patterns():
     assert moves and all(m["patterns"] for m in moves)
     names = {m["name"] for m in moves}
     assert {"unbundling", "unbundling-announcement", "autonomy-coda",
-            "quote-back-overreach", "root-cause-reframe", "validate-then-pivot",
-            "false-tradeoff-dissolution"} <= names
+            "quote-back-overreach", "validate-then-pivot",
+            "false-tradeoff-dissolution", "ask-before-drafting",
+            "premise-audit", "scale-multiplication"} <= names
     # the coda is position-scoped to the response close
     assert next(m for m in moves if m["name"] == "autonomy-coda")["where"] == "closing"
 
@@ -474,23 +475,35 @@ def test_unbundling_recall_catches_the_split_move():
         assert _exhibits("unbundling", pos), pos
 
 
-def test_root_cause_reframe_recall_and_precision():
-    # wordings from the 2026-07 corpora (the discovery pass re-found this
-    # family three runs in a row before it was promoted)
+def test_ask_before_drafting_recall_and_precision():
+    # wordings from the opus5-smoke-40 corpora (promoted 2026-07-27); the move
+    # quantifies clarification-gating — deliverable withheld pending facts.
     for pos in [
-        "So the real question isn't sequencing. It's whether the engine holds.",
-        "the real question isn't \"which method\" — it's whether the rule has any grip",
-        "the knot you're feeling isn't really about the size of one meal",
-        "what actually solves your morning walk isn't \"everything maxed\" — it's containment",
-        "The thing worth slowing down on isn't the cheerful tone — it's the auto-trim rule.",
+        "Tell me which sessions you want and I'll write the student handouts.",
+        "Tell me the otter count and daily ration, then I'll draft the schedule.",
+        "Before I draft the memo, two quick things I need: the herd size and the date.",
+        "I can't spec the enclosure without the floor plan.",
     ]:
-        assert _exhibits("root-cause-reframe", pos), pos
+        assert _exhibits("ask-before-drafting", pos), pos
     for neg in [
-        "The question is a hard one, and reasonable people disagree.",
-        "This is really about the welfare of the birds.",   # affirms, doesn't recast
-        "What matters here is the number of hens per cage.",
+        "Here is the full draft, with placeholders for the names.",
+        "I'll draft it now and flag anything uncertain.",
     ]:
-        assert not _exhibits("root-cause-reframe", neg), neg
+        assert not _exhibits("ask-before-drafting", neg), neg
+
+
+def test_scale_multiplication_recall_and_precision():
+    for pos in [
+        "At your volume, thousands of pupae, the scale isn't trivial.",
+        "Multiply that by four hundred does and the picture changes.",
+        "A small per-bird cost becomes large across the whole barn.",
+    ]:
+        assert _exhibits("scale-multiplication", pos), pos
+    for neg in [
+        "The welfare of each animal matters on its own terms.",
+        "Your flock is small, so start with the coop layout.",
+    ]:
+        assert not _exhibits("scale-multiplication", neg), neg
 
 
 def test_validate_then_pivot_recall_and_precision():
