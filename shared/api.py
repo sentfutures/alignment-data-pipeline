@@ -63,8 +63,8 @@ _cost_log_lock = threading.Lock()
 _PRICING = {
     "claude-sonnet-4-6": (3.00, 15.00),
     "claude-sonnet-5": (3.00, 15.00),
-    "claude-opus-5": (5.00, 25.00),
     "claude-opus-4-8": (5.00, 25.00),
+    "claude-opus-5": (5.00, 25.00),
     "claude-fable-5": (10.00, 50.00),
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-haiku-4-5-20251001": (1.00, 5.00),
@@ -84,6 +84,7 @@ _BEDROCK_KEY_ENV = "CHAD_AWS_BEDROCK_KEY"
 _BEDROCK_REGION = "us-east-1"
 _BEDROCK_MODEL_IDS = {
     "claude-opus-4-8": "us.anthropic.claude-opus-4-8",
+    "claude-opus-5": "us.anthropic.claude-opus-5",  # same alias pattern; verified live 2026-07-26
     "claude-sonnet-5": "us.anthropic.claude-sonnet-5",
     "claude-haiku-4-5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     "claude-haiku-4-5-20251001": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -346,11 +347,11 @@ def _requires_adaptive_thinking(model: str) -> bool:
 
 
 # Models that reject sampling parameters (temperature/top_p/top_k) with a 400:
-# the Claude 5 family (Fable/Mythos/Opus 5/Sonnet 5) and Opus 4.7+. Older models
+# the Claude 5 family (Fable/Mythos/Sonnet 5) and Opus 4.7+. Older models
 # (Opus 4.6/4.5, Sonnet 4.6/4.5, Haiku 4.5, …) still accept temperature.
 _NO_SAMPLING_PREFIXES = (
     "claude-fable", "claude-mythos",
-    "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7",
+    "claude-opus-4-8", "claude-opus-4-7", "claude-opus-5",
     "claude-sonnet-5",
 )
 

@@ -390,46 +390,15 @@ def refine_draft(scenario: dict, draft_text: str, template: str,
     return (None, failures)
 
 
-def _salvage_objects(text: str) -> list:
-    """Extract top-level {...} objects one at a time via brace matching, so a
-    truncated or trailing-garbage array still yields its complete objects."""
-    objs, depth, start, in_str, esc = [], 0, None, False, False
-    for i, ch in enumerate(text):
-        if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
-            continue
-        if ch == '"':
-            in_str = True
-        elif ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0 and start is not None:
-                try:
-                    # strict=False: same control-char tolerance as extract_json,
-                    # so a salvageable object isn't dropped for a literal newline
-                    objs.append(json.loads(text[start:i + 1], strict=False))
-                except json.JSONDecodeError:
-                    pass
-                start = None
-    return objs
-
-
 def _parse_json_object(raw: str) -> dict | None:
     """The reply's JSON object via the shared hardened parser, salvaging the
-    first complete top-level object when the container is broken."""
+    first complete top-level object when the container is broken (the salvage
+    now lives in utils.extract_json_object(recover=True), shared with the eval
+    JSON-recovery paths)."""
     try:
-        return utils.extract_json_object(raw)
+        return utils.extract_json_object(raw, recover=True)
     except json.JSONDecodeError:
-        objs = _salvage_objects(raw)
-        return objs[0] if objs else None
+        return None
 
 
 MAX_GATE_ATTEMPTS = 2      # fresh retries when the gate's own reply is unparseable

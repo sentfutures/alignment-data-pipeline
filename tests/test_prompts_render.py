@@ -75,6 +75,7 @@ TEMPLATE_KWARGS = [
         "library_block": "LIBRARY-X", "scope_block": "SCOPE-X", "user_message": "USER-X",
         "first_take": "FIRST-TAKE-X",
         "opening_hints": "HINT-X; HINT-Y; HINT-Z",
+        "quote_back_hints": "QB-X; QB-Y; QB-Z",
     }),
     ("dad/step3_rewrite.txt", {
         "principles_block": "PRINCIPLES-X",
@@ -85,7 +86,7 @@ TEMPLATE_KWARGS = [
         "user_message": "USER-X", "assistant_response": "RESP-X",
     }),
     ("tools/pattern_scan.txt", {"documents": "DOCS-X"}),
-    ("tools/reason_extraction.txt", {"user_message": "USER-X", "response": "RESP-X"}),
+    ("tools/consideration_extraction.txt", {"user_message": "USER-X", "response": "RESP-X"}),
 ]
 
 

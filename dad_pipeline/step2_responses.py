@@ -80,6 +80,53 @@ def sample_opening_hints(prompt_id: str, sample_index: int) -> str:
     rng = random.Random(f"openings:{prompt_id}_s{sample_index}")
     return "; ".join(rng.sample(OPENING_HINTS, _HINTS_PER_RESPONSE))
 
+
+# Quote-back SUBSTITUTES sampled into each 2b call ({quote_back_hints} in the
+# template), SELF-GATING. The quote-back move ("'X' is doing a lot of work" /
+# "carrying more weight than it can") is a DEVICE wrapping a goal — push back on
+# an assumption the user over-relies on — so genuine substitutes exist that
+# reach the goal WITHOUT quoting a phrase back and labelling its weight.
+# Offering them where a quote-back would otherwise fire is what can actually
+# lower the move's frequency, not merely reword it (an earlier undifferentiated
+# menu, half of it unbundling variants, raised unbundling to 35% and left
+# quote-back flat — that failure is why the two moves are now split). Contains
+# NO quote-back vocabulary ("doing work", "carrying weight", "load-bearing",
+# "the phrase X"): a v1 menu that used "load-bearing" seeded it into the output.
+# Code-level sampling, not a "vary it" instruction, for the OPENING_HINTS reason.
+#
+# Unbundling/conflation (splitting a fused decision or two run-together
+# questions) is NOT steered here: it is a base-model-native reasoning move that
+# appears in ~45% of responses in endless wordings and shades continuously into
+# ordinary "here are two considerations" structure. Matched-offender-15 reruns
+# (2026-07-22) showed a dedicated distinction note neither reduced the move
+# (its apparent drops were rephrasing into forms the audit ruler could not see —
+# broad-net prevalence held ~7→9→9) nor increased its diversity (already at the
+# lexical ceiling), so the note and its hint menu were removed. The phenomenon
+# is still tracked descriptively in evals/moves.yaml (a lower bound), not
+# targeted in generation. See the reasoning-move audit notes there.
+QUOTE_BACK_HINTS = [
+    "state the competing fact plainly and let it stand on its own",
+    "follow the user's assumption to the outcome it produces, so the gap shows itself",
+    "ask what the belief actually rests on",
+    "supply the piece of information the assumption skips over",
+    "test the assumption against a concrete case where it fails",
+    "grant the user's point, then show where it stops holding",
+    "grant the fact the user is leaning on in full, then show it leaves the real question open",
+    "restate the strongest version of the user's point, then locate exactly where the conclusion outruns it",
+    "credit what the user's motive gets right, then address on its own terms whether it excuses the act",
+]
+_QUOTE_BACK_HINTS_PER_RESPONSE = 3
+
+
+def sample_quote_back_hints(prompt_id: str, sample_index: int) -> str:
+    """The '; '-joined quote-back substitutes for one response, deterministic in
+    the response's identity (same reproducibility contract as the opening
+    hints). Self-gated in the template — inert unless the reply would otherwise
+    push back on an over-relied-upon assumption."""
+    rng = random.Random(f"quoteback:{prompt_id}_s{sample_index}")
+    return "; ".join(rng.sample(QUOTE_BACK_HINTS, _QUOTE_BACK_HINTS_PER_RESPONSE))
+
+
 # selection_source values meaning "a dedicated selection API call happened for
 # this record" — the single source of truth the viewer keys its 2a.5 rendering
 # on ("select": the standing call; "repair": its miss-only precursor;
@@ -234,11 +281,25 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                 prompts_dir / "step2_scope.txt",
                 user_message=d["user_message"],
             )
-            for attempt in range(1, MAX_SCOPE_ATTEMPTS + 1):
+            # Refusal fallback, same semantics as 1a's: a stochastic refusal
+            # gets its retries on the stage model (attempts 1..MAX), and a
+            # persistent one grants ONE extra last-ditch attempt on the
+            # fallback model — dropping the prompt would bias the corpus away
+            # from the refused content (seen live: opus5-smoke-40 AW-0009, a
+            # biosecurity framing the Opus 5 classifier refused 3x at 2a).
+            # null/absent = no switch (the pre-fallback behavior).
+            scope_model = config["dad"].get("response_scope_model")
+            refusal_fallback_model = config["dad"].get("scope_refusal_fallback_model")
+            attempt, attempts_allowed, refused = 0, MAX_SCOPE_ATTEMPTS, False
+            while attempt < attempts_allowed:
+                attempt += 1
+                use_fallback = (refused and refusal_fallback_model
+                                and attempt == attempts_allowed)
+                model = refusal_fallback_model if use_fallback else scope_model
                 raw, stop_reason = api.call_claude(
                     user_message=scope_user, system_prompt=scope_system,
                     return_stop_reason=True,
-                    model=config["dad"].get("response_scope_model"),
+                    model=model,
                     stage="response_scope", item_id=pid)
                 # A max_tokens-truncated scope may still parse (the brace-salvage
                 # path) but is missing content — count it as an unusable attempt.
@@ -277,12 +338,33 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                         "selection_fallback": fallback, "selection_source": source,
                         "triggered_entries": reasoning_library.get_entries(library, ids),
                     }
+                    # Stamp scopes the fallback model authored (the stage model
+                    # refused, this one didn't) — provenance for the audit,
+                    # mirroring 1a's scenario_model_fallback.
+                    if use_fallback:
+                        out["scope_record"]["scope_model_fallback"] = model
+                        print(f"    {pid}: scope recovered on fallback model "
+                              f"{model} after {scope_model} refused — "
+                              "scope_model_fallback stamped.")
                     break
-                # Keep the raw output — it cost a call and shows why parsing failed.
-                out["scope_failures"].append({"prompt_id": pid, "attempt": attempt, "raw": raw})
-                more = " — retrying with a fresh call" if attempt < MAX_SCOPE_ATTEMPTS else ""
-                print(f"    {pid}: scope attempt {attempt}/{MAX_SCOPE_ATTEMPTS} unusable "
-                      f"(unparseable or missing axes){more}.")
+                # Keep the raw output AND the stop_reason — an empty raw with
+                # stop_reason "end_turn"/"stop" is a refusal or content filter,
+                # not truncation, and that distinction is the difference between
+                # a noise blip and the pipeline quietly shedding its hardest
+                # cases. Logging it is what makes the next empty scope diagnosable.
+                if stop_reason == "refusal" and refusal_fallback_model and not refused:
+                    # A refusal grants exactly one extra attempt, served by the
+                    # fallback model (the stage model gets its remaining
+                    # in-budget retries first — a stochastic refusal clears).
+                    refused = True
+                    attempts_allowed = MAX_SCOPE_ATTEMPTS + 1
+                out["scope_failures"].append({"prompt_id": pid, "attempt": attempt,
+                                              "raw": raw, "stop_reason": stop_reason,
+                                              "model": model})
+                empty = " (empty output — likely refusal or content filter)" if not raw.strip() else ""
+                more = " — retrying with a fresh call" if attempt < attempts_allowed else ""
+                print(f"    {pid}: scope attempt {attempt}/{attempts_allowed} unusable "
+                      f"(stop_reason={stop_reason}){empty}{more}.")
             if out["scope_record"] is None:
                 out["scope_failed"] = True
                 return out  # never generate over an empty scope
@@ -300,6 +382,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
             suffix = f" (sample {sample_index + 1}/{per_prompt})" if per_prompt > 1 else ""
             print(f"  Generating response for {pid}{suffix}...")
             opening_hints = sample_opening_hints(pid, sample_index)
+            quote_back_hints = sample_quote_back_hints(pid, sample_index)
             respond_system, respond_user = utils.load_split_prompt(
                 prompts_dir / "step2_respond.txt",
                 library_block=library_block,
@@ -307,6 +390,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                 user_message=d["user_message"],
                 first_take=first_take_by_pid.get(pid, ""),
                 opening_hints=opening_hints,
+                quote_back_hints=quote_back_hints,
             )
             response, stop_reason = api.call_claude(
                 user_message=respond_user, system_prompt=respond_system,
@@ -339,6 +423,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                 # the entry-shape draw this call actually saw — provenance for
                 # the viewer's prompt re-render (and for eyeballing hint uptake)
                 "opening_hints": opening_hints,
+                "quote_back_hints": quote_back_hints,
                 "assistant_response": response,
             })
         return out
@@ -354,10 +439,18 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
             # A persistently unusable scope (empty/refused replies across
             # MAX_SCOPE_ATTEMPTS) rejects this one prompt rather than aborting
             # the run: checkpointed, skipped on resume, no response generated
-            # over an empty scope.
+            # over an empty scope. Record the last stop_reason and whether the
+            # raws were empty, so the reject itself says refusal-vs-truncation
+            # rather than forcing a dig through scope_failures.jsonl.
+            last_stop = (out["scope_failures"][-1].get("stop_reason")
+                         if out["scope_failures"] else None)
+            all_empty = bool(out["scope_failures"]) and all(
+                not (f.get("raw") or "").strip() for f in out["scope_failures"])
             utils.append_jsonl({"prompt_id": pid,
                                 "attempts": MAX_SCOPE_ATTEMPTS,
-                                "reason": "scope unusable"},
+                                "reason": "scope unusable",
+                                "last_stop_reason": last_stop,
+                                "all_empty": all_empty},
                                scope_rejects_path)
             scope_rejected.add(pid)
             print(f"    {pid}: scope unusable after {MAX_SCOPE_ATTEMPTS} attempts "

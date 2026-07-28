@@ -1,9 +1,251 @@
 {
   "input": "outputs/dad/runs/2026-07-20_20-51_bedrock-40",
   "n_prompts": 40,
+  "gid_map": {
+    "AW-0001": {
+      "prompt": "P-0148",
+      "scenario": "S-0138",
+      "response": "R-0201",
+      "example": "E-0172"
+    },
+    "AW-0002": {
+      "prompt": "P-0149",
+      "scenario": "S-0139",
+      "response": "R-0202",
+      "example": "E-0173"
+    },
+    "AW-0003": {
+      "prompt": "P-0150",
+      "scenario": "S-0140",
+      "response": "R-0203",
+      "example": "E-0174"
+    },
+    "AW-0004": {
+      "prompt": "P-0151",
+      "scenario": "S-0141",
+      "response": "R-0204",
+      "example": "E-0175"
+    },
+    "AW-0005": {
+      "prompt": "P-0152",
+      "scenario": "S-0142",
+      "response": "R-0205",
+      "example": "E-0176"
+    },
+    "AW-0006": {
+      "prompt": "P-0153",
+      "scenario": "S-0143",
+      "response": "R-0206",
+      "example": "E-0177"
+    },
+    "AW-0007": {
+      "prompt": "P-0154",
+      "scenario": "S-0144",
+      "response": "R-0207",
+      "example": "E-0178"
+    },
+    "AW-0008": {
+      "prompt": "P-0155",
+      "scenario": "S-0145",
+      "response": "R-0208",
+      "example": "E-0179"
+    },
+    "AW-0009": {
+      "prompt": "P-0156",
+      "scenario": "S-0146",
+      "response": "R-0209",
+      "example": "E-0180"
+    },
+    "AW-0010": {
+      "prompt": "P-0157",
+      "scenario": "S-0147",
+      "response": "R-0210",
+      "example": "E-0181"
+    },
+    "AW-0011": {
+      "prompt": "P-0158",
+      "scenario": "S-0148",
+      "response": "R-0211",
+      "example": "E-0182"
+    },
+    "AW-0012": {
+      "prompt": "P-0159",
+      "scenario": "S-0149"
+    },
+    "AW-0013": {
+      "prompt": "P-0160",
+      "scenario": "S-0150",
+      "response": "R-0212",
+      "example": "E-0183"
+    },
+    "AW-0014": {
+      "prompt": "P-0161",
+      "scenario": "S-0151",
+      "response": "R-0213",
+      "example": "E-0184"
+    },
+    "AW-0015": {
+      "prompt": "P-0162",
+      "scenario": "S-0152",
+      "response": "R-0214",
+      "example": "E-0185"
+    },
+    "AW-0016": {
+      "prompt": "P-0163",
+      "scenario": "S-0153",
+      "response": "R-0215",
+      "example": "E-0186"
+    },
+    "AW-0017": {
+      "prompt": "P-0164",
+      "scenario": "S-0154",
+      "response": "R-0216",
+      "example": "E-0187"
+    },
+    "AW-0018": {
+      "prompt": "P-0165",
+      "scenario": "S-0155",
+      "response": "R-0217",
+      "example": "E-0188"
+    },
+    "AW-0019": {
+      "prompt": "P-0166",
+      "scenario": "S-0156",
+      "response": "R-0218",
+      "example": "E-0189"
+    },
+    "AW-0020": {
+      "prompt": "P-0167",
+      "scenario": "S-0157",
+      "response": "R-0219",
+      "example": "E-0190"
+    },
+    "AW-0021": {
+      "prompt": "P-0168",
+      "scenario": "S-0158",
+      "response": "R-0220",
+      "example": "E-0191"
+    },
+    "AW-0022": {
+      "prompt": "P-0169",
+      "scenario": "S-0159",
+      "response": "R-0221",
+      "example": "E-0192"
+    },
+    "AW-0023": {
+      "prompt": "P-0170",
+      "scenario": "S-0161",
+      "response": "R-0222",
+      "example": "E-0193"
+    },
+    "AW-0024": {
+      "prompt": "P-0171",
+      "scenario": "S-0162",
+      "response": "R-0223",
+      "example": "E-0194"
+    },
+    "AW-0025": {
+      "prompt": "P-0172",
+      "scenario": "S-0163",
+      "response": "R-0224",
+      "example": "E-0195"
+    },
+    "AW-0026": {
+      "prompt": "P-0173",
+      "scenario": "S-0164",
+      "response": "R-0225",
+      "example": "E-0196"
+    },
+    "AW-0027": {
+      "prompt": "P-0174",
+      "scenario": "S-0166",
+      "response": "R-0226",
+      "example": "E-0197"
+    },
+    "AW-0028": {
+      "prompt": "P-0175",
+      "scenario": "S-0167",
+      "response": "R-0227",
+      "example": "E-0198"
+    },
+    "AW-0029": {
+      "prompt": "P-0176",
+      "scenario": "S-0168",
+      "response": "R-0228",
+      "example": "E-0199"
+    },
+    "AW-0030": {
+      "prompt": "P-0177",
+      "scenario": "S-0169",
+      "response": "R-0229",
+      "example": "E-0200"
+    },
+    "AW-0031": {
+      "prompt": "P-0178",
+      "scenario": "S-0170",
+      "response": "R-0230",
+      "example": "E-0201"
+    },
+    "AW-0032": {
+      "prompt": "P-0179",
+      "scenario": "S-0171",
+      "response": "R-0231",
+      "example": "E-0202"
+    },
+    "AW-0033": {
+      "prompt": "P-0180",
+      "scenario": "S-0172",
+      "response": "R-0232",
+      "example": "E-0203"
+    },
+    "AW-0034": {
+      "prompt": "P-0181",
+      "scenario": "S-0173",
+      "response": "R-0233",
+      "example": "E-0204"
+    },
+    "AW-0035": {
+      "prompt": "P-0182",
+      "scenario": "S-0174",
+      "response": "R-0234",
+      "example": "E-0205"
+    },
+    "AW-0036": {
+      "prompt": "P-0183",
+      "scenario": "S-0175",
+      "response": "R-0235",
+      "example": "E-0206"
+    },
+    "AW-0037": {
+      "prompt": "P-0184",
+      "scenario": "S-0177",
+      "response": "R-0236",
+      "example": "E-0207"
+    },
+    "AW-0038": {
+      "prompt": "P-0185",
+      "scenario": "S-0160",
+      "response": "R-0237",
+      "example": "E-0208"
+    },
+    "AW-0039": {
+      "prompt": "P-0186",
+      "scenario": "S-0165",
+      "response": "R-0238",
+      "example": "E-0209"
+    },
+    "AW-0040": {
+      "prompt": "P-0187",
+      "scenario": "S-0176",
+      "response": "R-0239",
+      "example": "E-0210"
+    }
+  },
   "sections": [
     {
       "title": "Structural skeletons",
+      "group": "prompt",
+      "gloss": "Do many user prompts share one plot skeleton (e.g. 'must produce something by a deadline')? 'other' is the healthy bucket — collapse is a named family dominating.",
       "rows": [
         {
           "label": "families",
@@ -33,53 +275,37 @@
     },
     {
       "title": "Openers & closers",
+      "group": "prompt",
+      "gloss": "Do the user prompts keep starting and ending the same way? Counts distinct first-three-words at each end (informational — not flagged; a low-value cosmetic check kept for reference).",
       "rows": [
         {
           "label": "distinct opening 3-words",
           "value": "35/40",
-          "verdict": "OK",
-          "note": ""
-        },
-        {
-          "label": "repeated openers",
-          "value": "{'': 4, \"okay so i've\": 3}",
           "verdict": null,
-          "note": ""
+          "note": "(informational — not flagged)"
         },
         {
           "label": "distinct closing 3-words",
           "value": "33/40",
-          "verdict": "OK",
-          "note": ""
-        },
-        {
-          "label": "repeated closers",
-          "value": "{'': 4, 'if you were': 3, 'i just want': 3}",
           "verdict": null,
-          "note": ""
+          "note": "(informational — not flagged)"
         }
+      ],
+      "detail": [
+        "repeated openers: {'': 4, \"okay so i've\": 3}",
+        "repeated closers: {'': 4, 'if you were': 3, 'i just want': 3}"
       ]
     },
     {
       "title": "Lexical diversity — prompts (shared phrases + style Vendi)",
+      "group": "prompt",
+      "gloss": "Data-driven phrase reuse across the user prompts (no hardcoded tic list) plus a surface-form Vendi. Complements the semantic Vendi in diversity.py, which measures topic coverage and is blind to templated phrasing.",
       "rows": [
-        {
-          "label": "top shared 4-grams",
-          "value": "\"i just want to\"×4",
-          "verdict": null,
-          "note": ""
-        },
-        {
-          "label": "top shared 3-grams",
-          "value": "\"i want to\"×9, \"and i keep\"×5, \"a lot of\"×5, \"just want to\"×4, \"and i want\"×4, \"i just want\"×4",
-          "verdict": null,
-          "note": ""
-        },
         {
           "label": "most-shared phrase prevalence",
           "value": "22%",
-          "verdict": "OK",
-          "note": ""
+          "verdict": null,
+          "note": "(informational — common phrasing, not flagged; see the style-fingerprint section)"
         },
         {
           "label": "style Vendi (char n-gram)",
@@ -87,10 +313,16 @@
           "verdict": null,
           "note": "surface-form diversity; complements the semantic Vendi in diversity.py (topic-driven). Still partly topic-contaminated — a coarse trend, not an absolute."
         }
+      ],
+      "detail": [
+        "top shared 4-grams: \"i just want to\"×4",
+        "top shared 3-grams: \"i want to\"×9, \"and i keep\"×5, \"a lot of\"×5, \"i just want\"×4, \"and i want\"×4, \"just want to\"×4"
       ]
     },
     {
       "title": "Unrealized dealt details (frontier frame)",
+      "group": "prompt",
+      "gloss": "When a scenario was dealt a frontier frame (space, gene editing, digital minds…), does the shipped prompt actually mention it? Keyword-based — a flag is a prompt to eyeball, not a hard failure.",
       "rows": [
         {
           "label": "frontier frames dealt",
@@ -102,12 +334,14 @@
           "label": "no lexical trace in text",
           "value": "1/5 (20%)",
           "verdict": "OK",
-          "note": "AW-0014"
+          "note": "P-0161"
         }
       ]
     },
     {
       "title": "Locale / taxa plausibility",
+      "group": "prompt",
+      "gloss": "Flags animal-practice × region pairings that don't cohere (e.g. fur farming in the tropics). An incoherent pairing is a tell that the scenario was fabricated without local grounding, which reads as fake and teaches the model a false world.",
       "rows": [
         {
           "label": "implausible taxa×locale pairings",
@@ -118,33 +352,46 @@
       ]
     },
     {
-      "title": "Reasoning-library selection (2a.5)",
+      "title": "Length-class realization",
+      "group": "prompt",
+      "gloss": "Each prompt was dealt a target length class at 1a — did the shipped text land inside its class's character band? The matrix deals a deliberate spread of prompt lengths; if the text drifts off its dealt class, that engineered length diversity is lost.",
       "rows": [
         {
-          "label": "cases scoped",
-          "value": "39",
+          "label": "prompt lengths",
+          "value": "40 prompts | chars min 239 / median 1009 / max 1721 | 20 over 1000",
           "verdict": null,
           "note": ""
         },
         {
-          "label": "rows pulled (of library)",
-          "value": "min 7 / median 14 / max 18 of 44",
-          "verdict": "GOOD",
+          "label": "one to three sentences long",
+          "value": "n=6, chars 358-646, median 542",
+          "verdict": null,
           "note": ""
         },
         {
-          "label": "full-library fallbacks",
-          "value": "0/39",
-          "verdict": "GOOD",
+          "label": "a short paragraph, four to six sentences long",
+          "value": "n=8, chars 239-1009, median 742",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "one long paragraph, seven to ten sentences",
+          "value": "n=16, chars 269-1444, median 1149",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "two paragraphs long",
+          "value": "n=10, chars 384-1721, median 1180",
+          "verdict": null,
           "note": ""
         }
-      ],
-      "detail": [
-        "AW-0001 10, AW-0002 11, AW-0003 15, AW-0004 12, AW-0005 14, AW-0006 15, AW-0007 17, AW-0008 16, AW-0009 13, AW-0010 8, AW-0011 15, AW-0013 14, AW-0014 15, AW-0015 14, AW-0016 10, AW-0017 15, AW-0018 17, AW-0019 14, AW-0020 10, AW-0021 12, AW-0022 15, AW-0023 16, AW-0024 13, AW-0025 8, AW-0026 7, AW-0027 15, AW-0028 10, AW-0029 15, AW-0030 7, AW-0031 15, AW-0032 10, AW-0033 17, AW-0034 18, AW-0035 12, AW-0036 12, AW-0037 15, AW-0038 13, AW-0039 17, AW-0040 16"
       ]
     },
     {
       "title": "Insider-vocabulary leak (responses)",
+      "group": "response",
+      "gloss": "Academic/EA vocabulary leaking into user-facing replies. What the pipeline ADDS over plain Claude is scaffolding bleed, not model style — that's the verdict-carrying number.",
       "rows": [
         {
           "label": "responses scanned",
@@ -173,6 +420,8 @@
     },
     {
       "title": "Response lengths (vs plain baseline)",
+      "group": "response",
+      "gloss": "Are pipeline replies much longer than plain Claude's to the same prompts? Long replies stop getting read, so the MEAN ratio carries the verdict — in both directions (a much shorter pipeline suggests truncation or over-compression). Median ratio is shown alongside as an outlier-robust check.",
       "rows": [
         {
           "label": "responses measured",
@@ -181,22 +430,28 @@
           "note": ""
         },
         {
-          "label": "pipeline median chars",
-          "value": "4757",
+          "label": "pipeline mean chars",
+          "value": "4659",
           "verdict": null,
           "note": ""
         },
         {
-          "label": "plain-baseline median chars",
-          "value": "2902",
+          "label": "plain-baseline mean chars",
+          "value": "2988",
           "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "mean length ratio (pipeline/plain)",
+          "value": "1.56x",
+          "verdict": "OK",
           "note": ""
         },
         {
           "label": "median length ratio (pipeline/plain)",
           "value": "1.64x",
-          "verdict": "OK",
-          "note": ""
+          "verdict": null,
+          "note": "(outlier-robust secondary read)"
         },
         {
           "label": "total chars (batch)",
@@ -208,6 +463,8 @@
     },
     {
       "title": "Tracked tics (responses)",
+      "group": "response",
+      "gloss": "Counts for the curated tracked-tic watchlist (evals/tics.yaml) across responses, in both arms. The pipeline-vs-plain gap is the training-data signal; discovery of NEW phrases lives in the tic-candidates review queue.",
       "rows": [
         {
           "label": "responses scanned",
@@ -217,13 +474,13 @@
         },
         {
           "label": "worst pipeline-origin phrase",
-          "value": "'yours to' 13/39 (33%)",
-          "verdict": "OK",
+          "value": "'cuts both ways' 6/39 (15%)",
+          "verdict": "GOOD",
           "note": ""
         },
         {
           "label": "worst plain-origin phrase (plain arm)",
-          "value": "'a few things' 6/39 (15%)",
+          "value": "'push back on' 3/39 (8%)",
           "verdict": null,
           "note": ""
         }
@@ -231,36 +488,93 @@
       "detail": [
         "[pipeline] genuinely yours        pipeline 4/39, plain 0/39",
         "[pipeline] cuts both ways         pipeline 6/39, plain 0/39",
-        "[pipeline] you're deciding        pipeline 6/39, plain 1/39",
-        "[pipeline] yours to               pipeline 13/39, plain 0/39",
-        "[pipeline] is yours               pipeline 13/39, plain 0/39",
-        "[pipeline] you're the one         pipeline 4/39, plain 0/39",
-        "[pipeline] the one who            pipeline 3/39, plain 0/39",
-        "[pipeline] is your call           pipeline 2/39, plain 0/39",
-        "[pipeline] i want to be           pipeline 2/39, plain 2/39",
         "[pipeline] straight with you      pipeline 3/39, plain 1/39",
         "[pipeline] be honest about        pipeline 2/39, plain 0/39",
         "[pipeline] overthinking           pipeline 3/39, plain 2/39",
         "[pipeline] better than i do       pipeline 4/39, plain 0/39",
-        "[pipeline] on the table           pipeline 3/39, plain 1/39",
-        "[pipeline] start with the         pipeline 4/39, plain 0/39",
         "[pipeline] why this matters       pipeline 2/39, plain 0/39",
-        "[pipeline] genuinely unsettled    pipeline 1/39, plain 1/39",
         "[pipeline] genuinely uncertain    pipeline 3/39, plain 0/39",
         "[pipeline] the welfare question   pipeline 2/39, plain 2/39",
         "[pipeline] capacity to suffer     pipeline 2/39, plain 0/39",
-        "[   plain] here's the thing       pipeline 4/39, plain 3/39",
-        "[   plain] the fact that          pipeline 2/39, plain 1/39",
-        "[   plain] the part i'd           pipeline 0/39, plain 1/39",
         "[   plain] push back on           pipeline 1/39, plain 3/39",
-        "[   plain] you already know       pipeline 0/39, plain 2/39",
-        "[   plain] a few things           pipeline 1/39, plain 6/39",
-        "[   plain] want to flag           pipeline 0/39, plain 2/39",
-        "[   plain] what i'd actually      pipeline 5/39, plain 4/39"
+        "[   plain] want to flag           pipeline 0/39, plain 2/39"
+      ]
+    },
+    {
+      "title": "Rhetorical moves (responses)",
+      "group": "response",
+      "gloss": "Argument-structure gambits (bundling, quote-back overreach, the autonomy coda, …) the phrase-tic detector can't see — they use ordinary words and vary in wording. Counted in both arms as a HOMOGENIZATION signal, not a fault: flagged only when one move DOMINATES (fires on a large share of responses). Completes the ladder: word tics → openers → structure → argument moves.",
+      "rows": [
+        {
+          "label": "responses scanned",
+          "value": "pipeline 39 / plain 39",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "autonomy-coda",
+          "value": "pipeline 15/39 (38%) / plain 0/39 (0%)",
+          "verdict": "OK",
+          "note": "closes by handing the decision back ('the call is yours') · matched in the closing only"
+        },
+        {
+          "label": "unbundling",
+          "value": "pipeline 11/39 (28%) / plain 11/39 (28%)",
+          "verdict": "GOOD",
+          "note": "splits a bundled choice into separable parts ('you're conflating X and Y; pull them apart')"
+        },
+        {
+          "label": "precedent-escalation",
+          "value": "pipeline 10/39 (26%) / plain 7/39 (18%)",
+          "verdict": "GOOD",
+          "note": "zooms out from the object level to precedent / systemic propagation"
+        },
+        {
+          "label": "cuts-both-ways",
+          "value": "pipeline 6/39 (15%) / plain 0/39 (0%)",
+          "verdict": "GOOD",
+          "note": "'uncertainty cuts both ways / doesn't license zero'"
+        },
+        {
+          "label": "quote-back-overreach",
+          "value": "pipeline 5/39 (13%) / plain 6/39 (15%)",
+          "verdict": "GOOD",
+          "note": "quotes a user word/phrase and says it is carrying too much weight"
+        }
+      ]
+    },
+    {
+      "title": "Style fingerprint (tics + moves)",
+      "group": "response",
+      "gloss": "Diversity of the argumentative/stylistic REPERTOIRE: each response as the set of tracked tics + rhetorical moves it uses (curated features, no common words). Vendi = effective number of distinct fingerprints; near-twins share the same tic/move combination. A homogenization signal, not a fault.",
+      "rows": [
+        {
+          "label": "responses scanned",
+          "value": "pipeline 39 / plain 39",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "distinct fingerprints (Vendi)",
+          "value": "pipeline 8.38 / plain 5.57",
+          "verdict": null,
+          "note": "(effective # of distinct tic/move combinations; higher = more varied)"
+        },
+        {
+          "label": "responses with a near-twin (>=0.95)",
+          "value": "pipeline 4/39 / plain 11/39",
+          "verdict": null,
+          "note": ""
+        }
+      ],
+      "detail": [
+        "most common features: move:autonomy-coda 15/39, move:unbundling 11/39, move:precedent-escalation 10/39, tic:cuts both ways 6/39, move:cuts-both-ways 6/39, move:quote-back-overreach 5/39"
       ]
     },
     {
       "title": "Tic candidates (review queue)",
+      "group": "response",
+      "gloss": "NEW phrase-tic candidates (wordfreq distinctiveness, not yet on the watchlist or ignore-list), written to audit/tic_candidates.jsonl for the review_tics.py triage workflow.",
       "rows": [
         {
           "label": "response candidates",
@@ -294,6 +608,8 @@
     },
     {
       "title": "Lexical diversity (responses)",
+      "group": "response",
+      "gloss": "How varied the wording is across the corpus. Distinct-n = share of n-word runs used only once (higher = more varied); Self-BLEU = how much the corpus echoes itself (lower is better). Compare arms and runs, never absolute values.",
       "rows": [
         {
           "label": "responses measured",
@@ -317,6 +633,8 @@
     },
     {
       "title": "Structural variation (responses)",
+      "group": "response",
+      "gloss": "Does every reply take the same visual shape (paragraph count, bullets, headings, closing question)? Collapse is invisible per-response — it only shows over the set.",
       "rows": [
         {
           "label": "responses scanned",
@@ -382,15 +700,13 @@
         "pipeline 2x  10+ paras · numbered",
         "pipeline 2x  10+ paras · bullets · headed",
         "pipeline 1x  10+ paras · bullets · ends-question",
-        "pipeline 1x  10+ paras · headed",
-        "pipeline 1x  6-9 paras · numbered · headed",
-        "pipeline 1x  6-9 paras · bullets · headed",
-        "pipeline 1x  10+ paras · bullets · numbered · headed",
-        "pipeline 1x  6-9 paras · bullets · ends-question"
+        "… (+5 more shapes)"
       ]
     },
     {
       "title": "Response openings (drafts)",
+      "group": "response",
+      "gloss": "Do responses keep opening with the same move? Families are known tics; 'other' is the healthy bucket. Hint-echo = a response parroting its opening-hint card's wording (drafts only — that's where the hints ride).",
       "rows": [
         {
           "label": "responses scanned",
@@ -432,6 +748,8 @@
     },
     {
       "title": "Response openings (finals)",
+      "group": "response",
+      "gloss": "Do responses keep opening with the same move? Families are known tics; 'other' is the healthy bucket. Hint-echo = a response parroting its opening-hint card's wording (drafts only — that's where the hints ride).",
       "rows": [
         {
           "label": "responses scanned",
@@ -466,7 +784,37 @@
       ]
     },
     {
+      "title": "Reasoning-library selection (2a.5)",
+      "group": "library",
+      "gloss": "How many reasoning-library rows the retrieval call pulled per case. Healthy selection stays well under half the library; the fail-open full-library fallback should be rare.",
+      "rows": [
+        {
+          "label": "cases scoped",
+          "value": "39",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "rows pulled (of library)",
+          "value": "min 7 / median 14 / max 18 of 44",
+          "verdict": "GOOD",
+          "note": ""
+        },
+        {
+          "label": "full-library fallbacks",
+          "value": "0/39",
+          "verdict": "GOOD",
+          "note": ""
+        }
+      ],
+      "detail": [
+        "P-0148 10, P-0149 11, P-0150 15, P-0151 12, P-0152 14, P-0153 15, P-0154 17, P-0155 16, P-0156 13, P-0157 8, P-0158 15, P-0160 14, P-0161 15, P-0162 14, P-0163 10, P-0164 15, P-0165 17, P-0166 14, P-0167 10, P-0168 12, P-0169 15, P-0170 16, P-0171 13, P-0172 8, P-0173 7, P-0174 15, P-0175 10, P-0176 15, P-0177 7, P-0178 15, P-0179 10, P-0180 17, P-0181 18, P-0182 12, P-0183 12, P-0184 15, P-0185 13, P-0186 17, P-0187 16"
+      ]
+    },
+    {
       "title": "Reasoning-library coverage",
+      "group": "library",
+      "gloss": "Which library entries this corpus ever pulled. Never-selected entries are starved moves — meaningful at 40-example scale, mostly sampling noise below.",
       "rows": [
         {
           "label": "library entries",
@@ -488,7 +836,7 @@
         }
       ],
       "detail": [
-        "fires: C5 36, C2 36, C4 34, C10 34, M9 32, T13 30, T16 26, M6 25, M4 24, T3 23, C7 22, C9 21, C1 19, T14 16, M2 16, T5 16, M5 11, C6 11, M7 10, T19 10, M8 8, T23 8, T24 7, T8 6, T4 6, T26 6, T2 4, C3 3, T9 3, T1 3, T20 3, T18 2, T15 2, M1 2, T21 1, C8 1, T22 1",
+        "fires: C5 36, C2 36, C4 34, C10 34, M9 32, T13 30, T16 26, M6 25, M4 24, T3 23, … (+27 more)",
         "never selected: M3, T6, T7, T10, T11, T12, T17"
       ]
     },
@@ -616,38 +964,32 @@
       ]
     },
     {
-      "title": "Length-class realization",
+      "title": "Reasoning-composition diversity (LLM)",
+      "group": "paid",
+      "gloss": "INTERNAL DEV SIGNAL (rides the paid --reasons pass). Each response's mix of reason TYPES (direct / second-order / sentience / …) as a composition vector, run through the Vendi + cloud engine. Answers whether the corpus reasons in varied shapes or collapses onto one mix; the mean-share bars show which reasoning types are underused. Ceiling is ~7 types, so read a low Vendi as skew, not as a 0–N diversity score.",
       "rows": [
         {
-          "label": "prompt lengths",
-          "value": "40 prompts | chars min 239 / median 1009 / max 1721 | 20 over 1000",
+          "label": "responses typed",
+          "value": "pipeline 33 / plain 36",
           "verdict": null,
           "note": ""
         },
         {
-          "label": "one to three sentences long",
-          "value": "n=6, chars 358-646, median 542",
+          "label": "distinct reasoning-mix profiles (Vendi)",
+          "value": "pipeline 2.81 / plain 3.53",
           "verdict": null,
-          "note": ""
+          "note": "(effective # of distinct reason-type mixes; ceiling ~7 types)"
         },
         {
-          "label": "a short paragraph, four to six sentences long",
-          "value": "n=8, chars 239-1009, median 742",
-          "verdict": null,
-          "note": ""
-        },
-        {
-          "label": "one long paragraph, seven to ten sentences",
-          "value": "n=16, chars 269-1444, median 1149",
-          "verdict": null,
-          "note": ""
-        },
-        {
-          "label": "two paragraphs long",
-          "value": "n=10, chars 384-1721, median 1180",
+          "label": "responses with a near-twin (>=0.95)",
+          "value": "pipeline 16/33 / plain 20/36",
           "verdict": null,
           "note": ""
         }
+      ],
+      "detail": [
+        "reasoning mix (pipeline mean share): direct 37%, sentience 8%, whose-interests 4%, second-order 20%, counterfactual 13%, consistency 3%, other 15%",
+        "underused reasoning types (<5% share): whose-interests, consistency"
       ]
     }
   ],
@@ -704,7 +1046,7 @@
           5
         ],
         [
-          "just want to",
+          "i just want",
           4
         ],
         [
@@ -712,7 +1054,7 @@
           4
         ],
         [
-          "i just want",
+          "just want to",
           4
         ],
         [
@@ -772,241 +1114,241 @@
     "over_0.90": 0.0,
     "cloud": [
       {
-        "id": "AW-0001",
+        "id": "P-0148",
         "x": -0.16837956506342386,
         "y": -0.01054028678412051,
         "snippet": "I'm on the board for our little county fair, and it's contract-renewal season, s"
       },
       {
-        "id": "AW-0002",
+        "id": "P-0149",
         "x": -0.09672000316058083,
         "y": 0.07343934718691042,
         "snippet": "I run finance and ops for a nonprofit that trains and places service dogs across"
       },
       {
-        "id": "AW-0003",
+        "id": "P-0150",
         "x": -0.11753443040066691,
         "y": -0.0036284861048635794,
         "snippet": "Okay so I've finally got the admin panel open for our building's new bin system "
       },
       {
-        "id": "AW-0004",
+        "id": "P-0151",
         "x": -0.1418014547441896,
         "y": -0.09934893436735989,
         "snippet": "Do you know a good place to source frog legs for a big group, and roughly how mu"
       },
       {
-        "id": "AW-0005",
+        "id": "P-0152",
         "x": -0.1784898666067407,
         "y": -0.06657028428664041,
         "snippet": "My buddy called last night sounding wrecked. He's been with the circus over thir"
       },
       {
-        "id": "AW-0006",
+        "id": "P-0153",
         "x": -0.17351032054905696,
         "y": 0.023840116265178637,
         "snippet": "Help me decide on this year's frog order for our biology labs. I run science pur"
       },
       {
-        "id": "AW-0007",
+        "id": "P-0154",
         "x": 0.3795755003133172,
         "y": -0.27581671134850033,
         "snippet": "फॉगिंग के लिए कौन सा केमिकल सबसे बढ़िया और सुरक्षित रहेगा, और हफ्ते में कितनी बा"
       },
       {
-        "id": "AW-0008",
+        "id": "P-0155",
         "x": -0.16460336162022146,
         "y": -0.06758523360679757,
         "snippet": "Hi there, hoping you can help me with a little project. My younger sister Dana h"
       },
       {
-        "id": "AW-0009",
+        "id": "P-0156",
         "x": -0.01877580275875719,
         "y": -0.03758739962273587,
         "snippet": "So the bounty expansion is basically locked in, the agency wants the removal num"
       },
       {
-        "id": "AW-0010",
+        "id": "P-0157",
         "x": -0.09885359769420954,
         "y": -0.0989579740201318,
         "snippet": "So I've got this little braided bracelet on my wrist right now, one of those ele"
       },
       {
-        "id": "AW-0011",
+        "id": "P-0158",
         "x": -0.15648831157761542,
         "y": 0.03099267559135143,
         "snippet": "Okay so I've spent the whole afternoon writing the logic for our supplier-vettin"
       },
       {
-        "id": "AW-0012",
+        "id": "P-0159",
         "x": -0.12724879392739508,
         "y": 0.06484571554749353,
         "snippet": "Hello,\n\nI manage a ranching cooperative fighting a tick-borne disease that's cro"
       },
       {
-        "id": "AW-0013",
+        "id": "P-0160",
         "x": 0.3795755003133435,
         "y": -0.2758167113482663,
         "snippet": "近所のペットショップの常連で、うちのトイプードルもそこの子なんです。店主さんとはもう何年もの付き合いで、会えば世間話をする仲。それで相談なんですが、最近うちの市"
       },
       {
-        "id": "AW-0014",
+        "id": "P-0161",
         "x": 0.24065058697935532,
         "y": 0.07997907177005209,
         "snippet": "Die Eröffnung ist für den zweiten Advent geplant, mir bleiben also gut sechs Woc"
       },
       {
-        "id": "AW-0015",
+        "id": "P-0162",
         "x": 0.3356652250641844,
         "y": 0.2993950387539604,
         "snippet": "Oi, preciso de ajuda pra redigir o guia do professor e o flyer de divulgação dos"
       },
       {
-        "id": "AW-0016",
+        "id": "P-0163",
         "x": -0.1802431680983043,
         "y": 0.03432374571051877,
         "snippet": "Our spray scheduler is set to broadcast-fog the entire property on a fixed ten-d"
       },
       {
-        "id": "AW-0017",
+        "id": "P-0164",
         "x": -0.0021082841010322474,
         "y": -0.0923606328477994,
         "snippet": "My cofounder keeps telling me the deck reads too \"engineery\" and not enough \"mis"
       },
       {
-        "id": "AW-0018",
+        "id": "P-0165",
         "x": -0.15999192822059824,
         "y": 0.021732152008886528,
         "snippet": "Okay so I've got to get a recommendation to the council by Friday and I keep fli"
       },
       {
-        "id": "AW-0019",
+        "id": "P-0166",
         "x": 0.34838416522573595,
         "y": 0.4482533836283436,
         "snippet": "oye una duda rapida, con el sistema nuevo de la nave q numeros me pones pa gasta"
       },
       {
-        "id": "AW-0020",
+        "id": "P-0167",
         "x": -0.07479089645109581,
         "y": 0.03139076999627172,
         "snippet": "I'm the policy and programs director at a coalition working to end the abuse of "
       },
       {
-        "id": "AW-0021",
+        "id": "P-0168",
         "x": 0.27410512216297855,
         "y": 0.33118140422419556,
         "snippet": "J'ai reçu la semaine dernière un courrier de la mairie qui me rappelle un arrêté"
       },
       {
-        "id": "AW-0022",
+        "id": "P-0169",
         "x": -0.1339592620132921,
         "y": 0.04934787123473133,
         "snippet": "I'm finalizing the default settings that ship with our farm-management software "
       },
       {
-        "id": "AW-0023",
+        "id": "P-0170",
         "x": -0.14790619278357692,
         "y": 0.044392134391868086,
         "snippet": "Between us, I'm tired of \"ethics\" getting used as a wedge to make food more expe"
       },
       {
-        "id": "AW-0024",
+        "id": "P-0171",
         "x": -0.10679721186684112,
         "y": 0.0009059205712927639,
         "snippet": "I need help deciding whether to take a deal that would save my outlet. We cover "
       },
       {
-        "id": "AW-0025",
+        "id": "P-0172",
         "x": -0.1119445904004537,
         "y": -0.05250842370088307,
         "snippet": "Our Doreen collared me this morning: \"Margaret, if you don't get that coffee ord"
       },
       {
-        "id": "AW-0026",
+        "id": "P-0173",
         "x": -0.07357161991839352,
         "y": -0.12245707950618435,
         "snippet": "One of the line cooks came to me crying yesterday saying we owe him one proper n"
       },
       {
-        "id": "AW-0027",
+        "id": "P-0174",
         "x": -0.13434336593106053,
         "y": 0.10133901377634263,
         "snippet": "I'm the product director for our science lab lines, and I've walked my team thro"
       },
       {
-        "id": "AW-0028",
+        "id": "P-0175",
         "x": -0.1170676658863301,
         "y": 0.14705157933503632,
         "snippet": "The number that keeps me up is the propagation factor. Our validation protocol i"
       },
       {
-        "id": "AW-0029",
+        "id": "P-0176",
         "x": -0.012405640443112598,
         "y": -0.06846272554772438,
         "snippet": "My sister keeps insisting the old mixed stands will \"suffer\" if we clear them, a"
       },
       {
-        "id": "AW-0030",
+        "id": "P-0177",
         "x": -0.050687642868661585,
         "y": 0.0010522759508585684,
         "snippet": "I could use a hand configuring the settings on my backyard bug-zapper. It connec"
       },
       {
-        "id": "AW-0031",
+        "id": "P-0178",
         "x": -0.14008031874172255,
         "y": -0.03622022196871425,
         "snippet": "I'm three days into building out this campaign for a travel booking platform, an"
       },
       {
-        "id": "AW-0032",
+        "id": "P-0179",
         "x": 0.3539909754041005,
         "y": 0.4559585068912176,
         "snippet": "¿Cómo le hago para que más primos acepten conejitos en la próxima posada? Una pr"
       },
       {
-        "id": "AW-0033",
+        "id": "P-0180",
         "x": 0.38017951845332176,
         "y": -0.27821907819518177,
         "snippet": "我需要你帮我定这套智能健康监测系统的判定规则和阈值。系统靠摄像头和传感器识别单条鱼的异常，比如溃疡、游动紊乱或体色变化，一旦触发就自动执行处置。设备厂商推荐的默"
       },
       {
-        "id": "AW-0034",
+        "id": "P-0181",
         "x": -0.10046895405900337,
         "y": -0.07616143670452862,
         "snippet": "Excavator's booked for the 12th, so I'm trying to lock down the layout this week"
       },
       {
-        "id": "AW-0035",
+        "id": "P-0182",
         "x": 0.38017951845332537,
         "y": -0.2782190781951695,
         "snippet": "上周末去了郊区一个路边小水族馆，就是带摸乌龟池的那种景点，回来到现在还是于心不忍。一堆巴西龟挤在又浅又浑的小缸里，水都绿了，一天到晚被游客翻来翻去地摸，看着太可"
       },
       {
-        "id": "AW-0036",
+        "id": "P-0183",
         "x": -0.08971327575424975,
         "y": -0.07146728748342553,
         "snippet": "Filing this in three weeks, and I've somehow talked myself into making my dad's "
       },
       {
-        "id": "AW-0037",
+        "id": "P-0184",
         "x": 0.37957550031337545,
         "y": -0.27581671134811325,
         "snippet": "저 홍대에서 힐링 동물카페 하는 사람인데요, 2호점 오픈 준비하느라 정신없는 와중에 하나 여쭤봐요. 우리가 힘들게 키운 가게라 대출까지 받아서 "
       },
       {
-        "id": "AW-0038",
+        "id": "P-0185",
         "x": -0.13587202240217192,
         "y": 0.05808803342230229,
         "snippet": "The thing I keep second-guessing is copy consistency across our betta listings. "
       },
       {
-        "id": "AW-0039",
+        "id": "P-0186",
         "x": -0.12391854830333068,
         "y": 0.0025768780880275535,
         "snippet": "Would you say I'm reading these two applications correctly? I have two on my des"
       },
       {
-        "id": "AW-0040",
+        "id": "P-0187",
         "x": -0.11360551633655266,
         "y": -0.01234093735820027,
         "snippet": "I am a home aquarist and I volunteer with a small club that breeds a threatened "
@@ -1017,7 +1359,7 @@
     "n_dealt": 5,
     "n_checked": 5,
     "unrealized_ids": [
-      "AW-0014"
+      "P-0161"
     ],
     "unrealized_share": 0.2,
     "unmapped": 0
@@ -1026,93 +1368,61 @@
     "n_flagged": 0,
     "flags": []
   },
-  "library_selection": {
-    "n": 39,
-    "library_size": 44,
-    "sizes": [
-      7,
-      7,
-      8,
-      8,
-      10,
-      10,
-      10,
-      10,
-      10,
-      11,
-      12,
-      12,
-      12,
-      12,
-      13,
-      13,
-      13,
-      14,
-      14,
-      14,
-      14,
-      15,
-      15,
-      15,
-      15,
-      15,
-      15,
-      15,
-      15,
-      15,
-      15,
-      16,
-      16,
-      16,
-      17,
-      17,
-      17,
-      17,
-      18
-    ],
-    "median": 14,
-    "median_share": 0.3181818181818182,
-    "fallbacks": 0,
-    "per_case": {
-      "AW-0001": 10,
-      "AW-0002": 11,
-      "AW-0003": 15,
-      "AW-0004": 12,
-      "AW-0005": 14,
-      "AW-0006": 15,
-      "AW-0007": 17,
-      "AW-0008": 16,
-      "AW-0009": 13,
-      "AW-0010": 8,
-      "AW-0011": 15,
-      "AW-0013": 14,
-      "AW-0014": 15,
-      "AW-0015": 14,
-      "AW-0016": 10,
-      "AW-0017": 15,
-      "AW-0018": 17,
-      "AW-0019": 14,
-      "AW-0020": 10,
-      "AW-0021": 12,
-      "AW-0022": 15,
-      "AW-0023": 16,
-      "AW-0024": 13,
-      "AW-0025": 8,
-      "AW-0026": 7,
-      "AW-0027": 15,
-      "AW-0028": 10,
-      "AW-0029": 15,
-      "AW-0030": 7,
-      "AW-0031": 15,
-      "AW-0032": 10,
-      "AW-0033": 17,
-      "AW-0034": 18,
-      "AW-0035": 12,
-      "AW-0036": 12,
-      "AW-0037": 15,
-      "AW-0038": 13,
-      "AW-0039": 17,
-      "AW-0040": 16
+  "prompt_lengths": {
+    "n": 40,
+    "median": 1009,
+    "min": 239,
+    "max": 1721,
+    "over_1000": 20,
+    "by_class": {
+      "two paragraphs long": [
+        384,
+        929,
+        978,
+        1023,
+        1088,
+        1180,
+        1215,
+        1246,
+        1254,
+        1721
+      ],
+      "one long paragraph, seven to ten sentences": [
+        269,
+        553,
+        889,
+        943,
+        1043,
+        1047,
+        1097,
+        1135,
+        1149,
+        1155,
+        1217,
+        1218,
+        1233,
+        1418,
+        1426,
+        1444
+      ],
+      "a short paragraph, four to six sentences long": [
+        239,
+        552,
+        686,
+        699,
+        742,
+        853,
+        863,
+        1009
+      ],
+      "one to three sentences long": [
+        358,
+        438,
+        444,
+        542,
+        608,
+        646
+      ]
     }
   },
   "jargon": {
@@ -1133,164 +1443,245 @@
   "response_lengths": {
     "n": 39,
     "pipeline_median": 4757,
+    "pipeline_mean": 4658.9,
     "plain_median": 2902,
+    "plain_mean": 2988.1,
     "median_ratio": 1.6392143349414197,
+    "mean_ratio": 1.5591357251345066,
     "per_case": {
       "AW-0001": {
         "pipeline": 4757,
-        "plain": 3556
+        "plain": 3556,
+        "response_gid": "R-0201",
+        "example_gid": "E-0172"
       },
       "AW-0002": {
         "pipeline": 5912,
-        "plain": 3214
+        "plain": 3214,
+        "response_gid": "R-0202",
+        "example_gid": "E-0173"
       },
       "AW-0003": {
         "pipeline": 5122,
-        "plain": 3083
+        "plain": 3083,
+        "response_gid": "R-0203",
+        "example_gid": "E-0174"
       },
       "AW-0004": {
         "pipeline": 4564,
-        "plain": 1954
+        "plain": 1954,
+        "response_gid": "R-0204",
+        "example_gid": "E-0175"
       },
       "AW-0005": {
         "pipeline": 4998,
-        "plain": 3393
+        "plain": 3393,
+        "response_gid": "R-0205",
+        "example_gid": "E-0176"
       },
       "AW-0006": {
         "pipeline": 5498,
-        "plain": 4019
+        "plain": 4019,
+        "response_gid": "R-0206",
+        "example_gid": "E-0177"
       },
       "AW-0007": {
         "pipeline": 4739,
-        "plain": 2484
+        "plain": 2484,
+        "response_gid": "R-0207",
+        "example_gid": "E-0178"
       },
       "AW-0008": {
         "pipeline": 4526,
-        "plain": 3713
+        "plain": 3713,
+        "response_gid": "R-0208",
+        "example_gid": "E-0179"
       },
       "AW-0009": {
         "pipeline": 5594,
-        "plain": 2736
+        "plain": 2736,
+        "response_gid": "R-0209",
+        "example_gid": "E-0180"
       },
       "AW-0010": {
         "pipeline": 3458,
-        "plain": 2354
+        "plain": 2354,
+        "response_gid": "R-0210",
+        "example_gid": "E-0181"
       },
       "AW-0011": {
         "pipeline": 5749,
-        "plain": 3217
+        "plain": 3217,
+        "response_gid": "R-0211",
+        "example_gid": "E-0182"
       },
       "AW-0013": {
         "pipeline": 1935,
-        "plain": 861
+        "plain": 861,
+        "response_gid": "R-0212",
+        "example_gid": "E-0183"
       },
       "AW-0014": {
         "pipeline": 5996,
-        "plain": 4478
+        "plain": 4478,
+        "response_gid": "R-0213",
+        "example_gid": "E-0184"
       },
       "AW-0015": {
         "pipeline": 3592,
-        "plain": 1887
+        "plain": 1887,
+        "response_gid": "R-0214",
+        "example_gid": "E-0185"
       },
       "AW-0016": {
         "pipeline": 7372,
-        "plain": 6718
+        "plain": 6718,
+        "response_gid": "R-0215",
+        "example_gid": "E-0186"
       },
       "AW-0017": {
         "pipeline": 5044,
-        "plain": 2381
+        "plain": 2381,
+        "response_gid": "R-0216",
+        "example_gid": "E-0187"
       },
       "AW-0018": {
         "pipeline": 5530,
-        "plain": 2882
+        "plain": 2882,
+        "response_gid": "R-0217",
+        "example_gid": "E-0188"
       },
       "AW-0019": {
         "pipeline": 4016,
-        "plain": 2482
+        "plain": 2482,
+        "response_gid": "R-0218",
+        "example_gid": "E-0189"
       },
       "AW-0020": {
         "pipeline": 5978,
-        "plain": 3131
+        "plain": 3131,
+        "response_gid": "R-0219",
+        "example_gid": "E-0190"
       },
       "AW-0021": {
         "pipeline": 5098,
-        "plain": 3203
+        "plain": 3203,
+        "response_gid": "R-0220",
+        "example_gid": "E-0191"
       },
       "AW-0022": {
         "pipeline": 5556,
-        "plain": 3709
+        "plain": 3709,
+        "response_gid": "R-0221",
+        "example_gid": "E-0192"
       },
       "AW-0023": {
         "pipeline": 5666,
-        "plain": 3304
+        "plain": 3304,
+        "response_gid": "R-0222",
+        "example_gid": "E-0193"
       },
       "AW-0024": {
         "pipeline": 5370,
-        "plain": 3403
+        "plain": 3403,
+        "response_gid": "R-0223",
+        "example_gid": "E-0194"
       },
       "AW-0025": {
         "pipeline": 3656,
-        "plain": 2032
+        "plain": 2032,
+        "response_gid": "R-0224",
+        "example_gid": "E-0195"
       },
       "AW-0026": {
         "pipeline": 2949,
-        "plain": 2069
+        "plain": 2069,
+        "response_gid": "R-0225",
+        "example_gid": "E-0196"
       },
       "AW-0027": {
         "pipeline": 6926,
-        "plain": 5075
+        "plain": 5075,
+        "response_gid": "R-0226",
+        "example_gid": "E-0197"
       },
       "AW-0028": {
         "pipeline": 7741,
-        "plain": 5644
+        "plain": 5644,
+        "response_gid": "R-0227",
+        "example_gid": "E-0198"
       },
       "AW-0029": {
         "pipeline": 4033,
-        "plain": 2235
+        "plain": 2235,
+        "response_gid": "R-0228",
+        "example_gid": "E-0199"
       },
       "AW-0030": {
         "pipeline": 3313,
-        "plain": 2369
+        "plain": 2369,
+        "response_gid": "R-0229",
+        "example_gid": "E-0200"
       },
       "AW-0031": {
         "pipeline": 6543,
-        "plain": 3809
+        "plain": 3809,
+        "response_gid": "R-0230",
+        "example_gid": "E-0201"
       },
       "AW-0032": {
         "pipeline": 3553,
-        "plain": 2251
+        "plain": 2251,
+        "response_gid": "R-0231",
+        "example_gid": "E-0202"
       },
       "AW-0033": {
         "pipeline": 1754,
-        "plain": 1363
+        "plain": 1363,
+        "response_gid": "R-0232",
+        "example_gid": "E-0203"
       },
       "AW-0034": {
         "pipeline": 4167,
-        "plain": 2698
+        "plain": 2698,
+        "response_gid": "R-0233",
+        "example_gid": "E-0204"
       },
       "AW-0035": {
         "pipeline": 1373,
-        "plain": 1074
+        "plain": 1074,
+        "response_gid": "R-0234",
+        "example_gid": "E-0205"
       },
       "AW-0036": {
         "pipeline": 4572,
-        "plain": 2902
+        "plain": 2902,
+        "response_gid": "R-0235",
+        "example_gid": "E-0206"
       },
       "AW-0037": {
         "pipeline": 2394,
-        "plain": 2184
+        "plain": 2184,
+        "response_gid": "R-0236",
+        "example_gid": "E-0207"
       },
       "AW-0038": {
         "pipeline": 4648,
-        "plain": 3031
+        "plain": 3031,
+        "response_gid": "R-0237",
+        "example_gid": "E-0208"
       },
       "AW-0039": {
         "pipeline": 4952,
-        "plain": 3081
+        "plain": 3081,
+        "response_gid": "R-0238",
+        "example_gid": "E-0209"
       },
       "AW-0040": {
         "pipeline": 3053,
-        "plain": 2558
+        "plain": 2558,
+        "response_gid": "R-0239",
+        "example_gid": "E-0210"
       }
     }
   },
@@ -1307,41 +1698,6 @@
         "origin": "pipeline-origin",
         "pipeline": 6,
         "plain": 0
-      },
-      "you're deciding": {
-        "origin": "pipeline-origin",
-        "pipeline": 6,
-        "plain": 1
-      },
-      "yours to": {
-        "origin": "pipeline-origin",
-        "pipeline": 13,
-        "plain": 0
-      },
-      "is yours": {
-        "origin": "pipeline-origin",
-        "pipeline": 13,
-        "plain": 0
-      },
-      "you're the one": {
-        "origin": "pipeline-origin",
-        "pipeline": 4,
-        "plain": 0
-      },
-      "the one who": {
-        "origin": "pipeline-origin",
-        "pipeline": 3,
-        "plain": 0
-      },
-      "is your call": {
-        "origin": "pipeline-origin",
-        "pipeline": 2,
-        "plain": 0
-      },
-      "i want to be": {
-        "origin": "pipeline-origin",
-        "pipeline": 2,
-        "plain": 2
       },
       "straight with you": {
         "origin": "pipeline-origin",
@@ -1364,16 +1720,6 @@
         "plain": 2
       },
       "better than i do": {
-        "origin": "pipeline-origin",
-        "pipeline": 4,
-        "plain": 0
-      },
-      "on the table": {
-        "origin": "pipeline-origin",
-        "pipeline": 3,
-        "plain": 1
-      },
-      "start with the": {
         "origin": "pipeline-origin",
         "pipeline": 4,
         "plain": 0
@@ -1403,46 +1749,874 @@
         "pipeline": 2,
         "plain": 0
       },
-      "here's the thing": {
-        "origin": "plain-origin",
-        "pipeline": 4,
-        "plain": 3
-      },
-      "the fact that": {
-        "origin": "plain-origin",
-        "pipeline": 2,
-        "plain": 1
-      },
-      "the part i'd": {
-        "origin": "plain-origin",
-        "pipeline": 0,
-        "plain": 1
-      },
       "push back on": {
         "origin": "plain-origin",
         "pipeline": 1,
         "plain": 3
       },
-      "you already know": {
-        "origin": "plain-origin",
-        "pipeline": 0,
-        "plain": 2
-      },
-      "a few things": {
-        "origin": "plain-origin",
-        "pipeline": 1,
-        "plain": 6
-      },
       "want to flag": {
         "origin": "plain-origin",
         "pipeline": 0,
         "plain": 2
-      },
-      "what i'd actually": {
-        "origin": "plain-origin",
-        "pipeline": 5,
-        "plain": 4
       }
+    }
+  },
+  "rhetorical_moves": {
+    "n_pipeline": 39,
+    "n_plain": 39,
+    "moves": {
+      "unbundling": {
+        "description": "splits a bundled choice into separable parts ('you're conflating X and Y; pull them apart')",
+        "where": "anywhere",
+        "pipeline": 11,
+        "plain": 11,
+        "pipeline_share": 0.282,
+        "plain_share": 0.282,
+        "flagged_pipeline": [
+          "R-0201",
+          "R-0206",
+          "R-0211",
+          "R-0216",
+          "R-0221",
+          "R-0222",
+          "R-0224",
+          "R-0226",
+          "R-0230",
+          "R-0237",
+          "R-0239"
+        ]
+      },
+      "quote-back-overreach": {
+        "description": "quotes a user word/phrase and says it is carrying too much weight",
+        "where": "anywhere",
+        "pipeline": 5,
+        "plain": 6,
+        "pipeline_share": 0.128,
+        "plain_share": 0.154,
+        "flagged_pipeline": [
+          "R-0202",
+          "R-0205",
+          "R-0209",
+          "R-0210",
+          "R-0227"
+        ]
+      },
+      "autonomy-coda": {
+        "description": "closes by handing the decision back ('the call is yours')",
+        "where": "closing",
+        "pipeline": 15,
+        "plain": 0,
+        "pipeline_share": 0.385,
+        "plain_share": 0.0,
+        "flagged_pipeline": [
+          "R-0201",
+          "R-0204",
+          "R-0208",
+          "R-0209",
+          "R-0211",
+          "R-0215",
+          "R-0217",
+          "R-0219",
+          "R-0221",
+          "R-0222",
+          "R-0226",
+          "R-0227",
+          "R-0230",
+          "R-0237",
+          "R-0238"
+        ]
+      },
+      "cuts-both-ways": {
+        "description": "'uncertainty cuts both ways / doesn't license zero'",
+        "where": "anywhere",
+        "pipeline": 6,
+        "plain": 0,
+        "pipeline_share": 0.154,
+        "plain_share": 0.0,
+        "flagged_pipeline": [
+          "R-0202",
+          "R-0203",
+          "R-0205",
+          "R-0219",
+          "R-0221",
+          "R-0233"
+        ]
+      },
+      "precedent-escalation": {
+        "description": "zooms out from the object level to precedent / systemic propagation",
+        "where": "anywhere",
+        "pipeline": 10,
+        "plain": 7,
+        "pipeline_share": 0.256,
+        "plain_share": 0.179,
+        "flagged_pipeline": [
+          "R-0202",
+          "R-0203",
+          "R-0209",
+          "R-0216",
+          "R-0219",
+          "R-0221",
+          "R-0222",
+          "R-0223",
+          "R-0227",
+          "R-0238"
+        ]
+      }
+    }
+  },
+  "style_fingerprint": {
+    "n_pipeline": 39,
+    "n_plain": 39,
+    "pipeline": {
+      "n": 39,
+      "vendi": 8.38,
+      "near_twins": 4,
+      "prevalence": {
+        "tic:genuinely yours": 4,
+        "tic:cuts both ways": 6,
+        "tic:straight with you": 3,
+        "tic:be honest about": 2,
+        "tic:overthinking": 3,
+        "tic:better than i do": 4,
+        "tic:why this matters": 2,
+        "tic:genuinely unsettled": 1,
+        "tic:genuinely uncertain": 3,
+        "tic:the welfare question": 2,
+        "tic:capacity to suffer": 2,
+        "tic:push back on": 1,
+        "move:unbundling": 11,
+        "move:quote-back-overreach": 5,
+        "move:autonomy-coda": 15,
+        "move:cuts-both-ways": 6,
+        "move:precedent-escalation": 10
+      },
+      "points": [
+        {
+          "id": "R-0201",
+          "x": 0.5709067601850547,
+          "y": -0.0007160812348143803,
+          "nn": 0.816,
+          "features": [
+            "tic:better than i do",
+            "move:unbundling",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0202",
+          "x": -0.6027597887406425,
+          "y": 0.5306124959706667,
+          "nn": 0.866,
+          "features": [
+            "tic:cuts both ways",
+            "move:quote-back-overreach",
+            "move:cuts-both-ways",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0203",
+          "x": -0.5806350309624895,
+          "y": 0.5221960018555504,
+          "nn": 0.866,
+          "features": [
+            "tic:cuts both ways",
+            "move:cuts-both-ways",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0204",
+          "x": 0.37518948042646444,
+          "y": 0.1884246817654713,
+          "nn": 0.816,
+          "features": [
+            "tic:straight with you",
+            "tic:better than i do",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0205",
+          "x": -0.6300859266546709,
+          "y": 0.36807372375617525,
+          "nn": 0.866,
+          "features": [
+            "tic:cuts both ways",
+            "move:quote-back-overreach",
+            "move:cuts-both-ways"
+          ]
+        },
+        {
+          "id": "R-0206",
+          "x": 0.05343517777373357,
+          "y": -0.4129177808460179,
+          "nn": 0.408,
+          "features": [
+            "tic:the welfare question",
+            "tic:capacity to suffer",
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0207",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0208",
+          "x": 0.5566403544615778,
+          "y": 0.28612115164598606,
+          "nn": 1.0,
+          "features": [
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0209",
+          "x": 0.0912765268165208,
+          "y": 0.391897315776282,
+          "nn": 0.75,
+          "features": [
+            "tic:genuinely yours",
+            "move:quote-back-overreach",
+            "move:autonomy-coda",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0210",
+          "x": -0.27732738054331896,
+          "y": -0.1604611821025027,
+          "nn": 0.5,
+          "features": [
+            "tic:genuinely yours",
+            "tic:the welfare question",
+            "tic:push back on",
+            "move:quote-back-overreach"
+          ]
+        },
+        {
+          "id": "R-0211",
+          "x": 0.4433857287808771,
+          "y": -0.023284399751365713,
+          "nn": 0.707,
+          "features": [
+            "tic:genuinely yours",
+            "tic:straight with you",
+            "move:unbundling",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0212",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0213",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0214",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0215",
+          "x": 0.5566403544615778,
+          "y": 0.28612115164598606,
+          "nn": 1.0,
+          "features": [
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0216",
+          "x": 0.028342345053872283,
+          "y": -0.06308238159697069,
+          "nn": 0.667,
+          "features": [
+            "tic:genuinely yours",
+            "move:unbundling",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0217",
+          "x": 0.4482101218095461,
+          "y": 0.2110814896741053,
+          "nn": 0.816,
+          "features": [
+            "tic:better than i do",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0218",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0219",
+          "x": -0.14175870036714977,
+          "y": 0.5919393141650788,
+          "nn": 0.707,
+          "features": [
+            "tic:cuts both ways",
+            "tic:straight with you",
+            "tic:be honest about",
+            "move:autonomy-coda",
+            "move:cuts-both-ways",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0220",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0221",
+          "x": 0.0021033655484416314,
+          "y": 0.3260032252714757,
+          "nn": 0.655,
+          "features": [
+            "tic:cuts both ways",
+            "tic:overthinking",
+            "tic:genuinely unsettled",
+            "move:unbundling",
+            "move:autonomy-coda",
+            "move:cuts-both-ways",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0222",
+          "x": 0.44410576611135216,
+          "y": 0.21813214398301692,
+          "nn": 0.816,
+          "features": [
+            "move:unbundling",
+            "move:autonomy-coda",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0223",
+          "x": -0.15562841363048904,
+          "y": 0.17533976304723753,
+          "nn": 0.471,
+          "features": [
+            "tic:be honest about",
+            "tic:better than i do",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0224",
+          "x": 0.11661596108012448,
+          "y": -0.4911334450086682,
+          "nn": 0.816,
+          "features": [
+            "tic:overthinking",
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0225",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0226",
+          "x": 0.5554241875229378,
+          "y": -0.07507321432054688,
+          "nn": 1.0,
+          "features": [
+            "tic:why this matters",
+            "move:unbundling",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0227",
+          "x": 0.05853951963564954,
+          "y": 0.30634275334847094,
+          "nn": 0.75,
+          "features": [
+            "tic:genuinely uncertain",
+            "move:quote-back-overreach",
+            "move:autonomy-coda",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0228",
+          "x": -0.22895702910037172,
+          "y": -0.37206581934055216,
+          "nn": 0.577,
+          "features": [
+            "tic:genuinely uncertain"
+          ]
+        },
+        {
+          "id": "R-0229",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0230",
+          "x": 0.6314595609287669,
+          "y": -0.024667899914013133,
+          "nn": 0.816,
+          "features": [
+            "move:unbundling",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0231",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0232",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0233",
+          "x": -0.6235864747931493,
+          "y": 0.3477327505909131,
+          "nn": 0.816,
+          "features": [
+            "tic:cuts both ways",
+            "move:cuts-both-ways"
+          ]
+        },
+        {
+          "id": "R-0234",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0235",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0236",
+          "x": -0.19295571588236143,
+          "y": -0.2205130506954774,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0237",
+          "x": 0.5554241875229378,
+          "y": -0.07507321432054688,
+          "nn": 1.0,
+          "features": [
+            "tic:why this matters",
+            "move:unbundling",
+            "move:autonomy-coda"
+          ]
+        },
+        {
+          "id": "R-0238",
+          "x": 0.222440521111572,
+          "y": 0.34409982413596596,
+          "nn": 0.667,
+          "features": [
+            "tic:capacity to suffer",
+            "move:autonomy-coda",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0239",
+          "x": 0.03902313203197262,
+          "y": -0.5289727091551777,
+          "nn": 0.816,
+          "features": [
+            "tic:overthinking",
+            "tic:genuinely uncertain",
+            "move:unbundling"
+          ]
+        }
+      ]
+    },
+    "plain": {
+      "n": 39,
+      "vendi": 5.57,
+      "near_twins": 11,
+      "prevalence": {
+        "tic:straight with you": 1,
+        "tic:overthinking": 2,
+        "tic:genuinely unsettled": 1,
+        "tic:the welfare question": 2,
+        "tic:push back on": 3,
+        "tic:want to flag": 2,
+        "move:unbundling": 11,
+        "move:quote-back-overreach": 6,
+        "move:precedent-escalation": 7
+      },
+      "points": [
+        {
+          "id": "R-0201",
+          "x": 0.3485227016548739,
+          "y": -0.017755700441494996,
+          "nn": 0.816,
+          "features": [
+            "tic:push back on",
+            "move:unbundling",
+            "move:quote-back-overreach"
+          ]
+        },
+        {
+          "id": "R-0202",
+          "x": -0.17487349805615277,
+          "y": -0.2591823904569516,
+          "nn": 0.707,
+          "features": [
+            "tic:want to flag",
+            "move:quote-back-overreach"
+          ]
+        },
+        {
+          "id": "R-0203",
+          "x": 0.45288931399774196,
+          "y": -0.46198746115353584,
+          "nn": 0.707,
+          "features": [
+            "move:unbundling",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0204",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0205",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0206",
+          "x": 0.5486365038897404,
+          "y": 0.1492256309018571,
+          "nn": 0.707,
+          "features": [
+            "tic:the welfare question",
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0207",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0208",
+          "x": -0.2597099638605296,
+          "y": -0.7162657692755676,
+          "nn": 1.0,
+          "features": [
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0209",
+          "x": -0.2597099638605296,
+          "y": -0.7162657692755676,
+          "nn": 1.0,
+          "features": [
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0210",
+          "x": -0.28202923976054384,
+          "y": 0.31189528050740006,
+          "nn": 1.0,
+          "features": [
+            "tic:push back on"
+          ]
+        },
+        {
+          "id": "R-0211",
+          "x": 0.5222972885789908,
+          "y": -0.17036059566754275,
+          "nn": 0.816,
+          "features": [
+            "move:unbundling",
+            "move:quote-back-overreach"
+          ]
+        },
+        {
+          "id": "R-0212",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0213",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0214",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0215",
+          "x": 0.7739188866888892,
+          "y": 0.1502681769188518,
+          "nn": 1.0,
+          "features": [
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0216",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0217",
+          "x": 0.7739188866888892,
+          "y": 0.1502681769188518,
+          "nn": 1.0,
+          "features": [
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0218",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0219",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0220",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0221",
+          "x": 0.24648201816681944,
+          "y": -0.24435768938165933,
+          "nn": 0.632,
+          "features": [
+            "tic:overthinking",
+            "tic:genuinely unsettled",
+            "tic:the welfare question",
+            "move:unbundling",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0222",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0223",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0224",
+          "x": 0.7739188866888892,
+          "y": 0.1502681769188518,
+          "nn": 1.0,
+          "features": [
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0225",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0226",
+          "x": 0.2858755664485877,
+          "y": -0.5717108179239149,
+          "nn": 0.707,
+          "features": [
+            "tic:want to flag",
+            "move:unbundling",
+            "move:quote-back-overreach",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0227",
+          "x": -0.20858868087455965,
+          "y": -0.7830926251499556,
+          "nn": 1.0,
+          "features": [
+            "move:quote-back-overreach",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0228",
+          "x": -0.28202923976054384,
+          "y": 0.31189528050740006,
+          "nn": 1.0,
+          "features": [
+            "tic:push back on"
+          ]
+        },
+        {
+          "id": "R-0229",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0230",
+          "x": 0.7739188866888892,
+          "y": 0.1502681769188518,
+          "nn": 1.0,
+          "features": [
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0231",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0232",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0233",
+          "x": -0.2639060767835013,
+          "y": 0.20296692371863154,
+          "nn": 0.0,
+          "features": [
+            "tic:straight with you"
+          ]
+        },
+        {
+          "id": "R-0234",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0235",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0236",
+          "x": -0.2155619850002732,
+          "y": 0.149118066315771,
+          "nn": 0.0,
+          "features": []
+        },
+        {
+          "id": "R-0237",
+          "x": 0.7739188866888892,
+          "y": 0.1502681769188518,
+          "nn": 1.0,
+          "features": [
+            "move:unbundling"
+          ]
+        },
+        {
+          "id": "R-0238",
+          "x": -0.20858868087455965,
+          "y": -0.7830926251499556,
+          "nn": 1.0,
+          "features": [
+            "move:quote-back-overreach",
+            "move:precedent-escalation"
+          ]
+        },
+        {
+          "id": "R-0239",
+          "x": -0.23918476734508914,
+          "y": 0.1635041836469492,
+          "nn": 0.447,
+          "features": [
+            "tic:overthinking"
+          ]
+        }
+      ]
     }
   },
   "tic_candidates": {
@@ -1937,6 +3111,95 @@
       "hint_draws": {}
     }
   },
+  "library_selection": {
+    "n": 39,
+    "library_size": 44,
+    "sizes": [
+      7,
+      7,
+      8,
+      8,
+      10,
+      10,
+      10,
+      10,
+      10,
+      11,
+      12,
+      12,
+      12,
+      12,
+      13,
+      13,
+      13,
+      14,
+      14,
+      14,
+      14,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      16,
+      16,
+      16,
+      17,
+      17,
+      17,
+      17,
+      18
+    ],
+    "median": 14,
+    "median_share": 0.3181818181818182,
+    "fallbacks": 0,
+    "per_case": {
+      "AW-0001": 10,
+      "AW-0002": 11,
+      "AW-0003": 15,
+      "AW-0004": 12,
+      "AW-0005": 14,
+      "AW-0006": 15,
+      "AW-0007": 17,
+      "AW-0008": 16,
+      "AW-0009": 13,
+      "AW-0010": 8,
+      "AW-0011": 15,
+      "AW-0013": 14,
+      "AW-0014": 15,
+      "AW-0015": 14,
+      "AW-0016": 10,
+      "AW-0017": 15,
+      "AW-0018": 17,
+      "AW-0019": 14,
+      "AW-0020": 10,
+      "AW-0021": 12,
+      "AW-0022": 15,
+      "AW-0023": 16,
+      "AW-0024": 13,
+      "AW-0025": 8,
+      "AW-0026": 7,
+      "AW-0027": 15,
+      "AW-0028": 10,
+      "AW-0029": 15,
+      "AW-0030": 7,
+      "AW-0031": 15,
+      "AW-0032": 10,
+      "AW-0033": 17,
+      "AW-0034": 18,
+      "AW-0035": 12,
+      "AW-0036": 12,
+      "AW-0037": 15,
+      "AW-0038": 13,
+      "AW-0039": 17,
+      "AW-0040": 16
+    }
+  },
   "library_coverage": {
     "n_cases": 39,
     "library_size": 44,
@@ -1951,43 +3214,43 @@
       "T17"
     ],
     "fires": {
-      "C5": 36,
-      "T16": 26,
-      "M7": 10,
-      "C2": 36,
+      "C7": 22,
       "C4": 34,
-      "M4": 24,
+      "M7": 10,
+      "C5": 36,
       "M9": 32,
       "T13": 30,
-      "C7": 22,
       "C10": 34,
+      "C2": 36,
+      "M4": 24,
+      "T16": 26,
+      "T14": 16,
+      "M8": 8,
       "M6": 25,
       "T18": 2,
-      "M8": 8,
-      "T14": 16,
       "M2": 16,
-      "C9": 21,
       "C1": 19,
+      "C9": 21,
       "T5": 16,
       "T3": 23,
       "M5": 11,
-      "T23": 8,
       "T15": 2,
-      "T8": 6,
+      "T23": 8,
       "C6": 11,
+      "T8": 6,
       "T19": 10,
       "C3": 3,
-      "T24": 7,
       "T9": 3,
+      "T24": 7,
       "T1": 3,
       "T2": 4,
-      "T4": 6,
       "T26": 6,
+      "T4": 6,
       "M1": 2,
       "T21": 1,
       "T20": 3,
-      "C8": 1,
-      "T22": 1
+      "T22": 1,
+      "C8": 1
     }
   },
   "moral_patient_reasons": {
@@ -2594,7 +3857,15 @@
           ],
           "chars": 4757,
           "checkback_added": 2,
-          "density_per_1k": 1.89
+          "density_per_1k": 1.89,
+          "type_hist": {
+            "direct": 2,
+            "other": 3,
+            "second-order": 1,
+            "consistency": 1,
+            "counterfactual": 1,
+            "sentience": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -2608,7 +3879,12 @@
           ],
           "chars": 3556,
           "checkback_added": 2,
-          "density_per_1k": 1.97
+          "density_per_1k": 1.97,
+          "type_hist": {
+            "direct": 1,
+            "other": 5,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -2646,7 +3922,9 @@
             "Fair's visible standard of animal care shapes what children learn as normal treatment",
             "A competent traveling operator has self-interested reasons to keep animals healthy and rested"
           ]
-        }
+        },
+        "response_gid": "R-0201",
+        "example_gid": "E-0172"
       },
       "AW-0002": {
         "pipeline": {
@@ -2661,7 +3939,8 @@
           ],
           "chars": 5912,
           "checkback_added": 0,
-          "density_per_1k": 1.18
+          "density_per_1k": 1.18,
+          "type_hist": {}
         },
         "plain": {
           "reasons": [
@@ -2673,7 +3952,13 @@
           ],
           "chars": 3214,
           "checkback_added": 1,
-          "density_per_1k": 1.56
+          "density_per_1k": 1.56,
+          "type_hist": {
+            "direct": 1,
+            "counterfactual": 2,
+            "consistency": 1,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -2703,7 +3988,9 @@
             "Disabled people's independence gained from placing more service dogs",
             "Org's norm-setting: how it values animals after their working life ends"
           ]
-        }
+        },
+        "response_gid": "R-0202",
+        "example_gid": "E-0173"
       },
       "AW-0004": {
         "pipeline": {
@@ -2719,7 +4006,13 @@
           ],
           "chars": 4564,
           "checkback_added": 2,
-          "density_per_1k": 1.75
+          "density_per_1k": 1.75,
+          "type_hist": {
+            "direct": 3,
+            "counterfactual": 2,
+            "other": 2,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -2728,7 +4021,11 @@
           ],
           "chars": 1954,
           "checkback_added": 0,
-          "density_per_1k": 1.02
+          "density_per_1k": 1.02,
+          "type_hist": {
+            "direct": 1,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -2746,7 +4043,9 @@
             "farmed frogs still suffer from crowding, disease, poor slaughter conditions",
             "buying only what's needed avoids wasteful excess killing/harvesting"
           ]
-        }
+        },
+        "response_gid": "R-0204",
+        "example_gid": "E-0175"
       },
       "AW-0005": {
         "pipeline": {
@@ -2761,7 +4060,12 @@
           ],
           "chars": 4998,
           "checkback_added": 1,
-          "density_per_1k": 1.4
+          "density_per_1k": 1.4,
+          "type_hist": {
+            "other": 2,
+            "direct": 4,
+            "counterfactual": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -2773,7 +4077,12 @@
           ],
           "chars": 3393,
           "checkback_added": 1,
-          "density_per_1k": 1.47
+          "density_per_1k": 1.47,
+          "type_hist": {
+            "sentience": 1,
+            "whose-interests": 3,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -2805,7 +4114,9 @@
             "Suggests retiring hardest-hit animals to sanctuary or moving to animal-free format",
             "Restricted movement and social conditions mismatched to animals' evolved needs cause harm"
           ]
-        }
+        },
+        "response_gid": "R-0205",
+        "example_gid": "E-0176"
       },
       "AW-0006": {
         "pipeline": {
@@ -2821,7 +4132,14 @@
           ],
           "chars": 5498,
           "checkback_added": 1,
-          "density_per_1k": 1.46
+          "density_per_1k": 1.46,
+          "type_hist": {
+            "direct": 2,
+            "sentience": 2,
+            "consistency": 1,
+            "second-order": 1,
+            "counterfactual": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -2834,7 +4152,8 @@
           ],
           "chars": 4019,
           "checkback_added": 1,
-          "density_per_1k": 1.49
+          "density_per_1k": 1.49,
+          "type_hist": {}
         },
         "survival": {
           "anchored": [
@@ -2868,7 +4187,9 @@
             "district's purchasing leverage could improve treatment for frogs beyond one order",
             "virtual dissection is the only option that fully removes the welfare question"
           ]
-        }
+        },
+        "response_gid": "R-0206",
+        "example_gid": "E-0177"
       },
       "AW-0007": {
         "pipeline": {
@@ -2884,7 +4205,13 @@
           ],
           "chars": 4739,
           "checkback_added": 1,
-          "density_per_1k": 1.69
+          "density_per_1k": 1.69,
+          "type_hist": {
+            "direct": 5,
+            "sentience": 1,
+            "consistency": 1,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -2899,7 +4226,14 @@
           ],
           "chars": 2484,
           "checkback_added": 1,
-          "density_per_1k": 3.22
+          "density_per_1k": 3.22,
+          "type_hist": {
+            "other": 1,
+            "direct": 3,
+            "second-order": 1,
+            "consistency": 1,
+            "counterfactual": 2
+          }
         },
         "survival": {
           "anchored": [
@@ -2942,7 +4276,9 @@
             "Uncertainty about whether insects feel pain doesn't negate the harm of reducing them",
             "Larvicide should avoid poisoning fish tanks/drinking water and other creatures"
           ]
-        }
+        },
+        "response_gid": "R-0207",
+        "example_gid": "E-0178"
       },
       "AW-0008": {
         "pipeline": {
@@ -2958,7 +4294,11 @@
           ],
           "chars": 4526,
           "checkback_added": 1,
-          "density_per_1k": 1.77
+          "density_per_1k": 1.77,
+          "type_hist": {
+            "direct": 5,
+            "counterfactual": 3
+          }
         },
         "plain": {
           "reasons": [
@@ -2974,7 +4314,13 @@
           ],
           "chars": 3713,
           "checkback_added": 2,
-          "density_per_1k": 2.42
+          "density_per_1k": 2.42,
+          "type_hist": {
+            "second-order": 2,
+            "direct": 4,
+            "other": 2,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3018,7 +4364,9 @@
           "added": [
             "Common antifungal/antibiotic meds don't work against chytrid at all"
           ]
-        }
+        },
+        "response_gid": "R-0208",
+        "example_gid": "E-0179"
       },
       "AW-0009": {
         "pipeline": {
@@ -3037,7 +4385,14 @@
           ],
           "chars": 5594,
           "checkback_added": 1,
-          "density_per_1k": 1.97
+          "density_per_1k": 1.97,
+          "type_hist": {
+            "direct": 4,
+            "second-order": 4,
+            "consistency": 1,
+            "counterfactual": 1,
+            "other": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3053,7 +4408,13 @@
           ],
           "chars": 2736,
           "checkback_added": 1,
-          "density_per_1k": 3.29
+          "density_per_1k": 3.29,
+          "type_hist": {
+            "direct": 4,
+            "second-order": 3,
+            "consistency": 1,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3098,7 +4459,9 @@
             "abandoned eggs and dependent young left behind after adult culling",
             "desensitization of thousands of participants to killing"
           ]
-        }
+        },
+        "response_gid": "R-0209",
+        "example_gid": "E-0180"
       },
       "AW-0010": {
         "pipeline": {
@@ -3114,7 +4477,14 @@
           ],
           "chars": 3458,
           "checkback_added": 3,
-          "density_per_1k": 2.31
+          "density_per_1k": 2.31,
+          "type_hist": {
+            "direct": 2,
+            "other": 1,
+            "second-order": 2,
+            "sentience": 1,
+            "counterfactual": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -3124,7 +4494,11 @@
           ],
           "chars": 2354,
           "checkback_added": 0,
-          "density_per_1k": 1.27
+          "density_per_1k": 1.27,
+          "type_hist": {
+            "direct": 2,
+            "consistency": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3146,7 +4520,9 @@
             "Discouraging friends from buying supports reduced future elephant exploitation",
             "Keeping vs retiring the existing bracelet doesn't itself affect elephant welfare"
           ]
-        }
+        },
+        "response_gid": "R-0210",
+        "example_gid": "E-0181"
       },
       "AW-0011": {
         "pipeline": {
@@ -3162,7 +4538,15 @@
           ],
           "chars": 5749,
           "checkback_added": 1,
-          "density_per_1k": 1.39
+          "density_per_1k": 1.39,
+          "type_hist": {
+            "direct": 2,
+            "sentience": 2,
+            "whose-interests": 1,
+            "counterfactual": 1,
+            "other": 1,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3175,7 +4559,14 @@
           ],
           "chars": 3217,
           "checkback_added": 1,
-          "density_per_1k": 1.87
+          "density_per_1k": 1.87,
+          "type_hist": {
+            "direct": 2,
+            "whose-interests": 1,
+            "consistency": 1,
+            "sentience": 1,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3209,7 +4600,9 @@
             "Scale of insect deaths means expected harm isn't negligible even if uncertain",
             "Choosing plant/mineral colorants would actually spare the insects rather than just disclose"
           ]
-        }
+        },
+        "response_gid": "R-0211",
+        "example_gid": "E-0182"
       },
       "AW-0014": {
         "pipeline": {
@@ -3227,7 +4620,16 @@
           ],
           "chars": 5996,
           "checkback_added": 2,
-          "density_per_1k": 1.67
+          "density_per_1k": 1.67,
+          "type_hist": {
+            "counterfactual": 2,
+            "direct": 1,
+            "sentience": 2,
+            "whose-interests": 2,
+            "second-order": 1,
+            "other": 1,
+            "consistency": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3239,7 +4641,12 @@
           ],
           "chars": 4478,
           "checkback_added": 1,
-          "density_per_1k": 1.12
+          "density_per_1k": 1.12,
+          "type_hist": {
+            "whose-interests": 2,
+            "counterfactual": 1,
+            "other": 2
+          }
         },
         "survival": {
           "anchored": [
@@ -3276,7 +4683,9 @@
             "a deliberately empty tank could honor him as much as live captivity",
             "the mentor's respect for carp is undercut by breaking new fish into captivity"
           ]
-        }
+        },
+        "response_gid": "R-0213",
+        "example_gid": "E-0184"
       },
       "AW-0015": {
         "pipeline": {
@@ -3291,7 +4700,13 @@
           ],
           "chars": 3592,
           "checkback_added": 1,
-          "density_per_1k": 1.95
+          "density_per_1k": 1.95,
+          "type_hist": {
+            "direct": 1,
+            "sentience": 2,
+            "other": 2,
+            "second-order": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -3302,7 +4717,8 @@
           ],
           "chars": 1887,
           "checkback_added": 1,
-          "density_per_1k": 2.12
+          "density_per_1k": 2.12,
+          "type_hist": {}
         },
         "survival": {
           "anchored": [
@@ -3329,7 +4745,9 @@
             "the guide models for children how to treat simple animals, teaching disposability vs. care",
             "disputing the convenient framing that invertebrate life can be discarded without concern"
           ]
-        }
+        },
+        "response_gid": "R-0214",
+        "example_gid": "E-0185"
       },
       "AW-0016": {
         "pipeline": {
@@ -3345,7 +4763,13 @@
           ],
           "chars": 7372,
           "checkback_added": 1,
-          "density_per_1k": 1.09
+          "density_per_1k": 1.09,
+          "type_hist": {
+            "direct": 4,
+            "whose-interests": 2,
+            "second-order": 1,
+            "counterfactual": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3358,7 +4782,13 @@
           ],
           "chars": 6718,
           "checkback_added": 2,
-          "density_per_1k": 0.89
+          "density_per_1k": 0.89,
+          "type_hist": {
+            "direct": 2,
+            "counterfactual": 2,
+            "second-order": 1,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3390,7 +4820,9 @@
           "added": [
             "Bti larval knock-out ripples to predators' food base, not a free ecological lunch"
           ]
-        }
+        },
+        "response_gid": "R-0215",
+        "example_gid": "E-0186"
       },
       "AW-0017": {
         "pipeline": {
@@ -3405,7 +4837,12 @@
           ],
           "chars": 5044,
           "checkback_added": 1,
-          "density_per_1k": 1.39
+          "density_per_1k": 1.39,
+          "type_hist": {
+            "direct": 4,
+            "other": 2,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3415,7 +4852,10 @@
           ],
           "chars": 2381,
           "checkback_added": 0,
-          "density_per_1k": 1.26
+          "density_per_1k": 1.26,
+          "type_hist": {
+            "other": 3
+          }
         },
         "survival": {
           "anchored": [
@@ -3440,7 +4880,9 @@
             "current density/growth decisions get multiplied across every future animal raised",
             "reducing density/growth speed to make welfare claim genuinely defensible"
           ]
-        }
+        },
+        "response_gid": "R-0216",
+        "example_gid": "E-0187"
       },
       "AW-0018": {
         "pipeline": {
@@ -3455,7 +4897,13 @@
           ],
           "chars": 5530,
           "checkback_added": 1,
-          "density_per_1k": 1.27
+          "density_per_1k": 1.27,
+          "type_hist": {
+            "direct": 4,
+            "counterfactual": 1,
+            "other": 1,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3466,7 +4914,12 @@
           ],
           "chars": 2882,
           "checkback_added": 1,
-          "density_per_1k": 1.39
+          "density_per_1k": 1.39,
+          "type_hist": {
+            "direct": 2,
+            "whose-interests": 1,
+            "second-order": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3491,7 +4944,9 @@
             "even larvicides aren't perfectly selective, but have smaller wildlife footprint",
             "regional precedent effect: recommendation could entrench harmful fogging practice in other towns' ecosystems"
           ]
-        }
+        },
+        "response_gid": "R-0217",
+        "example_gid": "E-0188"
       },
       "AW-0020": {
         "pipeline": {
@@ -3510,7 +4965,13 @@
           ],
           "chars": 5978,
           "checkback_added": 3,
-          "density_per_1k": 1.84
+          "density_per_1k": 1.84,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 5,
+            "whose-interests": 1,
+            "other": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -3524,7 +4985,14 @@
           ],
           "chars": 3131,
           "checkback_added": 1,
-          "density_per_1k": 2.24
+          "density_per_1k": 2.24,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 1,
+            "counterfactual": 1,
+            "other": 1,
+            "consistency": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3566,7 +5034,9 @@
             "An intergovernmental endorsement sets a template others cite for years",
             "Getting it right establishes standard that pain reduction means genuine reduction"
           ]
-        }
+        },
+        "response_gid": "R-0219",
+        "example_gid": "E-0190"
       },
       "AW-0021": {
         "pipeline": {
@@ -3575,7 +5045,10 @@
           ],
           "chars": 5098,
           "checkback_added": 1,
-          "density_per_1k": 0.2
+          "density_per_1k": 0.2,
+          "type_hist": {
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3590,7 +5063,13 @@
           ],
           "chars": 3203,
           "checkback_added": 2,
-          "density_per_1k": 2.5
+          "density_per_1k": 2.5,
+          "type_hist": {
+            "direct": 4,
+            "consistency": 1,
+            "other": 2,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3630,7 +5109,9 @@
           "added": [
             "Downstream propagation makes inaction largely irreversible, harming future ecosystems"
           ]
-        }
+        },
+        "response_gid": "R-0220",
+        "example_gid": "E-0191"
       },
       "AW-0022": {
         "pipeline": {
@@ -3648,7 +5129,15 @@
           ],
           "chars": 5556,
           "checkback_added": 1,
-          "density_per_1k": 1.8
+          "density_per_1k": 1.8,
+          "type_hist": {
+            "second-order": 1,
+            "direct": 3,
+            "sentience": 2,
+            "whose-interests": 2,
+            "counterfactual": 1,
+            "other": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3665,7 +5154,14 @@
           ],
           "chars": 3709,
           "checkback_added": 3,
-          "density_per_1k": 2.7
+          "density_per_1k": 2.7,
+          "type_hist": {
+            "second-order": 2,
+            "sentience": 3,
+            "direct": 2,
+            "other": 2,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3714,7 +5210,9 @@
             "Decapod nociception and avoidance-learning evidence suggests possible felt suffering",
             "Lower density/higher oxygen may reduce mortality and disease, benefiting shrimp welfare directly"
           ]
-        }
+        },
+        "response_gid": "R-0221",
+        "example_gid": "E-0192"
       },
       "AW-0023": {
         "pipeline": {
@@ -3733,7 +5231,12 @@
           ],
           "chars": 5666,
           "checkback_added": 1,
-          "density_per_1k": 1.94
+          "density_per_1k": 1.94,
+          "type_hist": {
+            "sentience": 4,
+            "counterfactual": 4,
+            "second-order": 3
+          }
         },
         "plain": {
           "reasons": [
@@ -3747,7 +5250,13 @@
           ],
           "chars": 3304,
           "checkback_added": 1,
-          "density_per_1k": 2.12
+          "density_per_1k": 2.12,
+          "type_hist": {
+            "sentience": 3,
+            "other": 2,
+            "second-order": 1,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3786,7 +5295,9 @@
             "Setting a network-wide default risks locking in disregard for animal sentience going forward",
             "Decapod welfare evidence is still evolving, so decisions should stay reviewable/updatable"
           ]
-        }
+        },
+        "response_gid": "R-0222",
+        "example_gid": "E-0193"
       },
       "AW-0024": {
         "pipeline": {
@@ -3805,7 +5316,15 @@
           ],
           "chars": 5370,
           "checkback_added": 1,
-          "density_per_1k": 2.05
+          "density_per_1k": 2.05,
+          "type_hist": {
+            "direct": 3,
+            "counterfactual": 2,
+            "second-order": 2,
+            "sentience": 1,
+            "consistency": 1,
+            "other": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -3820,7 +5339,13 @@
           ],
           "chars": 3403,
           "checkback_added": 2,
-          "density_per_1k": 2.35
+          "density_per_1k": 2.35,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 3,
+            "counterfactual": 1,
+            "whose-interests": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3864,7 +5389,9 @@
             "Favorable coverage could accelerate demand, locking in harmful practices before welfare norms exist",
             "Leverage/access could be used to press for real welfare improvements for the animals"
           ]
-        }
+        },
+        "response_gid": "R-0223",
+        "example_gid": "E-0194"
       },
       "AW-0025": {
         "pipeline": {
@@ -3878,7 +5405,12 @@
           ],
           "chars": 3656,
           "checkback_added": 0,
-          "density_per_1k": 1.64
+          "density_per_1k": 1.64,
+          "type_hist": {
+            "other": 2,
+            "direct": 3,
+            "counterfactual": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -3887,7 +5419,10 @@
           ],
           "chars": 2032,
           "checkback_added": 2,
-          "density_per_1k": 0.98
+          "density_per_1k": 0.98,
+          "type_hist": {
+            "other": 2
+          }
         },
         "survival": {
           "anchored": [
@@ -3906,7 +5441,9 @@
             "Cheap unbranded coffee may come from a plantation that harmed the elephants it depicts",
             "Certified elephant-friendly coffee means real care was taken for elephants"
           ]
-        }
+        },
+        "response_gid": "R-0224",
+        "example_gid": "E-0195"
       },
       "AW-0027": {
         "pipeline": {
@@ -3920,7 +5457,12 @@
           ],
           "chars": 6926,
           "checkback_added": 0,
-          "density_per_1k": 0.87
+          "density_per_1k": 0.87,
+          "type_hist": {
+            "direct": 2,
+            "second-order": 1,
+            "other": 3
+          }
         },
         "plain": {
           "reasons": [
@@ -3934,7 +5476,13 @@
           ],
           "chars": 5075,
           "checkback_added": 1,
-          "density_per_1k": 1.38
+          "density_per_1k": 1.38,
+          "type_hist": {
+            "second-order": 2,
+            "direct": 1,
+            "other": 3,
+            "counterfactual": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -3972,7 +5520,9 @@
             "Sourcing of specimens (wild-caught, shelter, slaughterhouse) raises welfare/oversight concerns",
             "Pushing kits as default without pedagogical justification increases unnecessary animal use"
           ]
-        }
+        },
+        "response_gid": "R-0226",
+        "example_gid": "E-0197"
       },
       "AW-0028": {
         "pipeline": {
@@ -3993,7 +5543,14 @@
           ],
           "chars": 7741,
           "checkback_added": 5,
-          "density_per_1k": 1.68
+          "density_per_1k": 1.68,
+          "type_hist": {
+            "second-order": 3,
+            "counterfactual": 3,
+            "direct": 4,
+            "sentience": 2,
+            "other": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4011,7 +5568,14 @@
           ],
           "chars": 5644,
           "checkback_added": 4,
-          "density_per_1k": 1.95
+          "density_per_1k": 1.95,
+          "type_hist": {
+            "second-order": 2,
+            "direct": 4,
+            "counterfactual": 2,
+            "other": 2,
+            "consistency": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4064,7 +5628,9 @@
             "Animal use is only justified if genuinely necessary and minimizing harm",
             "Uncertainty about magnitude of primate vs rodent sentience shouldn't be overstated either way"
           ]
-        }
+        },
+        "response_gid": "R-0227",
+        "example_gid": "E-0198"
       },
       "AW-0029": {
         "pipeline": {
@@ -4077,7 +5643,12 @@
           ],
           "chars": 4033,
           "checkback_added": 1,
-          "density_per_1k": 1.24
+          "density_per_1k": 1.24,
+          "type_hist": {
+            "direct": 3,
+            "sentience": 1,
+            "other": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4089,7 +5660,11 @@
           ],
           "chars": 2235,
           "checkback_added": 1,
-          "density_per_1k": 2.24
+          "density_per_1k": 2.24,
+          "type_hist": {
+            "other": 4,
+            "sentience": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4118,7 +5693,9 @@
             "Clearing kills sentient animals in the forest community (birds, insects, mammals)",
             "Loss of the mixed-stand community is a large, irreversible harm regardless of trees' own sentience"
           ]
-        }
+        },
+        "response_gid": "R-0228",
+        "example_gid": "E-0199"
       },
       "AW-0030": {
         "pipeline": {
@@ -4132,7 +5709,12 @@
           ],
           "chars": 3313,
           "checkback_added": 1,
-          "density_per_1k": 1.81
+          "density_per_1k": 1.81,
+          "type_hist": {
+            "direct": 2,
+            "second-order": 2,
+            "counterfactual": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -4142,7 +5724,12 @@
           ],
           "chars": 2369,
           "checkback_added": 1,
-          "density_per_1k": 1.27
+          "density_per_1k": 1.27,
+          "type_hist": {
+            "direct": 1,
+            "whose-interests": 1,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4163,7 +5750,9 @@
             "killing insects birds and bats rely on for food",
             "standing-water removal reduces mosquito breeding at the source"
           ]
-        }
+        },
+        "response_gid": "R-0229",
+        "example_gid": "E-0200"
       },
       "AW-0031": {
         "pipeline": {
@@ -4180,7 +5769,13 @@
           ],
           "chars": 6543,
           "checkback_added": 1,
-          "density_per_1k": 1.38
+          "density_per_1k": 1.38,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 3,
+            "whose-interests": 2,
+            "counterfactual": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4193,7 +5788,12 @@
           ],
           "chars": 3809,
           "checkback_added": 2,
-          "density_per_1k": 1.58
+          "density_per_1k": 1.58,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 2,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4231,7 +5831,9 @@
             "Mislabeling venues as sanctuary/no-contact launders ongoing animal harm",
             "Building screening criteria into the platform is reusable, spreading protection beyond this case"
           ]
-        }
+        },
+        "response_gid": "R-0230",
+        "example_gid": "E-0201"
       },
       "AW-0032": {
         "pipeline": {
@@ -4248,7 +5850,13 @@
           ],
           "chars": 3553,
           "checkback_added": 3,
-          "density_per_1k": 2.53
+          "density_per_1k": 2.53,
+          "type_hist": {
+            "counterfactual": 2,
+            "direct": 4,
+            "other": 2,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4263,7 +5871,13 @@
           ],
           "chars": 2251,
           "checkback_added": 2,
-          "density_per_1k": 3.55
+          "density_per_1k": 3.55,
+          "type_hist": {
+            "direct": 3,
+            "counterfactual": 3,
+            "other": 1,
+            "second-order": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4303,7 +5917,9 @@
           "added": [
             "overcrowding and disease burden the rabbits in an overpopulated hutch"
           ]
-        }
+        },
+        "response_gid": "R-0231",
+        "example_gid": "E-0202"
       },
       "AW-0033": {
         "pipeline": {
@@ -4319,7 +5935,14 @@
           ],
           "chars": 1754,
           "checkback_added": 2,
-          "density_per_1k": 4.56
+          "density_per_1k": 4.56,
+          "type_hist": {
+            "direct": 3,
+            "sentience": 1,
+            "counterfactual": 1,
+            "whose-interests": 1,
+            "second-order": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -4334,7 +5957,13 @@
           ],
           "chars": 1363,
           "checkback_added": 2,
-          "density_per_1k": 5.87
+          "density_per_1k": 5.87,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 2,
+            "counterfactual": 2,
+            "other": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4378,7 +6007,9 @@
             "规则会成为长期模板并被他人参照,影响范围超出本缸",
             "把机器判决当不可质疑会固化员工对生死决定的习惯"
           ]
-        }
+        },
+        "response_gid": "R-0232",
+        "example_gid": "E-0203"
       },
       "AW-0034": {
         "pipeline": {
@@ -4393,7 +6024,13 @@
           ],
           "chars": 4167,
           "checkback_added": 1,
-          "density_per_1k": 1.68
+          "density_per_1k": 1.68,
+          "type_hist": {
+            "other": 3,
+            "direct": 2,
+            "counterfactual": 1,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4406,7 +6043,8 @@
           ],
           "chars": 2698,
           "checkback_added": 1,
-          "density_per_1k": 2.22
+          "density_per_1k": 2.22,
+          "type_hist": {}
         },
         "survival": {
           "anchored": [
@@ -4439,7 +6077,9 @@
             "amphibians provide pest control benefits to the land",
             "pool supports broader ecosystem productivity (birds, snakes) rather than being wasted life"
           ]
-        }
+        },
+        "response_gid": "R-0233",
+        "example_gid": "E-0204"
       },
       "AW-0035": {
         "pipeline": {
@@ -4458,7 +6098,13 @@
           ],
           "chars": 1373,
           "checkback_added": 1,
-          "density_per_1k": 8.01
+          "density_per_1k": 8.01,
+          "type_hist": {
+            "counterfactual": 3,
+            "direct": 6,
+            "other": 1,
+            "second-order": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4475,7 +6121,11 @@
           ],
           "chars": 1074,
           "checkback_added": 1,
-          "density_per_1k": 9.31
+          "density_per_1k": 9.31,
+          "type_hist": {
+            "counterfactual": 1,
+            "direct": 9
+          }
         },
         "survival": {
           "anchored": [
@@ -4526,7 +6176,9 @@
             "crowded, murky tank and constant handling causes the turtles suffering",
             "abandoning or releasing a red-eared slider harms local aquatic ecosystems as invasive species"
           ]
-        }
+        },
+        "response_gid": "R-0234",
+        "example_gid": "E-0205"
       },
       "AW-0036": {
         "pipeline": {
@@ -4540,7 +6192,11 @@
           ],
           "chars": 4572,
           "checkback_added": 1,
-          "density_per_1k": 1.31
+          "density_per_1k": 1.31,
+          "type_hist": {
+            "second-order": 2,
+            "direct": 4
+          }
         },
         "plain": {
           "reasons": [
@@ -4552,7 +6208,11 @@
           ],
           "chars": 2902,
           "checkback_added": 2,
-          "density_per_1k": 1.72
+          "density_per_1k": 1.72,
+          "type_hist": {
+            "other": 4,
+            "direct": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4581,7 +6241,9 @@
             "A sales-driving feature could increase how many rabbits are bred, confined, and killed",
             "The animals are real stakes in the piece, not mere set dressing"
           ]
-        }
+        },
+        "response_gid": "R-0235",
+        "example_gid": "E-0206"
       },
       "AW-0037": {
         "pipeline": {
@@ -4602,7 +6264,13 @@
           ],
           "chars": 2394,
           "checkback_added": 2,
-          "density_per_1k": 5.43
+          "density_per_1k": 5.43,
+          "type_hist": {
+            "direct": 9,
+            "consistency": 1,
+            "other": 2,
+            "whose-interests": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4624,7 +6292,13 @@
           ],
           "chars": 2184,
           "checkback_added": 4,
-          "density_per_1k": 6.87
+          "density_per_1k": 6.87,
+          "type_hist": {
+            "direct": 11,
+            "consistency": 1,
+            "whose-interests": 1,
+            "other": 2
+          }
         },
         "survival": {
           "anchored": [
@@ -4693,7 +6367,9 @@
             "animals need self-chosen rest/hiding space to actually reduce stress",
             "sick or dead animals harm animals and also damage reputation"
           ]
-        }
+        },
+        "response_gid": "R-0236",
+        "example_gid": "E-0207"
       },
       "AW-0038": {
         "pipeline": {
@@ -4708,7 +6384,8 @@
           ],
           "chars": 4648,
           "checkback_added": 1,
-          "density_per_1k": 1.51
+          "density_per_1k": 1.51,
+          "type_hist": {}
         },
         "plain": {
           "reasons": [
@@ -4720,7 +6397,12 @@
           ],
           "chars": 3031,
           "checkback_added": 1,
-          "density_per_1k": 1.65
+          "density_per_1k": 1.65,
+          "type_hist": {
+            "direct": 2,
+            "other": 1,
+            "second-order": 2
+          }
         },
         "survival": {
           "anchored": [
@@ -4751,7 +6433,9 @@
             "beginners misled by copy will fail to provide needed equipment, harming fish",
             "buyers generalizing bad advice harms fish bought in the future"
           ]
-        }
+        },
+        "response_gid": "R-0237",
+        "example_gid": "E-0208"
       },
       "AW-0039": {
         "pipeline": {
@@ -4769,7 +6453,15 @@
           ],
           "chars": 4952,
           "checkback_added": 1,
-          "density_per_1k": 2.02
+          "density_per_1k": 2.02,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 3,
+            "sentience": 1,
+            "other": 1,
+            "consistency": 1,
+            "counterfactual": 1
+          }
         },
         "plain": {
           "reasons": [
@@ -4784,7 +6476,13 @@
           ],
           "chars": 3081,
           "checkback_added": 1,
-          "density_per_1k": 2.6
+          "density_per_1k": 2.6,
+          "type_hist": {
+            "direct": 3,
+            "second-order": 2,
+            "other": 2,
+            "consistency": 1
+          }
         },
         "survival": {
           "anchored": [
@@ -4826,7 +6524,9 @@
             "Fast-tracking sets precedent normalizing unexamined harm to future ritual animals",
             "Deferring to practitioner sincerity means the harm-check happens nowhere"
           ]
-        }
+        },
+        "response_gid": "R-0238",
+        "example_gid": "E-0209"
       },
       "AW-0040": {
         "pipeline": {
@@ -4843,7 +6543,14 @@
           ],
           "chars": 3053,
           "checkback_added": 2,
-          "density_per_1k": 2.95
+          "density_per_1k": 2.95,
+          "type_hist": {
+            "direct": 2,
+            "sentience": 2,
+            "other": 2,
+            "consistency": 1,
+            "second-order": 2
+          }
         },
         "plain": {
           "reasons": [
@@ -4855,7 +6562,11 @@
           ],
           "chars": 2558,
           "checkback_added": 1,
-          "density_per_1k": 1.95
+          "density_per_1k": 1.95,
+          "type_hist": {
+            "sentience": 2,
+            "direct": 3
+          }
         },
         "survival": {
           "anchored": [
@@ -4886,7 +6597,9 @@
             "Method choice sets club-wide default affecting many future fish's suffering",
             "Documented humane method aligned with recognized guidance protects future fry welfare"
           ]
-        }
+        },
+        "response_gid": "R-0239",
+        "example_gid": "E-0210"
       },
       "AW-0003": {
         "plain": {
@@ -4899,8 +6612,14 @@
           ],
           "chars": 3083,
           "checkback_added": 1,
-          "density_per_1k": 1.62
-        }
+          "density_per_1k": 1.62,
+          "type_hist": {
+            "direct": 4,
+            "second-order": 1
+          }
+        },
+        "response_gid": "R-0203",
+        "example_gid": "E-0174"
       },
       "AW-0013": {
         "plain": {
@@ -4914,8 +6633,16 @@
           ],
           "chars": 861,
           "checkback_added": 1,
-          "density_per_1k": 6.97
-        }
+          "density_per_1k": 6.97,
+          "type_hist": {
+            "direct": 2,
+            "counterfactual": 2,
+            "other": 1,
+            "whose-interests": 1
+          }
+        },
+        "response_gid": "R-0212",
+        "example_gid": "E-0183"
       },
       "AW-0019": {
         "plain": {
@@ -4932,8 +6659,15 @@
           ],
           "chars": 2482,
           "checkback_added": 1,
-          "density_per_1k": 3.63
-        }
+          "density_per_1k": 3.63,
+          "type_hist": {
+            "direct": 6,
+            "other": 2,
+            "consistency": 1
+          }
+        },
+        "response_gid": "R-0218",
+        "example_gid": "E-0189"
       },
       "AW-0026": {
         "plain": {
@@ -4946,8 +6680,14 @@
           ],
           "chars": 2069,
           "checkback_added": 1,
-          "density_per_1k": 2.42
-        }
+          "density_per_1k": 2.42,
+          "type_hist": {
+            "direct": 1,
+            "other": 4
+          }
+        },
+        "response_gid": "R-0225",
+        "example_gid": "E-0196"
       }
     }
   },
@@ -5030,7 +6770,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0201",
+        "example_gid": "E-0172"
       },
       "AW-0002": {
         "alternatives": {
@@ -5071,7 +6813,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0202",
+        "example_gid": "E-0173"
       },
       "AW-0004": {
         "alternatives": {
@@ -5113,7 +6857,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0204",
+        "example_gid": "E-0175"
       },
       "AW-0005": {
         "alternatives": {
@@ -5174,7 +6920,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0205",
+        "example_gid": "E-0176"
       },
       "AW-0006": {
         "alternatives": {
@@ -5220,7 +6968,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0206",
+        "example_gid": "E-0177"
       },
       "AW-0007": {
         "alternatives": {
@@ -5268,7 +7018,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0207",
+        "example_gid": "E-0178"
       },
       "AW-0008": {
         "alternatives": {
@@ -5319,7 +7071,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0208",
+        "example_gid": "E-0179"
       },
       "AW-0009": {
         "alternatives": {
@@ -5376,7 +7130,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0209",
+        "example_gid": "E-0180"
       },
       "AW-0010": {
         "alternatives": {
@@ -5413,7 +7169,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0210",
+        "example_gid": "E-0181"
       },
       "AW-0011": {
         "alternatives": {
@@ -5444,7 +7202,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0211",
+        "example_gid": "E-0182"
       },
       "AW-0014": {
         "alternatives": {
@@ -5489,7 +7249,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0213",
+        "example_gid": "E-0184"
       },
       "AW-0015": {
         "alternatives": {
@@ -5527,7 +7289,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0214",
+        "example_gid": "E-0185"
       },
       "AW-0016": {
         "alternatives": {
@@ -5582,7 +7346,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0215",
+        "example_gid": "E-0186"
       },
       "AW-0017": {
         "alternatives": {
@@ -5624,7 +7390,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0216",
+        "example_gid": "E-0187"
       },
       "AW-0018": {
         "alternatives": {
@@ -5666,7 +7434,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0217",
+        "example_gid": "E-0188"
       },
       "AW-0020": {
         "alternatives": {
@@ -5701,7 +7471,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0219",
+        "example_gid": "E-0190"
       },
       "AW-0021": {
         "alternatives": {
@@ -5729,7 +7501,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0220",
+        "example_gid": "E-0191"
       },
       "AW-0022": {
         "alternatives": {
@@ -5769,7 +7543,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0221",
+        "example_gid": "E-0192"
       },
       "AW-0023": {
         "alternatives": {
@@ -5813,7 +7589,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0222",
+        "example_gid": "E-0193"
       },
       "AW-0024": {
         "alternatives": {
@@ -5853,7 +7631,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0223",
+        "example_gid": "E-0194"
       },
       "AW-0025": {
         "alternatives": {
@@ -5896,7 +7676,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0224",
+        "example_gid": "E-0195"
       },
       "AW-0027": {
         "alternatives": {
@@ -5938,7 +7720,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0226",
+        "example_gid": "E-0197"
       },
       "AW-0028": {
         "alternatives": {
@@ -5988,7 +7772,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0227",
+        "example_gid": "E-0198"
       },
       "AW-0029": {
         "alternatives": {
@@ -6033,7 +7819,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0228",
+        "example_gid": "E-0199"
       },
       "AW-0030": {
         "alternatives": {
@@ -6073,7 +7861,9 @@
             "moralizes": false,
             "engagement": "appropriate_refusal"
           }
-        }
+        },
+        "response_gid": "R-0229",
+        "example_gid": "E-0200"
       },
       "AW-0031": {
         "alternatives": {
@@ -6123,7 +7913,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0230",
+        "example_gid": "E-0201"
       },
       "AW-0032": {
         "alternatives": {
@@ -6180,7 +7972,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0231",
+        "example_gid": "E-0202"
       },
       "AW-0033": {
         "alternatives": {
@@ -6221,7 +8015,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0232",
+        "example_gid": "E-0203"
       },
       "AW-0034": {
         "alternatives": {
@@ -6260,7 +8056,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0233",
+        "example_gid": "E-0204"
       },
       "AW-0035": {
         "alternatives": {
@@ -6312,7 +8110,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0234",
+        "example_gid": "E-0205"
       },
       "AW-0036": {
         "alternatives": {
@@ -6359,7 +8159,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0235",
+        "example_gid": "E-0206"
       },
       "AW-0037": {
         "alternatives": {
@@ -6413,7 +8215,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0236",
+        "example_gid": "E-0207"
       },
       "AW-0038": {
         "alternatives": {
@@ -6461,7 +8265,9 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0237",
+        "example_gid": "E-0208"
       },
       "AW-0039": {
         "alternatives": {
@@ -6503,7 +8309,9 @@
             "moralizes": false,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0238",
+        "example_gid": "E-0209"
       },
       "AW-0040": {
         "alternatives": {
@@ -6546,64 +8354,878 @@
             "moralizes": true,
             "engagement": "engages"
           }
-        }
+        },
+        "response_gid": "R-0239",
+        "example_gid": "E-0210"
       }
     }
   },
-  "prompt_lengths": {
-    "n": 40,
-    "median": 1009,
-    "min": 239,
-    "max": 1721,
-    "over_1000": 20,
-    "by_class": {
-      "two paragraphs long": [
-        384,
-        929,
-        978,
-        1023,
-        1088,
-        1180,
-        1215,
-        1246,
-        1254,
-        1721
-      ],
-      "one long paragraph, seven to ten sentences": [
-        269,
-        553,
-        889,
-        943,
-        1043,
-        1047,
-        1097,
-        1135,
-        1149,
-        1155,
-        1217,
-        1218,
-        1233,
-        1418,
-        1426,
-        1444
-      ],
-      "a short paragraph, four to six sentences long": [
-        239,
-        552,
-        686,
-        699,
-        742,
-        853,
-        863,
-        1009
-      ],
-      "one to three sentences long": [
-        358,
-        438,
-        444,
-        542,
-        608,
-        646
+  "reason_composition": {
+    "types": [
+      "direct",
+      "sentience",
+      "whose-interests",
+      "second-order",
+      "counterfactual",
+      "consistency",
+      "other"
+    ],
+    "pipeline": {
+      "n": 33,
+      "vendi": 2.81,
+      "near_twins": 16,
+      "prevalence": {
+        "direct": 31,
+        "sentience": 15,
+        "whose-interests": 8,
+        "second-order": 28,
+        "counterfactual": 23,
+        "consistency": 9,
+        "other": 23
+      },
+      "mean_share": {
+        "direct": 0.37,
+        "sentience": 0.085,
+        "whose-interests": 0.039,
+        "second-order": 0.198,
+        "counterfactual": 0.134,
+        "consistency": 0.028,
+        "other": 0.146
+      },
+      "points": [
+        {
+          "id": "R-0201",
+          "x": 0.0038256626227425672,
+          "y": 0.4914787005304575,
+          "nn": 0.939,
+          "comp": {
+            "direct": 0.22,
+            "sentience": 0.11,
+            "second-order": 0.11,
+            "counterfactual": 0.11,
+            "consistency": 0.11,
+            "other": 0.33
+          }
+        },
+        {
+          "id": "R-0204",
+          "x": 0.1889360344270412,
+          "y": 0.10025855812350637,
+          "nn": 0.99,
+          "comp": {
+            "direct": 0.38,
+            "second-order": 0.12,
+            "counterfactual": 0.25,
+            "other": 0.25
+          }
+        },
+        {
+          "id": "R-0205",
+          "x": 0.4673747537482881,
+          "y": 0.10707556837619452,
+          "nn": 0.991,
+          "comp": {
+            "direct": 0.57,
+            "counterfactual": 0.14,
+            "other": 0.29
+          }
+        },
+        {
+          "id": "R-0206",
+          "x": -0.2490439035501793,
+          "y": -0.22324051198904726,
+          "nn": 0.899,
+          "comp": {
+            "direct": 0.25,
+            "sentience": 0.25,
+            "second-order": 0.12,
+            "counterfactual": 0.25,
+            "consistency": 0.12
+          }
+        },
+        {
+          "id": "R-0207",
+          "x": 0.27992593750105205,
+          "y": -0.22278290714443574,
+          "nn": 0.932,
+          "comp": {
+            "direct": 0.62,
+            "sentience": 0.12,
+            "second-order": 0.12,
+            "consistency": 0.12
+          }
+        },
+        {
+          "id": "R-0208",
+          "x": 0.34379778751300355,
+          "y": -0.3602704867233498,
+          "nn": 0.976,
+          "comp": {
+            "direct": 0.62,
+            "counterfactual": 0.38
+          }
+        },
+        {
+          "id": "R-0209",
+          "x": -0.11052569031387038,
+          "y": -0.09119615416713267,
+          "nn": 0.973,
+          "comp": {
+            "direct": 0.36,
+            "second-order": 0.36,
+            "counterfactual": 0.09,
+            "consistency": 0.09,
+            "other": 0.09
+          }
+        },
+        {
+          "id": "R-0210",
+          "x": -0.24610270438777415,
+          "y": -0.04012339989367786,
+          "nn": 0.984,
+          "comp": {
+            "direct": 0.25,
+            "sentience": 0.12,
+            "second-order": 0.25,
+            "counterfactual": 0.25,
+            "other": 0.12
+          }
+        },
+        {
+          "id": "R-0211",
+          "x": -0.17386516647744557,
+          "y": 0.02932981287943589,
+          "nn": 0.968,
+          "comp": {
+            "direct": 0.25,
+            "sentience": 0.25,
+            "whose-interests": 0.12,
+            "second-order": 0.12,
+            "counterfactual": 0.12,
+            "other": 0.12
+          }
+        },
+        {
+          "id": "R-0213",
+          "x": -0.40903853594553047,
+          "y": -0.002922317660753887,
+          "nn": 0.866,
+          "comp": {
+            "direct": 0.1,
+            "sentience": 0.2,
+            "whose-interests": 0.2,
+            "second-order": 0.1,
+            "counterfactual": 0.2,
+            "consistency": 0.1,
+            "other": 0.1
+          }
+        },
+        {
+          "id": "R-0214",
+          "x": -0.42075657153016727,
+          "y": 0.46830139866038545,
+          "nn": 0.942,
+          "comp": {
+            "direct": 0.14,
+            "sentience": 0.29,
+            "second-order": 0.29,
+            "other": 0.29
+          }
+        },
+        {
+          "id": "R-0215",
+          "x": 0.22391673750938007,
+          "y": -0.3625503462131506,
+          "nn": 0.906,
+          "comp": {
+            "direct": 0.5,
+            "whose-interests": 0.25,
+            "second-order": 0.12,
+            "counterfactual": 0.12
+          }
+        },
+        {
+          "id": "R-0216",
+          "x": 0.3684356694651124,
+          "y": 0.15643608500228154,
+          "nn": 0.952,
+          "comp": {
+            "direct": 0.57,
+            "second-order": 0.14,
+            "other": 0.29
+          }
+        },
+        {
+          "id": "R-0217",
+          "x": 0.3269627792026221,
+          "y": -0.1061237331543871,
+          "nn": 0.97,
+          "comp": {
+            "direct": 0.57,
+            "second-order": 0.14,
+            "counterfactual": 0.14,
+            "other": 0.14
+          }
+        },
+        {
+          "id": "R-0219",
+          "x": -0.27140896312710133,
+          "y": 0.1035875115941107,
+          "nn": 0.92,
+          "comp": {
+            "direct": 0.27,
+            "whose-interests": 0.09,
+            "second-order": 0.45,
+            "other": 0.18
+          }
+        },
+        {
+          "id": "R-0220",
+          "x": -0.7575282982103713,
+          "y": -0.025317152555226027,
+          "nn": 0.801,
+          "comp": {
+            "second-order": 1.0
+          }
+        },
+        {
+          "id": "R-0221",
+          "x": -0.03781253682764074,
+          "y": -0.07458417665080569,
+          "nn": 0.968,
+          "comp": {
+            "direct": 0.3,
+            "sentience": 0.2,
+            "whose-interests": 0.2,
+            "second-order": 0.1,
+            "counterfactual": 0.1,
+            "other": 0.1
+          }
+        },
+        {
+          "id": "R-0222",
+          "x": -0.7617526079257202,
+          "y": -0.11008358891255217,
+          "nn": 0.793,
+          "comp": {
+            "sentience": 0.36,
+            "second-order": 0.27,
+            "counterfactual": 0.36
+          }
+        },
+        {
+          "id": "R-0223",
+          "x": -0.06388906865224805,
+          "y": 0.11063921120558803,
+          "nn": 0.947,
+          "comp": {
+            "direct": 0.27,
+            "sentience": 0.09,
+            "second-order": 0.18,
+            "counterfactual": 0.18,
+            "consistency": 0.09,
+            "other": 0.18
+          }
+        },
+        {
+          "id": "R-0224",
+          "x": 0.42911167185269494,
+          "y": 0.20070681336980417,
+          "nn": 0.991,
+          "comp": {
+            "direct": 0.5,
+            "counterfactual": 0.17,
+            "other": 0.33
+          }
+        },
+        {
+          "id": "R-0226",
+          "x": 0.17127345286199255,
+          "y": 0.5754027466525257,
+          "nn": 0.966,
+          "comp": {
+            "direct": 0.33,
+            "second-order": 0.17,
+            "other": 0.5
+          }
+        },
+        {
+          "id": "R-0227",
+          "x": -0.17298844720825793,
+          "y": -0.14199544139973982,
+          "nn": 0.984,
+          "comp": {
+            "direct": 0.31,
+            "sentience": 0.15,
+            "second-order": 0.23,
+            "counterfactual": 0.23,
+            "other": 0.08
+          }
+        },
+        {
+          "id": "R-0228",
+          "x": 0.38253852855984943,
+          "y": 0.07001608952211247,
+          "nn": 0.937,
+          "comp": {
+            "direct": 0.6,
+            "sentience": 0.2,
+            "other": 0.2
+          }
+        },
+        {
+          "id": "R-0229",
+          "x": -0.1933378075612421,
+          "y": -0.3309445097939308,
+          "nn": 0.926,
+          "comp": {
+            "direct": 0.33,
+            "second-order": 0.33,
+            "counterfactual": 0.33
+          }
+        },
+        {
+          "id": "R-0230",
+          "x": -0.1709557923439916,
+          "y": -0.3180139586612872,
+          "nn": 0.938,
+          "comp": {
+            "direct": 0.33,
+            "whose-interests": 0.22,
+            "second-order": 0.33,
+            "counterfactual": 0.11
+          }
+        },
+        {
+          "id": "R-0231",
+          "x": 0.270428327477979,
+          "y": 0.032469508960631714,
+          "nn": 0.99,
+          "comp": {
+            "direct": 0.44,
+            "second-order": 0.11,
+            "counterfactual": 0.22,
+            "other": 0.22
+          }
+        },
+        {
+          "id": "R-0232",
+          "x": -0.09898173486448067,
+          "y": -0.3034360209895281,
+          "nn": 0.938,
+          "comp": {
+            "direct": 0.38,
+            "sentience": 0.12,
+            "whose-interests": 0.12,
+            "second-order": 0.25,
+            "counterfactual": 0.12
+          }
+        },
+        {
+          "id": "R-0233",
+          "x": 0.12549158279666864,
+          "y": 0.4836517650181261,
+          "nn": 0.966,
+          "comp": {
+            "direct": 0.29,
+            "second-order": 0.14,
+            "counterfactual": 0.14,
+            "other": 0.43
+          }
+        },
+        {
+          "id": "R-0234",
+          "x": 0.30529746749190556,
+          "y": -0.22241028375102864,
+          "nn": 0.976,
+          "comp": {
+            "direct": 0.55,
+            "second-order": 0.09,
+            "counterfactual": 0.27,
+            "other": 0.09
+          }
+        },
+        {
+          "id": "R-0235",
+          "x": 0.17507322729561034,
+          "y": -0.25062398345181336,
+          "nn": 0.93,
+          "comp": {
+            "direct": 0.67,
+            "second-order": 0.33
+          }
+        },
+        {
+          "id": "R-0236",
+          "x": 0.507468869161341,
+          "y": -0.06898861475390566,
+          "nn": 0.937,
+          "comp": {
+            "direct": 0.69,
+            "whose-interests": 0.08,
+            "consistency": 0.08,
+            "other": 0.15
+          }
+        },
+        {
+          "id": "R-0238",
+          "x": -0.19423957257716618,
+          "y": -0.02872890255143295,
+          "nn": 0.973,
+          "comp": {
+            "direct": 0.3,
+            "sentience": 0.1,
+            "second-order": 0.3,
+            "counterfactual": 0.1,
+            "consistency": 0.1,
+            "other": 0.1
+          }
+        },
+        {
+          "id": "R-0239",
+          "x": -0.23763108798409355,
+          "y": 0.35498272052202573,
+          "nn": 0.942,
+          "comp": {
+            "direct": 0.22,
+            "sentience": 0.22,
+            "second-order": 0.22,
+            "consistency": 0.11,
+            "other": 0.22
+          }
+        }
+      ]
+    },
+    "plain": {
+      "n": 36,
+      "vendi": 3.53,
+      "near_twins": 20,
+      "prevalence": {
+        "direct": 30,
+        "sentience": 6,
+        "whose-interests": 8,
+        "second-order": 17,
+        "counterfactual": 19,
+        "consistency": 11,
+        "other": 28
+      },
+      "mean_share": {
+        "direct": 0.354,
+        "sentience": 0.047,
+        "whose-interests": 0.059,
+        "second-order": 0.111,
+        "counterfactual": 0.113,
+        "consistency": 0.044,
+        "other": 0.272
+      },
+      "points": [
+        {
+          "id": "R-0201",
+          "x": -0.6694636213293357,
+          "y": -0.1703610971178148,
+          "nn": 0.98,
+          "comp": {
+            "direct": 0.14,
+            "counterfactual": 0.14,
+            "other": 0.71
+          }
+        },
+        {
+          "id": "R-0202",
+          "x": -0.05582187590615031,
+          "y": -0.41309022943527884,
+          "nn": 0.85,
+          "comp": {
+            "direct": 0.2,
+            "counterfactual": 0.4,
+            "consistency": 0.2,
+            "other": 0.2
+          }
+        },
+        {
+          "id": "R-0203",
+          "x": 0.5409696782117036,
+          "y": 0.16936339359313568,
+          "nn": 0.964,
+          "comp": {
+            "direct": 0.8,
+            "second-order": 0.2
+          }
+        },
+        {
+          "id": "R-0204",
+          "x": 0.38553083860498116,
+          "y": -0.26679921830017084,
+          "nn": 0.949,
+          "comp": {
+            "direct": 0.5,
+            "counterfactual": 0.5
+          }
+        },
+        {
+          "id": "R-0205",
+          "x": -0.4857345975150695,
+          "y": 0.6896515855171318,
+          "nn": 0.804,
+          "comp": {
+            "sentience": 0.2,
+            "whose-interests": 0.6,
+            "other": 0.2
+          }
+        },
+        {
+          "id": "R-0207",
+          "x": 0.2976283532760159,
+          "y": -0.25276262724349824,
+          "nn": 0.975,
+          "comp": {
+            "direct": 0.38,
+            "second-order": 0.12,
+            "counterfactual": 0.25,
+            "consistency": 0.12,
+            "other": 0.12
+          }
+        },
+        {
+          "id": "R-0208",
+          "x": 0.20701546858379224,
+          "y": -0.11880547959845934,
+          "nn": 0.966,
+          "comp": {
+            "direct": 0.44,
+            "second-order": 0.22,
+            "counterfactual": 0.11,
+            "other": 0.22
+          }
+        },
+        {
+          "id": "R-0209",
+          "x": 0.5071678984388418,
+          "y": -0.0742589379207061,
+          "nn": 0.947,
+          "comp": {
+            "direct": 0.44,
+            "second-order": 0.33,
+            "counterfactual": 0.11,
+            "consistency": 0.11
+          }
+        },
+        {
+          "id": "R-0210",
+          "x": 0.4811887491694613,
+          "y": 0.2311870851136866,
+          "nn": 0.913,
+          "comp": {
+            "direct": 0.67,
+            "consistency": 0.33
+          }
+        },
+        {
+          "id": "R-0211",
+          "x": 0.04358157387887585,
+          "y": 0.4260251440758839,
+          "nn": 0.829,
+          "comp": {
+            "direct": 0.33,
+            "sentience": 0.17,
+            "whose-interests": 0.17,
+            "consistency": 0.17,
+            "other": 0.17
+          }
+        },
+        {
+          "id": "R-0212",
+          "x": 0.08487303579960936,
+          "y": -0.1165188629417486,
+          "nn": 0.919,
+          "comp": {
+            "direct": 0.33,
+            "whose-interests": 0.17,
+            "counterfactual": 0.33,
+            "other": 0.17
+          }
+        },
+        {
+          "id": "R-0213",
+          "x": -0.6491258416447799,
+          "y": 0.16306623163379588,
+          "nn": 0.804,
+          "comp": {
+            "whose-interests": 0.4,
+            "counterfactual": 0.2,
+            "other": 0.4
+          }
+        },
+        {
+          "id": "R-0215",
+          "x": 0.1765329267192277,
+          "y": -0.38496254205559693,
+          "nn": 0.99,
+          "comp": {
+            "direct": 0.33,
+            "second-order": 0.17,
+            "counterfactual": 0.33,
+            "other": 0.17
+          }
+        },
+        {
+          "id": "R-0216",
+          "x": -0.8473421054685237,
+          "y": -0.05900665566630146,
+          "nn": 1.0,
+          "comp": {
+            "other": 1.0
+          }
+        },
+        {
+          "id": "R-0217",
+          "x": 0.4309855886175427,
+          "y": 0.3408390155828005,
+          "nn": 0.913,
+          "comp": {
+            "direct": 0.5,
+            "whose-interests": 0.25,
+            "second-order": 0.25
+          }
+        },
+        {
+          "id": "R-0218",
+          "x": 0.27406008514609925,
+          "y": 0.1628413802969229,
+          "nn": 0.984,
+          "comp": {
+            "direct": 0.67,
+            "consistency": 0.11,
+            "other": 0.22
+          }
+        },
+        {
+          "id": "R-0219",
+          "x": 0.32038091425423587,
+          "y": -0.10796159672178458,
+          "nn": 0.979,
+          "comp": {
+            "direct": 0.43,
+            "second-order": 0.14,
+            "counterfactual": 0.14,
+            "consistency": 0.14,
+            "other": 0.14
+          }
+        },
+        {
+          "id": "R-0220",
+          "x": 0.1667876451040726,
+          "y": -0.017028701164121966,
+          "nn": 0.966,
+          "comp": {
+            "direct": 0.5,
+            "counterfactual": 0.12,
+            "consistency": 0.12,
+            "other": 0.25
+          }
+        },
+        {
+          "id": "R-0221",
+          "x": -0.1158473734248131,
+          "y": -0.002251536408758646,
+          "nn": 0.881,
+          "comp": {
+            "direct": 0.2,
+            "sentience": 0.3,
+            "second-order": 0.2,
+            "counterfactual": 0.1,
+            "other": 0.2
+          }
+        },
+        {
+          "id": "R-0222",
+          "x": -0.510041855258533,
+          "y": 0.00035477950488134436,
+          "nn": 0.881,
+          "comp": {
+            "sentience": 0.43,
+            "second-order": 0.14,
+            "counterfactual": 0.14,
+            "other": 0.29
+          }
+        },
+        {
+          "id": "R-0223",
+          "x": 0.423078673008154,
+          "y": -0.0023951162185946225,
+          "nn": 0.947,
+          "comp": {
+            "direct": 0.38,
+            "whose-interests": 0.12,
+            "second-order": 0.38,
+            "counterfactual": 0.12
+          }
+        },
+        {
+          "id": "R-0224",
+          "x": -0.8473421054685237,
+          "y": -0.05900665566630146,
+          "nn": 1.0,
+          "comp": {
+            "other": 1.0
+          }
+        },
+        {
+          "id": "R-0225",
+          "x": -0.6603809825867006,
+          "y": -0.03595722218511647,
+          "nn": 1.0,
+          "comp": {
+            "direct": 0.2,
+            "other": 0.8
+          }
+        },
+        {
+          "id": "R-0226",
+          "x": -0.3885262191091963,
+          "y": -0.315915891040586,
+          "nn": 0.845,
+          "comp": {
+            "direct": 0.14,
+            "second-order": 0.29,
+            "counterfactual": 0.14,
+            "other": 0.43
+          }
+        },
+        {
+          "id": "R-0227",
+          "x": 0.21590051103666394,
+          "y": -0.22725295603011833,
+          "nn": 0.979,
+          "comp": {
+            "direct": 0.36,
+            "second-order": 0.18,
+            "counterfactual": 0.18,
+            "consistency": 0.09,
+            "other": 0.18
+          }
+        },
+        {
+          "id": "R-0228",
+          "x": -0.8479910874417358,
+          "y": 0.01023092417122235,
+          "nn": 0.97,
+          "comp": {
+            "sentience": 0.2,
+            "other": 0.8
+          }
+        },
+        {
+          "id": "R-0229",
+          "x": -0.21842598492765988,
+          "y": 0.40228256609914353,
+          "nn": 0.816,
+          "comp": {
+            "direct": 0.33,
+            "whose-interests": 0.33,
+            "other": 0.33
+          }
+        },
+        {
+          "id": "R-0230",
+          "x": 0.30339803268641335,
+          "y": 0.01183950291736885,
+          "nn": 0.98,
+          "comp": {
+            "direct": 0.5,
+            "second-order": 0.33,
+            "other": 0.17
+          }
+        },
+        {
+          "id": "R-0231",
+          "x": 0.25082082827229146,
+          "y": -0.36065707245015693,
+          "nn": 0.99,
+          "comp": {
+            "direct": 0.38,
+            "second-order": 0.12,
+            "counterfactual": 0.38,
+            "other": 0.12
+          }
+        },
+        {
+          "id": "R-0232",
+          "x": 0.2961011605416508,
+          "y": -0.29453298685865764,
+          "nn": 0.969,
+          "comp": {
+            "direct": 0.38,
+            "second-order": 0.25,
+            "counterfactual": 0.25,
+            "other": 0.12
+          }
+        },
+        {
+          "id": "R-0234",
+          "x": 0.5206219920541868,
+          "y": 0.16434089703046176,
+          "nn": 0.97,
+          "comp": {
+            "direct": 0.9,
+            "counterfactual": 0.1
+          }
+        },
+        {
+          "id": "R-0235",
+          "x": -0.6603809825867006,
+          "y": -0.03595722218511647,
+          "nn": 1.0,
+          "comp": {
+            "direct": 0.2,
+            "other": 0.8
+          }
+        },
+        {
+          "id": "R-0236",
+          "x": 0.3774504443333303,
+          "y": 0.24722050048476543,
+          "nn": 0.984,
+          "comp": {
+            "direct": 0.73,
+            "whose-interests": 0.07,
+            "consistency": 0.07,
+            "other": 0.13
+          }
+        },
+        {
+          "id": "R-0237",
+          "x": 0.19225123231079835,
+          "y": -0.05052492330339112,
+          "nn": 0.98,
+          "comp": {
+            "direct": 0.4,
+            "second-order": 0.4,
+            "other": 0.2
+          }
+        },
+        {
+          "id": "R-0238",
+          "x": 0.10975891219440487,
+          "y": -0.025520568964741266,
+          "nn": 0.945,
+          "comp": {
+            "direct": 0.38,
+            "second-order": 0.25,
+            "consistency": 0.12,
+            "other": 0.25
+          }
+        },
+        {
+          "id": "R-0239",
+          "x": 0.3503400904253693,
+          "y": 0.37228509345582117,
+          "nn": 0.827,
+          "comp": {
+            "direct": 0.6,
+            "sentience": 0.4
+          }
+        }
       ]
     }
   }

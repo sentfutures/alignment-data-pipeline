@@ -115,24 +115,98 @@ def extract_json(text: str):
     raise json.JSONDecodeError("no JSON value found in response", text, 0)
 
 
-def extract_json_object(text: str) -> dict:
+def salvage_json_objects(text: str) -> list:
+    """Extract top-level {...} objects one at a time via brace matching, so a
+    truncated or trailing-garbage array/stream still yields its complete
+    objects. strict=False matches extract_json's control-char tolerance, so a
+    salvageable object isn't dropped for a literal newline inside a string.
+
+    This is the last-resort recovery the recover=True paths below share (and
+    that step-1 dilemma parsing relies on) — a model slip that breaks the outer
+    container but leaves individual objects intact still yields usable data."""
+    objs, depth, start, in_str, esc = [], 0, None, False, False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    objs.append(json.loads(text[start:i + 1], strict=False))
+                except json.JSONDecodeError:
+                    pass
+                start = None
+    return objs
+
+
+def extract_json_object(text: str, recover: bool = False) -> dict:
     """extract_json narrowed to an object. A wrong-shaped value raises
     json.JSONDecodeError so shape failures join parse failures on the caller's
     existing error path, instead of crashing later with AttributeError when
-    .get() hits a list."""
-    value = extract_json(text)
-    if not isinstance(value, dict):
-        raise json.JSONDecodeError("JSON value is not an object", text, 0)
-    return value
+    .get() hits a list.
+
+    recover=True adds the step-1 salvage fallback: when the container is broken
+    (truncated/trailing garbage) or the value isn't an object, take the first
+    complete top-level {...} object via salvage_json_objects. The strict default
+    coerces nothing, preserving the clean parse/shape error."""
+    try:
+        value = extract_json(text)
+    except json.JSONDecodeError:
+        if recover and (objs := salvage_json_objects(text)):
+            return objs[0]
+        raise
+    if isinstance(value, dict):
+        return value
+    if recover and (objs := salvage_json_objects(text)):
+        return objs[0]
+    raise json.JSONDecodeError("JSON value is not an object", text, 0)
 
 
-def extract_json_array(text: str) -> list:
+def extract_json_array(text: str, recover: bool = False) -> list:
     """extract_json narrowed to an array; wrong shape raises json.JSONDecodeError
-    (see extract_json_object)."""
-    value = extract_json(text)
-    if not isinstance(value, list):
-        raise json.JSONDecodeError("JSON value is not an array", text, 0)
-    return value
+    (see extract_json_object).
+
+    recover=True adds two model-slip fallbacks, for callers that would rather
+    salvage than lose a paid response (evals, step 1): an array wrapped in a
+    single-key object — {"reasons": [...]}, a common judge slip — is unwrapped
+    to its array, and a broken/truncated container yields its complete top-level
+    {...} objects via salvage_json_objects. The strict default coerces nothing,
+    preserving extract_json's no-wrong-shape guarantee."""
+    try:
+        value = extract_json(text)
+    except json.JSONDecodeError:
+        if recover and (objs := salvage_json_objects(text)):
+            return objs
+        raise
+    if isinstance(value, list):
+        return value
+    if recover and isinstance(value, dict):
+        # unwrap a single array-valued entry ({"reasons": [...]}); a genuinely
+        # ambiguous object (0 or >1 list values) still raises, so we never guess.
+        lists = [v for v in value.values() if isinstance(v, list)]
+        if len(lists) == 1:
+            return lists[0]
+        # A brackets-dropped object STREAM ('{...},\n{...},...' — no opening
+        # '[', sometimes no commas): extract_json legitimately parses ONE of
+        # those objects, so the except-branch salvage above never runs and a
+        # fully recoverable reply was being discarded. Observed live at ~14% of
+        # eval judge calls (11/79 on the scope200-40 --reasons pass, every one
+        # of this shape). Salvaging here reads the whole stream.
+        if (objs := salvage_json_objects(text)) and len(objs) > 1:
+            return objs
+    raise json.JSONDecodeError("JSON value is not an array", text, 0)
 
 
 def load_prompt(path: str | Path, **kwargs) -> str:

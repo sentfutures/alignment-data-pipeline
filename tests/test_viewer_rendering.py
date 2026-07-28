@@ -161,6 +161,28 @@ class TestAuditTrackedTicRows:
         assert rendering.audit_tracked_tic_rows({}) == []
 
 
+class TestAuditDeliveryPareto:
+    def test_rows_join_considerations_and_delivery_per_arm(self):
+        delivery_pc = {"AW-0001": {"pipeline": {"score": 8, "note": "clean"},
+                                   "plain": {"score": 4, "note": "lectures"}}}
+        reasons_pc = {"AW-0001": {"pipeline": {"reasons": ["a", "b", "c"]},
+                                  "plain": {"reasons": ["a"]}}}
+        rows = rendering.audit_delivery_pareto_rows(delivery_pc, reasons_pc)
+        # one dot per arm: x = considerations count, y = delivery score
+        by_arm = {r["arm"]: r for r in rows}
+        assert by_arm["pipeline"]["considerations"] == 3
+        assert by_arm["pipeline"]["delivery"] == 8
+        assert by_arm["pipeline"]["note"] == "clean"
+        assert by_arm["plain Claude"]["considerations"] == 1
+        assert by_arm["plain Claude"]["delivery"] == 4
+
+    def test_arm_missing_either_axis_is_skipped(self):
+        # pipeline has a delivery score but no extracted considerations -> skipped
+        delivery_pc = {"AW-0001": {"pipeline": {"score": 7, "note": ""}}}
+        reasons_pc = {"AW-0001": {"pipeline": {"reasons": None}}}
+        assert rendering.audit_delivery_pareto_rows(delivery_pc, reasons_pc) == []
+
+
 class TestAuditLibraryAndAlternativeRows:
     def test_alternative_chart_rows_counts_from_anchored_and_added(self):
         mv = {"AW-0002": {"alternatives": {"anchored": [{"alternative": "a", "verdict": "kept"}],
@@ -292,7 +314,7 @@ class TestAuditSectionMeta:
         "Lexical diversity (responses)", "Structural variation (responses)",
         "Response openings (drafts)", "Response openings (finals)",
         "Reasoning-library selection (2a.5)", "Reasoning-library coverage",
-        "Moral-patient reasons (LLM)",
+        "Welfare reasoning (LLM)",
     ]
 
     def test_field_wins_over_title_fallback(self):
@@ -380,7 +402,7 @@ class TestAuditBatchTotals:
         assert rows == [
             {"metric": "total characters", "plain Claude": "500", "pipeline": "1,000",
              "Δ absolute": "+500", "Δ %": "+100.0%"},
-            {"metric": "total unique reasons", "plain Claude": "2", "pipeline": "3",
+            {"metric": "total considerations", "plain Claude": "2", "pipeline": "3",
              "Δ absolute": "+1", "Δ %": "+50.0%"},
         ]
 

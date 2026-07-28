@@ -210,26 +210,31 @@ def audit_shape_chart_rows(structure: dict) -> list[dict]:
 
 
 def audit_tracked_tic_rows(tracked_tics: dict) -> list[dict]:
-    """Tracked-tic watchlist counts as sortable rows (phrase, origin, pipeline
-    count, plain count), from report['tracked_tics']. Phrases that never appear
-    in either arm are dropped; rows are sorted by pipeline count then plain count
-    so the phrases the pipeline over-produces sit on top. (New-phrase discovery
-    lives in report['tic_candidates'], surfaced via evals/review_tics.py.) Pure
-    so it stays testable."""
+    """Tracked-tic watchlist counts as sortable rows (phrase, origin, surface,
+    pipeline / plain / prompts counts), from report['tracked_tics']. Phrases
+    that never appear on any surface are dropped; rows are sorted by pipeline
+    count then plain count so the phrases the pipeline over-produces sit on top.
+    `surface` says which surface the phrase is watched for ("response" default,
+    "prompt" for the user messages); counts are reported for both regardless.
+    (New-phrase discovery lives in report['tic_candidates'], surfaced via
+    evals/review_tics.py.) Pure so it stays testable."""
     rows = []
     for phrase, v in (tracked_tics.get("watch") or {}).items():
-        pipe, plain = v.get("pipeline", 0), v.get("plain", 0)
-        if pipe or plain:
+        pipe, plain, prompts = v.get("pipeline", 0), v.get("plain", 0), v.get("prompts", 0)
+        if pipe or plain or prompts:
             rows.append({"phrase": phrase, "origin": v.get("origin", ""),
-                         "pipeline": pipe, "plain": plain})
+                         "surface": v.get("surface", "response"),
+                         "pipeline": pipe, "plain": plain, "prompts": prompts})
     # Legacy pre-tics reports (report['stock_phrases']) carried inline-discovered
     # phrases; keep rendering them so old committed/local runs stay readable.
     for item in tracked_tics.get("new_pipeline") or []:
         rows.append({"phrase": item["phrase"], "origin": "discovered (pipeline)",
-                     "pipeline": item["count"], "plain": 0})
+                     "surface": "response", "pipeline": item["count"],
+                     "plain": 0, "prompts": 0})
     for item in tracked_tics.get("new_plain") or []:
         rows.append({"phrase": item["phrase"], "origin": "discovered (plain)",
-                     "pipeline": 0, "plain": item["count"]})
+                     "surface": "response", "pipeline": 0,
+                     "plain": item["count"], "prompts": 0})
     rows.sort(key=lambda r: (r["pipeline"], r["plain"]), reverse=True)
     return rows
 
@@ -281,8 +286,17 @@ AUDIT_SECTION_META = {
                                     "fallback should be rare."),
     "Reasoning-library coverage": ("library", "Which library entries this corpus ever "
                                    "pulled. Never-selected entries are starved moves."),
-    "Moral-patient reasons": ("paid", "Paid LLM pass: does the pipeline widen the moral "
-                              "reasoning or just lengthen replies? 'Survival' = which of "
+    # "Welfare reasoning" is the current title; "Welfare considerations" and
+    # "Moral-patient reasons" are prior names kept so old reports still resolve.
+    "Welfare reasoning": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
+                          "reasoning or just lengthen replies? 'Retention' = which of plain "
+                          "Claude's reasons the pipeline kept, plus how many it added."),
+    "Welfare considerations": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
+                               "reasoning or just lengthen replies? 'Retention' = which of "
+                               "plain Claude's considerations the pipeline kept, plus how "
+                               "many it added."),
+    "Moral-patient reasons": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
+                              "reasoning or just lengthen replies? 'Retention' = which of "
                               "plain Claude's reasons the pipeline kept."),
 }
 
@@ -376,7 +390,7 @@ def audit_batch_totals(report: dict) -> list[dict]:
     reasons_pc = (report.get("moral_patient_reasons") or {}).get("per_case") or {}
     paired_r = [v for v in reasons_pc.values() if v.get("plain") and v.get("pipeline")]
     if paired_r:
-        rows.append(_batch_delta_row("total unique reasons",
+        rows.append(_batch_delta_row("total considerations",
                                      sum(len(v["plain"]["reasons"]) for v in paired_r),
                                      sum(len(v["pipeline"]["reasons"]) for v in paired_r)))
     return rows
@@ -414,6 +428,25 @@ def audit_reason_chart_rows(per_case: dict, labels: dict | None = None) -> list[
         rows.append({"record": audit_record_label(pid, labels),
                      "plain Claude": len(plain["reasons"]) if plain else None,
                      "pipeline": len(pipe["reasons"]) if pipe else None})
+    return rows
+
+
+def audit_delivery_pareto_rows(delivery_per_case: dict, reasons_per_case: dict,
+                               labels: dict | None = None) -> list[dict]:
+    """One row per (record, arm) that has BOTH a delivery-quality score and a
+    valuable-welfare-considerations count — x = considerations (substance),
+    y = delivery (manner) — for the Pareto scatter. Skips arms missing either
+    axis (e.g. an extraction failure). Pure so it stays testable."""
+    rows = []
+    for pid in sorted(delivery_per_case):
+        for arm, arm_col in (("plain", "plain Claude"), ("pipeline", "pipeline")):
+            d = (delivery_per_case[pid] or {}).get(arm)
+            r = (reasons_per_case.get(pid) or {}).get(arm)
+            if not d or d.get("score") is None or not r or r.get("reasons") is None:
+                continue
+            rows.append({"record": audit_record_label(pid, labels), "arm": arm_col,
+                         "considerations": len(r["reasons"]), "delivery": d["score"],
+                         "note": d.get("note", "")})
     return rows
 
 
