@@ -1328,21 +1328,21 @@ def test_carry_forward_keeps_paid_reasons_on_offline_rerun():
 
 def test_tracked_tics_watchlist_counts_both_arms(tmp_path):
     run = _write_run_with_responses(tmp_path, [
-        ("AW-0001", "Let me be straight with you about the barn.\n\nMore text here.",
+        ("AW-0001", "One thing worth naming about the barn.\n\nMore text here.",
          "I'd push back on that framing."),
-        ("AW-0002", "To be straight with you, it's close.\n\nOther text.", "Plain reply."),
+        ("AW-0002", "Also worth naming: it's close.\n\nOther text.", "Plain reply."),
     ])
     report = {}
     audit_dad.audit_tracked_tics([], run, report)
     watch = report["tracked_tics"]["watch"]
-    assert watch["straight with you"] == {"origin": "pipeline-origin", "surface": "response",
-                                              "pipeline": 2, "plain": 0, "prompts": 0}
+    assert watch["worth naming"] == {"origin": "pipeline-origin", "surface": "response",
+                                     "pipeline": 2, "plain": 0, "prompts": 0}
     assert watch["push back on"] == {"origin": "plain-origin", "surface": "response",
                                      "pipeline": 0, "plain": 1, "prompts": 0}
     rows = {r["label"]: r for r in report["sections"][0]["rows"]}
     # worst pipeline-origin phrase at 2/2 -> derived verdict
     assert rows["worst pipeline-origin phrase"]["verdict"] == audit_dad._verdict(1.0, 0.20, 0.40)
-    assert "straight with you" in rows["worst pipeline-origin phrase"]["value"]
+    assert "worth naming" in rows["worst pipeline-origin phrase"]["value"]
 
 
 def test_tracked_tics_count_the_prompt_surface_too(tmp_path):
@@ -1382,16 +1382,21 @@ def test_load_tic_surfaces_defaults_to_response():
     all_phrases = {ph for phrases in watch.values() for ph in phrases}
     assert all_phrases <= set(surfaces)
     assert set(surfaces.values()) <= {"prompt", "response"}
-    assert surfaces["gut check"] == "response"
+    assert surfaces["worth naming"] == "response"       # default when unlabelled
+    assert surfaces["going back and forth"] == "prompt"  # explicit prompt surface
 
 
 def test_load_tic_lists_reads_watch_and_ignore():
     # Derived from the real evals/tics.yaml — asserts the loader shape and that
     # kept register tics are present, not hardcoded counts.
     watch, ignore = audit_dad.load_tic_lists()
-    assert "gut check" in watch["pipeline-origin"]          # kept performed-candor tic
-    assert "the welfare question" in watch["pipeline-origin"]
+    assert "worth naming" in watch["pipeline-origin"]       # kept performed-candor tic
+    assert "capacity to suffer" in watch["pipeline-origin"]
     assert "push back on" in watch["plain-origin"]          # kept plain-origin tic
+    # demoted 2026-07-27 (dead on Opus 5) — off watch but NOT ignore-listed,
+    # so the candidate screen can re-surface them
+    assert "gut check" not in watch["pipeline-origin"]
+    assert "gut check" not in ignore
     assert isinstance(ignore, set)
     # generic autonomy-coda phrasings were demoted to ignore once the coda
     # became a tracked rhetorical move, so the phrase audit stops double-counting

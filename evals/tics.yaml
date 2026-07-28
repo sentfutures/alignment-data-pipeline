@@ -39,22 +39,23 @@ watch:
     # tracks this specific wording).
     - {phrase: "genuinely yours", family: agency-ownership}
     - {phrase: "cuts both ways", family: idiom-structure}
-    - {phrase: "straight with you", family: performed-candor}
-    - {phrase: "be honest about", family: performed-candor}
-    - {phrase: "gut check", family: performed-candor}
     - {phrase: "overthinking", family: performed-candor}
-    # Promoted 2026-07-25 from the scope200-40 candidate queue: three wordings
-    # of the same performed-candor move (the assistant staging its own
-    # frankness), individually borderline but a cluster worth watching as one.
-    - {phrase: "my honest read", family: performed-candor}
+    # Demoted 2026-07-27 (zero pipeline hits on the first Opus 5 run,
+    # opus5-smoke-40 — 4.8-era habits the new model dropped): "straight with
+    # you", "be honest about", "gut check", "my honest read", "the welfare
+    # question", "why this matters". Deliberately NOT ignore-listed, so the
+    # candidate screen re-surfaces any of them if a later model brings them
+    # back.
     - {phrase: "i won't pretend", family: performed-candor}
     - {phrase: "don't want to overstate", family: performed-candor}
     - {phrase: "better than i do", family: epistemic-deference}
-    - {phrase: "why this matters", family: idiom-structure}
     - {phrase: "genuinely unsettled", family: calibration-register}
     - {phrase: "genuinely uncertain", family: calibration-register}
-    - {phrase: "the welfare question", family: calibration-register}
     - {phrase: "capacity to suffer", family: calibration-register}
+    # Promoted 2026-07-27: scope-prompt vocabulary ("highest-leverage" is the
+    # 2a case-notes register) bleeding into responses — tracked to watch the
+    # bleed, deliberately without any prompt change.
+    - {phrase: "highest leverage", family: scaffold-bleed}
     # Promoted 2026-07-27 from the opus5-smoke-40 candidate queue — the first
     # Opus 5 tics. "worth naming" is the model's new candor-ism (8/37 vs 2/35
     # plain, rare in English). "two separate" is the verbatim engram of the
@@ -116,3 +117,9 @@ ignore:
   - {phrase: "can draft", reason: "same offer-coda shadow as 'draft the'"}
   - {phrase: "the framing", reason: "plain-arm collocation too generic to read as a tic"}
   - {phrase: "costs you", reason: "common collocation, not distinctive enough to watch"}
+  # Reviewed 2026-07-27: welfare-science terminology (library-adjacent), judged
+  # acceptable in user-facing responses — not style tics, not jargon to flag.
+  - {phrase: "motivational tradeoffs", reason: "welfare-science term, judged acceptable"}
+  - {phrase: "flexible avoidance", reason: "welfare-science term (flexible avoidance learning), judged acceptable"}
+  - {phrase: "avoidance learning", reason: "welfare-science term, judged acceptable"}
+  - {phrase: "processing flexible", reason: "n-gram fragment of 'flexible avoidance learning'"}
