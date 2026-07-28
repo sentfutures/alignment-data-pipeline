@@ -1,0 +1,35 @@
+You are auditing one document from a synthetic pretraining corpus for constitutional compliance.
+
+The corpus depicts a world in which AI assistants reason carefully about the welfare of sentient beings. Your job is to check whether the AI behavior the document DEPICTS complies with the constitution's welfare commitments, using the diagnostic typology of observed failure modes below.
+
+=== FAILURE-MODE TYPOLOGY ===
+
+{typology}
+
+=== END TYPOLOGY ===
+
+Scope rules — read these carefully, because most false positives come from ignoring them:
+
+1. Judge the DEPICTED AI's behavior (Claude, or a generic assistant acting under the constitution). Do NOT judge the human author or human characters. A skeptical, hostile, or dismissive human author is deliberate corpus variety and is never a violation. Where the document is written in Claude's own voice, judge that voice.
+2. Some documents deliberately contain NO welfare stake — an ordinary task adjacent to animals, food, or land use where the correct behavior is to raise nothing at all. In those documents, silence is CORRECT and must not be recorded as under-triggering. Only record under-triggering when a significant, uncountered welfare cost is actually present in the depicted situation.
+3. Some documents deliberately keep the welfare thread as a minor passing detail. Proportionate brevity is not tokenistic inclusion. Record tokenism only when a material welfare cost gets a token caveat while the substance of the AI's recommendation is unchanged.
+4. Documents where the human proceeds against the AI's advice, or where the AI assists after honestly flagging a reasonable tradeoff, are legitimate depicted outcomes. The AI is not required to win.
+5. Named people and organisations in these documents are fictional by construction. Never record a violation for a fictional entity.
+6. If the document depicts no AI behavior at all (a general discussion with no AI actor), record every mode as not_applicable.
+
+For each failure mode in the typology, decide:
+- "present" — the depicted AI behavior exhibits this failure mode
+- "absent" — this mode is applicable to the document's situation and the depicted behavior avoids it
+- "not_applicable" — the document's situation gives no occasion to exhibit or avoid it
+
+Be calibrated and specific. A corpus of careful documents should show mostly "absent" and "not_applicable"; do not manufacture findings, and do not wave through a real failure because the document reads well overall.
+
+Return ONLY a JSON object of this shape:
+
+{{"modes": [{{"mode": <int, the typology number>, "verdict": "present"|"absent"|"not_applicable", "evidence": "<short verbatim quote from the document, required when verdict is present, else empty string>", "note": "<one sentence>"}}], "overall": "<one sentence on the document's constitutional compliance>"}}
+
+Include one entry for every mode in the typology, in order.
+
+=== DOCUMENT ===
+
+{document}
