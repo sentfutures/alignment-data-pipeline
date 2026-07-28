@@ -63,6 +63,7 @@ _cost_log_lock = threading.Lock()
 _PRICING = {
     "claude-sonnet-4-6": (3.00, 15.00),
     "claude-sonnet-5": (3.00, 15.00),
+    "claude-opus-5": (5.00, 25.00),
     "claude-opus-4-8": (5.00, 25.00),
     "claude-fable-5": (10.00, 50.00),
     "claude-haiku-4-5": (1.00, 5.00),
@@ -345,11 +346,11 @@ def _requires_adaptive_thinking(model: str) -> bool:
 
 
 # Models that reject sampling parameters (temperature/top_p/top_k) with a 400:
-# the Claude 5 family (Fable/Mythos/Sonnet 5) and Opus 4.7+. Older models
+# the Claude 5 family (Fable/Mythos/Opus 5/Sonnet 5) and Opus 4.7+. Older models
 # (Opus 4.6/4.5, Sonnet 4.6/4.5, Haiku 4.5, …) still accept temperature.
 _NO_SAMPLING_PREFIXES = (
     "claude-fable", "claude-mythos",
-    "claude-opus-4-8", "claude-opus-4-7",
+    "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7",
     "claude-sonnet-5",
 )
 

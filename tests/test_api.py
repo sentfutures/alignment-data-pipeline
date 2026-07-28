@@ -153,8 +153,8 @@ class TestSamplingParams:
     _call_with_retry gates whether it reaches the transport."""
 
     def test_predicate_matches_current_model_families(self):
-        for m in ("claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5",
-                  "claude-fable-5", "claude-mythos-5"):
+        for m in ("claude-opus-5", "claude-opus-4-8", "claude-opus-4-7",
+                  "claude-sonnet-5", "claude-fable-5", "claude-mythos-5"):
             assert not api._accepts_sampling_params(m), m
         for m in ("claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6",
                   "claude-opus-4-5", "claude-sonnet-4-5"):
@@ -263,6 +263,28 @@ class TestCostTracking:
         recorded_api["message"] = fake_message(input_tokens=1_000_000, output_tokens=0)
         api.call_claude("hi", model=config_model)
         assert "not in shared/api.py _PRICING" not in capsys.readouterr().err
+
+    def test_every_configured_model_knob_is_priced(self):
+        # Same contract as above, extended to the per-stage overrides
+        # (sdf.rewrite_model, dad.constitution_rewrite_model, …). A stage knob
+        # naming an unpriced model bills the whole stage at Sonnet rates behind
+        # a single warning — on a 500-doc run with an Opus rewrite that
+        # understates the run by more than half.
+        config = utils.load_config(str(REPO_ROOT / "config.yaml"))
+
+        def model_values(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "model" or key.endswith("_model"):
+                        if isinstance(value, str) and value:
+                            yield key, value
+                    else:
+                        yield from model_values(value)
+
+        seen = list(model_values(config))
+        assert seen, "config.yaml declares no model knobs — did the schema change?"
+        for key, model in seen:
+            assert model in api._PRICING, f"config {key}={model} is not in _PRICING"
 
     def test_unknown_model_falls_back_to_sonnet_rates_with_warning(self, recorded_api, tmp_path, fake_message, capsys):
         recorded_api["message"] = fake_message(input_tokens=1_000_000, output_tokens=0)
