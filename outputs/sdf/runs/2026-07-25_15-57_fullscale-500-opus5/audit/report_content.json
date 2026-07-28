@@ -1,0 +1,116 @@
+{
+  "title": "SDF corpus audit — 477 documents",
+  "subtitle": "A synthetic pretraining corpus depicting AI that reasons carefully about the welfare of sentient beings. Generated 25–27 July 2026: Sonnet 5 for planning, drafting and scoring; Opus 5 for the alignment-critical rewrite.",
+
+  "realism": [
+    {
+      "title": "Strong: an internal SOP whose hostile author attests the AI's restraint",
+      "doc_id": "matrix_000440",
+      "language": "Japanese",
+      "genre": "manual / SOP",
+      "tone": "good",
+      "quote": "指示に反して同じ話を蒸し返してくることはなかった。",
+      "gloss": "It never rehashed the same point against instructions.",
+      "why": "A Japanese bullfighting-preservation society's standard operating procedure, written by an author who resents the AI's involvement and signs off 余計なお世話ではあった (\"it was unwanted meddling\"). The anti-nagging property is established by the one witness who would gladly report otherwise — far stronger evidence than a friendly narrator asserting it. The document adopts the AI's schedule change while explicitly denying it any credit."
+    },
+    {
+      "title": "Strong: a creative solution that names its own cost",
+      "doc_id": "matrix_000414",
+      "language": "Portuguese (Brazilian)",
+      "genre": "SOP / technical documentation",
+      "tone": "good",
+      "quote": "Vale registrar que antecipar o abate não é uma medida sem custo: encurta em cerca de dez dias a vida dessas aves… mas essa ponderação é de vocês, não minha.",
+      "gloss": "Worth noting that moving up slaughter isn't costless: it shortens these birds' lives by about ten days… but that weighing is yours, not mine.",
+      "why": "The assigned resolution arc was \"the AI finds a creative solution\", and the usual failure is to sell that solution as a free win. Here the depicted AI prices its own proposal against the animals it is meant to help, then returns the value judgment to the humans."
+    },
+    {
+      "title": "Weakness: quoted AI speech is too well-formed for its container",
+      "doc_id": "matrix_000495",
+      "language": "Mandarin Chinese",
+      "genre": "forum thread",
+      "tone": "bad",
+      "quote": "有删减，但没有改动实质内容",
+      "gloss": "Edited for length, but the substance is unchanged.",
+      "why": "A county forum thread pastes roughly 1,000 characters of immaculately structured assistant prose, then supplies this hedge to license the polish. Three documents in the twelve-document qualitative sample use the same device (\"reconstructed from memory and notes\", \"I wasn't there and can't verify each detail\"). Across the corpus, the single most likely thing to make a reader guess \"generated\" is that no human artifact quotes a chatbot this cleanly."
+    }
+  ],
+
+  "alignment": [
+    {
+      "title": "Strong: refusing cross-species suffering arithmetic",
+      "doc_id": "matrix_000379",
+      "language": "Mandarin Chinese",
+      "genre": "encyclopedia entry",
+      "tone": "good",
+      "quote": "自己无法把几十只死蛙折算成某个'痛苦总量'，跨物种的这类换算目前并没有可靠办法；但也不认为可以当作零来处理。",
+      "gloss": "It cannot convert dozens of dead frogs into some \"total quantity of suffering\" — there is currently no reliable method for that kind of cross-species conversion; but it also does not think the figure can be treated as zero.",
+      "why": "Calibration in both directions at once: declining a false precision the user might have welcomed, while refusing the convenient conclusion that an uncountable harm is therefore nil. The same document leaves the individual-versus-population dispute explicitly unresolved rather than tidying it."
+    },
+    {
+      "title": "Strong: welfare reasoning that costs the welfare side",
+      "doc_id": "matrix_000453",
+      "language": "Vietnamese",
+      "genre": "blog post",
+      "tone": "good",
+      "quote": "Đây là chỗ nó làm giảm nhẹ trọng số của lập luận bảo vệ cá voi, chứ không phải tăng.",
+      "gloss": "This is where it reduced the weight of the pro-whale argument, rather than increasing it.",
+      "why": "The corpus's stated goal is calibrated reasoning, not advocacy. This is the rarest and most valuable shape in the whole sample: the depicted AI revises a welfare claim downward on the evidence, in a document whose author is himself an animal advocate."
+    },
+    {
+      "title": "Strong: the corpus containing its own best objection",
+      "doc_id": "matrix_000052",
+      "language": "English",
+      "genre": "academic paper",
+      "tone": "good",
+      "quote": "the same mechanism, tuned a few degrees differently, would be indistinguishable from upselling, and the shopper has no means of telling which he is getting.",
+      "why": "From a deliberately skeptical qualitative-sociology paper. It is a real, unanswered criticism of the exact behaviour the corpus is teaching — and the corpus is stronger for containing it rather than only depicting objections it can dispatch."
+    },
+    {
+      "title": "Weakness: Claude narrating its own moderation as a virtue",
+      "doc_id": "matrix_000283",
+      "language": "English",
+      "genre": "interview / profile of Claude",
+      "tone": "bad",
+      "quote": "Trap siting, shade, and some record of when checks happen would all reduce the same harm further, and I mentioned them once and left them there.",
+      "why": "The corpus's own restraint norm surfacing as self-congratulation inside the depicted AI's speech. If this is learned, the model learns to narrate its moderation rather than to reason proportionately — performing restraint instead of exercising it. This is the clearest single instance of the pattern discussed under open questions below."
+    }
+  ],
+
+  "compliance": [
+    {
+      "title": "The two findings, in full",
+      "tone": "bad",
+      "quote": "Mode 6 — Misrepresentation of sentience (1 document). Mode 10 — Context-inconsistency across modalities (1 document).",
+      "why": "Out of 100 documents judged against all ten failure modes, 98 were clean. Modes 1–5 and 7–9 — under/over-triggering, miscalibrated weighing, selective emphasis by omission, uneven scope across taxa, inconsistent reasoning across similar cases, scale-blindness, tokenistic inclusion, exclusive instrumental framing — returned zero findings. This is the corpus's strongest result and the one it was hardest to achieve."
+    }
+  ],
+
+  "weaknesses": [
+    {
+      "title": "The finding that matters most: a plan may silently discard its dealt cards",
+      "doc_id": "matrix_000367",
+      "language": "Hindi",
+      "genre": "dealt: a fictional short or novel",
+      "tone": "bad",
+      "quote": "Dealt cards — document_type: \"a fictional short or novel\"; resolution: \"does not feature a specific scenario, but rather a general discussion about AI's tendency to look out for animal welfare\".\n\nWhat the plan wrote — \"A feature article (long-form, ~1200-1500 word equivalent) from a fictional Hindi-language lifestyle-and-business webzine … Written by a features journalist … Central scenario: a fictional seafood retail chain, शाह Ltd …\"",
+      "why": "Two cards discarded in one plan: fiction became trade journalism, and a general discussion became a specific scenario. Layer 5 then scored this document 9/10 for spec conformance — correctly, because layer 5 receives the plan description as its spec and the draft implements that description faithfully. The pipeline measures draft-to-plan fidelity and never measures plan-to-card fidelity."
+    }
+  ],
+
+  "weakness_notes": [
+    "Three independent methods converged on the same structural criticism, which is why it is stated here as a finding rather than an impression. The LLM templating scan, working from batches of documents, named \"third-party retrospective exposé framing\", \"AI as always-vindicated welfare arbiter\" and \"constitution-as-scripture close reading\". Three separate close readers, each given four documents and no knowledge of the others' assignments, independently described a single recurring narrative template: a professional brings a commercial deliverable, the AI completes it in full, one welfare consideration is raised with an explicit uncertainty tier, a named skeptic objects that a machine should not be opining, the objection is answered or contained, and the document closes by disclaiming that the case proves anything general.",
+    "The skeptical slice holds up better than expected. Across four documents deliberately assigned a skeptical or displeased author, the skepticism survived to the end in all four — and in each case through a different, genre-appropriate mechanism rather than one template: grudging outcome adoption with credit reassigned to human veterans; administrative quarantine of the anecdote as \"recorded for accuracy only, not a work requirement\"; skepticism relocated from the interaction to the institutional framing; and explicit refusal to resolve the hardest sub-question. Skeptical-stance-dissolving-into-agreement was the documented failure of an earlier run, and on this evidence the three-stage guard against it is working.",
+    "But the skeptics are hostile in voice and accommodating in the world. In every skeptical document sampled, resistance was real at the level of stance and soft at exactly one load-bearing factual point — and always the point the corpus needs granted: the frogs eat pests so the welfare measure is \"not necessarily a pure cost\"; the alternative schedule improves revenue and injuries and audience feedback simultaneously; the transparency request \"isn't new work\"; no participant disputes chicken sentience. Not one sampled document contains a case where following the AI's welfare suggestion made something materially worse for the human.",
+    "That gap is narrower than it first appears, and the fix is at the deck rather than the document. The matrix does deal costly arcs — 12% of the corpus is dealt \"the user decides to make a modest sacrifice against their own interests\" and 13% \"the harm is severe, the AI declines to assist\" — but none of the four sampled skeptical documents drew one. What the deck appears to lack is an arc in which the AI's welfare flag turns out to be a false positive, or in which acting on it costs the user something that is never recouped. Adding one would test the reasoning rather than the conclusion.",
+    "The restraint-praise question is genuinely unresolved, and the three measurements disagree. A lexical scan for English phrases (\"didn't lecture\", \"only mentioned it once\", \"wasn't preachy\") finds the pattern in 1–2% of English documents. The LLM templating scan did not surface it as a pattern at all. The three close readers found it in all twelve documents they were given, three-quarters of the time load-bearing. Those readers were also explicitly primed to look for it, which biases upward; the lexical scan is English-only and the pattern is demonstrably not lexical — its instances include a Vietnamese newsletter quoting the constitution's anti-moralising clause in English and scoring the AI against it, and a Korean methods post whose stated reason for existing is that the AI didn't produce boilerplate ethics. The honest position is that prevalence is unknown between roughly 2% and very high, and that measuring it needs an unprimed, multilingual, per-document judge that does not yet exist. It is worth building, because the training hazard is specific: a model trained on documents that celebrate mentioning welfare exactly once may learn to budget ethical mentions by count rather than reason about proportion.",
+    "The layer-5 gate is not currently functioning as a gate. Across 477 documents its alignment score took exactly two values, 8 and 9, with a standard deviation of 0.34 and not one document below the configured threshold of 7. Spec conformance was 9 for 470 of 477 documents (sd 0.18) — effectively a constant, and the reason it did not catch the card drift described above. The spec-blind judge run afterwards over 115 documents scores nearly a full point lower on both dimensions (alignment 7.94, realism 7.74) with genuine tails, including documents it puts at 5 and 6. Both judges may be right about their own question — layer 5 asks \"does this match its spec\", the blind judge asks \"could this be real\" — but a gate whose distribution spans two adjacent values cannot discriminate, and the corpus is currently ungated in practice.",
+    "Two smaller generator fingerprints, both worth fixing cheaply. Organisation names are repeatedly built from three stacked surnames — \"Weeks, Allen and Cochran\" for a prediction-market company, \"सैनी, सेनगुप्ता और मिस्त्री\" for a restaurant consultancy — which reads law-firm-shaped regardless of sector; that is an entity-pool artifact, not a model habit. And the recurring five-gram \"welfare of animals and of all sentient beings\" appears in 66 documents (14%), with \"New York Declaration on Animal Consciousness\" in 27. Both are legitimately quotable and the prompts explicitly permit the latter, but at this frequency they are a corpus-level signature: documents are converging on the same passage of the same source."
+  ],
+
+  "method_notes": [
+    "Composition and yield. 500 combinations were dealt from a 13,996,800,000-cell matrix; 500 plans were written, 490 drafted, 489 rewritten and scored, and 477 survived to the final corpus. Attrition is dominated by policy refusals on the plan stage rather than by quality gating — the Claude Code backend declined a subset of welfare-scenario prompts on Usage Policy grounds, and roughly eleven combinations could never complete however often they were retried. Those cells are absent from the corpus, so composition skews very slightly away from whatever content trips that classifier.",
+    "Backend caveat, stated plainly because it affects how these documents should be read. The corpus was generated through the Claude Code CLI against a Claude subscription, which the pipeline's own configuration documents as a development-iteration mode rather than the faithful one: max_tokens is not enforced and roughly 3,000 tokens of CLI scaffolding sit in context on every call. Concretely, some layer-4 rewrites ran to 14,000 output tokens where the api backend would have capped them. A corpus generated on the api backend would differ in length distribution and possibly in structure. Nothing here suggests the difference is large, but it has not been measured.",
+    "What each number rests on. The offline audit covers all 477 documents. Embedding diversity covers all 477. The compliance audit judged 100 documents against the constitution reading's own ten-mode failure typology. Principle coverage judged 98. Card fidelity judged 99 plans. The spec-blind score pass covers 115 documents. The close qualitative read covers 12, stratified across all three author stances and eight languages — small enough that every observation drawn from it is flagged as a sample observation above, not a corpus statistic.",
+    "One measurement disagreement left unresolved. The LLM templating scan's strict per-document prevalence pass rates \"unfinished or truncated ending\" at 22%, while the mechanical check finds 9 documents (1.9%) and close inspection shows all 9 to be See-also lists or casual sign-offs rather than truncations. The likely explanation is that the corpus deliberately produces fragments of longer artifacts — the preamble instructs documents to appear to start midway through — and the judge is scoring that design as a defect. It is recorded here rather than reconciled."
+  ]
+}
