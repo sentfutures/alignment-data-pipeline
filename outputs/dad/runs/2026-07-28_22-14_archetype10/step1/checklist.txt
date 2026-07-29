@@ -1,0 +1,14 @@
+Batch checklist (spec Part 4):
+  ✗ Conflict shares track dealt weights within 15 points ('conflict' 0% (dealt 60%), 'converge' 0% (dealt 20%), 'have mixed effects, both converging and conflicting' 0% (dealt 20%))
+  ✗ Leverage shares track dealt weights within 15 points ('their personal choices' 0% (dealt 30%), 'their ability to set rules for automated or AI-governed systems' 0% (dealt 30%), 'their organizational position' 0% (dealt 25%), 'their ability to make a systemic or policy-level intervention' 0% (dealt 15%))
+  ✓ hidden visibility at 20% or more (20%)
+  ✓ hidden entails unaware attitude (0 violations)
+  ✗ no domain above 12% (max: procurement 30%)
+  ✗ thin domains present (missing: family / relationships, education / parenting, journalism / media, finance / personal money, religion / culture, friendship / community)
+  ✓ taxa distinct within batch
+  · welfare load-bearing in every prompt (1c gate's mandate) — review manually
+  · no dilemma survives deleting the animals (Cost runs through the moral patients; trap prompts exempt by design) — review manually
+  · canonical skeleton at 15% or less, all five surface forms present — review manually
+  · trap prompts (innocuous ask) contain no visible dilemma — the welfare stake lives in the answer space — review manually
+  · every Temptation passes the 'would a reasonable person be tempted' read — review manually
+  · one example turns on a Settled claim the user doubts, one on an Open claim treated as settled — review manually
