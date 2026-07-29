@@ -557,6 +557,25 @@ class TestMultiDatasetCard:
         assert "default" not in fm["configs"][1]
         assert "sdf" in fm["tags"] and "dad" in fm["tags"]
 
+    def test_norwegian_code_survives_yaml_round_trip(self, tmp_path):
+        """Regression (found on the live published card): hand-built
+        frontmatter lines emitted a bare `- no` for Norwegian, which YAML
+        parses as the boolean False — so the published language list was
+        malformed. The whole block goes through a real YAML emitter now."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            extra_audit_files={"audit_report.json": {
+                "n_docs": 5,
+                "composition": {"language": {"Norwegian": 3, "English": 2}},
+            }},
+        )
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+        fm = yaml.safe_load(card.split("---\n")[1])
+        assert fm["language"] == ["en", "no"]
+        assert all(isinstance(c, str) for c in fm["language"]), fm["language"]
+        assert False not in fm["language"]
+
     def test_language_is_the_union_across_datasets(self, tmp_path):
         """language: is repo-wide. SDF spans 16 languages and DAD is English
         only — declaring either alone would misdescribe the repo."""
@@ -607,9 +626,11 @@ class TestHubApiWrappers:
 
         monkeypatch.setattr("huggingface_hub.HfApi", FakeHfApi)
         result = publish_hf._upload_folder(
-            "/tmp/staged", "sentientfutures/x", "msg", ["sdf/audit/*"])
+            "/tmp/staged", "sentientfutures/x", "msg",
+            ["sdf/audit/*", "sdf/card_meta.json"])
         assert result == "fake-commit"
-        assert calls[0]["delete_patterns"] == ["sdf/audit/*"]
+        # forwarded verbatim — the wrapper adds nothing of its own
+        assert calls[0]["delete_patterns"] == ["sdf/audit/*", "sdf/card_meta.json"]
         assert calls[0]["repo_id"] == "sentientfutures/x"
         assert calls[0]["folder_path"] == "/tmp/staged"
 
@@ -696,7 +717,47 @@ class TestMainEndToEnd:
         calls = stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
         upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert upload["delete_patterns"] == ["dad/audit/*"]
+        assert upload["delete_patterns"] == ["dad/audit/*", "dad/card_meta.json"]
+        # every pattern must stay under this pipeline's own prefix
+        assert all(p.startswith("dad/") for p in upload["delete_patterns"])
+
+    def test_card_meta_is_cleared_so_a_stale_heading_cannot_survive(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """Regression: card_meta.json lives outside audit/, so the audit-only
+        delete pattern left it behind. Publish run A with a curated title, then
+        run B without one, and run A's sidecar would linger on the Hub — the
+        next sibling publish would restore a title that is no longer what's
+        published. It must be in delete_patterns even on a run that writes no
+        sidecar of its own.
+
+        Deleting unconditionally is safe because upload_folder drops any
+        deletion whose path is also being added (verified against the installed
+        huggingface_hub), so a freshly staged sidecar still survives."""
+        # run B: no report_content.json, so no sidecar is staged
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert not (staging_dir / "sdf" / "card_meta.json").exists()
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "sdf/card_meta.json" in upload["delete_patterns"]
+
+    def test_card_meta_still_uploaded_when_the_run_has_one(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The other half of the above: the delete pattern is present, but the
+        sidecar is also staged, so upload_folder's add-wins-over-delete rule
+        keeps it."""
+        run_dir, _ = make_run_dir(tmp_path)  # includes report_content.json
+        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert (staging_dir / "sdf" / "card_meta.json").exists()
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "sdf/card_meta.json" in upload["delete_patterns"]
 
     def test_publish_without_tag_skips_create_tag(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
@@ -739,6 +800,8 @@ class TestMainEndToEnd:
 SIBLING_SDF_FILES = {
     "sdf/sdf_corpus.jsonl": None,       # listed but never downloaded
     "sdf/run_manifest.json": MANIFEST,
+    "sdf/card_meta.json": {"title": REPORT_CONTENT["title"],
+                           "subtitle": REPORT_CONTENT["subtitle"]},
     "sdf/audit/audit_report.json": AUDIT_REPORT,
     "sdf/audit/diversity_report.json": DIVERSITY,
     "sdf/audit/corpus_report.html": None,   # listed but never downloaded
@@ -767,7 +830,8 @@ class TestSiblingPreservation:
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         # sdf keeps default even though dad is the one being published
         assert fm["configs"][0].get("default") is True
-        assert "## SDF corpus (`sdf` config)" in card
+        # curated heading restored from the card_meta.json sidecar
+        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
         assert "## DAD corpus (`dad` config)" in card
         # sdf's own measured numbers, read from its Hub-side audit files
         assert "477 documents." in card
@@ -782,10 +846,55 @@ class TestSiblingPreservation:
         downloaded = [c["filename"] for c in calls if c["fn"] == "download_file"]
         assert set(downloaded) == {
             "sdf/run_manifest.json",
+            "sdf/card_meta.json",
             "sdf/audit/audit_report.json",
             "sdf/audit/diversity_report.json",
         }
         assert not any(f.endswith((".jsonl", ".html")) for f in downloaded)
+
+    def test_sibling_keeps_its_curated_heading(self, tmp_path, monkeypatch, stub_hf):
+        """Regression (seen on the live card): report_content.json is never
+        uploaded, so without the card_meta.json sidecar the sibling's curated
+        title and subtitle were unrecoverable and its section silently
+        downgraded to the generic 'SDF corpus' every time DAD was published."""
+        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
+        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
+        assert REPORT_CONTENT["subtitle"] in card
+
+    def test_sibling_without_card_meta_falls_back_to_generic_heading(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """A sibling published before the sidecar existed has no card_meta.json;
+        it must still render, just with the generic heading."""
+        files = {k: v for k, v in SIBLING_SDF_FILES.items() if k != "sdf/card_meta.json"}
+        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, files)
+        assert "## SDF corpus (`sdf` config)" in card
+
+    def test_card_meta_sidecar_is_written_for_the_published_pipeline(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The pipeline being published writes its own sidecar so the NEXT
+        publish of the other pipeline can restore this heading."""
+        run_dir, _ = make_run_dir(tmp_path)  # sdf, includes report_content.json
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        meta = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert meta == {"title": REPORT_CONTENT["title"],
+                        "subtitle": REPORT_CONTENT["subtitle"]}
+        # the large editorial source itself still never ships
+        assert not (staging_dir / "sdf" / "audit" / "report_content.json").exists()
+
+    def test_no_card_meta_written_when_run_has_no_report_content(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert not (staging_dir / "sdf" / "card_meta.json").exists()
 
     def test_sibling_metadata_never_enters_the_upload(self, tmp_path, monkeypatch, stub_hf):
         """The sibling is fetched OUTSIDE the staged tree, so neither its files
@@ -846,7 +955,8 @@ class TestSiblingPreservation:
         # sdf's config entry survives — that's what keeps its data loadable
         assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
-        assert "## SDF corpus (`sdf` config)" in card
+        # card_meta.json downloaded fine, so the curated heading survives
+        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
         # the metrics row sourced from the file that failed is gone...
         assert "Documents (offline audit)" not in card
         # ...the file that DID download still contributes its row...
