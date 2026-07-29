@@ -3,7 +3,10 @@ Hub-upload chokepoints (stubbed via the stub_hf fixture; never touches
 huggingface_hub or the network)."""
 
 import json
+import re
+import shutil
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -74,24 +77,24 @@ def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MA
 class TestResolveRunDir:
     def test_sdf_run(self, tmp_path):
         run_dir, _ = make_run_dir(tmp_path, pipeline="sdf")
-        resolved, corpus_name = publish_hf.resolve_run_dir(str(run_dir))
+        resolved, corpus_name = publish_hf.resolve_corpus_file(str(run_dir))
         assert resolved == run_dir
         assert corpus_name == "sdf_corpus.jsonl"
 
     def test_dad_run(self, tmp_path):
         run_dir, _ = make_run_dir(tmp_path, pipeline="dad")
-        _, corpus_name = publish_hf.resolve_run_dir(str(run_dir))
+        _, corpus_name = publish_hf.resolve_corpus_file(str(run_dir))
         assert corpus_name == "dad_corpus.jsonl"
 
     def test_missing_corpus_raises(self, tmp_path):
         empty = tmp_path / "runs" / "empty-run"
         empty.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            publish_hf.resolve_run_dir(str(empty))
+            publish_hf.resolve_corpus_file(str(empty))
 
     def test_not_a_directory_raises(self, tmp_path):
         with pytest.raises(SystemExit):
-            publish_hf.resolve_run_dir(str(tmp_path / "nope"))
+            publish_hf.resolve_corpus_file(str(tmp_path / "nope"))
 
 
 class TestStageRun:
@@ -169,6 +172,29 @@ class TestBuildMetricsRows:
         staging_dir.mkdir()
         assert publish_hf.build_metrics_rows(staging_dir) == []
 
+    def test_partial_realism_ablation_omits_row_instead_of_crashing(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            # present, but missing the fields the row formats — schema drift/partial write
+            extra_audit_files={"realism_ablation.json": {"n": 78, "layer5_mean": 8.487}},
+        )
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert publish_hf.build_metrics_rows(staging_dir) == []
+
+    def test_partial_vendi_curve_omits_only_the_broken_projection(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            extra_audit_files={"vendi_curve.json": {
+                "proj": {"1000": {"power": 50.1, "log": 48.2}, "5000": {"power": 90.4}},
+            }},
+        )
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        rows = publish_hf.build_metrics_rows(staging_dir)
+        assert len(rows) == 1
+        assert "n=1000" in rows[0][1] and "n=5000" not in rows[0][1]
+
 
 class TestBuildCard:
     def test_uses_report_content_title_and_subtitle(self, tmp_path):
@@ -245,6 +271,30 @@ class TestMainEndToEnd:
         out = capsys.readouterr().out
         assert "no Hub API calls made" in out
         assert "README.md" in out
+
+    def test_dry_run_without_staging_dir_leaves_files_on_disk(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """Regression: --dry-run's default staging dir used to live inside a
+        tempfile.TemporaryDirectory() that self-deleted the instant main()
+        returned, so the printed "Staged at <path>" was already gone by the
+        time a human went to look — defeating the entire point of --dry-run.
+        """
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        _run_main(monkeypatch, "--input", str(run_dir),
+                  "--repo-id", "sentientfutures/sdf-corpus", "--dry-run")
+        out = capsys.readouterr().out
+
+        match = re.search(r"Staged at (\S+) \(left on disk", out)
+        assert match, f"expected a 'Staged at <path>' message, got:\n{out}"
+        staged_path = Path(match.group(1))
+        try:
+            assert staged_path.is_dir()
+            assert (staged_path / corpus_name).exists()
+            assert (staged_path / "README.md").exists()
+        finally:
+            shutil.rmtree(staged_path.parent, ignore_errors=True)
 
     def test_publish_calls_hf_api_with_expected_args(self, tmp_path, monkeypatch, stub_hf):
         run_dir, corpus_name = make_run_dir(tmp_path)

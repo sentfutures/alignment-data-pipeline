@@ -56,14 +56,17 @@ python evals/audit_sdf.py --input outputs/sdf/latest --patterns
 # --compare a previous diversity_report.json for run-over-run deltas
 python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
+```
 
-# Publish a run's final corpus + audit reports as a Hugging Face dataset:
-# stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,html}
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to a public Hugging Face dataset repo (e.g. `sentientfutures/sdf-corpus`) — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+
+```bash
+# Stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,html}
 # (report_content.json excluded — editorial, already baked into corpus_report.html)
 # and writes a dataset card built entirely from the audit files' own measured
 # fields. Requires a Hub token with write access to the target repo/org, one
-# time (`huggingface-cli login`); --dry-run stages + prints the card with no
-# network calls.
+# time (`huggingface-cli login`, or HF_TOKEN in .env); --dry-run stages +
+# prints the card with no network calls.
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id sentientfutures/sdf-corpus --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id sentientfutures/sdf-corpus --tag <run-label>
 ```

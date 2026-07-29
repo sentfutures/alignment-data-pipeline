@@ -47,7 +47,7 @@ load_dotenv()
 CORPUS_FILENAMES = ("sdf_corpus.jsonl", "dad_corpus.jsonl")
 
 
-def resolve_run_dir(input_arg: str) -> tuple[Path, str]:
+def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     """Return (run_dir, corpus_filename) for an SDF or DAD run directory."""
     run_dir = Path(input_arg)
     if not run_dir.is_dir():
@@ -164,7 +164,7 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
     if d is not None:
         n, l5, blind, drop = (_get(d, "n"), _get(d, "layer5_mean"),
                                _get(d, "blind_same_rubric_mean"), _get(d, "mean_drop"))
-        if n is not None:
+        if None not in (n, l5, blind, drop):
             rows.append((
                 "Realism, spec-blind rescore (n={})".format(n),
                 f"{l5:.2f} (in-spec) vs {blind:.2f} (spec hidden), drop {drop:.2f}",
@@ -173,16 +173,17 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
 
     d = _load_json(audit_dir / "vendi_curve.json")
     if d is not None:
-        proj_1000 = _get(d, "proj", "1000")
-        proj_5000 = _get(d, "proj", "5000")
-        if proj_1000 or proj_5000:
-            def _fmt_proj(p):
-                return f"power {p['power']:.1f}, log {p['log']:.1f}"
-            parts = []
-            if proj_1000:
-                parts.append(f"n=1000: {_fmt_proj(proj_1000)}")
-            if proj_5000:
-                parts.append(f"n=5000: {_fmt_proj(proj_5000)}")
+        def _fmt_proj(p):
+            if not isinstance(p, dict) or p.get("power") is None or p.get("log") is None:
+                return None
+            return f"power {p['power']:.1f}, log {p['log']:.1f}"
+
+        parts = []
+        for n_label, key in (("n=1000", "1000"), ("n=5000", "5000")):
+            formatted = _fmt_proj(_get(d, "proj", key))
+            if formatted:
+                parts.append(f"{n_label}: {formatted}")
+        if parts:
             rows.append(("Projected effective-document count", "; ".join(parts), "vendi_curve.json"))
 
     return rows
@@ -292,12 +293,24 @@ def main() -> None:
                         help="Where to stage files (default: a temp dir)")
     args = parser.parse_args()
 
-    run_dir, corpus_name = resolve_run_dir(args.input)
+    run_dir, corpus_name = resolve_corpus_file(args.input)
     pipeline_tag = "sdf" if corpus_name == "sdf_corpus.jsonl" else "dad"
 
+    import contextlib
     import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        staging_dir = Path(args.staging_dir) if args.staging_dir else Path(tmp) / "staged"
+
+    if args.staging_dir:
+        # Explicitly requested — never ours to delete.
+        staging_ctx = contextlib.nullcontext(args.staging_dir)
+    elif args.dry_run:
+        # --dry-run's whole point is to let a human inspect the staged output
+        # afterward, so this directory must outlive the process.
+        staging_ctx = contextlib.nullcontext(tempfile.mkdtemp(prefix="publish_hf_"))
+    else:
+        staging_ctx = tempfile.TemporaryDirectory()
+
+    with staging_ctx as tmp:
+        staging_dir = Path(tmp) if args.staging_dir else Path(tmp) / "staged"
         staged = stage_run(run_dir, corpus_name, staging_dir)
 
         # report_content.json is excluded from the upload (already baked into
@@ -313,7 +326,7 @@ def main() -> None:
               f"{len(staged['audit_files'])} audit file(s): {', '.join(staged['audit_files']) or '(none)'}")
 
         if args.dry_run:
-            print(f"\n--dry-run: no Hub API calls made. Staged at {staging_dir}")
+            print(f"\n--dry-run: no Hub API calls made. Staged at {staging_dir} (left on disk for inspection).")
             print("\n--- README.md ---\n")
             print(card)
             return
