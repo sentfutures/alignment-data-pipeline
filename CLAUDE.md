@@ -10,7 +10,7 @@ Produces two complementary datasets:
 
 ## Setup
 
-See README "Setup" (venv + `pip install -r requirements.txt`, then `cp .env.example .env`). Auth depends on the `backend` key in `config.yaml`: `api` reads `ANTHROPIC_API_KEY`; `claude_code` bills the contributor's Claude subscription via the Claude Code CLI (logged-in session or `CLAUDE_CODE_OAUTH_TOKEN`); `auto` prefers the subscription and falls back to the api key — per-call: empty-system calls (the DAD baseline arm) always take the api leg so the plain-model condition stays exact, and an exhausted usage window demotes the rest of the run to the api, loudly, with each cost-log record naming the backend that served it. `api` stays the committed default: it is the faithful mode (subscription-served calls don't enforce `max_tokens` and carry CLI scaffolding in context), so runs meant to represent pipeline behavior stay on `api`; `auto`/`claude_code` are dev-iteration modes. See README "Authentication" for caveats (usage windows, notional cost logging). `OPENAI_API_KEY` is optional and read only by `evals/diversity.py` (embedding-based diversity audit).
+See README "Setup" (venv + `pip install -r requirements.txt`, then `cp .env.example .env`). Auth depends on the `backend` key in `config.yaml`: `api` reads `ANTHROPIC_API_KEY`; `claude_code` bills the contributor's Claude subscription via the Claude Code CLI (logged-in session or `CLAUDE_CODE_OAUTH_TOKEN`); `auto` prefers the subscription and falls back to the api key — per-call: empty-system calls (the DAD baseline arm) always take the api leg so the plain-model condition stays exact, and an exhausted usage window demotes the rest of the run to the api, loudly, with each cost-log record naming the backend that served it. `api` stays the committed default: it is the faithful mode (subscription-served calls don't enforce `max_tokens` and carry CLI scaffolding in context), so runs meant to represent pipeline behavior stay on `api`; `auto`/`claude_code` are dev-iteration modes. See README "Authentication" for caveats (usage windows, notional cost logging). `OPENAI_API_KEY` is optional and read only by `evals/diversity.py` (embedding-based diversity audit). `evals/publish_hf.py` (Hugging Face dataset publishing) reads `HF_TOKEN` from `.env` if set; otherwise falls back to a one-time `huggingface-cli login`, whose cached token `huggingface_hub` picks up on every later call. Either way the token needs write access to the target repo/org.
 
 `shared/__init__.py` enforces a Python floor (`MIN_PYTHON = (3, 12)`, matching numpy) at import — bump it there if the deps' floor rises. `.venv/` is gitignored.
 
@@ -56,6 +56,19 @@ python evals/audit_sdf.py --input outputs/sdf/latest --patterns
 # --compare a previous diversity_report.json for run-over-run deltas
 python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
+```
+
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to a public Hugging Face dataset repo (e.g. `sentientfutures/sdf-corpus`) — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+
+```bash
+# Stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,html}
+# (report_content.json excluded — editorial, already baked into corpus_report.html)
+# and writes a dataset card built entirely from the audit files' own measured
+# fields. Requires a Hub token with write access to the target repo/org, one
+# time (`huggingface-cli login`, or HF_TOKEN in .env); --dry-run stages +
+# prints the card with no network calls.
+python evals/publish_hf.py --input outputs/sdf/latest --repo-id sentientfutures/sdf-corpus --dry-run
+python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id sentientfutures/sdf-corpus --tag <run-label>
 ```
 
 ## Run Organization
