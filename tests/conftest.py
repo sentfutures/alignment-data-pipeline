@@ -245,6 +245,51 @@ def fake_message():
     return make
 
 
+@pytest.fixture
+def stub_hf(monkeypatch):
+    """Factory that replaces evals.publish_hf's three Hub-API chokepoints
+    (_create_repo/_upload_folder/_create_tag) with recording stubs, so
+    tests never import huggingface_hub or touch the network.
+
+    ``install()`` returns the list of recorded calls; pass ``raise_on_call=True``
+    to make every call raise instead — used to assert --dry-run makes none.
+    """
+
+    def install(raise_on_call: bool = False):
+        from evals import publish_hf
+        calls = []
+
+        def _blocked(name):
+            def fn(*args, **kwargs):
+                raise AssertionError(f"{name} called during a supposed --dry-run")
+            return fn
+
+        def _create_repo(repo_id):
+            calls.append({"fn": "create_repo", "repo_id": repo_id})
+
+        def _upload_folder(folder_path, repo_id, commit_message):
+            calls.append({
+                "fn": "upload_folder", "folder_path": folder_path,
+                "repo_id": repo_id, "commit_message": commit_message,
+            })
+            return "fake-commit-sha"
+
+        def _create_tag(repo_id, tag):
+            calls.append({"fn": "create_tag", "repo_id": repo_id, "tag": tag})
+
+        if raise_on_call:
+            monkeypatch.setattr(publish_hf, "_create_repo", _blocked("_create_repo"))
+            monkeypatch.setattr(publish_hf, "_upload_folder", _blocked("_upload_folder"))
+            monkeypatch.setattr(publish_hf, "_create_tag", _blocked("_create_tag"))
+        else:
+            monkeypatch.setattr(publish_hf, "_create_repo", _create_repo)
+            monkeypatch.setattr(publish_hf, "_upload_folder", _upload_folder)
+            monkeypatch.setattr(publish_hf, "_create_tag", _create_tag)
+        return calls
+
+    return install
+
+
 @pytest.fixture(scope="session")
 def prompts_sdf():
     return REPO_ROOT / "prompts" / "sdf"
