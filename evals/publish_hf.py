@@ -76,6 +76,15 @@ load_dotenv()
 
 CORPUS_FILENAMES = ("sdf_corpus.jsonl", "dad_corpus.jsonl")
 
+# Sidecar holding just the title/subtitle this dataset's card section uses.
+# report_content.json itself is never uploaded (it's a large editorial input,
+# already baked into corpus_report.html), but without SOME persisted copy of
+# those two strings a sibling's curated heading is unrecoverable on the next
+# publish, so its section would silently downgrade to the generic name every
+# time the other pipeline is published. Only the two strings already rendered
+# publicly in the card go in here — nothing otherwise invisible.
+CARD_META_FILENAME = "card_meta.json"
+
 # ISO 639-1 codes for every language name sdf_pipeline/compose_prompts.py's
 # derive_language() can produce (the `culture` axis in prompts/sdf/
 # variables.txt) — no existing name->code mapping exists anywhere in the
@@ -357,13 +366,6 @@ def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:
     whole on each publish, so every dataset that should survive must be
     present here (see fetch_sibling).
     """
-    # yaml.safe_dump, not an f-string: pretty_name and each section heading can
-    # come from report_content.json — editorial content this script doesn't
-    # control — and a raw quote or newline would corrupt hand-built YAML.
-    pretty_name_line = yaml.safe_dump(
-        {"pretty_name": pretty_name}, default_flow_style=False, allow_unicode=True
-    ).rstrip("\n")
-
     # language: is repo-wide, so it must be the union across datasets — SDF
     # spans 16 languages while DAD is English-only, and declaring either one
     # alone would misdescribe the repo.
@@ -373,32 +375,39 @@ def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:
         for code in detected_languages(ds["dir"], ds["pipeline"])
     }) or ["en"]
 
-    frontmatter = [
-        "---",
-        pretty_name_line,
-        f"license: {license_id}",
-        "language:",
-        *[f"  - {code}" for code in languages],
-        "tags:",
-        "  - synthetic-data",
-        "  - ai-alignment",
-        "  - animal-welfare",
-        "  - sentient-beings",
-        *[f"  - {ds['pipeline']}" for ds in datasets],
-        "configs:",
-    ]
+    configs = []
     for i, ds in enumerate(datasets):
-        frontmatter += [
-            f"  - config_name: {ds['pipeline']}",
-            "    data_files:",
-            "      - split: train",
-            f"        path: {ds['pipeline']}/{ds['staged']['corpus_file']}",
-        ]
+        entry = {
+            "config_name": ds["pipeline"],
+            "data_files": [
+                {"split": "train",
+                 "path": f"{ds['pipeline']}/{ds['staged']['corpus_file']}"},
+            ],
+        }
         if i == 0:
             # Sets which subset the viewer opens on and which data libraries
             # load by default; without it the order is default-then-alphabetical.
-            frontmatter += ["    default: true"]
-    frontmatter += ["---", ""]
+            entry["default"] = True
+        configs.append(entry)
+
+    # Dump the whole block through a real YAML emitter rather than hand-built
+    # lines. Hand-built lines silently corrupt values that look like other
+    # types to a YAML parser — a bare `- no` (Norwegian's ISO 639-1 code) is
+    # read back as the boolean False, which published a malformed language
+    # list. safe_dump quotes it as 'no'. sort_keys=False keeps config order
+    # meaningful (first entry is the default).
+    body = yaml.safe_dump(
+        {
+            "pretty_name": pretty_name,
+            "license": license_id,
+            "language": languages,
+            "tags": ["synthetic-data", "ai-alignment", "animal-welfare",
+                     "sentient-beings", *[ds["pipeline"] for ds in datasets]],
+            "configs": configs,
+        },
+        default_flow_style=False, allow_unicode=True, sort_keys=False,
+    ).rstrip("\n")
+    frontmatter = ["---", body, "---", ""]
 
     lines = [f"# {pretty_name}"]
     for ds in datasets:
@@ -491,7 +500,7 @@ def fetch_sibling(repo_id: str, sibling_tag: str, dest_dir: Path) -> dict | None
 
     wanted = [
         f for f in files
-        if f == f"{prefix}run_manifest.json"
+        if f in (f"{prefix}run_manifest.json", f"{prefix}{CARD_META_FILENAME}")
         or (f.startswith(f"{prefix}audit/") and f.endswith(".json"))
     ]
     # A transient download failure must NOT abort the publish: _create_repo has
@@ -535,6 +544,9 @@ def fetch_sibling(repo_id: str, sibling_tag: str, dest_dir: Path) -> dict | None
                           if f"{prefix}run_manifest.json" in files else None),
         "audit_files": sorted(audit_files),
         "n_docs": n,
+        # The sibling's curated heading/subtitle, so publishing this pipeline
+        # doesn't downgrade the sibling's section to the generic name.
+        "card_meta": _load_json(dataset_dir / CARD_META_FILENAME),
     }
 
 
@@ -600,7 +612,18 @@ def main() -> None:
               f"{'with' if staged['manifest_file'] else 'without'} run_manifest.json, "
               f"{len(staged['audit_files'])} audit file(s): {', '.join(staged['audit_files']) or '(none)'}")
 
-        datasets = [{"pipeline": pipeline_tag, "dir": staging_dir / pipeline_tag,
+        dataset_dir = staging_dir / pipeline_tag
+        # Persist the two strings this dataset's section heading uses, so the
+        # NEXT publish of the other pipeline can restore them instead of
+        # falling back to the generic name (report_content.json itself is
+        # never uploaded). Only what the card already shows publicly.
+        card_meta = {k: v for k, v in (content or {}).items()
+                     if k in ("title", "subtitle") and v}
+        if card_meta:
+            (dataset_dir / CARD_META_FILENAME).write_text(
+                json.dumps(card_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        datasets = [{"pipeline": pipeline_tag, "dir": dataset_dir,
                      "staged": staged, "content": content}]
 
         if args.dry_run:
@@ -630,7 +653,7 @@ def main() -> None:
                 print(f"Preserving existing '{sibling_tag}' dataset "
                       f"({sibling['n_docs']} records) in the card.")
                 entry = {"pipeline": sibling_tag, "dir": Path(sib_tmp) / sibling_tag,
-                         "staged": sibling, "content": None}
+                         "staged": sibling, "content": sibling.get("card_meta")}
                 # sdf first so it stays the viewer's default config regardless
                 # of which pipeline this invocation is publishing.
                 datasets = ([entry] + datasets if sibling_tag == "sdf"
