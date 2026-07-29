@@ -89,16 +89,24 @@ def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path) -> dict:
     Returns a manifest dict of what was staged, used both for the dataset
     card and for logging what --dry-run would have uploaded.
     """
-    # Refuse a --staging-dir that equals or contains run_dir: rmtree below
-    # would delete the very run we're about to read from, before the copy
-    # even runs (e.g. a mistyped --staging-dir pointing back at --input).
-    run_dir_real = run_dir.resolve()
+    # Refuse a --staging-dir that equals or contains run_dir, OR either of the
+    # two specific subtrees this function reads from (final/, audit/): rmtree
+    # below would delete data we're about to read before the copy even runs.
+    # Checking only run_dir itself isn't enough — a --staging-dir pointing at
+    # run_dir/final or run_dir/audit directly (an easy typo, since those are
+    # real, well-known subdirectory names on every run) would slip past a
+    # run_dir-only check while still destroying the corpus or audit reports.
     staging_real = staging_dir.resolve()
-    if run_dir_real == staging_real or run_dir_real.is_relative_to(staging_real):
-        raise SystemExit(
-            f"--staging-dir {staging_dir} equals or contains the run directory "
-            f"{run_dir} — refusing to delete it. Pick a --staging-dir outside the run."
-        )
+    for guarded, label in (
+        (run_dir.resolve(), "the run directory"),
+        ((run_dir / "final").resolve(), "the run's final/ directory"),
+        ((run_dir / "audit").resolve(), "the run's audit/ directory"),
+    ):
+        if guarded.is_relative_to(staging_real):
+            raise SystemExit(
+                f"--staging-dir {staging_dir} equals or contains {label} ({guarded}) "
+                f"— refusing to delete it. Pick a --staging-dir outside the run."
+            )
 
     # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
     # --input) must reflect only THIS run — otherwise leftover files from an

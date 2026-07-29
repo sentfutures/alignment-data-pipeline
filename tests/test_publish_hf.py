@@ -196,10 +196,27 @@ class TestStageRun:
             publish_hf.stage_run(run_dir, corpus_name, run_dir.parent)
         assert (run_dir / "final" / corpus_name).exists()
 
+    def test_staging_dir_equal_to_run_final_is_rejected(self, tmp_path):
+        """Regression: the run_dir-only check missed this — a --staging-dir
+        pointing directly at run_dir/final (an easy typo, since 'final' is a
+        real, well-known subdirectory name on every run) slipped past it,
+        and rmtree then deleted the corpus before it could be copied."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run(run_dir, corpus_name, run_dir / "final")
+        assert (run_dir / "final" / corpus_name).exists()
+
+    def test_staging_dir_equal_to_run_audit_is_rejected(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run(run_dir, corpus_name, run_dir / "audit")
+        assert (run_dir / "audit" / "audit_report.json").exists()
+
     def test_staging_dir_nested_inside_run_dir_is_allowed(self, tmp_path):
-        """The reverse nesting is safe — deleting a subdir of run_dir doesn't
-        touch run_dir's own final/audit/manifest files — and is a plausible
-        deliberate choice (colocating the staged output with the run)."""
+        """The reverse nesting is safe as long as it doesn't overlap final/
+        or audit/ specifically — deleting an unrelated subdir of run_dir
+        doesn't touch run_dir's own data, and colocating the staged output
+        with the run is a plausible deliberate choice."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         staging_dir = run_dir / "hf_staging"
         staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
