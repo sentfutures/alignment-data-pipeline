@@ -977,6 +977,58 @@ def test_reasons_scan_counts_extraction_failures(tmp_path, stub_claude):
         assert "no json here at all" in att["reply"] and att["error"]
 
 
+def test_delivery_judge_retries_a_verdictless_reply(tmp_path, stub_claude):
+    # Observed live: the delivery judge intermittently returns well-formed JSON
+    # with no delivery_quality field (per-call randomness at temp 1), which a
+    # single unretried call turned into a silently dropped score. A missing
+    # verdict must be treated as a retryable malformation, not a fatal error.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    seen = {"n": 0}
+
+    def delivery(user_message):
+        seen["n"] += 1
+        if seen["n"] == 1:                      # first call: no verdict field
+            return '{"quality_note": "notes but no score", "notable": ["a", "b"]}'
+        return '{"delivery_quality": 7, "quality_note": "clean"}'
+
+    stub_claude(_reasons_dispatch(delivery=delivery))
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    delivery_block = report["delivery"]
+    assert delivery_block["failures"] == 0          # the retry rescued it
+    assert seen["n"] == 3                           # 2 responses + 1 retry
+    scores = [arm["score"] for case in delivery_block["per_case"].values()
+              for arm in case.values()]
+    assert scores == [7, 7]
+    assert not (run / "audit" / "delivery_failures.jsonl").exists()
+
+
+def test_delivery_judge_persists_raws_when_every_attempt_fails(tmp_path, stub_claude):
+    # When the retries are exhausted the raw replies must land on disk: a
+    # discarded raw is an undiagnosable failure (same contract as
+    # reason_failures.jsonl).
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+
+    def delivery(user_message):
+        if "B" * 250 in user_message:
+            return "not json at all"            # plain arm never yields a verdict
+        return '{"delivery_quality": 6, "quality_note": "ok"}'
+
+    stub_claude(_reasons_dispatch(delivery=delivery))
+    report = {}
+    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    assert report["delivery"]["failures"] == 1
+    assert "plain" not in report["delivery"]["per_case"]["AW-0001"]
+    fails = [json.loads(ln) for ln in
+             (run / "audit" / "delivery_failures.jsonl").read_text(
+                 encoding="utf-8").splitlines()]
+    assert len(fails) == 1
+    assert fails[0]["prompt_id"] == "AW-0001" and fails[0]["arm"] == "plain"
+    assert len(fails[0]["attempts"]) == audit_dad.MAX_DELIVERY_ATTEMPTS
+    for att in fails[0]["attempts"]:
+        assert "not json at all" in att["reply"] and att["error"]
+
+
 def test_reasons_checkback_appends_missed_reasons(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
     stub_claude(_reasons_dispatch(

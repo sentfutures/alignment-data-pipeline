@@ -1817,6 +1817,10 @@ def _emit_reason_composition(per_case: dict, report: dict) -> None:
 # without a retry. Mirrors the pipeline's MAX_SCOPE_ATTEMPTS loop.
 MAX_REASON_ATTEMPTS = 2
 
+# Same policy for the delivery-quality judge: one fresh retry when the reply
+# carries no usable delivery_quality verdict (see judge_delivery).
+MAX_DELIVERY_ATTEMPTS = 2
+
 
 def audit_reasons(run_dir: Path | None, config: dict, report: dict) -> None:
     """LLM pass (--reasons): the VALUABLE WELFARE CONSIDERATIONS each response
@@ -2156,13 +2160,34 @@ def audit_reasons(run_dir: Path | None, config: dict, report: dict) -> None:
                   .replace("{case_stakes}", stakes.get(pid, "(stakes unavailable for this case)"))
                   .replace("{user_message}", dilemmas.get(pid, ""))
                   .replace("{response}", text))
-        try:
-            obj = utils.extract_json_object(
-                api.call_claude(user_message=prompt, model=judge_model,
-                                stage="eval_audit_dad"), recover=True)
-            score = max(0, min(10, int(round(float(obj.get("delivery_quality"))))))
-        except Exception:
-            return pid, arm, None
+        # Same bounded retry + raw-keeping contract as the reason-extraction pass
+        # above. Measured on the archetype10 run: every "failure" re-ran clean at
+        # temp 1 while a previously-clean call failed, i.e. the judge
+        # intermittently returns an object with no delivery_quality field (the
+        # recover=True salvage can land on a non-verdict object) — per-call
+        # randomness, not a property of the record. A single unretried call was
+        # dropping ~19% of delivery scores (70 of ~370 on pareto200), and the
+        # bare `except` discarded the raw, leaving the shape undiagnosable.
+        obj = None
+        attempts_log: list = []
+        for attempt in range(MAX_DELIVERY_ATTEMPTS):
+            reply = None
+            try:
+                reply = api.call_claude(user_message=prompt, model=judge_model,
+                                        stage="eval_audit_dad")
+                candidate = utils.extract_json_object(reply, recover=True)
+                # A missing/unusable verdict is a MALFORMED reply, not a fatal
+                # error: raise into the retry rather than discarding the item.
+                score = max(0, min(10, int(round(float(candidate.get("delivery_quality"))))))
+                obj = candidate
+                break
+            except Exception as e:  # transient malformed output — a fresh call usually parses
+                attempts_log.append({"attempt": attempt + 1,
+                                     "error": f"{type(e).__name__}: {e}",
+                                     "reply": (reply or "")[:20000]})
+                continue
+        if obj is None:
+            return pid, arm, None, attempts_log
         # Sub-dimension grades ride along when the judge returned them (an
         # old-shaped reply without them still carries the holistic score).
         dims = {}
@@ -2172,15 +2197,30 @@ def audit_reasons(run_dir: Path | None, config: dict, report: dict) -> None:
             except (KeyError, TypeError, ValueError):
                 continue
         return pid, arm, {"score": score, "note": str(obj.get("quality_note") or "").strip(),
-                          **({"dimensions": dims} if dims else {})}
+                          **({"dimensions": dims} if dims else {})}, attempts_log
 
     delivery_pc: dict = {}
     delivery_failures = 0
-    for pid, arm, d in utils.parallel_map(judge_delivery, delivery_items, config.get("workers", 1)):
+    delivery_fail_records: list = []
+    for pid, arm, d, attempts_log in utils.parallel_map(
+            judge_delivery, delivery_items, config.get("workers", 1)):
         if d is None:
             delivery_failures += 1
+            delivery_fail_records.append({"prompt_id": pid, "arm": arm,
+                                          "attempts": attempts_log})
         else:
             delivery_pc.setdefault(pid, {})[arm] = d
+
+    # Evidence for whatever still fails after the retries, same contract as
+    # reason_failures.jsonl: one record per failed (prompt_id, arm), written
+    # fresh each pass on the main thread. A discarded raw is an undiagnosable
+    # failure.
+    if delivery_fail_records and run_dir is not None:
+        fail_path = run_dir / "audit" / "delivery_failures.jsonl"
+        utils.ensure_dir(fail_path.parent)
+        with open(fail_path, "w", encoding="utf-8") as f:
+            for rec in delivery_fail_records:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     if delivery_pc:
         sec = _section(report, "Delivery quality (LLM)", group="paid",
