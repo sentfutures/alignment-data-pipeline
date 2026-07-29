@@ -808,6 +808,75 @@ class TestSiblingPreservation:
         assert fm["configs"][0].get("default") is True
         assert "## SDF corpus" not in card
 
+    def test_sibling_download_failure_keeps_config_and_does_not_abort(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """A transient failure fetching the sibling's metadata must not abort
+        the publish (create_repo has already run and this pipeline's corpus is
+        staged and valid) and must not drop the sibling's config entry either —
+        its files stay on the Hub, so removing the config would leave them
+        present but unloadable. Only the prose detail may degrade."""
+        calls = stub_hf(repo_files=SIBLING_SDF_FILES)
+
+        from evals import publish_hf as ph
+        real_download = ph._download_file
+
+        def flaky(repo_id, filename, local_dir):
+            if filename.endswith("audit_report.json"):
+                raise OSError("transient network blip")
+            return real_download(repo_id, filename, local_dir)
+
+        monkeypatch.setattr(ph, "_download_file", flaky)
+
+        run_dir, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=40, audit_files=[], include_html=False,
+            extra_audit_files={"audit_report.json": {"n_prompts": 40}},
+        )
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+
+        out = capsys.readouterr().out
+        assert "could not fetch" in out and "OSError" in out
+        # the publish still completed
+        assert any(c["fn"] == "upload_folder" for c in calls)
+
+        card = (staging_dir / "README.md").read_text()
+        fm = yaml.safe_load(card.split("---\n")[1])
+        # sdf's config entry survives — that's what keeps its data loadable
+        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
+        assert "## SDF corpus (`sdf` config)" in card
+        # the metrics row sourced from the file that failed is gone...
+        assert "Documents (offline audit)" not in card
+        # ...the file that DID download still contributes its row...
+        assert "Vendi 34.5" in card
+        # ...and the record count survives anyway, because fetch_sibling falls
+        # back from audit_report.json's n_docs to diversity_report's n_records
+        assert "477 documents." in card
+
+    def test_sibling_listing_failure_treats_it_as_absent(self, tmp_path, monkeypatch, stub_hf):
+        """If the repo can't even be listed (e.g. it doesn't exist yet on a
+        first publish) there's nothing to preserve, so proceed single-config."""
+        calls = stub_hf(repo_files=SIBLING_SDF_FILES)
+
+        from evals import publish_hf as ph
+
+        def boom(repo_id):
+            raise OSError("cannot reach hub")
+
+        monkeypatch.setattr(ph, "_list_repo_files", boom)
+
+        run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
+                                  include_html=False)
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert any(c["fn"] == "upload_folder" for c in calls)
+        card = (staging_dir / "README.md").read_text()
+        fm = yaml.safe_load(card.split("---\n")[1])
+        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+
     def test_sibling_dir_without_a_corpus_is_skipped(self, tmp_path, monkeypatch, stub_hf):
         """A partial sibling dir with metadata but no corpus can't be declared
         as a config — better to omit it than point a config at nothing."""

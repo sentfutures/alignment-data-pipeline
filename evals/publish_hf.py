@@ -494,8 +494,25 @@ def fetch_sibling(repo_id: str, sibling_tag: str, dest_dir: Path) -> dict | None
         if f == f"{prefix}run_manifest.json"
         or (f.startswith(f"{prefix}audit/") and f.endswith(".json"))
     ]
+    # A transient download failure must NOT abort the publish: _create_repo has
+    # already run and this pipeline's corpus is staged and valid, so raising
+    # here would throw away good paid work over the sibling's prose. It must
+    # also not drop the sibling entirely — its files stay on the Hub, so
+    # removing its config entry would leave them present but unloadable. So
+    # keep going with whatever landed: the config entry survives (that's what
+    # makes the data loadable) and only the provenance/metrics detail degrades,
+    # exactly how this module already treats any other missing audit input.
+    failed = []
     for f in wanted:
-        _download_file(repo_id, f, str(dest_dir))
+        try:
+            _download_file(repo_id, f, str(dest_dir))
+        except Exception as exc:
+            failed.append(f"{f} ({type(exc).__name__})")
+    if failed:
+        print(f"  WARNING: could not fetch {len(failed)} of {len(wanted)} "
+              f"{sibling_tag} metadata file(s): {', '.join(failed)}")
+        print(f"  The '{sibling_tag}' config entry is preserved, but its card "
+              f"section will be missing the detail those files carry.")
 
     # audit_files reflects everything actually on the Hub (including the HTML
     # and .jsonl we didn't download), so the card's pointers stay accurate.
