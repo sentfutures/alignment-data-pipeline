@@ -239,6 +239,19 @@ class TestBuildMetricsRows:
         assert len(rows) == 1
         assert rows[0][0] == "Constitutional compliance"
 
+    def test_compliance_missing_clean_documents_omits_row(self, tmp_path):
+        """Regression: only judged was guarded, not clean_documents — a
+        compliance report with judged but no clean_documents would render a
+        literal 'None of 100 judged clean' on the public card instead of
+        omitting the row, contradicting the module's own stated contract."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            extra_audit_files={"compliance_report.json": {"judged": 100}},
+        )
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert publish_hf.build_metrics_rows(staging_dir) == []
+
     def test_no_audit_dir_gives_no_rows(self, tmp_path):
         staging_dir = tmp_path / "staged"
         staging_dir.mkdir()

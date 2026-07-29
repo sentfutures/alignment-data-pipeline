@@ -184,7 +184,7 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
     d = _load_json(audit_dir / "compliance_report.json")
     if d is not None:
         judged, clean, frac = _get(d, "judged"), _get(d, "clean_documents"), _get(d, "clean_frac")
-        if judged is not None:
+        if judged is not None and clean is not None:
             rows.append((
                 "Constitutional compliance",
                 f"{clean} of {judged} judged clean ({frac:.1%})" if frac is not None
