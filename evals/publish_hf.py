@@ -263,7 +263,10 @@ def _upload_folder(folder_path: str, repo_id: str, commit_message: str) -> str:
 
 def _create_tag(repo_id: str, tag: str) -> None:
     from huggingface_hub import HfApi
-    HfApi().create_tag(repo_id=repo_id, tag=tag, repo_type="dataset")
+    # exist_ok: a retried publish with the same --tag (e.g. after fixing a
+    # typo'd --input) must not die here after the corpus has already been
+    # re-uploaded — that would leave the run in a partially-completed state.
+    HfApi().create_tag(repo_id=repo_id, tag=tag, repo_type="dataset", exist_ok=True)
 
 
 def main() -> None:

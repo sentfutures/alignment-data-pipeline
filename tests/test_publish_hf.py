@@ -290,6 +290,26 @@ class TestBuildCard:
         assert "`compliance_report.json`" in card
 
 
+class TestHubApiWrappers:
+    def test_create_tag_passes_exist_ok(self, monkeypatch):
+        """Regression: a retried publish with the same --tag (e.g. after
+        fixing a typo'd --input, the exact retry the staging-dir wipe logic
+        is designed to support) must not die on a "tag already exists" error
+        after the corpus has already been re-uploaded."""
+        calls = []
+
+        class FakeHfApi:
+            def create_tag(self, **kwargs):
+                calls.append(kwargs)
+
+        monkeypatch.setattr("huggingface_hub.HfApi", FakeHfApi)
+        publish_hf._create_tag("sentientfutures/sdf-corpus", "v1")
+        assert calls == [{
+            "repo_id": "sentientfutures/sdf-corpus", "tag": "v1",
+            "repo_type": "dataset", "exist_ok": True,
+        }]
+
+
 def _run_main(monkeypatch, *args):
     monkeypatch.setattr(sys, "argv", ["publish_hf.py", *args])
     publish_hf.main()
