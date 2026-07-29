@@ -3,9 +3,12 @@
 
 Stages a run directory into a flat dataset layout — the final corpus jsonl
 at the repo root, run_manifest.json for provenance, and (if present) every
-audit/*.json + audit/*.html file, globbed rather than named so a future run's
+audit/*.{json,jsonl,html} file, globbed rather than named so a future run's
 eval additions/omissions are picked up or skipped automatically — then writes
-a dataset card (README.md) and uploads the lot in one commit.
+a dataset card (README.md) and uploads the lot in one commit. Republishing a
+different run to the same --repo-id clears audit/ on the Hub first
+(delete_patterns), so a file only the PREVIOUS run produced can't linger
+next to the new corpus and card.
 
 The card is built entirely from measured fields already sitting in the audit
 JSONs — no interpretive prose is authored here. Audit files with a real,
@@ -122,7 +125,10 @@ def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path) -> dict:
     if audit_src.is_dir():
         audit_dst = staging_dir / "audit"
         utils.ensure_dir(audit_dst)
-        for pattern in ("*.json", "*.html"):
+        # *.jsonl too: evals/audit_dad.py writes audit/tic_candidates.jsonl and
+        # audit/reason_failures.jsonl for DAD runs — a fixed *.json/*.html
+        # pattern silently dropped both.
+        for pattern in ("*.json", "*.jsonl", "*.html"):
             for f in sorted(audit_src.glob(pattern)):
                 if f.name == "report_content.json":
                     continue  # editorial input, already baked into corpus_report.html
@@ -311,6 +317,12 @@ def _upload_folder(folder_path: str, repo_id: str, commit_message: str) -> str:
     return HfApi().upload_folder(
         folder_path=folder_path, repo_id=repo_id, repo_type="dataset",
         commit_message=commit_message,
+        # delete_patterns: republishing a different run to the same --repo-id
+        # must not leave a PREVIOUS run's audit files (e.g. one with
+        # realism_ablation.json alongside a later one without it) lingering
+        # next to the new corpus/card — audit/ should reflect only the run
+        # currently being staged, remote as well as local.
+        delete_patterns=["audit/*"],
     )
 
 

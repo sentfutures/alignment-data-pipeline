@@ -141,6 +141,22 @@ class TestStageRun:
         staged = publish_hf.stage_run(run_dir, corpus_name, tmp_path / "staged")
         assert staged["audit_files"] == ["custom_eval.json"]
 
+    def test_jsonl_audit_files_are_staged(self, tmp_path):
+        """Regression: the glob only matched *.json/*.html, silently dropping
+        evals/audit_dad.py's audit/tic_candidates.jsonl and
+        audit/reason_failures.jsonl for DAD runs."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", audit_files=[], include_html=False,
+            extra_audit_files={
+                "tic_candidates.jsonl": {"phrase": "so I've been thinking"},
+                "reason_failures.jsonl": {"reason": "example"},
+            },
+        )
+        staging_dir = tmp_path / "staged"
+        staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert set(staged["audit_files"]) == {"tic_candidates.jsonl", "reason_failures.jsonl"}
+        assert (staging_dir / "audit" / "tic_candidates.jsonl").exists()
+
     def test_reused_staging_dir_is_cleared_of_stale_files(self, tmp_path):
         """Regression: a --staging-dir reused across two invocations (e.g. after
         fixing a typo'd --input) must reflect only the LATEST run — leftover
@@ -418,6 +434,26 @@ class TestHubApiWrappers:
             "repo_id": "sentientfutures/sdf-corpus", "tag": "v1",
             "repo_type": "dataset", "exist_ok": True,
         }]
+
+    def test_upload_folder_passes_delete_patterns_for_audit(self, monkeypatch):
+        """Regression: republishing a different run to the same --repo-id
+        must clear audit/ on the Hub first — otherwise a file only an
+        EARLIER run produced (e.g. realism_ablation.json) lingers next to
+        the new corpus and card, misrepresenting what the current run
+        actually contains."""
+        calls = []
+
+        class FakeHfApi:
+            def upload_folder(self, **kwargs):
+                calls.append(kwargs)
+                return "fake-commit"
+
+        monkeypatch.setattr("huggingface_hub.HfApi", FakeHfApi)
+        result = publish_hf._upload_folder("/tmp/staged", "sentientfutures/sdf-corpus", "msg")
+        assert result == "fake-commit"
+        assert calls[0]["delete_patterns"] == ["audit/*"]
+        assert calls[0]["repo_id"] == "sentientfutures/sdf-corpus"
+        assert calls[0]["folder_path"] == "/tmp/staged"
 
 
 def _run_main(monkeypatch, *args):
