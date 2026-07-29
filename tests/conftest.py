@@ -247,17 +247,26 @@ def fake_message():
 
 @pytest.fixture
 def stub_hf(monkeypatch):
-    """Factory that replaces evals.publish_hf's three Hub-API chokepoints
-    (_create_repo/_upload_folder/_create_tag) with recording stubs, so
-    tests never import huggingface_hub or touch the network.
+    """Factory that replaces evals.publish_hf's five Hub-API chokepoints
+    (_create_repo/_upload_folder/_create_tag/_list_repo_files/_download_file)
+    with recording stubs, so tests never import huggingface_hub or touch the
+    network.
 
     ``install()`` returns the list of recorded calls; pass ``raise_on_call=True``
     to make every call raise instead — used to assert --dry-run makes none.
+
+    ``repo_files`` seeds what _list_repo_files reports (a repo-path -> JSON
+    dict mapping), so a test can simulate a sibling dataset already published.
+    _download_file then writes that JSON to the requested local_dir, mirroring
+    hf_hub_download's repo-structure-preserving behavior.
     """
 
-    def install(raise_on_call: bool = False):
+    def install(raise_on_call: bool = False, repo_files: dict | None = None):
+        from pathlib import Path as _Path
+
         from evals import publish_hf
         calls = []
+        repo_files = repo_files or {}
 
         def _blocked(name):
             def fn(*args, **kwargs):
@@ -267,24 +276,37 @@ def stub_hf(monkeypatch):
         def _create_repo(repo_id):
             calls.append({"fn": "create_repo", "repo_id": repo_id})
 
-        def _upload_folder(folder_path, repo_id, commit_message):
+        def _upload_folder(folder_path, repo_id, commit_message, delete_patterns):
             calls.append({
                 "fn": "upload_folder", "folder_path": folder_path,
                 "repo_id": repo_id, "commit_message": commit_message,
+                "delete_patterns": delete_patterns,
             })
             return "fake-commit-sha"
 
         def _create_tag(repo_id, tag):
             calls.append({"fn": "create_tag", "repo_id": repo_id, "tag": tag})
 
-        if raise_on_call:
-            monkeypatch.setattr(publish_hf, "_create_repo", _blocked("_create_repo"))
-            monkeypatch.setattr(publish_hf, "_upload_folder", _blocked("_upload_folder"))
-            monkeypatch.setattr(publish_hf, "_create_tag", _blocked("_create_tag"))
-        else:
-            monkeypatch.setattr(publish_hf, "_create_repo", _create_repo)
-            monkeypatch.setattr(publish_hf, "_upload_folder", _upload_folder)
-            monkeypatch.setattr(publish_hf, "_create_tag", _create_tag)
+        def _list_repo_files(repo_id):
+            calls.append({"fn": "list_repo_files", "repo_id": repo_id})
+            return sorted(repo_files)
+
+        def _download_file(repo_id, filename, local_dir):
+            calls.append({"fn": "download_file", "repo_id": repo_id,
+                          "filename": filename, "local_dir": local_dir})
+            dest = _Path(local_dir) / filename
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(repo_files[filename]), encoding="utf-8")
+            return str(dest)
+
+        stubs = {
+            "_create_repo": _create_repo, "_upload_folder": _upload_folder,
+            "_create_tag": _create_tag, "_list_repo_files": _list_repo_files,
+            "_download_file": _download_file,
+        }
+        for name, impl in stubs.items():
+            monkeypatch.setattr(publish_hf, name,
+                                _blocked(name) if raise_on_call else impl)
         return calls
 
     return install

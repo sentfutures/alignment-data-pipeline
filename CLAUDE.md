@@ -58,17 +58,30 @@ python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
 ```
 
-> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to a public Hugging Face dataset repo (e.g. `sentientfutures/sdf-corpus`) — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-mid-training-datasets` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+
+That one repo holds **both** corpora as separate HF *configs* (each gets its own selector in the dataset viewer), staged under per-pipeline subdirectories — `sdf/` and `dad/`, each with its corpus jsonl, `run_manifest.json`, and `audit/`. Consequences worth knowing before running it:
+
+- Publishing one pipeline **regenerates the whole card**, so the script fetches the sibling's metadata off the Hub (`fetch_sibling`) to rebuild its section. Its corpus and HTML are never downloaded or re-uploaded.
+- `delete_patterns` is scoped to `<pipeline>/audit/*`. A bare `audit/*` would delete the *sibling* dataset's audit files on every publish.
+- **Tags are repo-wide**, so prefix them per dataset (`sdf-v1-…`, `dad-v1-…`). The pre-multi-config `v1-fullscale-500-opus5` tag predates this convention.
+- `--dry-run` makes zero network calls, so it cannot see a sibling already on the Hub and says so — the preview shows only the pipeline being published.
 
 ```bash
-# Stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,html}
-# (report_content.json excluded — editorial, already baked into corpus_report.html)
-# and writes a dataset card built entirely from the audit files' own measured
-# fields. Requires a Hub token with write access to the target repo/org, one
-# time (`huggingface-cli login`, or HF_TOKEN in .env); --dry-run stages +
-# prints the card with no network calls.
-python evals/publish_hf.py --input outputs/sdf/latest --repo-id sentientfutures/sdf-corpus --dry-run
-python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id sentientfutures/sdf-corpus --tag <run-label>
+# Stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,jsonl,html}
+# into <pipeline>/ (report_content.json excluded — editorial, already baked into
+# corpus_report.html) and writes a dataset card built entirely from the audit
+# files' own measured fields. Provenance lists the per-stage `*_model` overrides,
+# not just the manifest's top-level `model` (which reads claude-sonnet-5 even on
+# runs whose real generation stages were all Opus). Requires a Hub token with
+# write access to the target repo/org, one time (`huggingface-cli login`, or
+# HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
+REPO=sentientfutures/animal-welfare-mid-training-datasets
+python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
+python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
+    --pretty-name "Animal-welfare midtraining datasets" --tag sdf-v1-<run-label>
+python evals/publish_hf.py --input outputs/dad/runs/<run_id> --repo-id $REPO \
+    --pretty-name "Animal-welfare midtraining datasets" --tag dad-v1-<run-label>
 ```
 
 ## Run Organization
