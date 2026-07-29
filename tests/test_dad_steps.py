@@ -1463,14 +1463,28 @@ class TestBaselineRun:
             {"dad": {"baseline": {"enabled": False}}}) is False
         assert baseline.enabled({"dad": {"baseline": {"enabled": True}}}) is True
 
-    @pytest.mark.parametrize("bad_reply", [
-        ("cut off mid-sen", "max_tokens"),  # truncated
-        ("", "end_turn"),                   # empty
+    def test_capped_baseline_retries_once_at_higher_budget(
+        self, tiny_config, tmp_path, stub_claude
+    ):
+        # The plain arm has no system prompt and so no length discipline, which
+        # makes it the most truncation-prone call in the pipeline; a doubled
+        # budget on retry rescues the arm instead of skipping a paid call.
+        calls = stub_claude([("cut off mid-sen", "max_tokens"), "Plain model answer."])
+        results = baseline.run(tiny_config, tmp_path, [_dilemma()])
+        assert [c["max_tokens"] for c in calls] == [baseline.BASE_MAX_TOKENS,
+                                                    baseline.BASE_MAX_TOKENS_RETRY]
+        assert len(results) == 1
+        assert results[0]["baseline_response"] == "Plain model answer."
+
+    @pytest.mark.parametrize("bad_replies", [
+        # capped even at the doubled budget (both attempts truncate)
+        [("cut off mid-sen", "max_tokens"), ("still cut off", "max_tokens")],
+        [("", "end_turn")],                 # empty (no retry — not a truncation)
     ], ids=["truncated", "empty"])
     def test_unusable_reply_skips_without_checkpoint(
-        self, tiny_config, tmp_path, stub_claude, bad_reply
+        self, tiny_config, tmp_path, stub_claude, bad_replies
     ):
-        stub_claude([bad_reply])
+        stub_claude(bad_replies)
         assert baseline.run(tiny_config, tmp_path, [_dilemma()]) == []
         assert utils.load_jsonl(tmp_path / "baseline_responses.jsonl") == []
 

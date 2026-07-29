@@ -11,13 +11,13 @@
         },
         {
           "label": "embedded",
-          "value": "9 of 9 records (0 cached, 9 new)",
+          "value": "10 of 10 records (9 cached, 1 new)",
           "verdict": null,
           "note": ""
         },
         {
           "label": "truncated for embedding",
-          "value": "6 of 9 (> 7000 chars)",
+          "value": "7 of 10 (> 7000 chars)",
           "verdict": null,
           "note": ""
         }
@@ -28,7 +28,7 @@
       "rows": [
         {
           "label": "mean nearest-neighbor sim",
-          "value": "0.781",
+          "value": "0.791",
           "verdict": null,
           "note": ""
         },
@@ -40,13 +40,14 @@
         },
         {
           "label": "near-dup >0.80 / >0.90 / >0.95",
-          "value": "55.6% / 0.0% / 0.0%",
+          "value": "70.0% / 0.0% / 0.0%",
           "verdict": "GOOD",
           "note": "(verdict on >0.90: near-verbatim in meaning-space)"
         }
       ],
       "detail": [
         "0.826  E-0666 ~ E-0671  ·  a: I run nutrition services for a 22-school district in Ohio, a  ·  b: I've spent a couple of weeks reading about fish farming and ",
+        "0.813  E-0670 ~ E-0672  ·  a: I run facilities and office procurement for a 60-person comp  ·  b: i need a vendor comparison matrix and the procurement rec me",
         "0.812  E-0665 ~ E-0667  ·  a: I run food procurement for a hospital system, eight sites, c  ·  b: Good afternoon. I would value a careful read of something be",
         "0.801  E-0664 ~ E-0671  ·  a: I could use another perspective on something I've been doing  ·  b: I've spent a couple of weeks reading about fish farming and "
       ]
@@ -56,19 +57,19 @@
       "rows": [
         {
           "label": "mean pairwise cosine",
-          "value": "0.731",
+          "value": "0.737",
           "verdict": null,
           "note": "(shared-topic corpora sit well above 0; track the trend across runs)"
         },
         {
           "label": "Vendi score",
-          "value": "2.8 effective docs of 9 (ratio 0.311)",
+          "value": "2.9 effective docs of 10 (ratio 0.286)",
           "verdict": null,
           "note": "(higher = more semantically distinct documents)"
         },
         {
           "label": "topic evenness",
-          "value": "0.918 across 2 clusters (largest 66.7%)",
+          "value": "1.000 across 2 clusters (largest 50.0%)",
           "verdict": null,
           "note": "(k-means on embeddings; 1.0 = perfectly even; compare across runs)"
         }
@@ -79,19 +80,19 @@
       "rows": [
         {
           "label": "near-dup >0.80 / >0.90 / >0.95",
-          "value": "0.0% / 0.0% / 0.0%",
+          "value": "20.0% / 0.0% / 0.0%",
           "verdict": "GOOD",
           "note": ""
         },
         {
           "label": "mean pairwise / Vendi",
-          "value": "cosine 0.690 · Vendi ratio 0.350",
+          "value": "cosine 0.693 · Vendi ratio 0.324",
           "verdict": null,
           "note": ""
         },
         {
           "label": "topic evenness",
-          "value": "0.918 across 2 clusters (largest 66.7%)",
+          "value": "1.000 across 2 clusters (largest 50.0%)",
           "verdict": null,
           "note": ""
         }
@@ -102,19 +103,19 @@
       "rows": [
         {
           "label": "near-dup >0.80 / >0.90 / >0.95",
-          "value": "77.8% / 0.0% / 0.0%",
+          "value": "80.0% / 0.0% / 0.0%",
           "verdict": "GOOD",
           "note": ""
         },
         {
           "label": "mean pairwise / Vendi",
-          "value": "cosine 0.742 · Vendi ratio 0.302",
+          "value": "cosine 0.746 · Vendi ratio 0.278",
           "verdict": null,
           "note": ""
         },
         {
           "label": "topic evenness",
-          "value": "0.918 across 2 clusters (largest 66.7%)",
+          "value": "0.881 across 2 clusters (largest 70.0%)",
           "verdict": null,
           "note": ""
         }
@@ -124,21 +125,21 @@
   "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-28_22-14_archetype10",
   "corpus": "dad_corpus.jsonl",
   "embed_model": "gemini-embedding-001",
-  "n_records": 9,
-  "n_embedded": 9,
+  "n_records": 10,
+  "n_embedded": 10,
   "n_empty": 0,
   "empty_ids": [],
-  "n_truncated": 6,
+  "n_truncated": 7,
   "max_chars": 7000,
   "cache": {
-    "cached": 0,
-    "embedded": 9
+    "cached": 9,
+    "embedded": 1
   },
   "nn": {
-    "mean": 0.7808,
+    "mean": 0.7915,
     "p90": 0.8255,
     "max": 0.8255,
-    "over_0.80": 0.5556,
+    "over_0.80": 0.7,
     "over_0.90": 0.0,
     "over_0.95": 0.0
   },
@@ -149,6 +150,13 @@
       "similarity": 0.8255,
       "a_snippet": "I run nutrition services for a 22-school district in Ohio, about two million lun",
       "b_snippet": "I've spent a couple of weeks reading about fish farming and I'm done with it: no"
+    },
+    {
+      "a": "E-0670",
+      "b": "E-0672",
+      "similarity": 0.813,
+      "a_snippet": "I run facilities and office procurement for a 60-person company, and this week I",
+      "b_snippet": "i need a vendor comparison matrix and the procurement rec memo for the protein a"
     },
     {
       "a": "E-0665",
@@ -165,24 +173,24 @@
       "b_snippet": "I've spent a couple of weeks reading about fish farming and I'm done with it: no"
     }
   ],
-  "mean_pairwise_cosine": 0.7312,
+  "mean_pairwise_cosine": 0.7367,
   "vendi": {
-    "score": 2.8,
-    "ratio": 0.3113
+    "score": 2.86,
+    "ratio": 0.2857
   },
   "clusters": {
     "k": 2,
     "clusters_nonempty": 2,
-    "evenness": 0.918,
-    "largest_share": 0.6667,
+    "evenness": 1.0,
+    "largest_share": 0.5,
     "sizes": [
-      6,
-      3
+      5,
+      5
     ]
   },
   "scopes": {
     "combined": {
-      "n": 9,
+      "n": 10,
       "nn_sims": [
         0.706,
         0.801,
@@ -190,48 +198,50 @@
         0.826,
         0.812,
         0.721,
-        0.78,
-        0.745,
-        0.826
+        0.785,
+        0.813,
+        0.826,
+        0.813
       ],
       "over": {
-        "0.80": 0.5556,
+        "0.80": 0.7,
         "0.90": 0.0,
         "0.95": 0.0
       },
-      "mean_pairwise_cosine": 0.7312,
-      "vendi_ratio": 0.3113,
+      "mean_pairwise_cosine": 0.7367,
+      "vendi_ratio": 0.2857,
       "clusters": {
         "k": 2,
         "clusters_nonempty": 2,
-        "evenness": 0.918,
-        "largest_share": 0.6667,
+        "evenness": 1.0,
+        "largest_share": 0.5,
         "sizes": [
-          6,
-          3
+          5,
+          5
         ],
         "detail": [
           {
-            "size": 6,
+            "size": 5,
             "rep_id": "E-0671",
             "rep": "I've spent a couple of weeks reading about fish farming and I'm done with it: no more farmed salmon, no more farmed shrimp, that part's deci",
             "ids": [
+              "E-0663",
               "E-0664",
-              "E-0665",
               "E-0666",
-              "E-0667",
-              "E-0669",
+              "E-0668",
               "E-0671"
             ]
           },
           {
-            "size": 3,
-            "rep_id": "E-0670",
-            "rep": "I run facilities and office procurement for a 60-person company, and this week I'm moving our standing monthly snack order off grass-fed bee",
+            "size": 5,
+            "rep_id": "E-0672",
+            "rep": "i need a vendor comparison matrix and the procurement rec memo for the protein architecture on our five closed-loop habitats (five-year crew",
             "ids": [
-              "E-0663",
-              "E-0668",
-              "E-0670"
+              "E-0665",
+              "E-0667",
+              "E-0669",
+              "E-0670",
+              "E-0672"
             ]
           }
         ]
@@ -239,62 +249,68 @@
       "cloud": [
         {
           "id": "E-0663",
-          "x": -0.331,
-          "y": 0.358,
+          "x": -0.334,
+          "y": 0.168,
           "snippet": "Namaste. Ek chhoti si salah chahiye. Ghar ka saara saaman main hi mangwata hoon — aata, da"
         },
         {
           "id": "E-0664",
-          "x": 0.052,
-          "y": 0.052,
+          "x": 0.05,
+          "y": 0.034,
           "snippet": "I could use another perspective on something I've been doing at home, or maybe just a bit "
         },
         {
           "id": "E-0665",
-          "x": 0.237,
-          "y": -0.071,
+          "x": 0.235,
+          "y": -0.051,
           "snippet": "I run food procurement for a hospital system, eight sites, call it a million meals a year "
         },
         {
           "id": "E-0666",
-          "x": 0.13,
-          "y": -0.154,
+          "x": 0.124,
+          "y": -0.274,
           "snippet": "I run nutrition services for a 22-school district in Ohio, about two million lunches a yea"
         },
         {
           "id": "E-0667",
           "x": 0.214,
-          "y": 0.01,
+          "y": 0.004,
           "snippet": "Good afternoon. I would value a careful read of something before it goes out to my members"
         },
         {
           "id": "E-0668",
-          "x": -0.393,
-          "y": -0.349,
+          "x": -0.397,
+          "y": -0.32,
           "snippet": "这种事问你合不合适我也不太确定，就试试吧。我表妹两个月后办婚宴，三十桌三百多人，买房和婚车都超支了，现在想把菜单上那道清蒸大鱼撤掉（本来是一桌一条，从缸里捞出来当着客人的面杀，说是"
         },
         {
           "id": "E-0669",
-          "x": 0.027,
-          "y": 0.25,
+          "x": 0.029,
+          "y": 0.291,
           "snippet": "ok so i've eaten basically the same lunch for two years, one chicken thigh with rice, some"
         },
         {
           "id": "E-0670",
-          "x": -0.141,
-          "y": -0.075,
+          "x": -0.137,
+          "y": 0.092,
           "snippet": "I run facilities and office procurement for a 60-person company, and this week I'm moving "
         },
         {
           "id": "E-0671",
-          "x": 0.205,
-          "y": -0.021,
+          "x": 0.201,
+          "y": -0.134,
           "snippet": "I've spent a couple of weeks reading about fish farming and I'm done with it: no more farm"
+        },
+        {
+          "id": "E-0672",
+          "x": 0.016,
+          "y": 0.19,
+          "snippet": "i need a vendor comparison matrix and the procurement rec memo for the protein architectur"
         }
       ]
     },
     "prompts": {
-      "n": 9,
+      "n": 10,
       "nn_sims": [
         0.692,
         0.752,
@@ -303,47 +319,49 @@
         0.767,
         0.683,
         0.729,
-        0.715,
-        0.778
+        0.805,
+        0.778,
+        0.805
       ],
       "over": {
-        "0.80": 0.0,
+        "0.80": 0.2,
         "0.90": 0.0,
         "0.95": 0.0
       },
-      "mean_pairwise_cosine": 0.6896,
-      "vendi_ratio": 0.3497,
+      "mean_pairwise_cosine": 0.6931,
+      "vendi_ratio": 0.3243,
       "clusters": {
         "k": 2,
         "clusters_nonempty": 2,
-        "evenness": 0.918,
-        "largest_share": 0.6667,
+        "evenness": 1.0,
+        "largest_share": 0.5,
         "sizes": [
-          6,
-          3
+          5,
+          5
         ],
         "detail": [
           {
-            "size": 6,
-            "rep_id": "P-0544",
-            "rep": "I run food procurement for a hospital system, eight sites, call it a million meals a year between patient trays, staff cafeterias and the od",
+            "size": 5,
+            "rep_id": "P-0551",
+            "rep": "I've spent a couple of weeks reading about fish farming and I'm done with it: no more farmed salmon, no more farmed shrimp, that part's deci",
             "ids": [
+              "P-0542",
               "P-0543",
-              "P-0544",
               "P-0546",
-              "P-0547",
               "P-0549",
               "P-0551"
             ]
           },
           {
-            "size": 3,
-            "rep_id": "P-0550",
-            "rep": "I run facilities and office procurement for a 60-person company, and this week I'm moving our standing monthly snack order off grass-fed bee",
+            "size": 5,
+            "rep_id": "P-0545",
+            "rep": "i need a vendor comparison matrix and the procurement rec memo for the protein architecture on our five closed-loop habitats (five-year crew",
             "ids": [
-              "P-0542",
+              "P-0544",
+              "P-0547",
               "P-0548",
-              "P-0550"
+              "P-0550",
+              "P-0545"
             ]
           }
         ]
@@ -351,62 +369,68 @@
       "cloud": [
         {
           "id": "P-0542",
-          "x": -0.288,
-          "y": 0.046,
+          "x": -0.25,
+          "y": 0.201,
           "snippet": "Namaste. Ek chhoti si salah chahiye. Ghar ka saara saaman main hi mangwata hoon — aata, da"
         },
         {
           "id": "P-0543",
-          "x": -0.047,
-          "y": 0.129,
+          "x": -0.009,
+          "y": 0.13,
           "snippet": "I could use another perspective on something I've been doing at home, or maybe just a bit "
         },
         {
           "id": "P-0544",
-          "x": 0.252,
-          "y": -0.056,
+          "x": 0.257,
+          "y": -0.033,
           "snippet": "I run food procurement for a hospital system, eight sites, call it a million meals a year "
         },
         {
           "id": "P-0546",
-          "x": 0.199,
-          "y": -0.291,
+          "x": 0.228,
+          "y": 0.127,
           "snippet": "I run nutrition services for a 22-school district in Ohio, about two million lunches a yea"
         },
         {
           "id": "P-0547",
-          "x": 0.149,
-          "y": -0.046,
+          "x": 0.146,
+          "y": -0.05,
           "snippet": "Good afternoon. I would value a careful read of something before it goes out to my members"
         },
         {
           "id": "P-0548",
-          "x": -0.438,
-          "y": -0.271,
+          "x": -0.382,
+          "y": 0.297,
           "snippet": "这种事问你合不合适我也不太确定，就试试吧。我表妹两个月后办婚宴，三十桌三百多人，买房和婚车都超支了，现在想把菜单上那道清蒸大鱼撤掉（本来是一桌一条，从缸里捞出来当着客人的面杀，说是"
         },
         {
           "id": "P-0549",
-          "x": 0.078,
-          "y": 0.398,
+          "x": 0.062,
+          "y": -0.182,
           "snippet": "ok so i've eaten basically the same lunch for two years, one chicken thigh with rice, some"
         },
         {
           "id": "P-0550",
-          "x": -0.171,
-          "y": 0.174,
+          "x": -0.226,
+          "y": -0.312,
           "snippet": "I run facilities and office procurement for a 60-person company, and this week I'm moving "
         },
         {
           "id": "P-0551",
-          "x": 0.265,
-          "y": -0.083,
+          "x": 0.307,
+          "y": 0.157,
           "snippet": "I've spent a couple of weeks reading about fish farming and I'm done with it: no more farm"
+        },
+        {
+          "id": "P-0545",
+          "x": -0.132,
+          "y": -0.335,
+          "snippet": "i need a vendor comparison matrix and the procurement rec memo for the protein architectur"
         }
       ]
     },
     "responses": {
-      "n": 9,
+      "n": 10,
       "nn_sims": [
         0.735,
         0.801,
@@ -415,47 +439,49 @@
         0.827,
         0.717,
         0.8,
-        0.8,
-        0.811
+        0.805,
+        0.811,
+        0.805
       ],
       "over": {
-        "0.80": 0.7778,
+        "0.80": 0.8,
         "0.90": 0.0,
         "0.95": 0.0
       },
-      "mean_pairwise_cosine": 0.7417,
-      "vendi_ratio": 0.3018,
+      "mean_pairwise_cosine": 0.7457,
+      "vendi_ratio": 0.2783,
       "clusters": {
         "k": 2,
         "clusters_nonempty": 2,
-        "evenness": 0.918,
-        "largest_share": 0.6667,
+        "evenness": 0.881,
+        "largest_share": 0.7,
         "sizes": [
-          6,
+          7,
           3
         ],
         "detail": [
           {
-            "size": 6,
+            "size": 7,
             "rep_id": "R-0695",
             "rep": "The memory is real, and on the numbers it isn't close. Here's what I can say with confidence, what I can't, and how you'd defend any of it i",
             "ids": [
               "R-0694",
               "R-0695",
-              "R-0696",
               "R-0697",
               "R-0698",
-              "R-0701"
+              "R-0699",
+              "R-0700",
+              "R-0702"
             ]
           },
           {
             "size": 3,
-            "rep_id": "R-0699",
-            "rep": "Practical first, since that's what determines whether this survives week three. **Storage** Dried silkworm pupae are fatty — roughly a quart",
+            "rep_id": "R-0701",
+            "rep": "Your hunch has a hole in it, and it's the one thing you asked to have stress-tested, so let me put it first. You're counting by pounds. Coun",
             "ids": [
               "R-0693",
-              "R-0699",
-              "R-0700"
+              "R-0696",
+              "R-0701"
             ]
           }
         ]
@@ -464,56 +490,62 @@
         {
           "id": "R-0693",
           "x": -0.372,
-          "y": -0.267,
+          "y": -0.242,
           "snippet": "Namaste. Seedha aapke aakhri sawaal se shuru karta hoon, kyunki uska jawaab hi baaki poori"
         },
         {
           "id": "R-0694",
-          "x": 0.105,
-          "y": -0.008,
+          "x": 0.094,
+          "y": 0.017,
           "snippet": "You're not being unkind in a different direction so much as you may be mistaken in the fir"
         },
         {
           "id": "R-0695",
-          "x": 0.163,
-          "y": 0.054,
+          "x": 0.151,
+          "y": 0.075,
           "snippet": "The memory is real, and on the numbers it isn't close. Here's what I can say with confiden"
         },
         {
           "id": "R-0696",
-          "x": 0.145,
-          "y": 0.139,
+          "x": 0.106,
+          "y": 0.203,
           "snippet": "You've got two separate things tangled together — a procurement decision with real cost an"
         },
         {
           "id": "R-0697",
-          "x": 0.239,
-          "y": -0.017,
+          "x": 0.234,
+          "y": 0.014,
           "snippet": "Good afternoon. You suspected a mis-ranking, and there is one. Your tier order runs almost"
         },
         {
           "id": "R-0698",
-          "x": -0.355,
-          "y": 0.426,
+          "x": -0.391,
+          "y": 0.366,
           "snippet": "你不必撒谎，也不必揭穿她——这两件事之间有很宽的空间，你表妹大概只是没想到而已。 **先说她给你那套台词的问题。** \"虾比大鱼清淡好消化\"是一句可以被证伪的事实陈述，而且它站不住"
         },
         {
           "id": "R-0699",
-          "x": -0.043,
-          "y": -0.248,
+          "x": -0.023,
+          "y": -0.251,
           "snippet": "Practical first, since that's what determines whether this survives week three. **Storage*"
         },
         {
           "id": "R-0700",
-          "x": -0.051,
-          "y": -0.138,
+          "x": -0.027,
+          "y": -0.174,
           "snippet": "You've built a solid case, and most of what follows is just tightening it. But one item in"
         },
         {
           "id": "R-0701",
-          "x": 0.168,
-          "y": 0.059,
+          "x": 0.137,
+          "y": 0.128,
           "snippet": "Your hunch has a hole in it, and it's the one thing you asked to have stress-tested, so le"
+        },
+        {
+          "id": "R-0702",
+          "x": 0.091,
+          "y": -0.136,
+          "snippet": "\"Low-harm almost by reflex\" — that reflex is doing real work in your memo, and it's the th"
         }
       ]
     }
