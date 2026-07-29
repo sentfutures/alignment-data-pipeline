@@ -74,6 +74,17 @@ def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path) -> dict:
     Returns a manifest dict of what was staged, used both for the dataset
     card and for logging what --dry-run would have uploaded.
     """
+    # Refuse a --staging-dir that equals or contains run_dir: rmtree below
+    # would delete the very run we're about to read from, before the copy
+    # even runs (e.g. a mistyped --staging-dir pointing back at --input).
+    run_dir_real = run_dir.resolve()
+    staging_real = staging_dir.resolve()
+    if run_dir_real == staging_real or run_dir_real.is_relative_to(staging_real):
+        raise SystemExit(
+            f"--staging-dir {staging_dir} equals or contains the run directory "
+            f"{run_dir} — refusing to delete it. Pick a --staging-dir outside the run."
+        )
+
     # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
     # --input) must reflect only THIS run — otherwise leftover files from an
     # earlier invocation ride along into upload_folder silently mixed with
@@ -168,7 +179,7 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
         n = _get(d, "n_records")
         vendi_score, vendi_ratio = _get(d, "vendi", "score"), _get(d, "vendi", "ratio")
         mpc = _get(d, "mean_pairwise_cosine")
-        if vendi_score is not None:
+        if None not in (n, vendi_score, vendi_ratio):
             detail = f"Vendi {vendi_score:.1f} effective docs of {n} (ratio {vendi_ratio:.3f})"
             if mpc is not None:
                 detail += f", mean pairwise cosine {mpc:.3f}"

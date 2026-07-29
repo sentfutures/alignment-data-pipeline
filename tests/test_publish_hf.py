@@ -158,6 +158,33 @@ class TestStageRun:
         assert not (staging_dir / corpus_a).exists()
         assert (staging_dir / corpus_b).exists()
 
+    def test_staging_dir_equal_to_run_dir_is_rejected(self, tmp_path):
+        """Regression: rmtree(staging_dir) must never fire before verifying
+        staging_dir doesn't equal or contain run_dir — otherwise a mistyped
+        --staging-dir pointing back at --input deletes the run being
+        published before it can even be copied."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run(run_dir, corpus_name, run_dir)
+        # the run must survive the rejected attempt intact
+        assert (run_dir / "final" / corpus_name).exists()
+
+    def test_staging_dir_that_contains_run_dir_is_rejected(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run(run_dir, corpus_name, run_dir.parent)
+        assert (run_dir / "final" / corpus_name).exists()
+
+    def test_staging_dir_nested_inside_run_dir_is_allowed(self, tmp_path):
+        """The reverse nesting is safe — deleting a subdir of run_dir doesn't
+        touch run_dir's own final/audit/manifest files — and is a plausible
+        deliberate choice (colocating the staged output with the run)."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_dir = run_dir / "hf_staging"
+        staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert staged["corpus_file"] == corpus_name
+        assert (run_dir / "final" / corpus_name).exists()
+
 
 class TestBuildMetricsRows:
     def test_files_with_a_generator_produce_a_row_each(self, tmp_path):
@@ -194,6 +221,22 @@ class TestBuildMetricsRows:
     def test_no_audit_dir_gives_no_rows(self, tmp_path):
         staging_dir = tmp_path / "staged"
         staging_dir.mkdir()
+        assert publish_hf.build_metrics_rows(staging_dir) == []
+
+    def test_partial_diversity_report_omits_row_instead_of_crashing(self, tmp_path):
+        """Regression: vendi_ratio/n_records were interpolated with :.3f/{} in
+        the same f-string but only vendi_score was guarded — a diversity
+        report with score but no ratio (not reachable via the current
+        evals/diversity.py generator, but the module's own contract is
+        'missing a field just omits the row') would raise instead."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            extra_audit_files={"diversity_report.json": {
+                "n_records": 477, "vendi": {"score": 34.45},  # ratio missing
+            }},
+        )
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
         assert publish_hf.build_metrics_rows(staging_dir) == []
 
     def test_files_without_a_generator_never_produce_a_row(self, tmp_path):
