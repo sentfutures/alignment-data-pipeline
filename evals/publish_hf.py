@@ -43,6 +43,7 @@ import shutil
 import sys
 from pathlib import Path
 
+import yaml
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -189,9 +190,16 @@ def build_card(
     title = (content or {}).get("title") or f"{pipeline_tag.upper()} corpus"
     subtitle = (content or {}).get("subtitle")
 
+    # yaml.safe_dump, not an f-string: title comes from report_content.json,
+    # editorial content this script doesn't control — a raw quote or newline
+    # in it would corrupt a hand-built '"{title}"' line into invalid YAML.
+    pretty_name_line = yaml.safe_dump(
+        {"pretty_name": title}, default_flow_style=False, allow_unicode=True
+    ).rstrip("\n")
+
     frontmatter = [
         "---",
-        f'pretty_name: "{title}"',
+        pretty_name_line,
         f"license: {license_id}",
         "language:",
         "  - en",

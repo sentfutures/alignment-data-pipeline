@@ -220,11 +220,29 @@ class TestBuildCard:
         staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
         card = publish_hf.build_card(staging_dir, staged, "cc-by-4.0", "sdf", content=REPORT_CONTENT)
         assert card.startswith("---\n")
-        assert 'pretty_name: "SDF corpus audit — 477 documents"' in card
+        assert "pretty_name: SDF corpus audit — 477 documents" in card
         assert "# SDF corpus audit — 477 documents" in card
         assert "A test subtitle." in card
         assert "license: cc-by-4.0" in card
         assert f"path: {corpus_name}" in card
+
+    def test_title_with_yaml_breaking_characters_stays_valid_frontmatter(self, tmp_path):
+        """Regression: title comes from report_content.json (editorial content
+        this script doesn't control) — a raw quote or embedded newline used
+        to corrupt the hand-built 'pretty_name: "{title}"' line into invalid
+        YAML. Must round-trip through a real YAML parser instead."""
+        run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        staging_dir = tmp_path / "staged"
+        staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        import yaml
+        for tricky_title in ['A "quoted" title', "A title\nwith a newline", "Title: with a colon"]:
+            card = publish_hf.build_card(
+                staging_dir, staged, "cc-by-4.0", "sdf",
+                content={"title": tricky_title},
+            )
+            frontmatter_text = card.split("---\n")[1]
+            parsed = yaml.safe_load(frontmatter_text)
+            assert parsed["pretty_name"] == tricky_title
 
     def test_falls_back_to_generic_title_without_content(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False,
