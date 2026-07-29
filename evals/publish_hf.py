@@ -670,7 +670,17 @@ def main() -> None:
             commit_message=f"Publish {pipeline_tag}: {run_dir.name}",
             # Scoped to THIS pipeline — a bare "audit/*" would delete the
             # sibling's audit files on every publish.
-            delete_patterns=[f"{pipeline_tag}/audit/*"],
+            #
+            # card_meta.json is listed too even though it lives outside audit/:
+            # it is only written when this run HAS a curated title, so without
+            # the pattern a later run of the same pipeline that lacks one would
+            # leave the earlier run's sidecar on the Hub, and the next sibling
+            # publish would restore a title that is no longer what's published.
+            # Safe to delete unconditionally because upload_folder drops any
+            # deletion whose path is also being added, so a freshly staged
+            # sidecar survives while a no-longer-produced one is cleared.
+            delete_patterns=[f"{pipeline_tag}/audit/*",
+                             f"{pipeline_tag}/{CARD_META_FILENAME}"],
         )
         if args.tag:
             _create_tag(args.repo_id, args.tag)

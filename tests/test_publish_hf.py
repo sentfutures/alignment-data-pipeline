@@ -626,9 +626,11 @@ class TestHubApiWrappers:
 
         monkeypatch.setattr("huggingface_hub.HfApi", FakeHfApi)
         result = publish_hf._upload_folder(
-            "/tmp/staged", "sentientfutures/x", "msg", ["sdf/audit/*"])
+            "/tmp/staged", "sentientfutures/x", "msg",
+            ["sdf/audit/*", "sdf/card_meta.json"])
         assert result == "fake-commit"
-        assert calls[0]["delete_patterns"] == ["sdf/audit/*"]
+        # forwarded verbatim — the wrapper adds nothing of its own
+        assert calls[0]["delete_patterns"] == ["sdf/audit/*", "sdf/card_meta.json"]
         assert calls[0]["repo_id"] == "sentientfutures/x"
         assert calls[0]["folder_path"] == "/tmp/staged"
 
@@ -715,7 +717,47 @@ class TestMainEndToEnd:
         calls = stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
         upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert upload["delete_patterns"] == ["dad/audit/*"]
+        assert upload["delete_patterns"] == ["dad/audit/*", "dad/card_meta.json"]
+        # every pattern must stay under this pipeline's own prefix
+        assert all(p.startswith("dad/") for p in upload["delete_patterns"])
+
+    def test_card_meta_is_cleared_so_a_stale_heading_cannot_survive(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """Regression: card_meta.json lives outside audit/, so the audit-only
+        delete pattern left it behind. Publish run A with a curated title, then
+        run B without one, and run A's sidecar would linger on the Hub — the
+        next sibling publish would restore a title that is no longer what's
+        published. It must be in delete_patterns even on a run that writes no
+        sidecar of its own.
+
+        Deleting unconditionally is safe because upload_folder drops any
+        deletion whose path is also being added (verified against the installed
+        huggingface_hub), so a freshly staged sidecar still survives."""
+        # run B: no report_content.json, so no sidecar is staged
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert not (staging_dir / "sdf" / "card_meta.json").exists()
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "sdf/card_meta.json" in upload["delete_patterns"]
+
+    def test_card_meta_still_uploaded_when_the_run_has_one(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The other half of the above: the delete pattern is present, but the
+        sidecar is also staged, so upload_folder's add-wins-over-delete rule
+        keeps it."""
+        run_dir, _ = make_run_dir(tmp_path)  # includes report_content.json
+        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+        assert (staging_dir / "sdf" / "card_meta.json").exists()
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "sdf/card_meta.json" in upload["delete_patterns"]
 
     def test_publish_without_tag_skips_create_tag(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
