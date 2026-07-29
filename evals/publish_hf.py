@@ -8,15 +8,22 @@ eval additions/omissions are picked up or skipped automatically — then writes
 a dataset card (README.md) and uploads the lot in one commit.
 
 The card is built entirely from measured fields already sitting in the audit
-JSONs — no interpretive prose is authored here. Each of the six known audit
-files contributes one metrics-table row (cited by source filename); any file
-that's absent just omits its row, the same "sections whose inputs are absent
-are omitted" convention evals/report_sdf.py already uses. report_content.json
-(the one editorial input among the audit files — curated excerpts/translations
-and report-section prose) is excluded from the upload: it's already fully
-baked into corpus_report.html, so nothing in it would be invisible to a Hub
-visitor. Its title/subtitle strings, already curated by the pipeline for this
-run, are reused verbatim as the card header when present.
+JSONs — no interpretive prose is authored here. Audit files with a real,
+committed generator (audit_report.json, compliance_report.json,
+diversity_report.json — see build_metrics_rows) each contribute one
+metrics-table row, cited by source filename; a file that's absent, or present
+but missing an expected field, just omits its row. Every OTHER file under
+audit/ is still staged/uploaded (glob-based, not a fixed list) and still
+listed in the card, just without a bespoke row — see build_metrics_rows'
+docstring for why card_fidelity_report.json/realism_ablation.json/
+vendi_curve.json (one-off artifacts of a specific historical run, no
+generator in this repo) are handled that way rather than hardcoded.
+report_content.json (the one editorial input among the audit files — curated
+excerpts/translations and report-section prose, read by evals/report_sdf.py)
+is excluded from the upload entirely: it's already fully baked into
+corpus_report.html, so nothing in it would be invisible to a Hub visitor. Its
+title/subtitle strings, already curated by the pipeline for this run, are
+reused verbatim as the card header when present.
 
 Usage:
   python evals/publish_hf.py --input outputs/sdf/latest --repo-id sentientfutures/sdf-corpus
@@ -66,6 +73,12 @@ def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path) -> dict:
     Returns a manifest dict of what was staged, used both for the dataset
     card and for logging what --dry-run would have uploaded.
     """
+    # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
+    # --input) must reflect only THIS run — otherwise leftover files from an
+    # earlier invocation ride along into upload_folder silently mixed with
+    # this run's data.
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
     utils.ensure_dir(staging_dir)
     staged: dict = {"corpus_file": None, "manifest_file": None, "audit_files": [], "n_docs": 0}
 
@@ -118,6 +131,18 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
 
     Every value is a measured field lifted verbatim from the file's own
     summary — no thresholds, verdicts, or causal claims added here.
+
+    Deliberately limited to files with an actual committed generator —
+    evals/audit_sdf.py, evals/diversity.py (both on main), and
+    evals/compliance_sdf.py (landing via PR #103) — rather than every audit/
+    filename PR #103's own run happened to carry. card_fidelity_report.json
+    and realism_ablation.json have no generator anywhere in this repo (a
+    one-off local analysis for that run), and vendi_curve.json is itself an
+    editorial input report_sdf.py reads rather than measures. Special-casing
+    their exact schemas here would be dead code for every other run. They're
+    still staged/uploaded (stage_run globs audit/ unconditionally) and still
+    surface in the card's "additional files" line — just without a row a
+    future run has no way to reproduce.
     """
     audit_dir = staging_dir / "audit"
     rows: list[tuple[str, str, str]] = []
@@ -137,18 +162,6 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
                 "compliance_report.json",
             ))
 
-    d = _load_json(audit_dir / "card_fidelity_report.json")
-    if d is not None:
-        judged = _get(d, "judged")
-        by_card = _get(d, "by_card_frac", default={})
-        if judged is not None and by_card:
-            per_axis = ", ".join(f"{axis} {frac:.1%}" for axis, frac in by_card.items())
-            rows.append((
-                "Card fidelity (plan honours dealt card)",
-                f"{per_axis} — n={judged}",
-                "card_fidelity_report.json",
-            ))
-
     d = _load_json(audit_dir / "diversity_report.json")
     if d is not None:
         n = _get(d, "n_records")
@@ -159,32 +172,6 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
             if mpc is not None:
                 detail += f", mean pairwise cosine {mpc:.3f}"
             rows.append(("Semantic diversity", detail, "diversity_report.json"))
-
-    d = _load_json(audit_dir / "realism_ablation.json")
-    if d is not None:
-        n, l5, blind, drop = (_get(d, "n"), _get(d, "layer5_mean"),
-                               _get(d, "blind_same_rubric_mean"), _get(d, "mean_drop"))
-        if None not in (n, l5, blind, drop):
-            rows.append((
-                "Realism, spec-blind rescore (n={})".format(n),
-                f"{l5:.2f} (in-spec) vs {blind:.2f} (spec hidden), drop {drop:.2f}",
-                "realism_ablation.json",
-            ))
-
-    d = _load_json(audit_dir / "vendi_curve.json")
-    if d is not None:
-        def _fmt_proj(p):
-            if not isinstance(p, dict) or p.get("power") is None or p.get("log") is None:
-                return None
-            return f"power {p['power']:.1f}, log {p['log']:.1f}"
-
-        parts = []
-        for n_label, key in (("n=1000", "1000"), ("n=5000", "5000")):
-            formatted = _fmt_proj(_get(d, "proj", key))
-            if formatted:
-                parts.append(f"{n_label}: {formatted}")
-        if parts:
-            rows.append(("Projected effective-document count", "; ".join(parts), "vendi_curve.json"))
 
     return rows
 

@@ -136,25 +136,49 @@ class TestStageRun:
         staged = publish_hf.stage_run(run_dir, corpus_name, tmp_path / "staged")
         assert staged["audit_files"] == ["custom_eval.json"]
 
+    def test_reused_staging_dir_is_cleared_of_stale_files(self, tmp_path):
+        """Regression: a --staging-dir reused across two invocations (e.g. after
+        fixing a typo'd --input) must reflect only the LATEST run — leftover
+        files from an earlier call must not ride along into the upload."""
+        staging_dir = tmp_path / "staged"
+
+        run_a, corpus_a = make_run_dir(tmp_path / "a", audit_files=["compliance_report.json"])
+        publish_hf.stage_run(run_a, corpus_a, staging_dir)
+        assert (staging_dir / "audit" / "compliance_report.json").exists()
+
+        run_b, corpus_b = make_run_dir(
+            tmp_path / "b", pipeline="dad", audit_files=["audit_report.json"], include_html=False,
+        )
+        staged_b = publish_hf.stage_run(run_b, corpus_b, staging_dir)
+
+        assert staged_b["audit_files"] == ["audit_report.json"]
+        assert not (staging_dir / "audit" / "compliance_report.json").exists()
+        assert not (staging_dir / "audit" / "corpus_report.html").exists()
+        # run A's corpus file (a different pipeline's filename) must not survive either
+        assert not (staging_dir / corpus_a).exists()
+        assert (staging_dir / corpus_b).exists()
+
 
 class TestBuildMetricsRows:
-    def test_all_known_files_produce_a_row_each(self, tmp_path):
+    def test_files_with_a_generator_produce_a_row_each(self, tmp_path):
+        """Only audit_report.json/compliance_report.json/diversity_report.json
+        get a bespoke row — the only three with an actual committed generator
+        (evals/audit_sdf.py, evals/compliance_sdf.py, evals/diversity.py).
+        card_fidelity_report.json/realism_ablation.json/vendi_curve.json are
+        one-off artifacts of a specific historical run with no generator
+        anywhere in this repo — see build_metrics_rows' docstring."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         staging_dir = tmp_path / "staged"
         publish_hf.stage_run(run_dir, corpus_name, staging_dir)
         rows = publish_hf.build_metrics_rows(staging_dir)
-        assert len(rows) == 6
+        assert len(rows) == 3
         joined = " ".join(f"{l}:{v}" for l, v, _source in rows)
         assert "98 of 100 judged clean (98.0%)" in joined
-        assert "resolution 65.7%" in joined
         assert "Vendi 34.5 effective docs of 477 (ratio 0.072)" in joined
-        assert "8.49 (in-spec) vs 5.78 (spec hidden), drop 2.71" in joined
-        assert "n=1000" in joined and "n=5000" in joined
         assert any(label == "Documents (offline audit)" and value == "477"
                    for label, value, _source in rows)
         assert {source for _, _, source in rows} == {
-            "audit_report.json", "compliance_report.json", "card_fidelity_report.json",
-            "diversity_report.json", "realism_ablation.json", "vendi_curve.json",
+            "audit_report.json", "compliance_report.json", "diversity_report.json",
         }
 
     def test_missing_files_omit_their_rows_without_error(self, tmp_path):
@@ -172,28 +196,21 @@ class TestBuildMetricsRows:
         staging_dir.mkdir()
         assert publish_hf.build_metrics_rows(staging_dir) == []
 
-    def test_partial_realism_ablation_omits_row_instead_of_crashing(self, tmp_path):
+    def test_files_without_a_generator_never_produce_a_row(self, tmp_path):
+        """card_fidelity_report.json/realism_ablation.json/vendi_curve.json are
+        never parsed at all, regardless of their content — so a malformed one
+        can't crash the publish (nothing to test beyond: no row, ever)."""
         run_dir, corpus_name = make_run_dir(
             tmp_path, audit_files=[], include_html=False,
-            # present, but missing the fields the row formats — schema drift/partial write
-            extra_audit_files={"realism_ablation.json": {"n": 78, "layer5_mean": 8.487}},
+            extra_audit_files={
+                "card_fidelity_report.json": {"unexpected": "shape"},
+                "realism_ablation.json": {"n": 78},
+                "vendi_curve.json": {"proj": "not even a dict"},
+            },
         )
         staging_dir = tmp_path / "staged"
         publish_hf.stage_run(run_dir, corpus_name, staging_dir)
         assert publish_hf.build_metrics_rows(staging_dir) == []
-
-    def test_partial_vendi_curve_omits_only_the_broken_projection(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"vendi_curve.json": {
-                "proj": {"1000": {"power": 50.1, "log": 48.2}, "5000": {"power": 90.4}},
-            }},
-        )
-        staging_dir = tmp_path / "staged"
-        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
-        rows = publish_hf.build_metrics_rows(staging_dir)
-        assert len(rows) == 1
-        assert "n=1000" in rows[0][1] and "n=5000" not in rows[0][1]
 
 
 class TestBuildCard:
@@ -240,6 +257,22 @@ class TestBuildCard:
         # compliance_report.json got its own metrics-table row — must not also
         # be duplicated into the catch-all "additional files" line
         extra_line = next(l for l in card.splitlines() if l.startswith("Additional"))
+        assert "compliance_report.json" not in extra_line
+
+    def test_no_generator_files_are_listed_as_extra_not_dropped(self, tmp_path):
+        """card_fidelity_report.json/realism_ablation.json/vendi_curve.json get
+        no metrics row (no committed generator reproduces them), but must
+        still be visible in the card — otherwise they'd be uploaded yet
+        invisible to anyone reading only the README."""
+        run_dir, corpus_name = make_run_dir(tmp_path)  # default: all seven fixture files + html
+        staging_dir = tmp_path / "staged"
+        staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        card = publish_hf.build_card(staging_dir, staged, "cc-by-4.0", "sdf")
+        extra_line = next(l for l in card.splitlines() if l.startswith("Additional"))
+        assert "`card_fidelity_report.json`" in extra_line
+        assert "`realism_ablation.json`" in extra_line
+        assert "`vendi_curve.json`" in extra_line
+        # compliance_report.json DID get a row — must not be duplicated here
         assert "compliance_report.json" not in extra_line
 
     def test_known_file_with_unexpected_schema_still_listed_as_extra(self, tmp_path):
