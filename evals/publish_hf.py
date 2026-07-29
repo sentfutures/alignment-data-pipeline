@@ -54,6 +54,18 @@ load_dotenv()
 
 CORPUS_FILENAMES = ("sdf_corpus.jsonl", "dad_corpus.jsonl")
 
+# ISO 639-1 codes for every language name sdf_pipeline/compose_prompts.py's
+# derive_language() can produce (the `culture` axis in prompts/sdf/
+# variables.txt) — no existing name->code mapping exists anywhere in the
+# repo to reuse; this set is closed and small, so a literal dict here is
+# the right amount of code, not a premature abstraction.
+LANGUAGE_CODES = {
+    "English": "en", "Portuguese": "pt", "Spanish": "es", "German": "de",
+    "French": "fr", "Polish": "pl", "Norwegian": "no", "Hindi": "hi",
+    "Urdu": "ur", "Bengali": "bn", "Mandarin Chinese": "zh", "Japanese": "ja",
+    "Korean": "ko", "Indonesian": "id", "Vietnamese": "vi", "Arabic": "ar",
+}
+
 
 def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     """Return (run_dir, corpus_filename) for an SDF or DAD run directory."""
@@ -188,6 +200,26 @@ def build_metrics_rows(staging_dir: Path) -> list[tuple[str, str, str]]:
     return rows
 
 
+def detected_languages(staging_dir: Path, pipeline_tag: str) -> list[str]:
+    """ISO 639-1 codes actually present in the corpus, not a hardcoded guess.
+
+    SDF runs get this from audit_report.json's own composition.language
+    breakdown (evals/audit_sdf.py, keyed by the same full names
+    LANGUAGE_CODES maps) — the culture matrix deliberately samples mostly
+    non-English documents, so hardcoding "en" would misdeclare the card's
+    language metadata for every real SDF run. DAD's audit_report.json has no
+    such breakdown (dilemmas are English-only by the dad.language_distribution
+    default), so DAD runs — and any SDF run missing the file or whose
+    language names don't map — fall back to ["en"] rather than guessing.
+    """
+    if pipeline_tag != "sdf":
+        return ["en"]
+    d = _load_json(staging_dir / "audit" / "audit_report.json")
+    names = _get(d, "composition", "language", default={}) if d else {}
+    codes = sorted({LANGUAGE_CODES[n] for n in names if n in LANGUAGE_CODES})
+    return codes or ["en"]
+
+
 def build_card(
     staging_dir: Path,
     staged: dict,
@@ -208,12 +240,14 @@ def build_card(
         {"pretty_name": title}, default_flow_style=False, allow_unicode=True
     ).rstrip("\n")
 
+    languages = detected_languages(staging_dir, pipeline_tag)
+
     frontmatter = [
         "---",
         pretty_name_line,
         f"license: {license_id}",
         "language:",
-        "  - en",
+        *[f"  - {code}" for code in languages],
         "tags:",
         "  - synthetic-data",
         "  - ai-alignment",

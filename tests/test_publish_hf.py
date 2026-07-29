@@ -22,7 +22,12 @@ DIVERSITY = {"n_records": 477, "vendi": {"score": 34.45, "ratio": 0.0722},
              "mean_pairwise_cosine": 0.3709}
 REALISM = {"n": 78, "layer5_mean": 8.487, "blind_same_rubric_mean": 5.782, "mean_drop": 2.705}
 VENDI_CURVE = {"proj": {"1000": {"power": 50.1, "log": 48.2}, "5000": {"power": 90.4, "log": 85.1}}}
-AUDIT_REPORT = {"n_docs": 477}
+AUDIT_REPORT = {
+    "n_docs": 477,
+    "composition": {"language": {
+        "English": 139, "Spanish": 48, "Mandarin Chinese": 57, "Urdu": 10,
+    }},
+}
 REPORT_CONTENT = {"title": "SDF corpus audit — 477 documents", "subtitle": "A test subtitle."}
 MANIFEST = {
     "run_id": "2026-07-25_15-57_fullscale-500-opus5",
@@ -256,6 +261,46 @@ class TestBuildMetricsRows:
         assert publish_hf.build_metrics_rows(staging_dir) == []
 
 
+class TestDetectedLanguages:
+    def test_sdf_run_derives_codes_from_audit_report_composition(self, tmp_path):
+        """Regression: the card used to hardcode language: [en], but the
+        culture matrix deliberately samples mostly non-English documents —
+        audit_report.json's own composition.language breakdown (already read
+        by build_metrics_rows) is the measured source of truth for this."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        # English, Spanish, Mandarin Chinese, Urdu -> en, es, zh, ur, sorted
+        assert publish_hf.detected_languages(staging_dir, "sdf") == ["en", "es", "ur", "zh"]
+
+    def test_dad_run_always_falls_back_to_en(self, tmp_path):
+        """DAD's audit_report.json has no composition.language breakdown —
+        dilemmas are English-only by the dad.language_distribution default —
+        so DAD runs shouldn't attempt the SDF-specific lookup at all."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad")
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert publish_hf.detected_languages(staging_dir, "dad") == ["en"]
+
+    def test_missing_audit_report_falls_back_to_en(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert publish_hf.detected_languages(staging_dir, "sdf") == ["en"]
+
+    def test_unmapped_language_name_is_skipped_not_crashed(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, audit_files=[], include_html=False,
+            extra_audit_files={"audit_report.json": {
+                "n_docs": 10,
+                "composition": {"language": {"English": 8, "Klingon": 2}},
+            }},
+        )
+        staging_dir = tmp_path / "staged"
+        publish_hf.stage_run(run_dir, corpus_name, staging_dir)
+        assert publish_hf.detected_languages(staging_dir, "sdf") == ["en"]
+
+
 class TestBuildCard:
     def test_uses_report_content_title_and_subtitle(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
@@ -268,6 +313,10 @@ class TestBuildCard:
         assert "A test subtitle." in card
         assert "license: cc-by-4.0" in card
         assert f"path: {corpus_name}" in card
+        # multi-language corpus (see AUDIT_REPORT fixture) — not hardcoded "en"
+        import yaml
+        frontmatter = yaml.safe_load(card.split("---\n")[1])
+        assert frontmatter["language"] == ["en", "es", "ur", "zh"]
 
     def test_title_with_yaml_breaking_characters_stays_valid_frontmatter(self, tmp_path):
         """Regression: title comes from report_content.json (editorial content
