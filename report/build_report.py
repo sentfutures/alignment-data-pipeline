@@ -1,56 +1,68 @@
 #!/usr/bin/env python3
-"""Build the report pages: the hub, and one page per pipeline.
+"""Build the handoff page: both corpora, one self-contained HTML file.
 
-    python report/build_report.py --dad-run outputs/dad/runs/<run_id>
-    # -> report/index.html, report/dad.html
-
-    python report/build_report.py --page dad --dad-run outputs/dad/runs/<run_id>
+    python report/build_report.py --dad-run outputs/dad/runs/<run_id> \\
+                                  --sdf-run outputs/sdf/runs/<run_id>
+    # -> report/index.html
 
 ``--run`` still works as an alias for ``--dad-run``, which keeps the command printed in
-the DAD page's own "Run it yourself" section true.
+the page's own "Running it yourself" block true. ``--sdf-run`` is optional: without it
+the document corpus's column and section say so instead of showing figures.
 
-Each page is one self-contained HTML file: no external CSS, JS, fonts or images, so it
-opens offline from the filesystem and survives an artifact host's CSP. The generators are
-stdlib only and import nothing from viewer/ or shared/, so they build in an environment
-where the pipeline's own dependencies are not installed.
+The page is one self-contained HTML file: no external CSS, JS, fonts or images, so it
+opens offline from the filesystem, survives an artifact host's CSP, and publishes to
+GitHub Pages as-is. The generator is stdlib only and imports nothing from viewer/ or
+shared/, so it builds in an environment where the pipeline's own dependencies are not
+installed.
 """
 
+import base64
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from report import common as C  # noqa: E402
-from report import dad, hub  # noqa: E402
+from report import page  # noqa: E402
 
 REPORT_DIR = Path(__file__).resolve().parent
-SHARED_CONTENT = REPORT_DIR / "content_shared.md"
-DAD_CONTENT = REPORT_DIR / "content_dad.md"
+CONTENT = [REPORT_DIR / "content_page.md", REPORT_DIR / "content_dad.md"]
+HERO = REPORT_DIR / "assets" / "hero.png"
+MAKER_ICON = REPORT_DIR / "assets" / "sf.png"
+
+
+def data_uri(path, mime="image/png"):
+    """An image as a data: URI, or "" if it is not there.
+
+    Inlining is not an optimisation here, it is the format: the page has to be one file
+    that opens offline, so the only picture it can carry is one encoded into it. The
+    source art lives in report/assets/ and never ships next to the HTML.
+    """
+    try:
+        raw = Path(path).read_bytes()
+    except OSError:
+        return ""
+    return f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
 
 
 def main():
     args = C.cli_parser(__doc__).parse_args()
+    if not args.dad_run:
+        C.die("--dad-run is required")
     out_dir = Path(args.out_dir or REPORT_DIR)
-    want = {"all": ("index", "dad"), "index": ("index",), "dad": ("dad",)}[args.page]
-
-    if "dad" in want:
-        if not args.dad_run:
-            C.die("--dad-run is required to build the DAD page")
-        kwargs = dad.load_inputs(args.dad_run, args.content or [DAD_CONTENT])
-        audit = kwargs["audit"]
-        html = dad.build(example=args.example, sibling=("index.html", "Overview"), **kwargs)
-        C.write(out_dir / "dad.html", html,
-                label=f"n={audit.get('n_prompts')} "
-                      f"delivery={'yes' if audit.get('delivery') else 'NO'} "
-                      f"showcase={'yes' if audit.get('showcase') else 'NO'} "
-                      f"diversity={'yes' if kwargs.get('diversity') else 'NO'}")
-
-    if "index" in want:
-        kwargs = hub.load_inputs(args.content or [SHARED_CONTENT], dad_run=args.dad_run,
-                                 sdf_run=args.sdf_run)
-        C.write(out_dir / "index.html", hub.build(**kwargs),
-                label=f"dad={'yes' if kwargs.get('dad_audit') else 'NO'} "
-                      f"sdf={'yes' if kwargs.get('sdf_audit') else 'NO'}")
+    kwargs = page.load_inputs(args.content or CONTENT, dad_run=args.dad_run,
+                              sdf_run=args.sdf_run)
+    hero = data_uri(HERO)
+    html = page.build(example=args.example, illustration=hero,
+                      maker_icon=data_uri(MAKER_ICON), **kwargs)
+    audit = (kwargs.get("dad_inputs") or {}).get("audit") or {}
+    C.write(out_dir / "index.html", html,
+            label=f"{C.editorial_words(html):,} words of prose · "
+                  f"hero={'inlined' if hero else 'NO'} · "
+                  f"dad n={audit.get('n_prompts')} "
+                  f"delivery={'yes' if audit.get('delivery') else 'NO'} "
+                  f"showcase={'yes' if audit.get('showcase') else 'NO'} "
+                  f"sdf={'yes' if kwargs.get('sdf_inputs') else 'NO'}")
 
 
 if __name__ == "__main__":

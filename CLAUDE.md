@@ -157,4 +157,5 @@ prompts/dad/        dilemma prompt spec + reasoning library + DAD step templates
 outputs/sdf/        intermediate + final SDF outputs
 outputs/dad/        intermediate + final DAD outputs
 evals/              scoring scripts and rubric
+report/             hand-over page: one self-contained index.html covering both datasets; see report/README.md
 ```

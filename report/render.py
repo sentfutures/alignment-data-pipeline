@@ -1,7 +1,7 @@
 """Presentation primitives for the standalone HTML reports: CSS, SVG charts, shell.
 
-Knows nothing about any pipeline — it takes numbers and returns HTML strings, so the
-hub, the DAD report and (later) the SDF report share one look.
+Knows nothing about any pipeline — it takes numbers and returns HTML strings, so both
+datasets' reports on the handoff page share one look.
 
 ONE THEME, LIGHT, deliberately. This is a document that gets handed to an external
 reader, printed, and screenshotted into slides. A viewer's OS preference is not a
@@ -14,7 +14,7 @@ mechanism from ``prefers-color-scheme``.
 Output is ONE self-contained file: no external CSS, JS, fonts, or images. An artifact
 host's CSP blocks every external origin, and the file has to survive being downloaded
 and opened offline. Charts are therefore inline <svg> generated here rather than a
-charting library, and the only JS is a tooltip and a scroll-spy.
+charting library, and the only JS is a tooltip and the chooser.
 
 stdlib only, and no repo imports: the report generator must run anywhere, including
 where the pipeline's own dependencies are not installed.
@@ -72,8 +72,35 @@ def inline_md(text):
     out = _MD_CODE.sub(r"<code>\1</code>", out)
     out = _MD_BOLD.sub(r"<b>\1</b>", out)
     out = _MD_ITAL.sub(r"<i>\1</i>", out)
-    out = _MD_LINK.sub(r"<a href='\2'>\1</a>", out)
+    out = _MD_LINK.sub(_link, out)
     return out
+
+
+# Leaving the page means leaving it in a NEW TAB: this is a long read whose chooser
+# state lives in the URL, and a reader who follows a link out and comes back with the
+# back button lands on a page that has closed itself again.
+NEW_TAB = " target='_blank' rel='noopener noreferrer'"
+
+# The outbound mark, drawn rather than typed. As a glyph (U+2197) it is a hairline in
+# most faces and a different shape in every one; this page is printed and screenshotted,
+# so the mark has to be the same weight as the type it sits beside, everywhere.
+EXT_ARROW = ("<svg class='ext' viewBox='0 0 12 12' width='9' height='9' aria-hidden='true' "
+             "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' "
+             "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
+             "<path d='M4.6 3.1h4.3v4.3'/></svg>")
+
+
+def _link(m):
+    """A link. One that leaves the page says so, with the arrow that means exactly that.
+
+    On a page that is a single file, "does this take me somewhere else" is the only
+    distinction between links that matters, so it is marked rather than left to the
+    reader to guess from the href.
+    """
+    label, href = m.group(1), m.group(2)
+    if not href.startswith("http"):
+        return f"<a href='{href}'>{label}</a>"
+    return f"<a href='{href}'{NEW_TAB}>{label}{EXT_ARROW}</a>"
 
 
 def paragraphs(text):
@@ -143,25 +170,6 @@ def tiles(items):
     if sum(1 for t in kept if "tile hero" in t) > 1:
         raise ValueError("a tile row may have at most one hero tile")
     return f"<div class='tiles'>{''.join(kept)}</div>"
-
-
-def buttons(entries):
-    """A centred row of destinations. entries: [(label, href_or_None, note)].
-
-    ``href=None`` renders a span rather than an anchor, so a report nobody has built yet
-    keeps the row's symmetry without being clickable — a dead link is worse than a
-    visibly unavailable one.
-    """
-    out = []
-    for label, href, note in entries:
-        inner = (f"<span class='btn-l'>{esc(label)}</span>"
-                 + (f"<span class='btn-n'>{esc(note)}</span>" if note else ""))
-        if href:
-            out.append(f"<a class='btn' href='{esc(href)}'>{inner}"
-                       f"<span class='btn-a' aria-hidden='true'>&rarr;</span></a>")
-        else:
-            out.append(f"<span class='btn off'>{inner}</span>")
-    return f"<div class='btns'>{''.join(out)}</div>" if out else ""
 
 
 def table(headers, rows, cls="", align=""):
@@ -477,6 +485,159 @@ def quote(text):
     return f"<blockquote>{esc(text)}</blockquote>"
 
 
+def sub(anchor, text):
+    """A subheading that is also a deep-link target.
+
+    The page is one document with two report sections in it, so every beat inside a
+    section needs its own id: a reader arriving from the dataset card lands on #dad,
+    and anyone quoting a finding wants #dad-weak.
+    """
+    return f"<h3 id='{esc(anchor)}'>{esc(text)}</h3>"
+
+
+def illustration(data_uri="", alt="", label="Illustration"):
+    """The hero's illustration.
+
+    ``data_uri`` must be a ``data:`` URI — the whole page is one file, so a reference
+    to anything outside it (even a relative path) breaks the artefact the moment it
+    travels. Without one the slot renders empty at the right proportions, so the hero
+    keeps the shape the finished page will have.
+    """
+    if not data_uri:
+        return ("\n<!-- TODO: hero illustration. Drop a PNG into report/assets/hero.png; "
+                "build_report.py inlines it as a data URI. No external asset may be "
+                "referenced: this page has to open offline from the filesystem. -->\n"
+                f"<div class='illo'><span>{esc(label)}</span></div>\n")
+    if not data_uri.startswith("data:"):
+        raise ValueError("the hero illustration must be a data: URI — the page is one file")
+    return (f"\n<div class='illo art'><img src='{esc(data_uri)}' alt='{esc(alt)}'></div>\n")
+
+
+
+
+def hero(title, art="", intro=""):
+    """The opening: the illustration, the title, and the lines that follow from it.
+
+    The intro is part of the hero rather than a section of its own — it is the second
+    half of the title's sentence, and a heading over it ("Intro") only told a reader
+    what they could already see. It carries the ``#intro`` id so the skip link has
+    somewhere to land.
+    """
+    return (f"<header class='hero'>{art}<h1>{esc(title)}</h1>"
+            + (f"<div class='hero-intro' id='intro'>{intro}</div>" if intro else "")
+            + "</header>\n")
+
+
+# Monochrome marks, drawn inline and inheriting currentColor: the page is one file, and a
+# colour logo would fight a palette built out of ink on paper. The GitHub silhouette is
+# the published mark; the Hugging Face one is a simplified face, which is what survives
+# being drawn at 15px in a single colour.
+# Marks drawn inline: the page is one file, so a logo is path data or it is nothing.
+# GitHub's is the published silhouette and inherits currentColor. Hugging Face's is
+# their actual logo, fetched from huggingface.co/front/assets, keeping its own fills —
+# it IS a smiley face, but theirs, hands and all, rather than a circle I drew.
+# (name -> viewBox, width, height, paths)
+ICONS = {
+    "github": ("0 0 16 16", 15, 15,
+               "<path d='M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 "
+               "0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-"
+               ".15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-"
+               ".87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02."
+               "08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-"
+               ".82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 "
+               "3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 "
+               "0 0 16 8c0-4.42-3.58-8-8-8z'/>"),
+    "hf": ("0 0 95 88", 16, 15, '<path fill="#FFD21E" d="M47.21 76.5a34.75 34.75 0 1 0 0-69.5 34.75 34.75 0 0 0 0 69.5Z"/><path fill="#FF9D0B" d="M81.96 41.75a34.75 34.75 0 1 0-69.5 0 34.75 34.75 0 0 0 69.5 0Zm-73.5 0a38.75 38.75 0 1 1 77.5 0 38.75 38.75 0 0 1-77.5 0Z"/><path fill="#3A3B45" d="M58.5 32.3c1.28.44 1.78 3.06 3.07 2.38a5 5 0 1 0-6.76-2.07c.61 1.15 2.55-.72 3.7-.32ZM34.95 32.3c-1.28.44-1.79 3.06-3.07 2.38a5 5 0 1 1 6.76-2.07c-.61 1.15-2.56-.72-3.7-.32Z"/><path fill="#FF323D" d="M46.96 56.29c9.83 0 13-8.76 13-13.26 0-2.34-1.57-1.6-4.09-.36-2.33 1.15-5.46 2.74-8.9 2.74-7.19 0-13-6.88-13-2.38s3.16 13.26 13 13.26Z"/><path fill="#3A3B45" d="M39.43 54a8.7 8.7 0 0 1 5.3-4.49c.4-.12.81.57 1.24 1.28.4.68.82 1.37 1.24 1.37.45 0 .9-.68 1.33-1.35.45-.7.89-1.38 1.32-1.25a8.61 8.61 0 0 1 5 4.17c3.73-2.94 5.1-7.74 5.1-10.7 0-2.34-1.57-1.6-4.09-.36l-.14.07c-2.31 1.15-5.39 2.67-8.77 2.67s-6.45-1.52-8.77-2.67c-2.6-1.29-4.23-2.1-4.23.29 0 3.05 1.46 8.06 5.47 10.97Z"/><path fill="#FF9D0B" d="M70.71 37a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM24.21 37a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM17.52 48c-1.62 0-3.06.66-4.07 1.87a5.97 5.97 0 0 0-1.33 3.76 7.1 7.1 0 0 0-1.94-.3c-1.55 0-2.95.59-3.94 1.66a5.8 5.8 0 0 0-.8 7 5.3 5.3 0 0 0-1.79 2.82c-.24.9-.48 2.8.8 4.74a5.22 5.22 0 0 0-.37 5.02c1.02 2.32 3.57 4.14 8.52 6.1 3.07 1.22 5.89 2 5.91 2.01a44.33 44.33 0 0 0 10.93 1.6c5.86 0 10.05-1.8 12.46-5.34 3.88-5.69 3.33-10.9-1.7-15.92-2.77-2.78-4.62-6.87-5-7.77-.78-2.66-2.84-5.62-6.25-5.62a5.7 5.7 0 0 0-4.6 2.46c-1-1.26-1.98-2.25-2.86-2.82A7.4 7.4 0 0 0 17.52 48Zm0 4c.51 0 1.14.22 1.82.65 2.14 1.36 6.25 8.43 7.76 11.18.5.92 1.37 1.31 2.14 1.31 1.55 0 2.75-1.53.15-3.48-3.92-2.93-2.55-7.72-.68-8.01.08-.02.17-.02.24-.02 1.7 0 2.45 2.93 2.45 2.93s2.2 5.52 5.98 9.3c3.77 3.77 3.97 6.8 1.22 10.83-1.88 2.75-5.47 3.58-9.16 3.58-3.81 0-7.73-.9-9.92-1.46-.11-.03-13.45-3.8-11.76-7 .28-.54.75-.76 1.34-.76 2.38 0 6.7 3.54 8.57 3.54.41 0 .7-.17.83-.6.79-2.85-12.06-4.05-10.98-8.17.2-.73.71-1.02 1.44-1.02 3.14 0 10.2 5.53 11.68 5.53.11 0 .2-.03.24-.1.74-1.2.33-2.04-4.9-5.2-5.21-3.16-8.88-5.06-6.8-7.33.24-.26.58-.38 1-.38 3.17 0 10.66 6.82 10.66 6.82s2.02 2.1 3.25 2.1c.28 0 .52-.1.68-.38.86-1.46-8.06-8.22-8.56-11.01-.34-1.9.24-2.85 1.31-2.85Z"/><path fill="#FFD21E" d="M38.6 76.69c2.75-4.04 2.55-7.07-1.22-10.84-3.78-3.77-5.98-9.3-5.98-9.3s-.82-3.2-2.69-2.9c-1.87.3-3.24 5.08.68 8.01 3.91 2.93-.78 4.92-2.29 2.17-1.5-2.75-5.62-9.82-7.76-11.18-2.13-1.35-3.63-.6-3.13 2.2.5 2.79 9.43 9.55 8.56 11-.87 1.47-3.93-1.71-3.93-1.71s-9.57-8.71-11.66-6.44c-2.08 2.27 1.59 4.17 6.8 7.33 5.23 3.16 5.64 4 4.9 5.2-.75 1.2-12.28-8.53-13.36-4.4-1.08 4.11 11.77 5.3 10.98 8.15-.8 2.85-9.06-5.38-10.74-2.18-1.7 3.21 11.65 6.98 11.76 7.01 4.3 1.12 15.25 3.49 19.08-2.12Z"/><path fill="#FF9D0B" d="M77.4 48c1.62 0 3.07.66 4.07 1.87a5.97 5.97 0 0 1 1.33 3.76 7.1 7.1 0 0 1 1.95-.3c1.55 0 2.95.59 3.94 1.66a5.8 5.8 0 0 1 .8 7 5.3 5.3 0 0 1 1.78 2.82c.24.9.48 2.8-.8 4.74a5.22 5.22 0 0 1 .37 5.02c-1.02 2.32-3.57 4.14-8.51 6.1-3.08 1.22-5.9 2-5.92 2.01a44.33 44.33 0 0 1-10.93 1.6c-5.86 0-10.05-1.8-12.46-5.34-3.88-5.69-3.33-10.9 1.7-15.92 2.78-2.78 4.63-6.87 5.01-7.77.78-2.66 2.83-5.62 6.24-5.62a5.7 5.7 0 0 1 4.6 2.46c1-1.26 1.98-2.25 2.87-2.82A7.4 7.4 0 0 1 77.4 48Zm0 4c-.51 0-1.13.22-1.82.65-2.13 1.36-6.25 8.43-7.76 11.18a2.43 2.43 0 0 1-2.14 1.31c-1.54 0-2.75-1.53-.14-3.48 3.91-2.93 2.54-7.72.67-8.01a1.54 1.54 0 0 0-.24-.02c-1.7 0-2.45 2.93-2.45 2.93s-2.2 5.52-5.97 9.3c-3.78 3.77-3.98 6.8-1.22 10.83 1.87 2.75 5.47 3.58 9.15 3.58 3.82 0 7.73-.9 9.93-1.46.1-.03 13.45-3.8 11.76-7-.29-.54-.75-.76-1.34-.76-2.38 0-6.71 3.54-8.57 3.54-.42 0-.71-.17-.83-.6-.8-2.85 12.05-4.05 10.97-8.17-.19-.73-.7-1.02-1.44-1.02-3.14 0-10.2 5.53-11.68 5.53-.1 0-.19-.03-.23-.1-.74-1.2-.34-2.04 4.88-5.2 5.23-3.16 8.9-5.06 6.8-7.33-.23-.26-.57-.38-.98-.38-3.18 0-10.67 6.82-10.67 6.82s-2.02 2.1-3.24 2.1a.74.74 0 0 1-.68-.38c-.87-1.46 8.05-8.22 8.55-11.01.34-1.9-.24-2.85-1.31-2.85Z"/><path fill="#FFD21E" d="M56.33 76.69c-2.75-4.04-2.56-7.07 1.22-10.84 3.77-3.77 5.97-9.3 5.97-9.3s.82-3.2 2.7-2.9c1.86.3 3.23 5.08-.68 8.01-3.92 2.93.78 4.92 2.28 2.17 1.51-2.75 5.63-9.82 7.76-11.18 2.13-1.35 3.64-.6 3.13 2.2-.5 2.79-9.42 9.55-8.55 11 .86 1.47 3.92-1.71 3.92-1.71s9.58-8.71 11.66-6.44c2.08 2.27-1.58 4.17-6.8 7.33-5.23 3.16-5.63 4-4.9 5.2.75 1.2 12.28-8.53 13.36-4.4 1.08 4.11-11.76 5.3-10.97 8.15.8 2.85 9.05-5.38 10.74-2.18 1.69 3.21-11.65 6.98-11.76 7.01-4.31 1.12-15.26 3.49-19.08-2.12Z"/>'),
+}
+
+
+def icon(name):
+    if name not in ICONS:
+        return ""
+    viewbox, w, h, paths = ICONS[name]
+    return (f"<svg class='ico' viewBox='{viewbox}' width='{w}' height='{h}' "
+            f"aria-hidden='true' fill='currentColor'>{paths}</svg>")
+
+
+def linkbutton(href, label, name="", meta=""):
+    """An outbound link as a button: mark, label, and the arrow that says it leaves.
+
+    Every link off this page is one of two destinations, so both get the same treatment
+    and a reader can tell at a glance which is which.
+    """
+    return (f"<a class='lbtn' href='{esc(href)}'{NEW_TAB}>{icon(name)}"
+            f"<span>{esc(label)}</span>"
+            + (f"<span class='lbtn-m'>{esc(meta)}</span>" if meta else "")
+            + EXT_ARROW + "</a>")
+
+
+def compare(columns, rows, actions=()):
+    """The two datasets, side by side, with their names as the masthead.
+
+    columns: [(name, description)]. rows: [(label, cell, cell)]. actions: [(cell, cell)],
+    one row of buttons at the foot of each column.
+
+    A comparison is a table — the whole point is that "records" lines up with "records" —
+    but the names carry the section instead of a heading above it, so the header cells do
+    the work a masthead would.
+    """
+    heads = "".join(f"<th><span class='cmp-name'>{esc(name)}</span>"
+                    + (f"<span class='cmp-d'>{inline_md(desc)}</span>" if desc else "")
+                    + "</th>" for name, desc in columns)
+    body = "".join("<tr><th class='cmp-k' scope='row'>" + esc(label) + "</th>"
+                   + "".join(f"<td>{esc(c)}</td>" for c in cells) + "</tr>"
+                   for label, *cells in rows)
+    foot = "".join("<tr><td></td>" + "".join(f"<td class='cmp-a'>{esc(c)}</td>" for c in cells)
+                   + "</tr>" for cells in actions)
+    return (f"<div class='cmp-wrap'><table class='cmp'>"
+            f"<thead><tr><td class='cmp-corner'></td>{heads}</tr></thead>"
+            f"<tbody>{body}</tbody>"
+            + (f"<tfoot>{foot}</tfoot>" if foot else "")
+            + "</table></div>")
+
+
+def iconlink(href, label, name=""):
+    """A link with its provider's mark and the outbound arrow. Not a button: in the
+    footer there is nothing to press, only two places to go."""
+    return (f"<a class='ilink' href='{esc(href)}'{NEW_TAB}>{icon(name)}"
+            f"<span>{esc(label)}</span>{EXT_ARROW}</a>")
+
+
+def chooser(options, prompt=""):
+    """The two datasets as a choice, then the chosen one below.
+
+    options: [(panel_id, label)]. Just the names: the description and the figures are
+    both on the page already, a few inches up, and a reader choosing between two names
+    needs neither repeated. Nothing is open on load — the choice is the point — and a
+    ``#panel_id`` in the URL opens that panel, so a deep link from the dataset card
+    still lands where it says it will.
+    """
+    buttons = []
+    for pid, label in options:
+        buttons.append(
+            f"<button class='choice' type='button' role='tab' aria-selected='false' "
+            f"aria-controls='{esc(pid)}' data-panel='{esc(pid)}' id='choose-{esc(pid)}'>"
+            f"{esc(label)}<span class='choice-a' aria-hidden='true'>&darr;</span></button>")
+    return ((f"<p class='choose-q'>{inline_md(prompt)}</p>" if prompt else "")
+            + f"<div class='choices' role='tablist'>{''.join(buttons)}</div>")
+
+
+def panel(pid, body, cta=None):
+    """One chooser panel: closed until its button is pressed.
+
+    ``cta`` is (other_panel_id, label) and renders at the bottom as the way across, so
+    the dataset a reader did not choose is still offered to them once they finish.
+    """
+    tail = ""
+    if cta:
+        other, label = cta
+        tail = (f"<p class='panel-cta'><button class='cta' type='button' "
+                f"data-panel='{esc(other)}'>{esc(label)}"
+                f"<span aria-hidden='true'> &rarr;</span></button></p>")
+    return (f"<section id='{esc(pid)}' class='panel' role='tabpanel' "
+            f"aria-labelledby='choose-{esc(pid)}' hidden>{body}{tail}</section>")
+
+
 CSS = """
 /* Aged paper, one theme. Every text-on-surface pair below clears WCAG AA (4.5:1) and
    tests/test_report_common.py::test_text_contrast_meets_wcag_aa recomputes them from
@@ -487,7 +648,7 @@ CSS = """
 --surface-0:#f7f4ea;--surface-1:#f1ebdd;--surface-2:#e9e1cd;
 --border:#cec3a6;--hairline:#ded5be;--grid:#e1d9c4;--axis:#bcaf90;
 --text-primary:#1a1712;--text-secondary:#4a443c;--text-muted:#675f54;
---link:#1b5aa8;--link-rule:#a9c6e8;
+--accent:#3b2fa0;--accent-wash:#eae7f7;--accent-edge:#c9c3ea;
 --series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;
 --series-5:#e87ba4;--series-6:#008300;--series-7:#4a3aa7;--series-8:#e34948;
 --good:#0ca30c;--warn:#fab219;--bad:#d03b3b;
@@ -505,57 +666,58 @@ font:1.0625rem/1.62 var(--serif);-webkit-text-size-adjust:100%}
 .skip:focus{left:12px;top:12px;z-index:20;background:var(--surface-0);padding:8px 12px;
 border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
 
-/* Shell: a sticky rail, a prose measure, and a figure track that bleeds past it. */
+/* Shell: one centred column, with a figure track that bleeds past the prose measure. */
 html{scroll-behavior:smooth}
-.shell{display:grid;grid-template-columns:12.5rem minmax(0,50rem);column-gap:5rem;
-max-width:1170px;margin:0 auto;padding:44px 28px 110px}
-/* The rail column is reserved on EVERY page, including the landing page, which simply
-   leaves it empty. So the content column lands on exactly the same left edge at exactly
-   the same width on both, and clicking into a report makes the contents appear beside
-   the text rather than shoving it sideways.
-   margin-top floats the rail just below the height of the title; sticky then parks it at
-   `top` once the header has scrolled away. */
-.rail{grid-column:1;position:sticky;top:3.5rem;align-self:start;margin-top:5.5rem;
-font:500 .78rem/1.45 var(--sans)}
-main{grid-column:2;min-width:0}
-section{display:grid;grid-template-columns:[text-start] minmax(0,38rem) [text-end] 1fr [full-end];
-scroll-margin-top:4.5rem}
+.shell{max-width:53rem;margin:0 auto;padding:0 28px 110px}
+main{min-width:0}
+/* minmax(0,1fr), never a bare 1fr: a bare fr track takes its automatic minimum from
+   the item's min-content size, so a child with a definite width wider than the column —
+   the comparison's 64rem wrapper — GROWS the track past the page, and every percentage
+   resolved against that grid area (left:50%, margin-left:50%) then points somewhere to
+   the right of the page centre. Measured: the wrapper's centre landed 116px right. */
+section{display:grid;
+grid-template-columns:[text-start] minmax(0,38rem) [text-end] minmax(0,1fr) [full-end];
+scroll-margin-top:2.5rem}
 section>*{grid-column:text-start/text-end}
-section>figure,section>.tiles,section>.scroll,section>.pair,section>details,section>.cards{
-grid-column:text-start/full-end}
+section>figure,section>.tiles,section>.scroll,section>.pair,section>details,
+section>.choices,section>.lbtns,section>.cmp-wrap{grid-column:text-start/full-end}
 section+section{margin-top:5rem}
-header.top{margin-bottom:3.2rem}
-/* The landing page: same grid, same column, no rail in it. Only the vertical rhythm and
-   the hero's type scale differ — prose sits on the same 38rem measure the reports use,
-   and the cards bleed to the full column exactly as a report's figures do. Everything
-   ranges left; the column is centred in the viewport, the type inside it is not. */
-.shell.solo{padding-top:8rem}
-.shell.solo section+section{margin-top:5.5rem}
-.shell.solo header.top{margin-bottom:7rem}
-.shell.solo h1{font-size:3.9rem;line-height:1.03;letter-spacing:-.03em;margin:0 0 .9rem}
-.shell.solo .lede{font-size:1.3rem;line-height:1.45;max-width:48ch;margin:0;
-color:var(--text-secondary)}
-.shell.solo h2{font-size:1.5rem;margin:0 0 .5rem}
-.shell.solo .dek{max-width:52ch;margin:0 0 2rem}
-.shell.solo .cards{margin-top:2.2rem}
-/* Buttons: the primary is ink-on-paper reversed (16.2:1); the unavailable one keeps the
-   row's shape with a dashed edge and muted ink (5.3:1) and is not an anchor. */
-.btns{display:flex;gap:1rem;flex-wrap:wrap;margin:3rem 0 0}
-.btn{display:inline-flex;align-items:baseline;gap:.55rem;font:600 .95rem/1.3 var(--sans);
-padding:.85rem 1.4rem;text-decoration:none;min-width:15rem;justify-content:center}
-a.btn{background:var(--text-primary);color:var(--surface-0);border:1px solid var(--text-primary)}
-a.btn:hover{background:var(--surface-0);color:var(--text-primary)}
-.btn.off{border:1px dashed var(--border);color:var(--text-muted);
-flex-direction:column;align-items:center;gap:.15rem}
-.btn-l{white-space:nowrap}
-.btn-n{font:400 .76rem/1.3 var(--sans);opacity:.9}
-.btn-a{font-size:1.05em;line-height:1}
+/* The panel is a section, so its own display:grid would beat the browser's default
+   [hidden] rule. It has to be said out loud. */
+.panel[hidden]{display:none}
 
+/* The hero: the image, the title and the lines that follow from it, centred, with
+   enough air to separate them from the page and no more. The two datasets are two
+   things, so they are two things here as well as in the table below. */
+.hero{display:flex;flex-direction:column;align-items:center;
+padding:2.6rem 28px 5rem;text-align:center}
+.hero h1{max-width:22ch;margin:6rem 0 0;font-size:3rem}
+.hero .illo{margin:0;width:100%}
+/* The artwork is 1536x1024 but its ink occupies only a 1318x425 band centred at 48.5%
+   of the height — a third of the file is transparent above it and a third below. Left
+   uncropped it spends ~340px of the hero on nothing, and every gap measured against it
+   is a gap the reader cannot see. Cropped here rather than in the asset, which stays
+   exactly as it was supplied. */
+.hero .illo.art img{max-width:36rem;margin:6rem auto 0;aspect-ratio:1318/425;
+object-fit:cover;object-position:50% 48.5%}
+.hero-intro{max-width:60ch;margin:3rem auto 0}
+.hero-intro p{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
+.hero-intro p+p{margin-top:1.05rem}
+.hero-intro ul+p{margin-top:1.9rem}
+.hero-intro ul{list-style:none;padding:0;margin:2.1rem 0 0;display:grid;
+grid-template-columns:1fr 1fr;gap:1.6rem;text-align:left}
+.hero-intro li{margin:0;padding-top:.6rem;border-top:2px solid var(--text-primary);
+font:.92rem/1.55 var(--sans);color:var(--text-secondary)}
+.hero-intro li b{display:block;margin-bottom:.15rem;color:var(--text-primary);
+font:650 1.02rem/1.3 var(--serif)}
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
 text-wrap:balance;font-variant-numeric:proportional-nums}
 h2{font:600 1.55rem/1.2 var(--serif);letter-spacing:-.011em;margin:0 0 .4rem;text-wrap:balance}
 h3{font:600 1.1rem/1.3 var(--serif);margin:2.3rem 0 .3rem;text-wrap:balance}
+/* Every beat inside a report is its own deep-link target, so it needs the same
+   headroom a section gets. */
+h3[id]{scroll-margin-top:4.5rem}
 h4{font:650 .82rem/1.35 var(--sans);margin:1.5rem 0 .4rem;color:var(--text-primary)}
 p{margin:0 0 1.05em;color:var(--text-secondary);text-wrap:pretty}
 ul{color:var(--text-secondary);padding-left:20px;margin:0 0 1.05em}li{margin:.3em 0}
@@ -566,21 +728,95 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
 .muted{color:var(--text-muted);font:.84rem/1.5 var(--sans)}
 .mono{font-family:var(--mono);font-size:.86em}
 
-/* Rail: section numbers live here, so headings stay plain English. */
-.rail ol{list-style:none;margin:0;padding:0;counter-reset:sec}
-.rail li{display:grid;grid-template-columns:1.3em 1fr;gap:7px;margin:0 0 .62rem}
-.rail li::before{counter-increment:sec;content:counter(sec);color:var(--text-muted);
-font-variant-numeric:tabular-nums;text-align:right;font-size:.72rem;line-height:1.6}
-.rail li.nonum::before{content:"";counter-increment:none}
-.rail a{color:var(--text-secondary);text-decoration:none}
-.rail a:hover{color:var(--text-primary)}
-.rail a[aria-current=true]{color:var(--text-primary);font-weight:650}
-.rail .back{margin:0 0 1rem}
-.rail .back a{color:var(--link);text-decoration:none}
-.rail .back a:hover{text-decoration:underline}
-.rail .rail-h{font:650 .66rem/1 var(--sans);text-transform:uppercase;letter-spacing:.1em;
-color:var(--text-muted);margin:0 0 .8rem;padding-top:.9rem;
-border-top:1px solid var(--hairline)}
+/* The choice, and the two ways out of the page. */
+.choose-q{font:1.22rem/1.5 var(--serif);color:var(--text-primary);margin:0 0 1.4rem}
+/* The choice lines up with the thing being chosen: 40rem centred on the page is exactly
+   the two dataset columns above (2 x 20rem), so each button sits under its own column.
+   Its heading centres over them for the same reason. */
+#explore h2{grid-column:text-start/full-end;text-align:center;margin-bottom:2rem}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;
+width:min(100%,40rem);margin:0 auto 1rem}
+/* Two names and an arrow, in the accent. The cream fill with a border was doing duty as
+   a button, a card, a chip and a code block at once, and had stopped meaning anything;
+   an outline in the accent that fills when you choose says "this is a control". */
+.choice{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+padding:1rem 1.25rem;background:none;border:1px solid var(--accent-edge);
+border-radius:4px;cursor:pointer;font:650 1.14rem/1.3 var(--serif);color:var(--accent);
+text-align:left}
+.choice:hover{background:var(--accent-wash)}
+.choice[aria-selected=true]{background:var(--accent);border-color:var(--accent);
+color:var(--surface-0)}
+.choice-a{font:400 1.1rem/1 var(--sans);opacity:.8}
+.panel{margin-top:3.2rem}
+.panel-cta{margin:3rem 0 0;padding-top:1.2rem;border-top:1px solid var(--border)}
+/* The primary button: the same shape as the outline ones, filled. It is the one thing
+   the page asks a reader to do at the end of a report. */
+.cta{display:inline-flex;align-items:center;gap:.45rem;padding:.6rem 1rem;cursor:pointer;
+background:var(--accent);border:1px solid var(--accent);border-radius:4px;
+font:600 .82rem/1.3 var(--mono);letter-spacing:-.01em;color:var(--surface-0)}
+.cta:hover{background:var(--text-primary);border-color:var(--text-primary)}
+/* The comparison: a table, but the names are its masthead rather than a heading over
+   the top of it, and the last row is what a reader does next.
+
+   WHAT IS CENTRED IS THE PAIR, NOT THE TABLE. The two dataset columns straddle the page
+   centre and the field labels hang off their left, in the margin — so the thing being
+   compared sits in the middle and the labels read as an index down the side.
+
+   Two steps, both stated as arithmetic rather than left to a layout mode to work out:
+
+     1. .cmp-wrap is centred on the PAGE. left:50% resolves against its grid area, so
+        the wrapper must be in the full-bleed track above (the full main column, which is
+        centred in the viewport). In the default 38rem prose track it centres on the text
+        column instead and the whole block lands ~5.75rem left of the hero.
+     2. .cmp is pushed right by exactly `half the wrapper − one column − the labels`, so
+        the pair's midpoint lands on the wrapper's midpoint. A percentage margin resolves
+        against the wrapper's width, so this is one subtraction and needs no auto margins,
+        no flex free space, and no negative margins.
+
+   The three widths are custom properties: change one and the offset follows. */
+.cmp-wrap{--cmp-label:10.5rem;--cmp-col:20rem;
+position:relative;left:50%;transform:translateX(-50%);
+width:min(100vw - 2.5rem,64rem);overflow-x:auto;margin:.4rem 0 0}
+.cmp{border-collapse:collapse;table-layout:fixed;
+width:calc(var(--cmp-label) + 2*var(--cmp-col));
+margin-left:calc(50% - var(--cmp-col) - var(--cmp-label));
+font:.86rem/1.55 var(--sans)}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:.62rem .9rem;
+border-bottom:1px solid var(--hairline)}
+.cmp thead th{border-bottom:1px solid var(--border);padding:0 .9rem 1.35rem;
+width:var(--cmp-col)}
+/* table-layout:fixed takes every column width from the FIRST row, so the corner cell
+   has to carry the label width — the .cmp-k rule below is in the body rows, where fixed
+   layout never looks. */
+.cmp .cmp-corner{border:0;width:var(--cmp-label)}
+.cmp-name{display:block;font:600 1.28rem/1.2 var(--serif);letter-spacing:-.012em;
+color:var(--text-primary)}
+.cmp-d{display:block;margin-top:.75rem;font:.85rem/1.55 var(--sans);color:var(--text-muted)}
+/* Flush right, hard against the pair, and never wrapped: the labels are an index down
+   the side of the comparison, and an index that breaks over two lines stops reading as
+   one. --cmp-label is wide enough for the longest of them. */
+.cmp-k{font:650 .68rem/1.9 var(--sans);text-transform:uppercase;letter-spacing:.08em;
+color:var(--text-muted);width:var(--cmp-label);white-space:nowrap}
+/* Everything `.cmp th` already sets — the rule, the alignment, the padding — needs a
+   rule that OUT-SPECIFIES it, not merely one that follows it. */
+.cmp th.cmp-k{border-bottom:0;text-align:right;padding:.62rem 1.1rem .62rem 0;
+vertical-align:middle}
+.cmp tbody td{color:var(--text-secondary)}
+.cmp tfoot td{border-bottom:0;padding-top:1rem}
+.cmp-a{display:table-cell}
+/* Each way in sits in the row of the figure it belongs to — the prompts against how
+   many there are, the sample records against how many were published — with the figure
+   at the column's left edge and the button at its right. */
+.cmp-fig{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.lbtns{display:flex;flex-wrap:wrap;gap:.7rem;margin:1.1rem 0}
+.lbtn{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .8rem;
+border:1px solid var(--accent-edge);border-radius:4px;background:none;text-decoration:none;
+font:600 .8rem/1.3 var(--mono);letter-spacing:-.01em;color:var(--accent)}
+.lbtn:hover{background:var(--accent-wash)}
+.lbtn .ico{flex:0 0 auto}
+.lbtn-m{font-weight:400;color:var(--text-muted)}
+.lbtn:hover .lbtn-m{color:var(--text-secondary)}
+svg.ext{margin-left:.22em;vertical-align:-.05em;flex:0 0 auto}
 
 /* Numbers. Direction is a labelled chip, never a colored numeral. */
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;
@@ -658,52 +894,84 @@ border-left:2px solid var(--hairline);padding-left:.9rem}
 .pane.pipeline .resp{border-left-color:var(--series-3)}
 .pane.plain .resp{border-left-color:var(--series-2)}
 mark{background:var(--mark);color:inherit;padding:0 .1em}
-a{color:var(--link);text-decoration:underline;text-decoration-thickness:1px;
-text-underline-offset:2px;text-decoration-color:var(--link-rule)}
-a:hover{text-decoration-color:var(--link)}
-a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--link);
+/* Selection is the page's one piece of interaction colour, so it is the accent at full
+   strength rather than the browser's blue. */
+::selection{background:var(--accent);color:var(--surface-0)}
+/* A link is a typographic object, not a coloured word: mono against the serif, bold
+   enough to hold the accent, and underlined in the accent rather than in a tint of it.
+   Buttons are unaffected — .lbtn, .choice, .cta and .skip each set their own font
+   shorthand, which beats a bare element selector. */
+a{font-family:var(--mono);font-weight:600;font-size:.92em;letter-spacing:-.01em;
+color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
+text-underline-offset:3px;text-decoration-color:var(--accent)}
+a:hover{background:var(--accent-wash)}
+a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--accent);
 outline-offset:2px}
-footer.foot{margin-top:5rem;padding-top:1rem;border-top:1px solid var(--border);
-font:.78rem/1.6 var(--sans);color:var(--text-muted)}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.6rem;margin:1.6rem 0 0}
-.card{border-top:2px solid var(--text-primary);padding-top:.9rem}
-.card.soon{border-top-color:var(--border)}
-.card h3{margin:0 0 .3rem;font-size:1.22rem}
-.card .card-k{font:650 .68rem/1 var(--sans);text-transform:uppercase;letter-spacing:.1em;
-color:var(--text-muted);margin-bottom:.5rem}
-.card p{font-size:.95rem;margin-bottom:.7rem}
-.card .card-n{font:.8rem/1.6 var(--sans);color:var(--text-secondary);
-border-top:1px solid var(--hairline);padding-top:.6rem;margin:0 0 .7rem}
-.card .card-go{font:650 .86rem/1.4 var(--sans)}
+/* One line: who made it on the left, where to go on the right. */
+footer.foot{margin-top:5rem;padding-top:1.1rem;border-top:1px solid var(--border);
+font:.85rem/1.6 var(--sans);color:var(--text-muted);
+display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
+footer.foot p{margin:0;color:inherit}
+.foot-links{display:flex;gap:1.6rem}
+/* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
+   the page stays one file. */
+.ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
+margin-right:.5rem;flex:0 0 auto}
+.ilink{display:inline-flex;align-items:center;gap:.45rem;font:600 .82rem/1.3 var(--mono);
+color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
+text-underline-offset:3px;text-decoration-color:var(--accent)}
+.ilink:hover{background:var(--accent-wash)}
+/* The hero's illustration. Dashed while empty, so an unfilled slot reads as deliberate
+   rather than as a broken asset; once filled it is line art on the paper, with no frame
+   of its own. */
+.illo{aspect-ratio:16/6;margin:2.6rem 0 0;border:1px dashed var(--accent-edge);
+display:flex;align-items:center;justify-content:center}
+.illo span{font:650 .7rem/1 var(--sans);text-transform:uppercase;letter-spacing:.12em;
+color:var(--accent)}
+.illo.art{aspect-ratio:auto;border:0;background:none;display:block;margin:4rem 0 .4rem}
+.illo.art img{display:block;width:100%;height:auto;max-width:46rem}
 #tip{position:fixed;pointer-events:none;opacity:0;background:var(--text-primary);
 color:var(--surface-0);font:12px/1.4 var(--sans);padding:5px 8px;transition:opacity .1s;
 z-index:9;max-width:320px}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}
 *{transition:none!important;animation:none!important}}
-@media (max-width:1120px){.shell{grid-template-columns:minmax(0,1fr);max-width:52rem;
-row-gap:0}.rail{position:static;grid-column:1;margin:0 0 2.4rem}
-.rail ol{display:flex;flex-wrap:wrap;gap:.3rem 1.3rem}.rail li{margin:0}
-.rail .rail-h{margin-bottom:.5rem}main{grid-column:1}}
+/* Below the width the offset needs, the comparison goes back to being an ordinary
+   full-width table: a centred pair that runs off the left of the screen is worse than
+   an uncentred one. */
+/* Below the width the offset needs, the pair cannot straddle the centre without the
+   labels running off the left of the screen, so the comparison goes back to being an
+   ordinary full-width table. */
+@media (max-width:1000px){.cmp-wrap{position:static;left:auto;transform:none;width:100%}
+.cmp{table-layout:auto;width:100%;margin-left:0}
+.cmp-k{width:8rem;white-space:normal;text-align:left}.cmp thead th{width:auto}}
 @media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
 section>*{grid-column:1}.pair{grid-template-columns:1fr}
-.cards{grid-template-columns:1fr}}
-@media (max-width:620px){body{font-size:1rem}.shell{padding:26px 16px 70px}
+.choices{grid-template-columns:1fr}}
+@media (max-width:620px){body{font-size:1rem}.shell{padding:0 16px 70px}
 h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
-.shell.solo{padding-top:3.2rem}.shell.solo h1{font-size:2.3rem}
-.shell.solo .lede{font-size:1.1rem}.shell.solo h2{font-size:1.3rem}
-.shell.solo header.top{margin-bottom:4rem}
-.shell.solo section+section{margin-top:3.5rem}
-.btns{flex-direction:column;gap:.7rem}.btn{min-width:0;width:100%}
-.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}}
+.hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
+.hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
+.hero-intro ul{grid-template-columns:1fr;gap:1.1rem}
+.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
+.illo{aspect-ratio:16/9}}
 @media print{
 @page{margin:16mm 14mm}
 :root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
 body{font-size:10.5pt;line-height:1.5}
-.rail,#tip,.skip{display:none}
+#tip,.skip,.choices,.panel-cta{display:none}
 .shell,section{display:block;max-width:none}
+.hero{padding:0 0 1.5rem;display:block;text-align:left}
+/* A sheet of paper is narrower than the bleed the centred pair needs, and the labels
+   would print off the left edge. */
+.cmp-wrap{position:static;left:auto;transform:none;width:100%;overflow:visible}
+.cmp{table-layout:auto;width:100%;margin-left:0}
+/* A printed page is not a page anyone can click, so both reports print, whichever
+   one is open on screen. */
+.panel[hidden]{display:block!important}
 p,ul,.dek,.fig-c,.fig-n,.lede{max-width:none}
 h1,h2,h3,h4,.fig-t,.dek{break-after:avoid-page}
-figure,.tiles,table,.pair,blockquote,.card{break-inside:avoid-page}
+figure,.tiles,table,.pair,blockquote{break-inside:avoid-page}
+.panel{break-before:page}
 tr,li{break-inside:avoid}
 thead{display:table-header-group}
 details{display:block}details>div{display:block!important}summary{list-style:none}
@@ -721,55 +989,59 @@ if(!el){t.style.opacity=0;return;}t.textContent=el.getAttribute('data-tip');t.st
 document.addEventListener('mousemove',function(e){if(t.style.opacity=='1'){
 t.style.left=Math.min(e.clientX+12,window.innerWidth-t.offsetWidth-8)+'px';
 t.style.top=(e.clientY-32)+'px';}});
-var links={},secs=[];
-[].forEach.call(document.querySelectorAll('.rail a[href^="#"]'),function(a){
-var s=document.getElementById(a.getAttribute('href').slice(1));
-if(s){links[s.id]=a;secs.push(s);}});
-if(!secs.length||!window.IntersectionObserver)return;
-var io=new IntersectionObserver(function(es){es.forEach(function(en){
-if(en.isIntersecting){for(var k in links)links[k].removeAttribute('aria-current');
-links[en.target.id].setAttribute('aria-current','true');}});},
-{rootMargin:'-15% 0px -70% 0px'});
-secs.forEach(function(s){io.observe(s);});})();
+var choices=[].slice.call(document.querySelectorAll('.choice'));
+if(!choices.length)return;
+function open(id,scroll){
+choices.forEach(function(b){var on=b.getAttribute('data-panel')===id;
+b.setAttribute('aria-selected',on?'true':'false');
+var p=document.getElementById(b.getAttribute('data-panel'));
+if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});
+if(!scroll)return;
+var t=document.getElementById(scroll===true?id:scroll),y;
+if(!t)return;
+/* Switching report scrolls the buttons exactly out of frame: the chooser reappearing
+   above a report you have just opened reads as the page moving under you. A deep link
+   to a beat INSIDE a report goes to the beat instead, with air above it. */
+if(t.classList.contains('panel')){var c=document.querySelector('.choices');
+y=c?c.getBoundingClientRect().bottom+window.pageYOffset:0;}
+else{y=t.getBoundingClientRect().top+window.pageYOffset-96;}
+window.scrollTo({top:y,behavior:'smooth'});}
+function mark(id){if(history.replaceState)history.replaceState(null,'','#'+id);
+else location.hash=id;}
+/* A hash may name a panel (#dad) or anything inside one (#dad-weak, from a quoted
+   finding). Either way the panel it lives in is the one to open. */
+function fromHash(scroll){var id=(location.hash||'').slice(1);if(!id)return false;
+var el=document.getElementById(id);var p=el&&el.closest?el.closest('.panel'):null;
+if(!p)return false;open(p.id,scroll?id:false);
+if(!scroll&&el.scrollIntoView)el.scrollIntoView();return true;}
+choices.forEach(function(b){b.addEventListener('click',function(){
+var id=b.getAttribute('data-panel');open(id,false);mark(id);});});
+[].forEach.call(document.querySelectorAll('.cta'),function(b){
+b.addEventListener('click',function(){var id=b.getAttribute('data-panel');
+open(id,true);mark(id);});});
+window.addEventListener('hashchange',function(){fromHash(true);});
+/* Wait for load, not parse: the hero image is a data URI several megabytes long, and
+   scrolling to a deep-linked beat before it has laid out puts the reader thousands of
+   pixels away from it once the image finally takes up its space. */
+if(document.readyState==='complete')fromHash(false);
+else window.addEventListener('load',function(){fromHash(false);});})();
 """
 
 
-def document(*, title, toc, body, heading=None, lede="", hero="", meta_line="",
-             sibling=None, footer="", layout="article"):
+def document(*, title, masthead, body, footer=""):
     """The shell. One file, one theme, no external anything.
 
-    ``layout='landing'`` drops the rail and centres one column with a larger hero: a
-    landing page's job is the hero and the two links out of it, and a contents list for
-    four short sections is furniture.
-
-    ``sibling`` is (href, label) for the companion page, rendered as a back-link at the
-    TOP of the rail — the one place that stays reachable once a reader is deep in the
-    page. Not a tab bar: a tab that 404s when the file travels alone is a lie about the
-    artefact.
+    There is no contents rail: the page is a hero, three short sections and a choice, and
+    a list of five links beside that is furniture. Everything a reader navigates to is
+    either on the first screen or one button away.
     """
-    rail = ""
-    if layout != "landing" and toc:
-        items = []
-        for i, l in toc:
-            cls = " class='nonum'" if i in ("summary", "appendix") else ""
-            items.append(f"<li{cls}><a href='#{i}'>{esc(l)}</a></li>")
-        back = (f"<p class='back'><a href='{esc(sibling[0])}'>&lsaquo; {esc(sibling[1])}</a></p>"
-                if sibling else "")
-        rail = (f"<nav class='rail' aria-labelledby='rail-h'>{back}"
-                f"<p class='rail-h' id='rail-h'>Contents</p>"
-                f"<ol>{''.join(items)}</ol></nav>\n")
     return (f"<!DOCTYPE html>\n<html lang='en'>\n<meta charset='utf-8'>\n"
             f"<meta name='viewport' content='width=device-width,initial-scale=1'>\n"
             f"<meta name='color-scheme' content='only light'>\n"
             f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
-            f"<a class='skip' href='#main'>Skip to content</a>\n"
-            f"<div class='shell{'' if rail else ' solo'}'>\n{rail}"
-            f"<main id='main'>\n<header class='top'>\n"
-            + f"<h1>{esc(heading if heading is not None else title)}</h1>\n"
-            + (f"<p class='lede'>{inline_md(lede)}</p>\n" if lede else "")
-            + hero
-            + (f"<p class='meta'>{meta_line}</p>\n" if meta_line else "")
-            + f"</header>\n{body}\n"
+            f"<a class='skip' href='#intro'>Skip to content</a>\n"
+            f"{masthead}"
+            f"<div class='shell'>\n<main id='main'>\n{body}\n"
             + (f"<footer class='foot'>{footer}</footer>\n" if footer else "")
             + f"</main>\n</div>\n"
             f"<div id='tip'></div>\n<script>{JS}</script>\n</html>\n")

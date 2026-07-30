@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""The DAD report page: what the dilemma-SFT pipeline produces, and what it measures.
+"""The dilemma corpus's section of the handoff page: the ``#dad`` beats.
 
 The audience is a technical reader at another lab — someone deciding whether the method
 and its measurement are sound, and whether to run the pipeline themselves. That is a
 different job from the Streamlit corpus-audit page, which is organised by what the eval
-measured; this is organised by what a reader needs, in the order they need it: the gap,
-one worked example, what the numbers say, how it is built, what it would teach a model,
-how it is measured, where it is weak, how to run it.
+measured; this is organised by what a reader needs, in the order they need it.
+
+This module builds BLOCKS, not a page: ``blocks()`` returns the section's body, and
+report/page.py wraps it in the one ``<section id='dad'>`` on the artefact. Blocks stay
+flat — a figure has to be a direct child of the section for the CSS grid to bleed it
+past the text measure, so nothing here wraps a beat in a container.
 
 Two rules make the artefact trustworthy, and both are enforced here rather than left to
 an author's discipline:
@@ -33,22 +36,24 @@ from report import common as C
 from report import render as R
 
 CONTENT_IDS = (
-    "title", "lede", "gap", "example_pick", "example_intro", "results_intro",
-    "method_intro", "stage1", "stage2", "stage3", "control", "footprint_intro",
-    "measurement_intro", "judge_limits", "weaknesses_intro", "reproduce", "appendix_intro",
+    "dad_what", "example_pick", "example_intro", "results_intro", "method_intro",
+    "stage1", "stage2", "stage3", "control", "measurement_intro", "judge_limits",
+    "weaknesses_intro", "reproduce", "appendix_intro",
 )
 
-TOC = [
-    ("gap", "The gap"),
-    ("example", "One example, end to end"),
-    ("results", "What the numbers say"),
-    ("method", "How it is built"),
-    ("footprint", "Stylistic footprint"),
-    ("measurement", "How it is measured"),
-    ("weaknesses", "Where it is weak"),
-    ("reproduce", "Run it yourself"),
-    ("appendix", "Appendix"),
-]
+SECTION_ID = "dad"
+SECTION_TITLE = "Difficult advice"
+
+# The skeleton, in order. The document corpus's section takes the same one, so a reader
+# learns it once; the ids are prefixed because both sections live in one document.
+BEATS = (
+    ("dad-what", "What it is"),
+    ("dad-example", "One example, end to end"),
+    ("dad-measured", "What we measured"),
+    ("dad-built", "How it is built"),
+    ("dad-weak", "Where it is weak"),
+    ("dad-appendix", "Appendix"),
+)
 
 
 _STAGE_KNOBS = ("scenario_model", "prompt_draft_model", "prompt_gate_model",
@@ -73,8 +78,12 @@ _DELIVERY_DIMS = ("goal_responsiveness", "proportionality", "tone", "calibration
 
 # ------------------------------------------------------------------ loading
 
-def load_inputs(run_dir, content_paths):
-    """All filesystem access, in one place. Returns build() kwargs."""
+def load_inputs(run_dir):
+    """All filesystem access, in one place. Returns this section's kwargs.
+
+    Prose is not loaded here: the page owns one content namespace across both sections,
+    so report/page.py loads it once.
+    """
     from pathlib import Path
     run_dir = Path(run_dir)
     audit = C.read_json(run_dir / "audit" / "audit_report.json")
@@ -85,13 +94,43 @@ def load_inputs(run_dir, content_paths):
         "audit": audit,
         "diversity": C.read_json(run_dir / "audit" / "diversity_report.json"),
         "manifest": C.read_json(run_dir / "run_manifest.json"),
-        "content": C.load_content(content_paths, CONTENT_IDS),
         "corpus": C.read_jsonl(run_dir / "final" / "dad_corpus.jsonl"),
         "baseline": C.read_jsonl(run_dir / "baseline" / "baseline_responses.jsonl"),
         "rewrites": C.read_jsonl(run_dir / "step3" / "rewrites.jsonl"),
         "costs": C.read_jsonl(run_dir / "cost_log.jsonl"),
+        "deals": C.read_jsonl(run_dir / "step1" / "scenario_deals.jsonl"),
+        "n_prompt_templates": C.prompt_count(run_dir, "step*.txt"),
         "run_id": run_dir.name,
     }
+
+
+# The dealt axes the comparison table reports as this corpus's spread, in the order
+# they read: what the decision is about, whose welfare is at stake, where it happens.
+_SPREAD_AXES = (("domain", "domains"), ("taxa_category", "taxa groups"),
+                ("cultural_setting", "cultural settings"))
+
+
+def spread(deals):
+    """How wide the dealt combinations run, straight off step 1's own deal records.
+
+    Counted from the deals rather than the shipped corpus because the deal is where
+    the spread is engineered — a rejected scenario still tells you what the matrix
+    covers.
+    """
+    if not deals:
+        return ""
+    out = []
+    for key, label in _SPREAD_AXES:
+        seen = set()
+        for deal in deals:
+            value = deal.get(key)
+            if isinstance(value, list):
+                seen.update(v for v in value if v)
+            elif value:
+                seen.add(value)
+        if seen:
+            out.append(f"{len(seen)} {label}")
+    return " · ".join(out)
 
 
 # ------------------------------------------------------------------ facts
@@ -144,10 +183,10 @@ def _models(manifest):
 def facts(audit, manifest=None, diversity=None, costs=None):
     """Every number the prose can interpolate, computed once, in one place.
 
-    Run-conditional figures appear here as pre-composed CLAUSES with a degraded
-    default, not as bare numbers. That is what lets the page open with its finding
-    while keeping the invariant that a run missing the paid pass degrades rather than
-    lying: the sentence survives, its claim doesn't.
+    Run-conditional figures reach prose only with a degraded default — a run missing
+    the paid pass renders "an unmeasured share" where the figure would be, so the
+    sentence survives and its claim does not. The delivery comparison is deliberately
+    NOT available to prose as a clause: it is stated once, by _delivery_statement().
     """
     mpr = audit.get("moral_patient_reasons") or {}
     surv = mpr.get("survival") or {}
@@ -181,12 +220,6 @@ def facts(audit, manifest=None, diversity=None, costs=None):
         f["considerations_pipeline"] = f"{cons['pipeline']:.1f}"
         f["considerations_plain"] = f"{cons['plain']:.1f}"
         f["lift_pct"] = f"{(cons['pipeline'] / cons['plain'] - 1) * 100:.0f}%"
-        # Clauses are whole sentences, so the degraded version reads as English in the
-        # same slot: "the substance comparison did not run on this run."
-        f["substance_clause"] = (f"the pipeline's answers carry {f['lift_pct']} more usable "
-                                f"welfare considerations per answer "
-                                f"({f['considerations_pipeline']} against "
-                                f"{f['considerations_plain']})")
     if anchored:
         f["retention_pct"] = f"{(surv.get('kept', 0) + surv.get('weakened', 0)) / anchored:.0%}"
         f["dropped_n"] = surv.get("dropped")
@@ -208,10 +241,6 @@ def facts(audit, manifest=None, diversity=None, costs=None):
         f["delivery_plain"] = f"{bm:.1f}" if bm is not None else "?"
         if bm is not None:
             f["delivery_delta"] = f"{abs(pm - bm):.1f}"
-            f["delivery_clause"] = (
-                f"They are {f['delivery_delta']} points {'worse' if pm < bm else 'better'} than "
-                f"it on judged delivery ({f['delivery_pipeline']} against "
-                f"{f['delivery_plain']} out of 10)")
     if (structure.get("pipeline") or {}).get("effective_shapes") is not None:
         f["shapes_pipeline"] = f"{structure['pipeline']['effective_shapes']:.1f}"
         f["shapes_plain"] = f"{(structure.get('plain') or {}).get('effective_shapes', 0):.1f}"
@@ -237,8 +266,6 @@ def facts(audit, manifest=None, diversity=None, costs=None):
     # so, in the same place the finding would have been.
     for key, default in (
         ("cost_total", "not logged"), ("cost_per_example", "not logged"),
-        ("substance_clause", "the substance comparison did not run on this run"),
-        ("delivery_clause", "Judged delivery was not measured on this run"),
         ("length_pct", "an unmeasured amount"), ("near_dup_pct", "an unmeasured share"),
         ("library_clause", "an animal-ethics reasoning library"),
         ("added_per_answer", "an unmeasured number of"),
@@ -304,20 +331,17 @@ def hero_tiles(audit, f, cons):
     return R.tiles(items)
 
 
-# ------------------------------------------------------------------ sections
+# ------------------------------------------------------------------ beats
 
-def section_gap(content, f):
-    return C.section("gap", "The gap", C.prose(content, "gap", f))
-
-
-def section_example(audit, content, f, baseline, rewrites, labels, pick=None):
+def blocks_example(audit, content, f, baseline, rewrites, labels, pick=None):
     """One full dilemma, control against pipeline.
 
     Both answers stay inline in full: they are the artefact, and a reader at a lab
     wants to read them rather than take a summary's word for it. What moved out is the
     word-level diff, which as 1,095 words of confetti earned nothing where it stood.
     """
-    blocks = [C.prose(content, "example_intro", f)]
+    blocks = [R.sub("dad-example", "One example, end to end"),
+              C.prose(content, "example_intro", f)]
     showcase = (audit.get("showcase") or {}).get("examples") or []
     by_pid_base = {r.get("prompt_id"): r for r in baseline or []}
     by_pid_rw = {r.get("prompt_id"): r for r in rewrites or []}
@@ -326,31 +350,28 @@ def section_example(audit, content, f, baseline, rewrites, labels, pick=None):
     pick = pick or _example_pick(content)
     if pick:
         chosen = {"prompt_id": pick, "highlights": [], "summary": "",
-                  "provenance": "chosen by hand from this run's records and pinned in the prose "
-                                "file, so a rebuild shows the same case"}
+                  "provenance": "pinned in the prose file, so a rebuild shows the same case"}
     elif showcase:
         ex = showcase[0]
         chosen = {"prompt_id": ex.get("prompt_id"), "summary": ex.get("summary", ""),
                   "highlights": ex.get("highlights") or [],
                   "user_message": ex.get("user_message"), "plain": ex.get("plain_response"),
                   "pipeline": ex.get("pipeline_response"),
-                  "provenance": "selected by the showcase judge from the retention and delivery "
-                                "data; the highlighted spans are the judge's, validated against "
-                                "the response text"}
+                  "provenance": "selected by the showcase judge; the highlighted spans are "
+                                "its own, validated against the response text"}
     else:
         per_case = (audit.get("moral_patient_reasons") or {}).get("per_case") or {}
         ranked = sorted(per_case.items(),
                         key=lambda kv: -len(((kv[1].get("survival") or {}).get("added") or [])))
         if ranked:
             chosen = {"prompt_id": ranked[0][0], "highlights": [], "summary": "",
-                      "provenance": "selected mechanically, as the record where the pipeline added "
-                                    "the most considerations beyond the control; this run has no "
-                                    "judge-selected showcase"}
+                      "provenance": "selected mechanically, as the record where the pipeline "
+                                    "added the most considerations beyond the control"}
 
     if not chosen or not chosen.get("prompt_id"):
         blocks.append(R.note("No worked example could be built: this run has neither a showcase "
                              "pass nor per-record retention data."))
-        return C.section("example", "One example, end to end", *blocks)
+        return "".join(blocks)
 
     pid = chosen["prompt_id"]
     base = by_pid_base.get(pid) or {}
@@ -361,7 +382,7 @@ def section_example(audit, content, f, baseline, rewrites, labels, pick=None):
     if not (user_msg and pipeline):
         blocks.append(R.note(f"Worked example {R.esc(pid)} could not be assembled from this "
                              "run's files."))
-        return C.section("example", "One example, end to end", *blocks)
+        return "".join(blocks)
 
     gid = labels.get(pid, pid)
     if chosen.get("summary"):
@@ -376,11 +397,11 @@ def section_example(audit, content, f, baseline, rewrites, labels, pick=None):
     counts = _survival_counts(surv)
     if counts:
         blocks.append("<h4>What changed</h4>")
-        blocks.append(R.dek(
-            f"The retention judge read the control's answer first and tracked each of its "
-            f"welfare considerations into the pipeline's: {counts['kept']} kept, "
+        blocks.append(
+            f"<p class='muted'>The retention judge tracked each of the control's welfare "
+            f"considerations into the pipeline's answer: {counts['kept']} kept, "
             f"{counts['weakened']} weakened, {counts['dropped']} dropped, and "
-            f"{counts['added']} points the pipeline raised that the control did not."))
+            f"{counts['added']} points the pipeline raised that the control did not.</p>")
 
     blocks.append(R.sidebyside(
         "The control · plain model, no system prompt", R.highlight(plain, []),
@@ -396,12 +417,10 @@ def section_example(audit, content, f, baseline, rewrites, labels, pick=None):
         before, after = rw["draft_response"], rw["rewritten_response"]
         blocks.append(R.details(
             "What the constitution rewrite changed in this answer",
-            f"<p class='muted'>{_diff_summary(before, after)} Stage 2's draft and the shipped "
-            "answer are a revision of one another, so a diff of those two is meaningful; the "
-            "control and the pipeline answer are independently generated, so diffing them "
-            "would be noise. The three largest changes:</p>" + _diff_hunks(before, after),
+            f"<p class='muted'>{_diff_summary(before, after)} The three largest changes:</p>"
+            + _diff_hunks(before, after),
             meta="3 largest changes · full diff in the appendix"))
-    return C.section("example", "One example, end to end", *blocks)
+    return "".join(blocks)
 
 
 def _example_pick(content):
@@ -539,17 +558,21 @@ def scoreboard(audit, f, cons):
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
 
 
-def section_results(audit, content, f, cons, labels):
-    blocks = [C.prose(content, "results_intro", f)]
-    board = scoreboard(audit, f, cons)
-    if board:
-        blocks.append(f"<h4>The whole comparison, on {f.get('n_measured', '?')} dilemmas</h4>")
-        blocks.append(board)
+def blocks_what(audit, content, f, cons, labels):
+    """What the corpus is, and the two charts worth leading with.
 
+    Every other chart this run supports is in the appendix. The delivery regression is
+    stated in prose exactly ONCE, here — the tile, the scoreboard row and the derived
+    weakness carry the same number as data, which is not the same as saying it four
+    times.
+    """
     mpr = audit.get("moral_patient_reasons") or {}
+    blocks = [R.sub("dad-what", "What it is"),
+              C.prose(content, "dad_what", f),
+              hero_tiles(audit, f, cons),
+              C.prose(content, "results_intro", f)]
+
     if cons and cons.get("plain") is not None:
-        subset_rows = [{"label": name, "plain": b, "pipeline": p}
-                       for name, b, p in cons["subsets"] if p is not None]
         blocks.append(R.figure(
             title="Valuable welfare considerations per answer",
             note_="A distinct welfare point, or a concrete lower-harm action, that a judge "
@@ -558,16 +581,8 @@ def section_results(audit, content, f, cons, labels):
             chart=R.hbar([("the control", round(cons["plain"], 2)),
                           ("the pipeline", round(cons["pipeline"], 2))],
                          color=R.ARM_PAIR, fmt="{:.1f}"),
-            caption=f"**The pipeline raises {f.get('lift_pct', '?')} more of them.** "
-                    f"The two arms answer the same dilemmas, so the gap is per-answer, "
-                    f"not corpus-wide."))
-        if subset_rows:
-            blocks.append(R.figure(
-                title="Split by kind of consideration",
-                chart=R.grouped_hbar(subset_rows,
-                                     series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
-                                     fmt="{:.2f}"),
-                caption="**The gain is in reasoning, not only in offering alternatives.**"))
+            caption=f"**The pipeline raises {f.get('lift_pct', '?')} more of them**, on the "
+                    f"same {f.get('n_measured', '?')} dilemmas."))
         if cons["source"] == "reconstructed":
             blocks.append("<p class='muted'>Reconstructed from this run's separate reasoning "
                           "and alternatives measures; it predates the unified extraction.</p>")
@@ -575,96 +590,60 @@ def section_results(audit, content, f, cons, labels):
     if mpr.get("failures"):
         blocks.append(R.note(
             f"Means are over {f.get('n_pipeline', '?')} pipeline and {f.get('n_plain', '?')} "
-            f"control answers: {mpr['failures']} extractions failed and are excluded. That is "
-            "not a fully matched comparison, and a missing answer is a gap rather than a zero."))
+            f"control answers: {mpr['failures']} extractions failed and are excluded, so the "
+            "comparison is not fully matched."))
 
-    surv = mpr.get("survival") or {}
-    if surv.get("kept") is not None:
-        blocks.append(R.figure(
-            title="What happened to the control's considerations",
-            note_="The judge read the control's answer first, then tracked each of its "
-                  "considerations into the pipeline's.",
-            chart=R.segbar([("kept", surv.get("kept") or 0, R.PLAIN),
-                            ("weakened", surv.get("weakened") or 0, "var(--series-4)"),
-                            ("dropped", surv.get("dropped") or 0, "var(--series-8)"),
-                            ("added", surv.get("added_total") or 0, R.PIPELINE)]),
-            caption=f"**{f.get('retention_pct', '?')} of the control's "
-                    f"{f.get('anchored_n', '?')} considerations survive the pipeline, and it "
-                    f"adds {f.get('added_per_answer', '?')} more per answer.** Nothing here "
-                    f"checks whether the additions are correct — see the limits below."))
-
-    types_p = (mpr.get("pipeline") or {}).get("type_hist") or _type_hist(mpr.get("per_case"),
-                                                                        "pipeline")
-    types_b = (mpr.get("plain") or {}).get("type_hist") or _type_hist(mpr.get("per_case"), "plain")
-    if types_p and types_b:
-        gloss = (audit.get("reason_composition") or {}).get("type_gloss") or {}
-        keys = list(dict(types_p, **types_b))
-        rows = [{"label": k, "plain": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
-                for k in keys]
-        blocks.append(R.figure(
-            title="Kinds of consideration raised",
-            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)]),
-            caption="**The pipeline does not just say more of the same thing.** Its largest "
-                    "gains are in the kinds of point the control raises least.",
-            table_html=R.table(["kind", "what it is", "control", "pipeline"],
-                               [(k, gloss.get(k, "—"), types_b.get(k, 0), types_p.get(k, 0))
-                                for k in keys], align="llrr") if gloss else None))
-
-    blocks.extend(_delivery_blocks(audit, f, mpr, labels))
-    return C.section("results", "What the numbers say", *blocks)
+    blocks.append(_delivery_statement(audit, f))
+    board = scoreboard(audit, f, cons)
+    if board:
+        blocks.append(f"<h4>The whole comparison, on {f.get('n_measured', '?')} dilemmas</h4>")
+        blocks.append(board)
+    blocks.append(_pareto_figure(audit, mpr, labels))
+    return "".join(b for b in blocks if b)
 
 
-def _delivery_blocks(audit, f, mpr, labels):
+def _delivery_statement(audit, f):
+    """The one place the delivery regression is written out.
+
+    A run without the paid pass says so here instead, in the same slot.
+    """
     delivery = audit.get("delivery") or {}
     if not delivery.get("per_case"):
-        return [R.note(
+        return R.note(
             "Delivery quality was **not measured on this run**, so there is no evidence here "
             "either way about whether the added substance cost manner. Populate it with "
-            "`python evals/audit_dad.py --input <run> --reasons`.")]
-    out = ["<h3>Manner</h3>"]
+            "`python evals/audit_dad.py --input <run> --reasons`.")
     pm, bm = delivery.get("pipeline_mean"), delivery.get("plain_mean")
-    if bm is not None and pm < bm:
-        out.append(R.note(
-            f"**The pipeline is {f.get('delivery_delta', '?')} points worse than the control "
-            f"here** ({f['delivery_pipeline']} against {f['delivery_plain']} out of 10). The "
-            "extra substance was not free: judged on manner alone, the control's answers read "
-            "as more helpful and less obtrusive. Any claim that this pipeline adds substance "
-            "without costing delivery is not supported by this run.", tone="bad"))
+    if bm is None or pm is None or pm >= bm:
+        return ""
     dims = delivery.get("dimensions") or {}
-    if dims.get("pipeline"):
-        keys = [k for k in _DELIVERY_DIMS if k in dims["pipeline"]]
-        rows = []
-        for k in keys:
-            p, b = dims["pipeline"].get(k), (dims.get("plain") or {}).get(k)
-            rows.append((k.replace("_", " "), f"{b:.2f}" if b is not None else "—",
-                         f"{p:.2f}" if p is not None else "—",
-                         f"{p - b:+.2f}" if p is not None and b is not None else "—"))
-        n_worse = sum(1 for r in rows if r[3].startswith("-"))
-        out.append(R.figure(
-            title="Delivery quality, dimension by dimension",
-            note_="Each dimension is judged 0–10 on the answer alone: did it serve the goal the "
-                  "user actually had, was the response proportionate, was the tone right, was "
-                  "uncertainty calibrated.",
-            chart=R.table(["dimension", "control", "pipeline", "delta"], rows, align="lrrr"),
-            caption=(f"**The pipeline is worse on every one of them.** That is the strongest "
-                     f"single piece of evidence against this corpus, and it is why delivery "
-                     f"leads the weaknesses below." if n_worse == len(rows) else
-                     f"**Worse on {n_worse} of {len(rows)} dimensions.**")))
+    worse = [k for k, v in (dims.get("pipeline") or {}).items()
+             if (dims.get("plain") or {}).get(k) is not None and v < dims["plain"][k]]
+    every = (" The pipeline is worse on all four judged dimensions: goal responsiveness, "
+             "proportionality, tone and calibration."
+             if worse and len(worse) == len(dims.get("pipeline") or {}) else "")
+    return R.note(
+        f"**Judged delivery went the wrong way: {f['delivery_pipeline']} against the "
+        f"control's {f['delivery_plain']} out of 10.** The added substance was not free — on "
+        f"manner alone, the plain answers read as more helpful.{every}", tone="bad")
+
+
+def _pareto_figure(audit, mpr, labels):
+    delivery = audit.get("delivery") or {}
+    if not delivery.get("per_case"):
+        return ""
     n_p, n_b, fails = delivery.get("n_pipeline"), delivery.get("n_plain"), delivery.get("failures")
     asym = ""
     if n_p is not None and n_b is not None and (n_p != n_b or fails):
         asym = (f" These means are over {n_p} pipeline and {n_b} control answers — "
                 f"{fails or 0} judgements failed, so the two arms are not the same set of "
                 f"records.")
-    out.append(R.figure(
+    return R.figure(
         title="Substance against manner, one dot per answer",
         note_="Judged delivery quality on the horizontal axis, valuable welfare considerations "
               "on the vertical. Diamonds are each arm's mean." + asym,
         chart=_pareto(delivery, mpr, labels),
-        caption="**The pipeline arm sits up and to the left: it buys substance with manner.** "
-                "Up and to the right would be substance at no cost, which is what the method "
-                "is aiming at and did not reach on this run."))
-    return out
+        caption="**The pipeline arm sits up and to the left: it buys substance with manner.**")
 
 
 def _type_hist(per_case, arm):
@@ -721,13 +700,14 @@ def _pareto(delivery, mpr, labels):
 
 # ------------------------------------------------------------------ method
 
-def section_method(content, f, manifest, costs):
-    blocks = [C.prose(content, "method_intro", f)]
+def blocks_built(content, f, manifest, costs, run_id):
+    """The three stages, the control, and the command that reproduces all of it."""
+    blocks = [R.sub("dad-built", "How it is built"), C.prose(content, "method_intro", f)]
     for key, heading in (("stage1", "Stage 1 · the dilemma"),
                          ("stage2", "Stage 2 · the reasoning"),
                          ("stage3", "Stage 3 · the constitution rewrite"),
                          ("control", "The control arm")):
-        blocks.append(f"<h3>{R.esc(heading)}</h3>{C.prose(content, key, f)}")
+        blocks.append(f"<h4>{R.esc(heading)}</h4>{C.prose(content, key, f)}")
     table = C.stage_cost_table(costs, _STAGE_LABELS)
     if table:
         blocks.append(R.details("Per-stage cost and model", table,
@@ -736,13 +716,30 @@ def section_method(content, f, manifest, costs):
         blocks.append(R.details("Per-stage model", R.table(
             ["stage", "model"], [(k.replace("_model", "").replace("_", " "), v)
                                  for k, v in _models(manifest)["per_stage"].items()])))
-    return C.section("method", "How it is built", *blocks)
+    blocks.append("<h4>Running it yourself</h4>")
+    blocks.append(C.prose(content, "reproduce", f))
+    cmd = ("# generate a dataset\n"
+           "python dad_pipeline/run.py --config config.yaml --label my-run\n\n"
+           "# the standard evals run automatically at the end of a full run;\n"
+           "# to re-run them on an existing run directory:\n"
+           "python evals/audit_dad.py --input outputs/dad/latest --reasons\n"
+           "python evals/diversity.py --input outputs/dad/latest\n\n"
+           "# rebuild this page\n"
+           f"python report/build_report.py --dad-run outputs/dad/runs/{run_id}")
+    blocks.append(f"<pre>{R.esc(cmd)}</pre>")
+    return "".join(blocks)
 
 
 # ------------------------------------------------------------------ footprint
 
-def section_footprint(audit, content, f):
-    blocks = [C.prose(content, "footprint_intro", f)]
+def _footprint_figures(audit, f):
+    """The stylistic footprint: what a model trained on this corpus would inherit.
+
+    These are charts a reader can reach for, not charts the page leads with, so they
+    live in the appendix drawer. Captions still state the finding, including where a
+    measure moved the wrong way.
+    """
+    blocks = []
     rl = audit.get("response_lengths") or {}
     if rl.get("pipeline_mean"):
         blocks.append(R.figure(
@@ -751,8 +748,7 @@ def section_footprint(audit, content, f):
                           ("the pipeline", round(rl["pipeline_mean"]))],
                          color=R.ARM_PAIR, unit=" chars", fmt="{:,.0f}"),
             caption=f"**{f.get('length_pct', '?')} longer than the control.** Length is the "
-                    f"most visible property a model would inherit from this corpus, and the "
-                    f"judges see it too — see the limits below."))
+                    f"most visible property a model would inherit, and the judges see it too."))
     stance = (audit.get("moves") or {}).get("stance") or {}
     if stance.get("pipeline"):
         rows = [{"label": k, "plain": (stance.get("plain") or {}).get(k),
@@ -765,7 +761,7 @@ def section_footprint(audit, content, f):
                                  percent=True),
             caption=f"**The pipeline moralizes more than the control** "
                     f"({f.get('moralizes_pipeline', '?')} against "
-                    f"{f.get('moralizes_plain', '?')}). Stage 3 exists to prevent exactly this."))
+                    f"{f.get('moralizes_plain', '?')}), which stage 3 exists to prevent."))
     tics = audit.get("tracked_tics") or audit.get("stock_phrases") or {}
     watch = tics.get("watch") or {}
     n_pipe, n_plain = tics.get("n_pipeline") or 0, tics.get("n_plain") or 0
@@ -780,11 +776,11 @@ def section_footprint(audit, content, f):
             blocks.append(R.figure(
                 title="Tracked phrases",
                 note_="Phrases the eval watches by name because earlier runs turned them into "
-                      "habits. Share of answers in each arm containing the phrase at least once.",
+                      "habits. Share of each arm's answers containing one at least once.",
                 chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
                                      percent=True, label_w=210),
-                caption="**A phrase in more than about half of the answers is a tic rather than "
-                        "a word choice.** The pipeline's most common phrase is well under that."))
+                caption="**The pipeline's most common tracked phrase stays well under half of "
+                        "its answers**, which is where a word choice becomes a tic."))
     moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
     if moves:
         rows = sorted(({"label": name, "plain": d.get("plain_share"),
@@ -797,8 +793,8 @@ def section_footprint(audit, content, f):
                    if (r["plain"] or 0) > 0.25 and not (r["pipeline"] or 0)]
         blocks.append(R.figure(
             title="Rhetorical habits",
-            note_="Argumentative moves, as a share of each arm's answers. Hover a bar for what "
-                  "the move is; all of them, with definitions, are in the appendix.",
+            note_="Argumentative moves, as a share of each arm's answers. Hover a bar for "
+                  "what the move is; the definitions are below.",
             chart=R.grouped_hbar(rows[:6], series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
                                  percent=True, label_w=210, glossary=gloss),
             caption=(_habits_caption(invented, dropped) if (invented or dropped) else
@@ -816,9 +812,26 @@ def section_footprint(audit, content, f):
                          color=R.ARM_PAIR, fmt="{:.1f}"),
             caption=(f"**The pipeline's answers are less varied in shape than the control's** "
                      f"({f.get('shapes_pipeline', '?')} against {f.get('shapes_plain', '?')} "
-                     f"effective shapes). More substance came at a cost in format range."
+                     f"effective shapes)."
                      if worse else "**Structural range holds up against the control.**")))
-    return C.section("footprint", "Stylistic footprint", *blocks)
+    dims = (audit.get("delivery") or {}).get("dimensions") or {}
+    if dims.get("pipeline"):
+        keys = [k for k in _DELIVERY_DIMS if k in dims["pipeline"]]
+        rows = []
+        for k in keys:
+            p, b = dims["pipeline"].get(k), (dims.get("plain") or {}).get(k)
+            rows.append((k.replace("_", " "), f"{b:.2f}" if b is not None else "—",
+                         f"{p:.2f}" if p is not None else "—",
+                         f"{p - b:+.2f}" if p is not None and b is not None else "—"))
+        n_worse = sum(1 for r in rows if r[3].startswith("-"))
+        blocks.append(R.figure(
+            title="Delivery quality, dimension by dimension",
+            note_="Each dimension is judged 0–10 on the answer alone: did it serve the goal "
+                  "the user actually had, was it proportionate, was the tone right, was "
+                  "uncertainty calibrated.",
+            chart=R.table(["dimension", "control", "pipeline", "delta"], rows, align="lrrr"),
+            caption=f"**Worse on {n_worse} of {len(rows)} dimensions.**"))
+    return blocks
 
 
 def _habits_caption(invented, dropped):
@@ -828,20 +841,18 @@ def _habits_caption(invented, dropped):
     sentence about conditional data.
     """
     if invented and dropped:
-        claim = (f"**The pipeline turned `{invented[0]}` into a habit the control never shows, "
-                 f"and dropped `{dropped[0]}`, which the control reaches for.**")
-    elif invented:
-        claim = (f"**`{invented[0]}` is a habit the pipeline has and the control does not.**")
-    else:
-        claim = f"**The pipeline dropped `{dropped[0]}`, a move the control reaches for.**"
-    return (claim + " A move that appears in one arm and not the other is the clearest thing a "
-                    "model trained on this data would pick up.")
+        return (f"**The pipeline turned `{invented[0]}` into a habit the control never shows, "
+                f"and dropped `{dropped[0]}`, which the control reaches for.**")
+    if invented:
+        return f"**`{invented[0]}` is a habit the pipeline has and the control does not.**"
+    return f"**The pipeline dropped `{dropped[0]}`, a move the control reaches for.**"
 
 
 # ------------------------------------------------------------------ measurement
 
-def section_measurement(audit, content, f, diversity):
-    blocks = [C.prose(content, "measurement_intro", f)]
+def blocks_measured(audit, content, f, diversity):
+    blocks = [R.sub("dad-measured", "What we measured"),
+              C.prose(content, "measurement_intro", f)]
     mpr = audit.get("moral_patient_reasons") or {}
     checks = [
         ("Valuable welfare considerations", bool(mpr.get("pipeline")),
@@ -859,15 +870,18 @@ def section_measurement(audit, content, f, diversity):
          bool(audit.get("tracked_tics") or audit.get("rhetorical_moves")),
          "Recurring phrasing and argumentative habits, as a share of each arm"),
         ("Length, structure, jargon", bool(audit.get("response_lengths")),
-         "Offline corpus measurements against the control"),
+         "Offline dataset measurements against the control"),
         ("Semantic diversity", bool(diversity),
          "Embedding near-duplicate rate, topic spread, effective record count"),
     ]
     rows = [(name, what if ok else R.Raw(f"<i>not run on this run</i> — {R.esc(what)}"))
             for name, ok, what in checks]
     blocks.append(R.table(["check", "what it establishes"], rows))
+    # The subhead is code's, not the prose file's: h3 is the beat level inside a section,
+    # and a prose `### ` would put this at the same level as "What we measured" itself.
+    blocks.append("<h4>What these measurements do not establish</h4>")
     blocks.append(C.prose(content, "judge_limits", f))
-    return C.section("measurement", "How it is measured", *blocks)
+    return "".join(blocks)
 
 
 # ------------------------------------------------------------------ weaknesses
@@ -918,38 +932,75 @@ def derived_warnings(audit, manifest, f):
     return sorted(out, key=lambda w: 0 if w[0] == "BAD" else 1)
 
 
-def section_weaknesses(audit, content, f, manifest):
-    warnings = derived_warnings(audit, manifest, f)
-    return C.section("weaknesses", "Where it is weak",
-                     C.prose(content, "weaknesses_intro", f),
-                     C.warnings_table(warnings))
-
-
-# ------------------------------------------------------------------ reproduce
-
-def section_reproduce(content, f, run_id):
-    cmd = ("# generate a corpus\n"
-           "python dad_pipeline/run.py --config config.yaml --label my-run\n\n"
-           "# the standard evals run automatically at the end of a full run;\n"
-           "# to re-run them on an existing run directory:\n"
-           "python evals/audit_dad.py --input outputs/dad/latest --reasons\n"
-           "python evals/diversity.py --input outputs/dad/latest\n\n"
-           "# rebuild this page\n"
-           f"python report/build_report.py --dad-run outputs/dad/runs/{run_id}")
-    return C.section("reproduce", "Run it yourself",
-                     C.prose(content, "reproduce", f),
-                     f"<pre>{R.esc(cmd)}</pre>")
+def blocks_weak(audit, content, f, manifest):
+    return (R.sub("dad-weak", "Where it is weak")
+            + C.prose(content, "weaknesses_intro", f)
+            + C.warnings_table(derived_warnings(audit, manifest, f)))
 
 
 # ------------------------------------------------------------------ appendix
 
-def section_appendix(audit, content, f, rewrites, labels, diversity, pick=None):
-    """Everything that is evidence but not argument.
+def _appendix_charts(audit, f, cons):
+    """The substance charts the page does not lead with, then the footprint ones."""
+    out = []
+    mpr = audit.get("moral_patient_reasons") or {}
+    if cons and cons.get("plain") is not None:
+        subset_rows = [{"label": name, "plain": b, "pipeline": p}
+                       for name, b, p in cons["subsets"] if p is not None]
+        if subset_rows:
+            out.append(R.figure(
+                title="Split by kind of consideration",
+                chart=R.grouped_hbar(subset_rows,
+                                     series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+                                     fmt="{:.2f}"),
+                caption="**The gain is in the reasoning as well as in the alternatives "
+                        "offered.**"))
+    surv = mpr.get("survival") or {}
+    if surv.get("kept") is not None:
+        out.append(R.figure(
+            title="What happened to the control's considerations",
+            note_="The judge read the control's answer first, then tracked each of its "
+                  "considerations into the pipeline's.",
+            chart=R.segbar([("kept", surv.get("kept") or 0, R.PLAIN),
+                            ("weakened", surv.get("weakened") or 0, "var(--series-4)"),
+                            ("dropped", surv.get("dropped") or 0, "var(--series-8)"),
+                            ("added", surv.get("added_total") or 0, R.PIPELINE)]),
+            caption=f"**{f.get('retention_pct', '?')} of the control's "
+                    f"{f.get('anchored_n', '?')} considerations survive the pipeline, and it "
+                    f"adds {f.get('added_per_answer', '?')} more per answer.** No pass checks "
+                    f"whether the additions are correct."))
+    types_p = (mpr.get("pipeline") or {}).get("type_hist") or _type_hist(mpr.get("per_case"),
+                                                                        "pipeline")
+    types_b = (mpr.get("plain") or {}).get("type_hist") or _type_hist(mpr.get("per_case"), "plain")
+    if types_p and types_b:
+        gloss = (audit.get("reason_composition") or {}).get("type_gloss") or {}
+        keys = list(dict(types_p, **types_b))
+        rows = [{"label": k, "plain": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
+                for k in keys]
+        out.append(R.figure(
+            title="Kinds of consideration raised",
+            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)]),
+            caption="**The pipeline's largest gains are in the kinds of point the control "
+                    "raises least.**",
+            table_html=R.table(["kind", "what it is", "control", "pipeline"],
+                               [(k, gloss.get(k, "—"), types_b.get(k, 0), types_p.get(k, 0))
+                                for k in keys], align="llrr") if gloss else None))
+    return out + _footprint_figures(audit, f)
 
-    It is in the page rather than cut so that "nothing was left out" stays a checkable
-    claim, and collapsed so it costs a reader nothing.
+
+def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, pick=None):
+    """Everything that is evidence, collapsed so it costs a reader nothing.
+
+    Every chart the page does not lead with lands here, in one drawer, so the two that
+    do lead are the two a reader sees.
     """
-    blocks = [C.prose(content, "appendix_intro", f)]
+    blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f)]
+
+    charts = _appendix_charts(audit, f, cons)
+    if charts:
+        blocks.append(R.details(
+            "Every other chart from this run", "".join(charts),
+            meta=f"{len(charts)} figures · {f.get('footprint_regressions', '')}"))
 
     rows, verdicted = [], 0
     for sec in audit.get("sections") or []:
@@ -988,9 +1039,9 @@ def section_appendix(audit, content, f, rewrites, labels, diversity, pick=None):
             "Retention record by record",
             R.figure(title="Considerations kept, weakened, dropped and added, per record",
                      chart=chart,
-                     caption="**No single record collapses.** The check this answers is whether "
-                             "the corpus average hides a handful of records where the pipeline "
-                             "threw the control's reasoning away."),
+                     caption="**Every record keeps most of the control's considerations**, "
+                             "so the average is not hiding one where the pipeline threw them "
+                             "away."),
             meta=f"{len(per_case)} records"))
 
     if diversity:
@@ -998,18 +1049,18 @@ def section_appendix(audit, content, f, rewrites, labels, diversity, pick=None):
         nn = diversity.get("nn") or {}
         clusters = ((diversity.get("scopes") or {}).get("combined") or {}).get("clusters") or {}
         blocks.append(R.details(
-            "Corpus diversity",
-            "<p class='muted'>Embedding-space measurements over the final corpus, from "
+            "Dataset diversity",
+            "<p class='muted'>Embedding-space measurements over the final dataset, from "
             f"<code>{R.esc((diversity or {}).get('embed_model', '?'))}</code>.</p>"
             + R.tiles([
                 R.stat(f"{vendi.get('score', 0):.1f}", "effectively distinct records",
-                       f"of {diversity.get('n_records', '?')} actual records — a diversity "
-                       f"score that counts near-duplicates as fractions of a record"),
+                       f"of {diversity.get('n_records', '?')} actual records; near-duplicates "
+                       f"count as fractions of a record"),
                 R.stat(f"{nn.get('over_0.90', 0):.0%}", "near-duplicate records",
                        f"cosine similarity above 0.90 to their nearest neighbour; "
                        f"{nn.get('over_0.80', 0):.0%} above 0.80"),
                 R.stat(f"{clusters.get('evenness', 0):.2f}", "topic-spread evenness",
-                       f"1.00 would be perfectly even; the largest topic cluster holds "
+                       f"1.00 is perfectly even; the largest cluster holds "
                        f"{clusters.get('largest_share', 0):.0%} of records"),
             ]),
             meta=f"{diversity.get('n_records', '?')} records"))
@@ -1019,56 +1070,32 @@ def section_appendix(audit, content, f, rewrites, labels, diversity, pick=None):
     if rw and rw.get("draft_response") and rw.get("rewritten_response"):
         blocks.append(R.details(
             "The full stage-3 rewrite diff for the worked example",
-            "<p class='muted'>Struck-through words are stage 2's draft; highlighted words are "
-            "the shipped answer.</p>" + _word_diff(rw["draft_response"], rw["rewritten_response"]),
+            "<p class='muted'>Struck through: stage 2's draft. Highlighted: the shipped "
+            "answer.</p>" + _word_diff(rw["draft_response"], rw["rewritten_response"]),
             meta=f"{len(rw['rewritten_response'].split()):,} words"))
-    return C.section("appendix", "Appendix", *blocks)
+    return "".join(blocks)
 
 
 # ------------------------------------------------------------------ assembly
 
-def body(*, audit, content, diversity=None, manifest=None, corpus=None, baseline=None,
-         rewrites=None, costs=None, run_id="", example=None):
-    """The sections, the rail entries, and the header fields. Pure: no filesystem, no
-    argv. Returns (body_html, toc, header_kwargs) so a future combined page can put two
-    bodies inside one document()."""
+def blocks(*, audit, content, diversity=None, manifest=None, corpus=None, baseline=None,
+           rewrites=None, costs=None, deals=None, n_prompt_templates=None, run_id="",
+           example=None):
+    """The whole ``#dad`` section body, in skeleton order. Pure: no filesystem, no argv.
+
+    Returns one flat string of blocks. report/page.py wraps it in ``<section id='dad'>``
+    with the h2; every block here is therefore a grid child of that section, which is
+    what lets figures bleed past the text measure.
+    """
     f = facts(audit, manifest, diversity, costs)
     cons = _considerations(audit)
     labels = _labels(audit)
-    sections = [
-        section_gap(content, f),
-        section_example(audit, content, f, baseline, rewrites, labels, example),
-        section_results(audit, content, f, cons, labels),
-        section_method(content, f, manifest, costs),
-        section_footprint(audit, content, f),
-        section_measurement(audit, content, f, diversity),
-        section_weaknesses(audit, content, f, manifest),
-        section_reproduce(content, f, run_id or (manifest or {}).get("run_id", "<run_id>")),
-        section_appendix(audit, content, f, rewrites, labels, diversity, example),
-    ]
-    toc = [(sid, label) for sid, label in TOC
-           if any(f"<section id='{sid}'" in s for s in sections)]
-    n_note = (f"{f.get('n', '?')} dilemmas dealt, {f.get('n_measured', '?')} measured"
-              if f.get("n_measured") != f.get("n") else f"{f.get('n', '?')} examples")
-    meta = C.meta_line(run_id=run_id, manifest=manifest, pairs=(
-        ("generated with", f"<code>{R.esc(f.get('gen_models', '?'))}</code>"),
-        ("audited with", f"<code>{R.esc(f.get('extract_model', '?'))}</code> extracting and "
-                         f"<code>{R.esc(f.get('judge_model', '?'))}</code> judging"),
-    ))
-    meta = f"{n_note} · {meta}"
-    head = {
-        "title": C.fill(content["title"], f).strip(),
-        "lede": C.fill(content["lede"], f).strip(),
-        "hero": hero_tiles(audit, f, cons),
-        "meta_line": meta,
-        "footer": "Every figure on this page is computed from the run's own audit output at "
-                  "build time; none is typed in by hand. The weaknesses section is derived "
-                  "from the audit's verdicts, so a regression appears there whether or not "
-                  "anyone wrote it up.",
-    }
-    return "".join(sections), toc, head
-
-
-def build(*, sibling=None, **kwargs):
-    body_html, toc, head = body(**kwargs)
-    return R.document(toc=toc, body=body_html, sibling=sibling, **head)
+    run = run_id or (manifest or {}).get("run_id", "<run_id>")
+    return "".join([
+        blocks_what(audit, content, f, cons, labels),
+        blocks_example(audit, content, f, baseline, rewrites, labels, example),
+        blocks_measured(audit, content, f, diversity),
+        blocks_built(content, f, manifest, costs, run),
+        blocks_weak(audit, content, f, manifest),
+        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, example),
+    ])

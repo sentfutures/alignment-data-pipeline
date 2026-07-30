@@ -1,37 +1,37 @@
-# `report/` — the standalone report pages
+# `report/` — the handoff page
 
-A small hand-over site explaining these corpora to an external technical reader
-(someone who runs evals or midtraining at a lab). Each page is one self-contained HTML
-file you can host anywhere, email, or open offline from the filesystem.
+One self-contained HTML file covering both datasets, written for one reader: someone who
+runs midtraining at another lab, has no context on this project, and has about forty
+seconds to decide whether to keep reading. It publishes to GitHub Pages as it stands,
+emails, and opens offline from the filesystem.
 
-| Page | File | What it is |
-|---|---|---|
-| Landing | `index.html` | A large hero, two buttons for the two reports, then three sections: why this data is missing, the two corpora (including the belief-implantation route we turned down), and what neither report shows. Deliberately short (~680 words) and deliberately rail-less — `document(layout="landing")` drops the contents list but keeps the shell's grid, so the rail column is reserved and simply left empty: the content lands on the same left edge, at the same width, on both pages, and clicking into a report makes the contents appear *beside* the prose instead of shoving it sideways. Everything ranges left; only the vertical rhythm and the hero's type scale differ from a report. Anything a reader only needs *while reading a report* lives on that report's page: the provenance conventions, the measurement philosophy and the build rules are all stated there, so repeating them here was duplication. |
-| DAD | `dad.html` | The dilemma corpus in detail: the gap, one worked example in full, what the numbers say, how it is built, its stylistic footprint, how it is measured, where it is weak, how to run it, an appendix. |
-| SDF | *not built yet* | The document corpus. The landing page already introduces it and says the report is in preparation. `report/sdf.py` + `content_sdf.md` are the shape it would take; see the notes at the bottom of this file. |
+The two datasets are **Difficult advice** (`dad`) and **Synthetic documents** (`sdf`) —
+"corpus" and "corpora" are not words this page uses.
 
-These are **not** the Streamlit corpus-audit page. That is an internal review tool
-organised by what the eval measured; these are organised by what a reader needs to
-believe, in order.
+This is **not** the Streamlit corpus-audit page. That is an internal review tool
+organised by what the eval measured; this is organised by what a reader needs, in order.
 
 ## Build
 
 ```bash
-python report/build_report.py --dad-run outputs/dad/runs/<run_id>
-# -> report/index.html, report/dad.html
-
-python report/build_report.py --page dad --dad-run outputs/dad/runs/<run_id>
-python report/build_report.py --page index --dad-run <dir> --sdf-run <dir>
+python report/build_report.py \
+  --dad-run outputs/dad/runs/2026-07-20_20-51_bedrock-40 \
+  --sdf-run outputs/sdf/runs/2026-07-11_20-06_matrix100-cli
+# -> report/index.html
 ```
 
-`--run` still works as an alias for `--dad-run`, which keeps the command printed in the
-DAD page's own "Run it yourself" section true. `--content` (repeatable) overrides a
-page's prose files. The current build comes from
-`outputs/dad/runs/2026-07-20_20-51_bedrock-40`.
+Those two runs are the pinned ones behind the current build. `--run` still works as an
+alias for `--dad-run`, which keeps the command printed in the page's own "Running it
+yourself" block true. `--content` (repeatable) overrides the prose files, `--example`
+overrides the worked example, `--out-dir` writes elsewhere.
 
-To get the full DAD page, the run needs its paid audit pass. Without it the delivery,
-Pareto and showcase blocks say "not measured on this run", the lede's delivery clause
-degrades to the same, and the weaknesses table gains a BAD row:
+`--sdf-run` is optional. Without it the synthetic documents' column says "not published
+yet" and its report says no audit output was supplied — the page still builds, and
+carries no dead links.
+
+To get the full difficult-advice report, the DAD run needs its paid audit pass. Without it the
+delivery, Pareto and showcase blocks say "not measured on this run" and the weaknesses
+table gains a BAD row:
 
 ```bash
 python evals/audit_dad.py --input outputs/dad/runs/<run_id> --reasons
@@ -42,123 +42,217 @@ To run the evals on the shared AWS Bedrock credits instead of an Anthropic API k
 `--config config.bedrock.yaml` (identical to `config.yaml` but `backend: bedrock`, which
 reads `CHAD_AWS_BEDROCK_KEY`).
 
+## The page
+
+| Anchor | What it is |
+|---|---|
+| hero | The illustration, the title, and the three lines that follow from it (*Teaching Claude Why*, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing. |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Five rows — what it is for, what a record is, how many records, how many prompt templates, licence — because the reader is deciding whether to run the pipeline, not shopping for a dataset. Dates, model ids and the composition spread live in the report that goes into them. The foot of each column is its dataset viewer. |
+| `#explore` | "Which would you like to explore?" — two buttons carrying each dataset's name, one line and its figures. |
+| `#sdf` | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen. |
+| `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
+| footer | Repo and both viewers as buttons, one provenance line per run, and the build claim. |
+
+Both reports take the same skeleton, so a reader learns it once: **what it is + headline
+figures / one example end to end / what we measured / how it is built / where it is weak
+/ appendix**. Each beat is an `<h3>` with its own id (`#dad-weak`, `#sdf-what`).
+
+There is no contents rail: the whole navigation of the page is one choice.
+
+## The chooser
+
+Neither report is open on load — the choice is the point. Three things make that safe,
+and all three are pinned by `TestChooser`:
+
+- **`#dad` and `#sdf` in the URL open that report**, on load and on `hashchange`, so the
+  dataset card's deep links land where they say they will. A hash naming anything *inside*
+  a report (`#dad-weak`, from a quoted finding) opens the report it lives in and scrolls
+  to it — that is what `closest('.panel')` in the inline JS is for.
+- **Each report ends with a button offering the other**, which switches panels and
+  scrolls to the top of the new one. The dataset a reader did not pick is one click from
+  the end of the one they did.
+- **Printing expands both**, so a PDF of the page is the whole thing.
+
+The cost is real and was accepted deliberately: Cmd-F cannot see a closed report.
+`.panel[hidden]{display:none}` is load-bearing — a panel is a `<section>`, and
+`section{display:grid}` beats the browser's own `[hidden]` rule.
+
 ## Files
 
 | File | Role |
 |---|---|
-| `content_shared.md` | **Landing-page prose.** |
-| `content_dad.md` | **DAD prose.** The file to iterate on for that page. |
-| `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, the CLI parser. Everything both pages use. |
-| `dad.py` | The DAD page: `CONTENT_IDS`, `TOC`, `facts()`, the section builders, `derived_warnings()`. |
-| `hub.py` | The landing page. |
+| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset *is*, also used under each chooser button); `*_use` are what each is *for*. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
+| `content_dad.md` | **Difficult-advice prose.** The file to iterate on for that report. |
+| `page.py` | The page: hero, comparison table, caveats, chooser, footer, and the one `document()` call. |
+| `dad.py` | The `#dad` beats: `facts()`, the block builders, `derived_warnings()`. |
+| `sdf.py` | The `#sdf` beats — small on purpose; see "Finishing the second report". |
+| `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser. |
 | `render.py` | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge. |
 | `build_report.py` | The CLI. |
 
-Each pipeline module exposes `body()` (returning sections, rail entries and header
-fields) and `build()`. `document()` is called once, by `build()`. That is what would make
-a single combined page a short function rather than a refactor, and it costs nothing
-today.
-
-Cross-page navigation is one link. `build()` takes `sibling=(href, label)` and renders it
-as a `‹ Overview` back-link at the **top** of the report page's contents rail, above a
-`CONTENTS` label — the one place that stays reachable once a reader is deep in the page,
-and the reason the section list starts below the fold of the masthead. The landing page
-has no rail and needs no back-link. There is no tab bar: a tab that 404s when a file
-travels alone is a lie about the artefact.
+Each report module exposes `blocks()`, returning its body as one flat string; `page.py`
+wraps that in `render.panel()`, which is the `<section>`. Blocks stay flat because a
+figure has to be a direct child of the section for the CSS grid to bleed it past the
+text measure.
 
 ## The rules
 
 **1. No number is ever typed into a prose file.** Prose interpolates `{{placeholders}}`
-resolved from the run's own audit JSON, and an unknown one fails the build.
-Run-conditional figures are available to prose only as **pre-composed clauses** carrying
-an explicit degraded string — `{{substance_clause}}`, `{{delivery_clause}}`,
-`{{library_clause}}`, `{{footprint_regressions}}`. A run missing the paid pass renders
-"no measured delivery comparison on this run" where the finding would be, so the sentence
-survives and its claim does not. Do not add a bare conditional number to prose; add a
-clause to `facts()`. The landing page interpolates nothing at all — it has no run of its own, so a
-placeholder there is a build error.
+resolved from the runs' own output, and an unknown one fails the build. Run-conditional
+figures reach prose only with an explicit degraded string — `{{library_clause}}`,
+`{{near_dup_pct}}`, `{{length_pct}}` — so a run missing the paid pass renders "an
+unmeasured share" where the figure would be and the sentence survives. The page's own
+prose has exactly two facts available, `{{gen_models}}` and `{{judge_models}}`, both of
+which name models in the caveats strip. Do not add a bare conditional number to prose;
+add a clause to the owning module's `facts()`.
 
-**2. The weaknesses section is derived, not written.** Every BAD/OK verdict in the audit,
-plus provenance rules (non-`api` backend, uncommitted changes, small n) and DAD-specific
-rules (a delivery regression, per-measure arm asymmetry, length inflation, an unmeasured
-delivery pass), emits its own row whether or not anyone wrote it up. `content_dad.md`
-adds to that floor; it cannot replace it. `warnings_table()` may **collapse** rows into a
+**2. The weaknesses beats are derived, not written.** Every BAD/OK verdict the DAD audit
+recorded, plus provenance rules (non-`api` backend, uncommitted changes, small n) and
+DAD-specific rules (a delivery regression, per-measure arm asymmetry, length inflation,
+an unmeasured delivery pass), emits its own row whether or not anyone wrote it up.
+`evals/audit_sdf.py` only *prints* its verdicts, so `sdf.derived_warnings()` re-applies
+the eval's own thresholds instead. `warnings_table()` may **collapse** rows into a
 drawer, and the drawer states how many it holds — collapsing is a view, never a filter.
-`test_weaknesses_render_without_any_editorial_prose` pins this.
 
-Section ids in each prose file must exactly match that module's `CONTENT_IDS` — a missing
-or unknown id is a build error, so a typo can never silently drop a section. Two prose
-files may not both define an id. `example_pick` holds the prompt_id of the DAD worked
-example (or `auto`), so a rebuild reproduces the same case without a command-line flag.
+**3. The delivery regression is stated once.** In prose, in the results, by
+`dad._delivery_statement()`. The hero tile, the scoreboard row and the derived weakness
+carry the same number as data; a prose file that says it again is the hedging this page
+was rebuilt to remove. `TestSayingItOnce` pins it.
+
+**4. Synthetic documents comes first**, in the comparison, the chooser and the panel
+order, so the page reads in one order throughout.
+
+**5. Both datasets are for midtraining.** "SFT" names the *format* of the difficult-advice
+data — chat transcripts, consumed as supervised fine-tuning — not a different training
+phase; the documents are consumed as continued pretraining. The "what it is for" row says
+both halves, because internal shorthand has the two sounding like different phases.
+
+**6. Prose has a budget.** The build prints `editorial_words()` for the page it just
+wrote, and `test_the_prose_has_a_ceiling` fails if the shipped prose files grow past it.
+Deks — the aphoristic line under a heading — are rationed to two for the whole page.
+
+Section ids in each prose file must exactly match the owning module's `CONTENT_IDS`; a
+missing or unknown id is a build error, and two files may not both define one, so moving
+a block between prose files is a rename. `example_pick` holds the prompt_id of the DAD
+worked example (or `auto`), so a rebuild reproduces the same case without a flag.
+
+## The hero illustration
+
+`report/assets/hero.png` is inlined as a `data:` URI at build time (`build_report.
+data_uri()`), because the page must open offline and survive an artifact host's CSP: a
+file reference, even a relative one, breaks the "one file" guarantee and
+`test_is_self_contained` with it. `render.illustration()` raises on anything that is not
+a `data:` URI, and renders a marked-TODO placeholder at the right proportions if the
+asset is missing.
+
+`report/assets/hero.png` is the artwork as supplied, unedited — an RGBA PNG, so the line
+art sits straight on the cream with no background of its own. It is 2.1 MB, which
+makes the built page ~3 MB — fine for a page you open or publish, worth knowing
+before you email it.
 
 ## Constraints
 
-- **Self-contained**: no external CSS, JS, fonts or images. Each page must open offline
-  from the filesystem, and artifact hosts' CSP blocks external origins. Charts are inline
-  `<svg>`; the only JS is a tooltip handler and a rail scroll-spy. Enforced by
-  `test_is_self_contained`.
+- **Self-contained**: no external CSS, JS, fonts or images. Charts and the two link
+  marks are inline `<svg>`, the hero is a data URI, and the only JS is a tooltip handler
+  and the chooser. Enforced by `test_is_self_contained`, which allows a `data:` src and
+  nothing else off-page.
+- **One accent, `--accent:#3b2fa0`.** The page's only interaction colour: the text
+  selection and every link. Indigo because it cannot collide with anything the palette
+  reserves — far from `--good`, `--warn` and `--bad`, so a selection can never read as a
+  verdict, and deeper than `--series-7`, which only appears inside charts. There is no
+  separate `--link` token; two names for one hex is how a palette drifts.
+- **A link is a typographic object**: `var(--mono)` at `.92em`, weight 600, accent
+  coloured, with a 2px accent underline. Buttons are not links — `.lbtn`, `.choice` and
+  `.cta` each set their own `font:` shorthand, which beats the bare `a` rule.
+- **One solid button.** `.cta.solid` — accent ground, cream text — is reserved for the
+  one action the page is asking for, "Read the report". Everything else is an outline
+  button (`.lbtn`, `.choice`) or a text link.
+- **A link that leaves the page says so**, with an arrow that is *drawn* — `EXT_ARROW`,
+  an inline SVG at `stroke-width:2` in `currentColor`. As a glyph (U+2197) it is a
+  hairline in most faces and a different shape in every one, and this page is printed and
+  screenshotted. `inline_md()` adds it to any absolute link automatically, and
+  `linkbutton()` carries it too.
 - **One theme, aged paper.** `render.py` declares `color-scheme:only light` and emits a
   matching `<meta>`. `only` is load-bearing: it opts the page out of Chrome-Android and
-  Samsung Internet's auto-darkening, which `prefers-color-scheme` does not cover. These
-  are printed and screenshotted artefacts, and a viewer's OS preference is not a signal
-  about how a published document should look. `test_is_light_mode_only` pins it.
+  Samsung Internet's auto-darkening, which `prefers-color-scheme` does not cover.
 - **The palette is contrast-verified, not eyeballed.** The page is `#f7f4ea` warm cream,
   panels `#f1ebdd`, code and table heads `#e9e1cd`, rules `#cec3a6`.
   `test_text_contrast_meets_wcag_aa` recomputes WCAG ratios from the CSS tokens
-  themselves and fails if any text-on-surface pair drops below 4.5:1, so darkening a
-  surface without darkening its ink breaks the suite rather than shipping. Cream is much
-  less forgiving than white in two specific ways, both handled: the old `#dcd9cf` border
-  fell to 1.19:1 and was replaced, and the pale chip washes only reach ~1.15:1 against
-  the page, so every chip carries a tinted `--*-edge` hairline. `segbar()` draws no text
-  inside its bars for the same reason — surface-coloured labels were 2.5:1 on the green.
-- **Reserved status colours.** `--good`/`--warn`/`--bad` are not series hues. They used to
-  be — `--good` was byte-identical to `--series-3`, the pipeline's own colour, so the
-  palette quietly editorialised "pipeline = good". `test_status_colors_are_not_series_colors`
-  pins the separation. Direction is also carried by a labelled chip rather than by
-  colouring a numeral, so a status colour never travels alone.
+  themselves and fails if any text-on-surface pair drops below 4.5:1. Cream is much less
+  forgiving than white: the pale chip washes only reach ~1.15:1 against the page, so
+  every chip carries a tinted `--*-edge` hairline, and `segbar()` draws no text inside
+  its bars.
+- **Reserved status colours.** `--good`/`--warn`/`--bad` are not series hues.
+  `test_status_colors_are_not_series_colors` pins the separation. Direction is carried by
+  a labelled chip, so a status colour never travels alone.
 - **Arm colours follow the arm.** `hbar(color=...)` takes a sequence; pass `R.ARM_PAIR`
-  for any (control, pipeline) chart. Without it `hbar` falls back to `PAL[i]`, which
-  colours bars by row order — that is how the headline chart came to paint the pipeline in
-  the control's own colour while every other chart used green.
-- **stdlib only**, and no imports from `viewer/` or `shared/` — the pages have to build
-  where the pipeline's dependencies are not installed, which is also what makes them
+  for any (control, pipeline) chart. Without it `hbar` colours bars by row order — that
+  is how the headline chart came to paint the pipeline in the control's own colour.
+- **British English in prose, American in code.**
+- **stdlib only**, and no imports from `viewer/` or `shared/` — the page has to build
+  where the pipeline's dependencies are not installed, which is also what makes it
   portable. Cost: the row-building helpers in `viewer/rendering.py` are re-implemented
   here, so a schema change to `audit_report.json` can drift.
-- Both audit schemas render: modern (`valuable_welfare_considerations`) and legacy
+- Both DAD audit schemas render: modern (`valuable_welfare_considerations`) and legacy
   (reconstructed from `moral_patient_reasons` + `moves.alternatives`, exactly as
   `evals/audit_dad.py` does).
+
+## Checking it renders
+
+The generator's tests assert on the HTML it emits; they cannot tell you where anything
+lands on screen. Two layout bugs got through that way — a `1fr` grid track silently
+grown past the page by the comparison's wrapper, and a deep link scrolling before the
+hero image had claimed its space — so if you are changing layout, measure it:
+
+```bash
+apt-get install -y chromium && npm install puppeteer   # chromium must match your arch
+node -e "const p=require('puppeteer');(async()=>{
+  const b=await p.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+  const pg=await b.newPage(); await pg.setViewport({width:1440,height:1000});
+  await pg.goto('file://\$PWD/report/index.html',{waitUntil:'load'});
+  console.log(await pg.evaluate(()=>{
+    const th=[...document.querySelectorAll('.cmp thead th')].map(e=>e.getBoundingClientRect());
+    return {centre:innerWidth/2, pairMid:(th[0].left+th[1].right)/2};}));
+  await pg.screenshot({path:'/tmp/page.png',fullPage:true}); await b.close();})()"
+```
+
+`pairMid` must equal `centre`: the two dataset columns straddle the page centre and the
+field labels hang off their left, outside the pair.
 
 ## Tests
 
 ```bash
-pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_hub.py
+pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_page.py
 ```
 
-116 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
-placeholder contract, the provenance floor, the warnings table); `test_dad_report.py`
-covers the DAD page along four risk axes — degradation, self-containment, candour, colour
-integrity; `test_report_hub.py` covers the landing page, whose distinctive risks are a link to a
-page nobody has built and a stray placeholder.
+156 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
+placeholder contract, the provenance floor, the warnings table, the prose count);
+`test_dad_report.py` covers the dilemma section along five risk axes — degradation,
+self-containment, candour, saying the regression once, colour integrity;
+`test_report_page.py` covers the page itself, whose distinctive risks are a report that
+cannot be reached, a column that shows nothing when a run is missing, and prose growing
+back.
 
-## Adding the SDF page
+## Finishing the second report
 
-`report/render.py` and `report/common.py` are already pipeline-agnostic, so an SDF page is
-a new `report/sdf.py` + `report/content_sdf.md`, plus `sdf_href="sdf_report.html"` passed
-to the landing page. Two things to know before starting:
+`report/sdf.py` ships the chooser entry, the comparison-table figures and a derived
+provenance floor. The full section is a matter of filling in the same beats `dad.py` uses —
+`R.sub("sdf-example", ...)` and so on — plus a `content_sdf.md` that takes over the
+`sdf_what` / `sdf_soon` ids from `content_page.md` (a rename: the build fails if both
+files define one). Three things to know before starting:
 
 - **`derived_warnings()` cannot be shared.** `evals/audit_dad.py` records its verdicts
-  into `sections[].rows[]`; `evals/audit_sdf.py` only prints them. So
-  `common.audit_verdict_warnings()` returns `[]` for an SDF audit, and that page has to
-  compute its own thresholds (top-type share, truncation fraction, near-dup rate,
-  formulaic openings, score-distribution degeneracy). Teaching `audit_sdf.py` to record
-  rows the way `audit_dad.py` does would give future runs the shared floor for free;
-  committed runs predate it either way.
+  into `sections[].rows[]`; `evals/audit_sdf.py` only prints them, so
+  `common.audit_verdict_warnings()` returns `[]` for an SDF audit. `sdf.derived_warnings()`
+  mirrors the eval's own thresholds instead. Teaching `audit_sdf.py` to record rows the
+  way `audit_dad.py` does would give future runs the shared floor for free.
 - **`evals/report_sdf.py` on `origin/aidan/sdf-500-run-and-report` is not portable.**
   Roughly half of its 853 lines is editorial prose welded to a 477-document run ("across
   477 documents", "nineteen drifted — 95%"), which is exactly what rule 1 exists to
-  prevent. Lift its `histogram()` and `excerpt_block()`; write the rest. `render.py`
-  already has `histogram()`.
+  prevent. Lift its `excerpt_block()`; write the rest. `render.py` already has
+  `histogram()`.
 - The only committed SDF run with a full `audit/audit_report.json` is
   `outputs/sdf/runs/2026-07-11_20-06_matrix100-cli` (100 docs). The newer
   `2026-07-13_13-18_al-gap-fixes-100docs` has only `diversity_report.json` and would need
-  `python evals/audit_sdf.py --input <run> --patterns` re-run.
+  `python evals/audit_sdf.py --input <run> --patterns` re-run. Per-document layer-5
+  scores live in `layer5/scores.jsonl` and in each corpus record's `scores` field.

@@ -82,6 +82,26 @@ class TestFill:
         assert C.fill("{{delivery_clause}}.", f).endswith("on this run.")
 
 
+class TestEditorialWords:
+    """The page has a prose budget, so the build prints one number for it. What it
+    counts is what a person wrote — not the corpus, and not the audit's own wording."""
+
+    def test_counts_paragraphs_and_captions(self):
+        assert C.editorial_words("<p>one two three</p><figcaption>four five</figcaption>") == 5
+
+    def test_does_not_count_corpus_text_or_tables(self):
+        html = ("<p>counted words here</p>"
+                "<blockquote>the user's message is not authored prose</blockquote>"
+                "<div class='resp'>neither is a model answer</div>"
+                "<table><tr><td>nor a derived warning row</td></tr></table>"
+                "<svg><text>nor a chart label</text></svg>"
+                "<!-- nor a comment -->")
+        assert C.editorial_words(html) == 3
+
+    def test_empty_page_is_zero(self):
+        assert C.editorial_words("") == 0
+
+
 class TestProvenanceWarnings:
     def test_non_api_backend_is_flagged(self):
         w = C.provenance_warnings({"config": {"backend": "bedrock"}})
@@ -183,7 +203,8 @@ class TestPalette:
         ("text-primary", "surface-0"), ("text-secondary", "surface-0"),
         ("text-muted", "surface-0"), ("text-muted", "surface-1"),
         ("text-muted", "surface-2"), ("text-secondary", "surface-1"),
-        ("link", "surface-0"),
+        ("accent", "surface-0"),          # links, on the page
+        ("surface-0", "accent"),          # selected text, on the accent
         ("good-ink", "good-wash"), ("warn-ink", "warn-wash"), ("bad-ink", "bad-wash"),
     ]
 
@@ -193,6 +214,14 @@ class TestPalette:
             assert ink in t and surface in t, f"missing token: {ink} / {surface}"
             r = _ratio(t[ink], t[surface])
             assert r >= 4.5, f"--{ink} on --{surface} is {r:.2f}:1, below AA's 4.5"
+
+    def test_the_accent_is_not_a_status_or_series_colour(self):
+        """A selection or a link must never read as a verdict, so the one accent this
+        page has is kept clear of the reserved hues and of the chart series."""
+        t = _tokens()
+        reserved = {t[k] for k in ("good", "warn", "bad")}
+        reserved |= {v for k, v in t.items() if k.startswith("series-")}
+        assert t["accent"] not in reserved
 
     def test_the_page_is_paper_not_white(self):
         assert _tokens()["surface-0"].lower() != "#ffffff"

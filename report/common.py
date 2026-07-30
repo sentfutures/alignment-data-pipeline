@@ -4,7 +4,7 @@ Same contract as render.py: stdlib only, no repo imports, no pipeline knowledge 
 report generators have to build in an environment where the pipeline's own
 dependencies are not installed, which is also what makes them portable.
 
-Everything here is used by report/dad.py and report/hub.py today. Anything that only
+Everything here is used by report/page.py and report/dad.py today. Anything that only
 one pipeline needs stays in that pipeline's module: in particular the weaknesses floor
 splits in two, because ``evals/audit_dad.py`` records its verdicts into
 ``sections[].rows[]`` and ``evals/audit_sdf.py`` only prints them. So
@@ -22,6 +22,21 @@ from report import render as R
 
 
 # ------------------------------------------------------------------ loading
+
+# A run snapshots the prompts it ran with into inputs/prompts/, which is the honest
+# source for "how many prompts is this pipeline" — the question a reader who wants to
+# run it against their own model is actually asking. Counted: the stage templates only.
+# Not the variables matrix (a weighted table, not a prompt), not the reasoning library,
+# not archive/, and not *_score.txt, which is an eval rather than a generation stage.
+def prompt_count(run_dir, glob):
+    """How many stage templates the run was generated with, or None if it kept no
+    snapshot of them."""
+    snapshot = Path(run_dir) / "inputs" / "prompts"
+    if not snapshot.is_dir():
+        return None
+    n = sum(1 for p in snapshot.glob(glob) if not p.name.endswith("_score.txt"))
+    return n or None
+
 
 def read_json(path):
     try:
@@ -124,8 +139,28 @@ def prose(content, key, f):
 
 
 def section(sid, heading, *blocks):
+    """A section. A falsy heading omits the <h2> — for a section whose own content is
+    its title, like the comparison, whose two column mastheads say what it is."""
     body = "".join(b for b in blocks if b)
-    return f"<section id='{sid}'><h2>{R.esc(heading)}</h2>{body}</section>"
+    head = f"<h2>{R.esc(heading)}</h2>" if heading else ""
+    return f"<section id='{sid}'>{head}{body}</section>"
+
+
+_STRIP_BLOCKS = re.compile(
+    r"<(script|style|svg)\b.*?</\1>|<blockquote\b.*?</blockquote>"
+    r"|<div class='resp'>.*?</div>|<table\b.*?</table>|<!--.*?-->", re.S)
+
+
+def editorial_words(html):
+    """How many words of authored prose a built page carries.
+
+    Corpus text, chart internals and every table — including the derived warnings,
+    whose wording comes from the audit — are excluded, so what is counted is the part
+    a person wrote. Printed at build time: the page's whole brief is that a reader
+    with forty seconds gets what they need, and prose is the thing that grows back.
+    """
+    text = _STRIP_BLOCKS.sub(" ", html or "")
+    return len(re.findall(r"[A-Za-z][A-Za-z'’-]*", re.sub(r"<[^>]+>", " ", text)))
 
 
 # ------------------------------------------------------------------ cost
@@ -254,13 +289,11 @@ def write(path, html, *, label=""):
 
 def cli_parser(doc):
     p = argparse.ArgumentParser(description=(doc or "").strip().split("\n")[0])
-    p.add_argument("--page", default="all", choices=("all", "index", "dad"),
-                   help="which page(s) to build (default all)")
     p.add_argument("--dad-run", "--run", dest="dad_run", default=None,
-                   help="DAD run directory")
+                   help="DAD run directory (required)")
     p.add_argument("--sdf-run", dest="sdf_run", default=None,
-                   help="SDF run directory (the SDF page is not built yet; the hub uses "
-                        "this only to show its headline numbers)")
+                   help="SDF run directory. Optional: without it the document corpus's "
+                        "column and section say so instead of showing figures")
     p.add_argument("--out-dir", default=None, help="output directory (default report/)")
     p.add_argument("--content", action="append", default=None,
                    help="prose file, repeatable; overrides the page's default prose file(s)")
