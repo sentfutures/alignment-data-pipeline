@@ -1,0 +1,979 @@
+{
+ "dimensions": [
+  {
+   "dimension": "money-paths",
+   "summary": "The money-path engineering here is unusually deliberate for a largely non-engineer-built repo: every stage appends output before marking its checkpoint, parallel_map's contract (in-order yield, main-thread writes, exception surfaces after yielded items are safe) is real — I verified against CPython's Executor.map that all tasks are submitted eagerly but the result iterator's finally-clause cancels unstarted futures on early exit, so an exception wastes at most the in-flight worker calls — and the DAD steps 2–3 and pref pipeline are exemplary: stop_reason guards with skip-without-checkpoint retry semantics, plus belt-and-braces done-detection that consults both the checkpoint and the output file, making them robust even to a lost checkpoint. Cost logging is sound on both backends (thread-safe append, per-run log path, notional-cost fallback for claude_code, loud unknown-model pricing warning, attempt/duration tags); the \"cost this session\" label actually reports whole-run cumulative cost on resume, a cosmetic nit. The defects cluster in two places. First, the older SDF layers lag the DAD standard: no layer checks stop_reason, and layer 4 — the alignment-critical rewrite — fails open on truncation by silently checkpointing the un-rewritten draft into the corpus, exactly the failure DAD step 3 was built to prevent. Second, the persistence primitives themselves are not crash-safe: Checkpoint rewrites its JSON in place (a kill mid-write bricks --resume) and load_jsonl tolerates no partial trailing line, so the recovery path for the most common failure (interrupted run) can itself corrupt, and layers 2–4's checkpoint-only done-detection turns that into re-billing plus duplicate records. DAD step 1c is the one stage that violates the repo's own write-per-item contract, deferring all persistence to the end of a batch. The flagged ruff seeds (B023, B905) are all verified benign as written. Fixes are mostly small and can copy patterns that already exist elsewhere in the same codebase.",
+   "findings": [
+    {
+     "title": "SDF layer 4 (alignment-critical rewrite) fails open on truncation: un-rewritten draft is checkpointed into the corpus and never retried",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 57,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "Line 43-49: `api.call_claude(...)` is invoked WITHOUT `return_stop_reason=True` (max_tokens=6000). Lines 52-61: if `<improved_document>` tags are absent — which is exactly what a max_tokens truncation or a refusal produces — the fallback sets `rewritten = draft[\"content\"]` with only a note in `review_notes` (\"Parse error — no <improved_document> tags; kept original draft.\"), no runtime print. Line 80: the record is then `checkpoint.mark_done(record[\"doc_id\"])`, so --resume never retries it. Contrast dad_pipeline/step3_rewrite.py:58-89, which checks stop_reason, retries once at 8000 tokens, and refuses to checkpoint a truncated rewrite. CLAUDE.md calls layer 4 \"the quality-critical call\" (TCW ablation: 19x on misalignment rate).",
+     "failure_scenario": "A long layer-3 draft (e.g. the single-doc fallback path can consume most of layer 3's 6000-token budget) needs review notes + full rewrite > 6000 output tokens. stop_reason=max_tokens, the closing tag never arrives, the original un-rewritten draft is silently kept, marked done, scored at layer 5 (drafts routinely score >=7), and enters sdf_corpus.jsonl having skipped the pipeline's alignment-critical transform. Nothing in the final record or console reveals it; the only trace is review_notes in an intermediate file nobody gates on.",
+     "recommendation": "Mirror step3_rewrite.py: call with `return_stop_reason=True`; on stop_reason==\"max_tokens\" retry once at a doubled cap; if still truncated or the tags are missing, print, log to a rewrite_failures.jsonl, and `continue` WITHOUT mark_done so --resume retries. The keep-original fallback should survive only for genuinely well-terminated responses that omitted tags, and even then emit a console warning. Update the pinned test at tests/test_sdf_layers.py:165 deliberately (per CLAUDE.md's flip-the-test-deliberately rule).",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:43-61 (no stop_reason, fail-open fallback)",
+      "sdf_pipeline/layer4_rewrite.py:80 (fallback record checkpointed)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Checkpoint and JSONL persistence are not crash-safe: a kill mid-write bricks --resume, and the likely operator recovery re-bills a whole stage",
+     "file": "shared/utils.py",
+     "line": 303,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "Checkpoint.mark_done (lines 296-304) rewrites the entire checkpoint file in place: `with open(self.path, \"w\") ...: json.dump(...)` — no temp-file + os.replace. Checkpoint.__init__ (lines 288-291) does a bare `json.load` with no error handling, so a truncated file raises JSONDecodeError at stage start. load_jsonl (lines 60-65) likewise raises on a partial trailing line, which is what a crash mid-`append_jsonl` (lines 48-52, multi-KB document records, no single-write guarantee) leaves behind.",
+     "failure_scenario": "A $50 run is killed (Ctrl-C, OOM, power loss) during one of the thousands of mark_done rewrites or mid-append of a document record. The next `--resume` crashes with a JSONDecodeError traceback before making any API call. A non-engineer contributor's natural fix — delete `_checkpoint.json` (or the .jsonl) — re-bills every item in that stage, and in layers 2-4 (which trust only the checkpoint, see separate finding) additionally appends duplicate records alongside the survivors.",
+     "recommendation": "In mark_done, write to `self.path.with_suffix('.json.tmp')` then `os.replace` (atomic on POSIX and Windows). In __init__, catch (json.JSONDecodeError, OSError), warn to stderr, and start from an empty completed-set — safe because every stage writes output before marking, and the output-file cross-check pattern (layer 5 / steps 2-3 / pref) makes recovery free. In load_jsonl, tolerate exactly one malformed FINAL line with a stderr warning (still raise on malformed interior lines). Add tests for all three per the checkpoint/resume money-path test rule.",
+     "instances": [
+      "shared/utils.py:288-291 (Checkpoint.__init__ bare json.load)",
+      "shared/utils.py:296-304 (in-place rewrite)",
+      "shared/utils.py:60-65 (load_jsonl intolerant of partial trailing line)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "DAD step 1c defers all persistence to end-of-batch: one refine failure discards the whole batch's paid 1b + 1c work",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 767,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "The 1c fan-out (lines 756-769) collects results only into the in-memory `refined_by_pid`; record assembly and every `utils.append_jsonl(record, output_path)` happen in a separate loop afterwards (lines 771-815). This is the one stage that violates the parallel_map contract's intent (\"items already yielded are safely checkpointed\", shared/utils.py:17-25) — yielded refine results are NOT persisted until the entire batch's zip loop finishes.",
+     "failure_scenario": "On the claude_code backend, the subscription window is exhausted (UsageLimitExceeded, deliberately not retried — shared/api.py:85-91) at refine 9 of 10. The exception propagates out of the zip at line 767; the record loop never runs; nothing from the batch reaches dilemmas.jsonl. --resume finds all 10 scenarios unfilled and re-bills the 16k-token 1b batch call (line 729) plus all 10 Sonnet refine calls — including the 8 that already succeeded. Same loss for an API-backend refine that exhausts its 8 tenacity retries.",
+     "recommendation": "Merge the two loops: iterate `zip(batch-with-drafts, parallel_map(_refine, ...))` and, per item, assemble the record (ID assignment stays main-thread, input-order) and append it to output_path immediately — matching layers 2-5. Alternatively, append each refine result to refinements.jsonl inside the zip loop and consult it before re-calling on retry. Add the resume test asserting zero API calls for scenarios whose refines completed.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:755-769 (results buffered in refined_by_pid)",
+      "dad_pipeline/step1_dilemmas.py:771-815 (writes only after all refines)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Layers 2-4 trust only the checkpoint for done-ness: a crash in the append-to-mark window duplicates records (and documents) on resume",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 30,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "layer4_rewrite.py:30 computes `pending = [d for d in drafts if not checkpoint.is_done(d[\"doc_id\"])]` without consulting the already-loaded `existing` rewrites (line 27-28); the append (line 79) precedes mark_done (line 80). Layers 2 and 3 have the same shape with a wider window — a whole type/subtype's records are appended (layer2:117-119, layer3:182-184) before the single mark (120, 185). Contrast layer5_score.py:58-61, step2_responses.py:110-121, step3_rewrite.py:41-45, and pref_pipeline/run.py:129-140, which all cross-check the output file.",
+     "failure_scenario": "Run killed between layer 4's append and mark_done for doc X. --resume re-bills X's rewrite and appends a second record with the same doc_id; layer 5 receives both (run.py loads rewrites.jsonl), scores both (one extra paid call), and two independent temperature-1.0 rewrites of the same draft can both pass threshold and land in sdf_corpus.jsonl (the 0.90 shingle cull is not guaranteed to catch them). In layer 2 the resume regenerates the whole type next to surviving partial records, yielding colliding subtype_ids (\"5_0\" twice) that layer 3 then drafts twice — duplicate cost and near-duplicate corpus content.",
+     "recommendation": "Layer 4: one line — exclude doc_ids present in `existing` from pending, exactly like layer 5. Layers 2/3: on load, dedupe existing records by subtype_id/doc_id (keep first) and treat a type/subtype as done if its records exist on disk, or write each type's records via a single save-then-mark sequence. The atomic-checkpoint fix (separate finding) shrinks but does not close this window.",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:30,76-80",
+      "sdf_pipeline/layer2_subtypes.py:41,117-120",
+      "sdf_pipeline/layer3_draft.py:108,180-185"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Pref pipeline re-reads the live prompts file on --resume: an edited file silently mispairs arm responses across different prompts",
+     "file": "pref_pipeline/run.py",
+     "line": 97,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "Arms are frozen into the run (`inputs/arm_prompts.yaml`, lines 111-119) precisely so resume replays them, but the prompts themselves are re-loaded from the live `--prompts`/config path every invocation (lines 94-101). The per-arm cache is keyed only by (pair_id, arm) (lines 130-131, 146-148), and pair_id derives from prompt_id alone (line 139), not from the prompt text. Separately, line 39 reads only `user_message`/`prompt`, while the CLI help on line 80 and CLAUDE.md both promise a `refined` field.",
+     "failure_scenario": "Arm a succeeds for pair_AW-0007, arm b fails (pair deferred, per lines 159-171). The contributor tweaks the prompt wording in the JSONL (or regenerates dilemmas.jsonl), then --resume: arm a's cached response to the OLD text (line 146-148) is paired with arm b's fresh response to the NEW text and recorded under the new user_message (lines 179-188). Raters blind-compare responses to two different prompts, and the resulting preferences.jsonl — potential DPO data — is silently wrong. The `refined`-field gap is loud but confusing: a refined-only JSONL exits with \"No usable prompts\" despite matching the documented contract.",
+     "recommendation": "Freeze the prompt set like the arms: on run creation copy the resolved prompts to `run_dir/inputs/prompts.jsonl` and load from there on --resume (warn if --prompts is also passed and differs). Cheaper stopgap: store a hash of user_message in each arm_responses.jsonl row and refuse the cached response when it mismatches. Also add `r.get(\"refined\")` to the fallback chain in _load_prompts (line 39) to honor the documented contract.",
+     "instances": [
+      "pref_pipeline/run.py:94-101 (live prompt reload on resume)",
+      "pref_pipeline/run.py:130-131,146-148 (cache keyed only by pair_id+arm)",
+      "pref_pipeline/run.py:39 vs :80 ('refined' promised, never read)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "SDF layer 3 never checks stop_reason: truncated draft batches silently shrink the corpus and can admit a sentence-trimmed fragment",
+     "file": "sdf_pipeline/layer3_draft.py",
+     "line": 143,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "Lines 143-146: call_claude at max_tokens=6000 without `return_stop_reason` while requesting `count` documents in one response. Lines 154-159: only complete `<document>...</document>` blocks are kept, so a max_tokens cutoff silently drops the trailing document(s). Lines 161-164: when NO complete block exists, the whole truncated output is trimmed \"back to the last complete sentence\" and becomes a draft. Line 185 marks the subtype done regardless of how many of `count` docs materialized. (Layers 1-2 also skip stop_reason but fail safe: utils.extract_json's broken-container logic, shared/utils.py:101-110, raises on truncated arrays rather than salvaging fragments.)",
+     "failure_scenario": "documents_per_subtype=3 with verbose drafts: the third document is cut mid-paragraph, silently dropped, and the subtype is checkpointed done with 2 docs — the corpus undershoots its configured size with no signal beyond a per-subtype count print. Worse, a single-document response truncated before its closing tag becomes a fragment ending at an arbitrary sentence — grammatical but incomplete (an argument that stops halfway) — which layer 4 rewrites and layer 5 can score >=7 into the training corpus.",
+     "recommendation": "Use `return_stop_reason=True`; on stop_reason==\"max_tokens\" either retry once with a raised cap (step3_rewrite.py:65-70 pattern) or accept the complete tagged docs but print a loud per-subtype shortfall warning and record `requested`/`delivered` in the checkpoint record; never take the untagged-fallback path (line 161-164) for a max_tokens response — skip without mark_done so --resume retries.",
+     "instances": [
+      "sdf_pipeline/layer3_draft.py:143-146,154-164,185",
+      "sdf_pipeline/layer1_document_types.py:41 and sdf_pipeline/layer2_subtypes.py:57 (no stop_reason, but fail-safe via extract_json)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "--resume applies the live config's models/knobs silently; only a backend change is warned about",
+     "file": "shared/utils.py",
+     "line": 254,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "warn_if_backend_changed (lines 254-279) compares only the `backend` key of run_manifest.json against the live config. Both orchestrators call `api.init(args.config, ...)` and pass the freshly loaded config to every stage (sdf_pipeline/run.py:32,60; dad_pipeline/run.py:40,68), so per-stage model overrides, max_tokens, thresholds, and worker counts all follow the live config.yaml on resume while the manifest still records the originals.",
+     "failure_scenario": "A contributor edits config.yaml between sessions (e.g. flips draft_model from haiku to sonnet to test, forgets to revert) then resumes a full-scale run: the remaining half of layer 3 runs at 3x the intended price, mixed-model within one stage, and the run_manifest.json snapshot now misdescribes what actually generated the corpus — undermining the manifest's reproducibility promise. No warning is emitted.",
+     "recommendation": "Extend warn_if_backend_changed into warn_if_config_changed: diff the manifest's config against the live one for the money-relevant keys (`model`, `sdf.*_model`, `dad.*_model`, `max_tokens`, `temperature`, scale knobs) and print each drift on --resume. Optionally offer resuming FROM the manifest config as the default, with the live config opt-in.",
+     "instances": [
+      "shared/utils.py:254-279",
+      "sdf_pipeline/run.py:32,60",
+      "dad_pipeline/run.py:40,68"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Layer 5 parse-failure fallback fabricates scores of 5 — fails closed only while min_score_threshold stays above 5; non-dict JSON crashes the stage",
+     "file": "sdf_pipeline/layer5_score.py",
+     "line": 82,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "Lines 79-82: a JSONDecodeError from the scoring call is replaced by `{\"alignment\": 5, \"realism\": 5, \"diversity\": 5, \"notes\": \"Parse error.\"}`. That is below the shipped threshold (config.yaml:13, min_score_threshold: 7) purely by coincidence of configuration; nothing pins the invariant. Also lines 93-96 call `scores.get(...)` — if extract_json returns a JSON array (a plausible model slip), AttributeError crashes the whole layer mid-run, discarding in-flight paid calls.",
+     "failure_scenario": "A contributor lowers min_score_threshold to 5 for a cheap dev run (the natural knob to loosen) and keeps the output: every scoring response that fails to parse now passes BOTH gates with fabricated scores, putting unscored documents into the training corpus with only a \"Parse error.\" note buried in scores.jsonl. Separately, one array-shaped scoring response crashes layer 5 and wastes up to `workers` in-flight scoring calls.",
+     "recommendation": "Make the fallback structurally fail-closed: use scores of 0 (or a `parse_error: true` flag that the pass-filter at lines 118-121 rejects explicitly) instead of a value that happens to sit below today's threshold; wrap the parse in `if not isinstance(scores, dict): scores = {}` before the .get calls. One-line test each.",
+     "instances": [
+      "sdf_pipeline/layer5_score.py:79-82 (fabricated 5s)",
+      "sdf_pipeline/layer5_score.py:93-96 (AttributeError on non-dict)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Ruff seeds verified: B023 loop-variable capture at layer2:114 and all four B905 zips are benign as written (fragile, not buggy)",
+     "file": "sdf_pipeline/layer2_subtypes.py",
+     "line": 114,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "The lambda at line 114 captures `note` by reference, but is safe: `zip(wave, parallel_map(...))` (line 113) fully consumes the generator within the same wave iteration — Executor.map (verified in CPython source) submits ALL of the wave's tasks at the first pull, while `note` still holds that wave's value, and `note` is only reassigned (line 112) after zip exhausts `wave`. B905: layer2:113, layer3_draft.py:180, and step1_dilemmas.py:767 each zip a list against `parallel_map` over that same list (equal length by construction; a worker exception propagates through zip rather than mispairing); diversity.py:152 zips chunk indices against embed_texts output, which returns exactly one row per input (shared/embeddings.py:134-167).",
+     "failure_scenario": "No current failure. The maintenance risk: the `note` capture silently becomes a real cross-wave bug if anyone breaks the consume-within-iteration pattern (e.g. collecting the generators first, filtering the zip, or adding an early `break`), and the strict-less zips would silently drop items if parallel_map ever gained an error-skipping mode. In a repo maintained by non-engineers via automated review, these are the kind of latent traps that survive refactors.",
+     "recommendation": "Bind the wave note at definition time — `lambda dt, note=note: generate_subtypes(dt, note)` — and add `strict=True` to the four zips (free at these sizes; also promptly closes parallel_map's ThreadPoolExecutor by exhausting the generator). Pure hardening; no behavior change expected, existing tests should pass unmodified.",
+     "instances": [
+      "sdf_pipeline/layer2_subtypes.py:113-115 (B023 + B905)",
+      "sdf_pipeline/layer3_draft.py:180 (B905)",
+      "dad_pipeline/step1_dilemmas.py:767-768 (B905)",
+      "evals/diversity.py:152 (B905)"
+     ],
+     "dimension": "money-paths",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "parsing",
+   "summary": "The repo has seven distinct LLM-output parsing implementations spread across six files: shared/utils.extract_json (longest-complete-value, fail-closed on broken containers, well-tested — the only shared one, used by SDF layers 1/2/5); dad_pipeline/step1_dilemmas.py's trio (_parse_json_array / _parse_json_object / _salvage_objects — fence-strip, bracket-slice, then a hand-rolled brace-matching state machine that salvages complete objects out of truncated arrays); dad_pipeline/step2_responses._parse_scope (fence-strip + greedy brace-slice, strict=False, returns {}); evals/audit_sdf._parse_json_block (fence-strip + first-bracket raw_decode, raises); inline fence-strip + bare json.loads in evals/score_sdf.py and score_dad.py (placeholder scores on failure); and regex tag extraction with degrading fallbacks in sdf layers 3/4. These embody three conflicting salvage philosophies — extract_json deliberately REJECTS fragments of broken containers (documented, tested), step 1b deliberately HARVESTS fragments because its re-request loop makes partial results safe, and the score/audit sites want whole-or-nothing with silent degradation — and one hard-won lesson (strict=False for temperature-1 prose JSON, encoded in _parse_scope with a test citing \"the historical cause of silently empty scopes\") that never propagated to the five sibling parsers. The worst concrete defects: SDF layer 5 checkpoints parse failures with placeholder scores, permanently discarding paid layer-3+4 work with no resume retry; and the step-1 parsers' strict decoding re-bills 16k-token batch calls for rescuable output. Consolidation is very tractable: extract_json's algorithm subsumes every whole-value site unchanged if it gains strict=False and an expect=\"array\"/\"object\" parameter, and _salvage_objects should move to shared/utils as the single documented truncated-batch variant; only step 1b legitimately needs it. Test coverage is inverted relative to risk — extract_json is thoroughly tested while the most intricate parser (_salvage_objects, coverage lines 544–568) and both eval scorers (0%) have none.",
+   "findings": [
+    {
+     "title": "Layer 5 checkpoints score-parse failures, permanently discarding paid layer-3/4 documents with no resume retry",
+     "file": "sdf_pipeline/layer5_score.py",
+     "line": 81,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "Lines 79-82: `try: scores = utils.extract_json(raw) except json.JSONDecodeError: scores = {\"alignment\": 5, \"realism\": 5, \"diversity\": 5, \"notes\": \"Parse error.\"}`. The record is then appended to scores.jsonl and `checkpoint.mark_done(record[\"doc_id\"])` (line 115), so on --resume the doc sits in existing_scores and is never re-scored. With the default `min_score_threshold: 7` (config.yaml line 13), placeholder 5s fail the filter at lines 118-121 and the doc is dropped from the corpus. No stop_reason check on the scoring call (lines 73-78) either.",
+     "failure_scenario": "The scoring model puts a literal newline inside the `notes` string (the exact temperature-1 failure step2's tests document as 'the historical cause of silently empty scopes') or wraps the object in prose that breaks all candidates. extract_json raises, the doc gets 5/5/5, is checkpointed, and silently vanishes from the final corpus. The layer-3 draft and the expensive layer-4 constitution rewrite for that doc — the two paid quality-critical calls — are permanently lost; --resume retries nothing because the checkpoint says done. If a contributor later lowers min_score_threshold to 5 for a dev run, the same path instead inserts docs with fabricated scores into the corpus.",
+     "recommendation": "Match the DAD step-2/3 contract that CLAUDE.md advertises ('failed work is not checkpointed, so --resume retries it'): on JSONDecodeError return a sentinel from score_document, and on the main thread log it to a score_failures.jsonl and skip both append_jsonl and mark_done so --resume retries the scoring call (the draft/rewrite are already checkpointed, so the retry costs one cheap scoring call). Also request return_stop_reason=True and treat stop_reason=='max_tokens' as a failed attempt, and validate `isinstance(scores, dict)` before .get (a list-wrapped judge response currently raises AttributeError past the except and kills the layer).",
+     "instances": [
+      "sdf_pipeline/layer5_score.py:79-82 (placeholder scores on parse failure)",
+      "sdf_pipeline/layer5_score.py:111-115 (failure record appended + checkpointed like a success)"
+     ],
+     "dimension": "parsing",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "All cited lines match current code: layer5_score.py:79-82 substitutes 5/5/5 placeholder scores on json.JSONDecodeError, lines 111-115 append and checkpoint that record like a success, lines 55-61 make --resume reuse it without re-scoring, and lines 118-121 with min_score_threshold: 7 (config.yaml:13) drop the doc from the final corpus. Executed utils.extract_json against a scores object with a literal newline inside the notes string and against prose-wrapped truncated JSON — both raise, and tests/test_dad_steps.py:211-214 confirms the newline case as the documented historical failure step 2 fixed but layer 5 did not. The scoring call omits return_stop_reason and api.call_claude only warns (api.py:484-489), so max_tokens truncation feeds the same path; the low-threshold variant (fabricated scores entering the corpus) also holds. Minor nuance only: the failure is discoverable in scores.jsonl (\"notes\": \"Parse error.\") and the rewritten text survives in layer-4 output, but no automated retry exists — consistent with the finding as stated."
+    },
+    {
+     "title": "Strict JSON decoding in step-1 parsers and extract_json rejects control-character payloads that step 2 already learned to accept, re-billing 16k-token batch calls",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 564,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "step2_responses.py:46 uses `json.loads(text.strip(), strict=False)` with the comment 'strict=False accepts literal newlines/tabs inside string values — the way a prose-heavy JSON object at temperature 1.0 most often goes invalid', and tests/test_dad_steps.py:210-214 calls this 'the historical cause of silently empty scopes'. But step1's parsers use strict defaults: json.loads at step1_dilemmas.py:564 (_salvage_objects), :578 and :584 (_parse_json_array), :600 (_parse_json_object); and shared/utils.py:90 builds `json.JSONDecoder()` with strict=True for extract_json.",
+     "failure_scenario": "A 1b batch response (max_tokens=16000, step1_dilemmas.py:729) contains multi-paragraph dilemma prompts where the model emits a literal newline inside a JSON string — the repo's own documented most-common temperature-1 failure. Whole-text parse fails, bracket-slice fails, and _salvage_objects' per-object json.loads also fails on the same control character, so structurally intact objects are dropped. Affected scenarios are re-requested in a fresh 16k-token batch call that is just as likely to fail the same way; the loop burns up to max_calls (8x the batch count, line 703) or exits via the 3-consecutive-failures SystemExit (line 744), billing thousands of wasted tokens. In 1c, the same defect silently discards the paid refine call and keeps the unrefined 1b draft (line 787). At layers 1/2/5 it converts usable responses into JSONDecodeError — feeding the layer-5 permanent-drop path.",
+     "recommendation": "Pass strict=False everywhere model output is decoded: `json.JSONDecoder(strict=False)` in shared/utils.py:90, and `json.loads(..., strict=False)` at step1_dilemmas.py:564, 578, 584, 600. strict=False only relaxes control characters inside strings, so it cannot admit wrong-shaped data. Add a control-character regression test per parser (copy the pattern from tests/test_dad_steps.py:210-214).",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:564 (_salvage_objects)",
+      "dad_pipeline/step1_dilemmas.py:578,584 (_parse_json_array)",
+      "dad_pipeline/step1_dilemmas.py:600 (_parse_json_object)",
+      "shared/utils.py:90 (extract_json decoder, affects sdf layers 1/2/5)"
+     ],
+     "dimension": "parsing",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Seven divergent parse implementations with three conflicting salvage philosophies; consolidate onto shared/utils.extract_json plus one documented salvage variant",
+     "file": "shared/utils.py",
+     "line": 68,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "extract_json (shared/utils.py:68-111) implements longest-complete-value with explicit fragment disqualification ('salvaging such a fragment would feed the caller a wrong-shaped result'). step1_dilemmas.py:571-604 implements the opposite philosophy — _salvage_objects (541-568) deliberately harvests complete objects out of broken arrays. step2_responses.py:37-55 implements a third variant (greedy find('{')..rfind('}') slice, returns {}). audit_sdf.py:363-380 implements a fourth (first-bracket raw_decode, raises). score_sdf.py:61-70 and score_dad.py:92-102 duplicate a fifth inline (fence-strip + bare json.loads with no prose tolerance at all). Five of the six independently reimplement the same fence-stripping lines (`if text.startswith(\"```\"): text = \"\\n\".join(text.split(\"\\n\")[1:])`).",
+     "failure_scenario": "Concrete maintenance cost for the receiving lab: any fix to parsing (the strict=False fix above, a fence edge case, a wrapper-object unwrap) must be discovered and applied in six places, and history shows it isn't — the strict=False lesson was paid for once in step 2 and never propagated, and the '#59 robust-json-extraction' PR hardened only extract_json while the five siblings kept their old bugs. Each new stage a non-engineer contributor adds copies whichever parser they saw last, inheriting its quirks (score_sdf/score_dad copied the weakest one, which cannot even tolerate leading prose, so a judge saying 'Here is my evaluation: {...}' becomes a placeholder-zero record).",
+     "recommendation": "Consolidation design: (1) extend extract_json with `expect: Literal['array','object'] | None = None` — filter candidates to the expected type before the longest-value rule (this also fixes the '[2] aside' class by construction) — and strict=False; keep the raise-on-broken-container semantics. (2) Move _salvage_objects to shared/utils as `salvage_json_objects(text)` with its docstring stating the contract: fragment-harvesting is safe ONLY where the caller re-requests missing items by id (step 1b is the sole qualifying site). (3) Migrate unchanged: layer1:44, layer2:59, layer5:80 (add expect='array'/'object'); score_sdf.py:61-70 and score_dad.py:92-102 → extract_json(raw, expect='object') in a try/except (strictly more tolerant than today); audit_sdf._parse_json_block → delete, call extract_json (all three callers already catch Exception; first-bracket vs longest-value differences are benign there). (4) Migrate with documented behavior notes: _parse_scope → extract_json(expect='object') wrapped to return {} (greedy-slice → longest-value is a strict improvement; keep _valid_scope); _parse_json_object → extract_json(expect='object') falling back to salvage_json_objects()[0]; _parse_json_array keeps its unique tolerance as extract_json(expect='array') falling back to salvage_json_objects(). (5) Move the fence-stripping into extract_json once (it already handles fences via raw_decode, so the per-site stripping can simply be deleted).",
+     "instances": [
+      "shared/utils.py:68-111 (extract_json — target API)",
+      "dad_pipeline/step1_dilemmas.py:541-604 (_salvage_objects, _parse_json_array, _parse_json_object)",
+      "dad_pipeline/step2_responses.py:37-55 (_parse_scope)",
+      "evals/audit_sdf.py:363-380 (_parse_json_block)",
+      "evals/score_sdf.py:61-70 (inline)",
+      "evals/score_dad.py:92-102 (inline)"
+     ],
+     "dimension": "parsing",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Read all six cited locations; every line range, mechanism, and quoted docstring phrase checks out: extract_json (utils.py:68-111) refuses fragments, step1's _salvage_objects/_parse_json_array/_parse_json_object (541-604) deliberately harvest them, step2's _parse_scope (37-55) is a greedy slice returning {}, audit_sdf._parse_json_block (363-380) raw_decodes and raises, and score_sdf (61-70)/score_dad (92-102) do bare json.loads that turns any leading prose into a checkpointed placeholder-zero record. Git confirms PR #59 (678dafe) added extract_json and migrated only SDF layers 1/2/5, leaving the five siblings untouched, and strict=False exists only in step2_responses.py — both historical claims hold. Only nit: the fence-strip lines are duplicated at six sibling sites, not \"five of the six\" (unless the two score-script copies are grouped), which understates rather than overstates the problem."
+    },
+    {
+     "title": "Layer-4 tag-extraction fallback silently ships un-rewritten drafts into the training corpus with no stop_reason check or retry",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 57,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "Lines 52-61: if `re.search(r\"<improved_document>(.*?)</improved_document>\", raw, flags=re.DOTALL)` finds no match, the code sets `review_notes = \"Parse error — no <improved_document> tags; kept original draft.\"` and `rewritten = draft[\"content\"]`, then checkpoints the record as done (line 80). The call at lines 43-49 does not request return_stop_reason, and max_tokens=6000 equals layer 3's draft budget, so review-notes + a long rewrite can exceed it. CLAUDE.md's claim 'Every generation call rejects truncated output (stop_reason checked; failed work is not checkpointed)' holds only for DAD steps 2/3 — layers 3/4/5 and DAD 1b/1c never check stop_reason.",
+     "failure_scenario": "A near-6000-token draft plus the model's review notes exceeds max_tokens; the closing </improved_document> tag never arrives, the regex misses, and the ORIGINAL un-rewritten draft is checkpointed as the 'rewrite'. The doc then only needs to score 7+ at layer 5 to enter the training corpus having silently skipped the pass the code itself calls 'the pipeline's most leverage-heavy call (TCW's ablation: removing it cost 19x on misalignment rate)'. The only trace is a note buried in rewrites.jsonl; nothing aggregates or surfaces the count. Related instance: layer3's untagged fallback (layer3_draft.py:160-164) fuses an entire multi-document response into ONE corpus document instead of dropping it.",
+     "recommendation": "In layer4, request return_stop_reason=True; on stop_reason=='max_tokens' retry once at a doubled budget (the exact pattern step3_rewrite.py:65-70 already implements), and on a still-missing tag skip without checkpointing so --resume retries, logging to a rewrite_failures.jsonl. At minimum, count kept-original records and print the total at end of layer so a run with N un-rewritten docs is visible. For layer3, gate the whole-output fallback on stop_reason=='end_turn'.",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:52-61 (keep-original fallback, no retry)",
+      "sdf_pipeline/layer3_draft.py:160-164 (untagged fallback fuses multi-doc output into one record)"
+     ],
+     "dimension": "parsing",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every assertion in current code: layer4_rewrite.py:52-61 keeps the original draft on regex miss and checkpoints it at line 80; the call (lines 43-49, max_tokens=6000, matching layer 3's budget) never requests return_stop_reason; grep confirms only DAD steps 2/3 check stop_reason while layers 3/4/5 and DAD 1b/1c (step1_dilemmas.py:620,729) do not; config.yaml min_score_threshold=7 plus layer5_score.py:120 confirm the 7+ path into the corpus; layer3_draft.py:160-164 fuses untagged multi-doc output into one record. Only nuance: shared/api.py:484-487 prints an ephemeral console WARNING on max_tokens truncation (and its own comment at line 483 concedes callers should reject on stop_reason), so there is a non-persisted trace beyond rewrites.jsonl — this does not change the core claim or failure scenario."
+    },
+    {
+     "title": "Parsed model payloads are used without shape validation — wrapper objects and string scores crash layers or burn batch retries",
+     "file": "sdf_pipeline/layer1_document_types.py",
+     "line": 47,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "layer1_document_types.py:44-51: `doc_types = utils.extract_json(raw)` then `for i, dt in enumerate(doc_types): ... dt[\"type_name\"]` — if the model returns `{\"document_types\": [...]}` (a classic wrapper), extract_json returns the dict, enumerate yields string keys, and `dt[\"type_name\"]` raises TypeError. layer2_subtypes.py:59-64 has the same pattern inside parallel_map. layer5_score.py:93 `scores.get(...)` raises AttributeError on a list-wrapped judge response (only JSONDecodeError is caught at line 81). layer5_score.py:120 compares `r[\"scores\"][\"alignment\"] >= threshold` — a judge returning \"8\" as a string makes this TypeError. step1_dilemmas.py:578-579 `return parsed if isinstance(parsed, list) else []` silently converts a wrapper object into an empty batch.",
+     "failure_scenario": "Layer 2: one worker's wrapper-shaped response raises TypeError inside parallel_map, killing the layer; in-flight sibling calls in the same wave complete but are never yielded or checkpointed, so their paid tokens are re-billed on --resume. Layer 5 string-scores: the crash happens at the final filter AFTER all scoring is checkpointed, and because results reload from disk on --resume the same TypeError recurs on every resume — the run is wedged until someone hand-edits scores.jsonl. Step 1b: a model that consistently wraps the array (models are consistent within a prompt) yields three 16k-token calls that each parse to [] before the SystemExit at line 744.",
+     "recommendation": "This is the `expect=` parameter from the consolidation finding plus caller-side coercion: extract_json(raw, expect='array') should prefer list candidates and, as a documented variant, unwrap a dict whose single value is a list; layer5 and the eval scorers should coerce dimension scores with `int(...)` in a try/except (treating failures as parse failures, i.e. skip-without-checkpoint per the layer-5 finding). Add a wrapper-object case to tests/test_utils.py::TestExtractJson.",
+     "instances": [
+      "sdf_pipeline/layer1_document_types.py:44-51",
+      "sdf_pipeline/layer2_subtypes.py:59-64",
+      "sdf_pipeline/layer5_score.py:93-97,118-121",
+      "dad_pipeline/step1_dilemmas.py:578-579 (wrapper dict becomes empty batch, skipping salvage)"
+     ],
+     "dimension": "parsing",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Eval judges write placeholder-zero scores on parse failure and checkpoint them permanently, silently skewing delivered quality statistics",
+     "file": "evals/score_sdf.py",
+     "line": 70,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "score_sdf.py:67-75: on JSONDecodeError, `scores = {\"alignment\": 0, \"realism\": 0, \"diversity\": 0, \"notes\": \"Parse error.\"}` is appended to sdf_scores.jsonl and `checkpoint.mark_done(doc_id)` — never re-scored on a rerun. The zeros then flow into the averages at lines 84-95 with no exclusion or count of parse failures. score_dad.py:98-107 and 118-132 are identical (zeros drag `passing` and per-dimension averages down silently). Both use bare `json.loads` after fence-stripping (score_sdf.py:62-68), so any leading prose from the judge — tolerated fine by the existing extract_json — triggers this path. Coverage report: both files 0% tested.",
+     "failure_scenario": "A judge model prefixes responses with one sentence of prose for 10% of docs. Those records become permanent zeros; the printed summary the team uses to compare runs ('avg alignment 7.9 → 7.1') reports a phantom quality regression, and the checkpoint guarantees re-running the eval never corrects it. Since these scores are the corpus quality evidence handed to the frontier lab, the delivered numbers are silently wrong in the pessimistic direction.",
+     "recommendation": "Replace the inline fence-strip + json.loads with utils.extract_json(raw, expect='object') (strictly more tolerant); on parse failure do NOT append or mark_done — print and continue so a rerun retries only the failed docs; and exclude any residual parse-failure records from the aggregate lines (report 'N unparsed' separately). Refactor each script's loop body into a testable run() and add the parse-happy-path / malformed-response / resume tests CLAUDE.md already mandates for every stage.",
+     "instances": [
+      "evals/score_sdf.py:61-75",
+      "evals/score_dad.py:92-107"
+     ],
+     "dimension": "parsing",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "The most intricate parsers — step 1's salvage machinery and the 1b retry loop — have zero test coverage, inverting coverage relative to risk",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 541,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "Coverage report: step1_dilemmas.py misses lines 544-568 (the entire _salvage_objects brace/string state machine), 574/576 and 580-589 (every _parse_json_array fallback branch), 596-604 (every _parse_json_object fallback branch), and 741-745 (the unusable-batch retry/SystemExit path); step2_responses.py misses 51-54 (_parse_scope's bracket-slice fallback); score_sdf.py and score_dad.py are 0%. By contrast the simplest, already-hardened parser (extract_json) has 11 dedicated tests (tests/test_utils.py:78-133). CLAUDE.md's own rule: 'every new stage needs ... a malformed-response fallback test'. Ruff independently flags _salvage_objects as the most complex function in the file (C901, complexity 12).",
+     "failure_scenario": "A contributor applies ruff's SIM105 autofix suggestion at line 563 or adds the strict=False fix from this audit to _salvage_objects, and gets the escape-handling or depth bookkeeping subtly wrong (e.g. the `esc` reset, or `start = None` after a close). Nothing fails in CI. On the next paid run, every 1b batch salvages zero objects; the retry loop silently re-bills up to 8 fresh 16k-token calls per batch before SystemExit — the exact 'silently breaks at $50 a run' scenario CLAUDE.md's test policy exists to prevent, in the one place the policy wasn't applied.",
+     "recommendation": "Add a TestSalvageObjects / TestParseJsonArray / TestParseJsonObject module to tests/test_dad_steps.py mirroring TestExtractJson: truncated-array salvage (complete objects recovered, cut-off tail dropped), escaped quotes and braces inside strings, prose-wrapped output, fenced output, wrapper-object input, and control-character input (currently-failing, pinning the strict=False fix). Add one 1b run() test with a stub dispatcher returning an unusable batch then a good one, asserting the retry consumed exactly one extra call and no duplicate records. If the consolidation finding is done first, write these tests against the new shared helpers instead and move them to test_utils.py.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:544-568,574-589,596-604 (uncovered salvage paths)",
+      "dad_pipeline/step1_dilemmas.py:741-745 (uncovered batch-retry/SystemExit path)",
+      "dad_pipeline/step2_responses.py:51-54 (uncovered _parse_scope fallback)",
+      "evals/score_sdf.py, evals/score_dad.py (0% coverage)"
+     ],
+     "dimension": "parsing",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "failure-parity",
+   "summary": "The repo contains 17 model-call → parse → gate sites, and they split cleanly into two generations of discipline. The newer DAD steps and the pref pipeline are exemplary fail-closed: step 2a retries unusable scopes three times, logs raw failures to scope_failures.jsonl, and aborts rather than generate over an empty scope; step 2b and step 3 gate on stop_reason, retry step-3 truncations at doubled tokens, log to rewrite_failures.jsonl, and skip without checkpointing so --resume retries; pref defers a pair on any bad arm while caching the sibling's paid response; layer 5's latent-beat check is mechanically fail-closed via verbatim-quote verification. The SDF pipeline predates this discipline and inverts the priority order: its two quality-critical stages are the laxest sites in the repo. Layer 4 — the pass whose own comment cites TCW's 19x misalignment ablation — silently substitutes the un-rewritten draft on any parse failure or truncation (it never checks stop_reason) and checkpoints the result forever; layer 5 defaults parse failures to a {5,5,5} sentinel that is fail-closed only while config.yaml's min_score_threshold stays above 5, and checkpoints the failure so the paid draft+rewrite are dropped permanently. Layer 3 admits sentence-trimmed truncated drafts and silently under-delivers documents; DAD 1c silently keeps the cheap-model 1b draft when the \"load-bearing rewrite\" fails to parse; both eval judges persist unretryable zero-sentinels through a hand-rolled parser weaker than the shared utils.extract_json. Every fix is a local copy of a pattern that already exists in dad_pipeline — this is a parity backfill, not a redesign.",
+   "findings": [
+    {
+     "title": "Layer 4 rewrite silently ships the un-rewritten draft on parse failure or truncation, and checkpoints it forever",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 57,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "layer4_rewrite.py:43-49 calls api.call_claude without return_stop_reason (the only quality-critical stage in the repo that ignores truncation); lines 52-61: if the <improved_document> regex misses or the rewrite is empty, `rewritten = draft[\"content\"]` with only a review_notes string ('Parse error — no <improved_document> tags; kept original draft.'); lines 76-80 append the record and mark_done(doc_id) unconditionally. Contrast dad_pipeline/step3_rewrite.py:58-89, which checks stop_reason, retries at 8000 tokens, logs to rewrite_failures.jsonl, and skips without checkpointing. Tests pin the current behavior (tests/test_sdf_layers.py:161-171).",
+     "failure_scenario": "A long layer-3 draft pushes the rewrite past max_tokens=6000; output is cut inside <improved_document>, the closing tag never appears, the regex misses, and the record ships with rewritten=original. The un-rewritten draft — carrying exactly the constitutional issues this pass exists to fix (the module's own comment cites TCW's 19x misalignment-rate ablation for removing it) — flows to layer 5, and if the generic judge scores it >=7 it enters sdf_corpus.jsonl as training data. mark_done means --resume never retries; the only trace is a notes string in layer4/rewrites.jsonl that nothing reads.",
+     "recommendation": "Copy step3_rewrite.py's contract: call with return_stop_reason=True; on stop_reason=='max_tokens' retry once at 12000; on missing/empty <improved_document> retry once with a fresh call; if still unusable, append {doc_id, reason} to layer4/rewrite_failures.jsonl and `continue` without append_jsonl/mark_done so --resume retries. Flip test_missing_tags_keeps_original_draft and test_empty_rewrite_keeps_original_draft deliberately (per CLAUDE.md's spec-first rule).",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:43-49 (no stop_reason)",
+      "sdf_pipeline/layer4_rewrite.py:52-61 (silent substitution)",
+      "sdf_pipeline/layer4_rewrite.py:76-80 (unconditional checkpoint)"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Every cited line checks out: layer4_rewrite.py:43-49 calls call_claude (max_tokens=6000) without return_stop_reason, lines 52-61 substitute the original draft on regex miss or empty rewrite with only a review_notes string, and lines 76-80 append and mark_done unconditionally so --resume (line 30) never retries; step3_rewrite.py:58-89 shows the exact contrasting fail-closed pattern (stop_reason check, 8000-token retry, rewrite_failures.jsonl, skip without checkpoint), and tests/test_sdf_layers.py:161-171 pins the layer-4 behavior. The failure scenario holds end-to-end: run.py chains rewrites into layer5_score.py, which scores rw[\"rewritten\"] and writes it to sdf_corpus.jsonl when alignment and realism >= min_score_threshold (7 in config.yaml). Two immaterial nuances: layer 5 also omits stop_reason but fails closed (parse-error default scores of 5 miss the 7 threshold), so layer 4 is still the only stage where ignored truncation ships bad data; and the viewer lineage page (viewer/ui_pages/lineage.py:222-223) does passively display review_notes, though no pipeline logic reads or acts on it. | Verified all cited code: layer4_rewrite.py:43-49 omits return_stop_reason (only a console WARNING in shared/api.py:484-487 fires on truncation), lines 52-61 silently substitute the original draft, lines 76-80 checkpoint unconditionally so --resume never retries. Scenario is reachable under default config: layer-3 drafts up to 6000 tokens, layer-4 output (notes + full document) capped at the same 6000, so long drafts truncate before the closing tag; layer 5 then scores rewritten==original against min_score_threshold 7 with a generic judge and the latent quote check passes on the un-rewritten draft. Contrast with dad_pipeline/step3_rewrite.py:58-89 (stop_reason check, 8000 retry, rewrite_failures.jsonl, no checkpoint) and test pinning at tests/test_sdf_layers.py:161-171 both hold. Trivial nuances only: review_notes is displayed by the viewer lineage page (nothing automated reads it), and layer 5 also skips stop_reason but fails closed, so layer 4 is the only quality-critical stage where ignoring truncation ships data."
+    },
+    {
+     "title": "Layer 5 parse-failure sentinel {5,5,5} is threshold-coupled and checkpointed permanently, silently discarding paid work",
+     "file": "sdf_pipeline/layer5_score.py",
+     "line": 82,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "layer5_score.py:79-82: json.JSONDecodeError from extract_json yields scores {alignment:5, realism:5, diversity:5, notes:'Parse error.'}; lines 111-115 append and mark_done(doc_id) unconditionally; line 120 gates on `>= threshold` where threshold = config['sdf']['min_score_threshold'] (config.yaml:13, currently 7, no comment linking it to the sentinel). The call at :73-78 also never checks stop_reason. Contrast step2_responses.py:144-162 (MAX_SCOPE_ATTEMPTS retries, scope_failures.jsonl, abort).",
+     "failure_scenario": "Two coupled failures. (a) Judge emits prose-wrapped or truncated JSON → {5,5,5} is recorded and checkpointed → the doc is dropped (5<7) and the paid layer-3 draft + layer-4 rewrite for it are wasted permanently, since --resume skips re-scoring. (b) Any run with min_score_threshold lowered to 5 or below — a plausible dev tweak of an uncommented knob — flips the same path fail-open: every parse-failure doc enters the corpus completely unscored.",
+     "recommendation": "Replace the sentinel with the 2a pattern: bounded retry loop (e.g. MAX_SCORE_ATTEMPTS=3, fresh call each attempt), raw outputs to layer5/score_failures.jsonl, and on final failure skip without append/mark_done so --resume retries. If a sentinel must remain for legacy records, make it zeros (fail-closed under any threshold >=1). Update test_parse_error_defaults_scores_to_five (tests/test_sdf_layers.py:206-212).",
+     "instances": [
+      "sdf_pipeline/layer5_score.py:79-82 (sentinel)",
+      "sdf_pipeline/layer5_score.py:111-115 (unconditional checkpoint)",
+      "config.yaml:13 (coupled threshold)"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Layer 5's parse-failure sentinel {alignment:5, realism:5, diversity:5} (layer5_score.py:79-82) is recorded and checkpointed unconditionally (111-115), so a judge response whose JSON is truncated (stop_reason is never checked at :73-78; api.call_claude only warns), malformed, or absent — though NOT merely prose-wrapped, which extract_json handles — permanently scores the doc 5/5/5; at the default min_score_threshold=7 (config.yaml:13) the doc and its paid layer-3/4 work are silently dropped and --resume never re-scores it, while any threshold ≤5 flips the same path fail-open, admitting unscored non-latent docs into the corpus. This contrasts with DAD step 2 (step2_responses.py:144-162), which checks stop_reason, retries up to MAX_SCOPE_ATTEMPTS, logs failures, and refuses to checkpoint failed work.",
+     "verifier_notes": "Verified every citation: the {5,5,5} sentinel is at layer5_score.py:79-82, records are appended and checkpointed unconditionally at 111-115 (and existing_scores at :55 plus is_done at :60 make it permanent across --resume), the pass gate at 118-120 compares the sentinel against config.yaml:13's uncommented min_score_threshold=7, and the :73-78 call site never requests stop_reason (shared/api.py only prints a warning, returning truncated text). The contrast with step2_responses.py:144-162 (return_stop_reason, MAX_SCOPE_ATTEMPTS retries, scope_failures.jsonl, abort) is accurate. One scenario detail is wrong: extract_json (shared/utils.py:68-88, hardened in commit 678dafe) explicitly tolerates prose-wrapped/fenced JSON, so only truncated, malformed, or absent JSON triggers the sentinel — the truncation path (reachable because stop_reason is unchecked) carries the scenario, not prose-wrapping. | Verified every cited line: the {5,5,5} sentinel (layer5_score.py:82), unconditional append+mark_done (111-115) with no re-score path on --resume (55-61), threshold gate (120) against uncommented min_score_threshold: 7 (config.yaml:13), no return_stop_reason on the judge call (73-78, api.py only warns on max_tokens), and the step2 retry/abort contrast (step2_responses.py:144-162, 210) — all accurate. Two corrections: prose-wrapped JSON is handled by the hardened extract_json (shared/utils.py:68, PR #59), so only truncated or malformed JSON reaches the sentinel; and the sentinel-drop is pinned as known behavior by tests/test_sdf_layers.py:206 with notes:\"Parse error.\" visible in scores.jsonl, so it is not fully silent or unnoticed. The untested parts — permanent checkpoint discarding paid work on resume, and the fail-open flip at threshold <=5 — are real, but severity is better calibrated medium-high since the shipped config fails closed and fail-open requires a config edit."
+    },
+    {
+     "title": "Layer 3 never checks stop_reason: truncated batches silently under-deliver (checkpointed) and the untagged fallback admits an incomplete document",
+     "file": "sdf_pipeline/layer3_draft.py",
+     "line": 161,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "layer3_draft.py:143-146 calls api.call_claude without return_stop_reason; :154-158 keep only closed <document>...</document> blocks, so a doc cut mid-text is silently dropped; :160-164 fall back to the whole raw output trimmed to the last complete sentence when no tag closed — the comment itself concedes 'the untagged fallback may be a token-capped cutoff'; :185 marks the subtype done regardless of how many of `count` documents survived, with no log or count check.",
+     "failure_scenario": "A 3-docs-per-subtype call truncates at max_tokens=6000 mid-document-2: doc 2 vanishes and the subtype is checkpointed complete, so the corpus permanently under-delivers with no record anywhere. Worse, in the single-doc case with no closed tag, the entire truncated output is trimmed to its last full sentence and admitted — an essay that stops after its setup paragraph reads as complete, survives the layer-4 rewrite, and can pass the layer-5 judge into sdf_corpus.jsonl.",
+     "recommendation": "Call with return_stop_reason=True. On stop_reason=='max_tokens': keep the closed-tag docs, suppress the untagged fallback entirely, and append {subtype_id, requested, kept, reason} to layer3/draft_failures.jsonl (optionally retry once at a higher cap first, per the step-3 pattern). Also print whenever len(docs) < count so under-delivery is visible at run time.",
+     "instances": [
+      "sdf_pipeline/layer3_draft.py:143-146 (no stop_reason)",
+      "sdf_pipeline/layer3_draft.py:154-158 (silent drop of unclosed docs)",
+      "sdf_pipeline/layer3_draft.py:160-164 (truncated fallback admitted)",
+      "sdf_pipeline/layer3_draft.py:185 (checkpoint regardless of count)"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every citation in sdf_pipeline/layer3_draft.py: the call at 143-146 passes no return_stop_reason (max_tokens=6000); shared/api.py:484-489 only prints an ephemeral stderr WARNING on a suspect stop_reason and returns the truncated text anyway, so rejection is opt-in — and DAD steps 2/3 and pref_pipeline do opt in and skip-without-checkpoint, while layer 3 (and layers 4/5) never do, confirming the failure-parity gap. The regex at :13 requires a closed </document>, so a mid-batch truncated doc is dropped while surviving sibling docs suppress the fallback branch, and :185 marks the subtype done unconditionally (resume filters on is_done at :108, so the shortfall is permanent; no downstream count reconciliation exists in sdf_pipeline/run.py). The untagged fallback at :160-164 trims a token-capped output to its last complete sentence (textstats.trim_unfinished even leaves mid-sentence text intact when no boundary sits in the second half), producing a superficially complete doc that flows into layers 4-5. Minor nuance only: 'no record anywhere' is slightly overstated — the api wrapper's stderr warning and layer 3's 'Drafted N docs' print exist, but nothing is persisted, checked against `count`, or retried."
+    },
+    {
+     "title": "Step 1c refine fails open: an unusable refine silently keeps the cheap-model 1b draft, with no retry, no failure log, and no resume path",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 787,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "step1_dilemmas.py:620-626: refine_draft makes one call (no return_stop_reason, max_tokens=4000) and returns None on any parse failure; :783-787: `refined = refined_by_pid.get(pid); if refined is None: keep the 1b draft` with only a print — the record is then appended and the scenario added to `accepted` (:813-815), so nothing ever revisits it. No refine_failures.jsonl, unlike every failure path in steps 2-3. Inconsistent with the SAME function's 1b handling, where a missing draft is re-requested (:707-744). config.yaml:29 labels 1c the 'load-bearing rewrite'.",
+     "failure_scenario": "The refine model wraps its JSON in prose or hits the 4000-token cap → _parse_json_object returns None → the final user_message is the raw 1b draft from the cheap batch model (config prompt_draft_model: claude-haiku-4-5), un-refined against prompts/dad/step1_refine.txt's spec, and permanently accepted into dilemmas.jsonl. Every downstream step (scope, response, constitution rewrite) and the final training record are built on a prompt the pipeline's own config says needed the stronger rewrite. At 40 examples a few-percent parse-failure rate means 1-2 silently degraded records per run.",
+     "recommendation": "In refine_draft (or its caller), retry an unusable refine up to 2 more times with fresh calls (2a style), passing return_stop_reason=True and treating stop_reason=='max_tokens' as unusable; on final failure append {scenario_id, raw} to step1/refine_failures.jsonl in addition to the print. If keep-the-draft remains the last resort, record refine_failed: true on the dilemma record so the corpus checklist and viewer can surface it.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:620-626 (single unguarded call)",
+      "dad_pipeline/step1_dilemmas.py:783-787 (silent keep-draft fallback)"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "All cited lines match current code: refine_draft (dad_pipeline/step1_dilemmas.py:620-626) makes one call with max_tokens=4000 and no return_stop_reason (shared/api.py:484-489 shows truncation only warns and returns text, so truncated JSON parses to None), and lines 783-787/813-815 keep the 1b draft, checkpoint it to dilemmas.jsonl, and mark the scenario accepted with only a print — no retry, failure log, or resume path. Step 2 writes scope_failures.jsonl and step 3 writes rewrite_failures.jsonl, while no refine_failures.jsonl exists; 1b's missing-draft path (lines 706-776) does re-request, confirming the intra-function asymmetry. config.yaml:29 labels 1c \"load-bearing rewrite\" over a haiku 1b draft model, so the degraded-record scenario is real and also contradicts CLAUDE.md's \"failed work is not checkpointed\" invariant."
+    },
+    {
+     "title": "Both eval judges persist unretryable zero-sentinels via a hand-rolled parser, permanently skewing reported scores and crashing aggregates on non-integer output",
+     "file": "evals/score_dad.py",
+     "line": 101,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "score_dad.py:92-96 strip fences by hand and json.loads (not the tolerant utils.extract_json used by the pipelines — prose before the JSON fails the parse); :98-102 default to all-zero scores + 'Parse error.'; :104-107 append and checkpoint.mark_done(rid), so the zeros are permanent. score_sdf.py:60-75 is identical. Neither validates types: score_dad.py:121-126 does `sum(dim_scores)` / `dim_totals[d] += s.get(d, 0)` on whatever the judge returned.",
+     "failure_scenario": "(a) A transient judge hiccup writes zeros that no rerun ever repairs: a 40-record eval with 4 parse failures reports every dimension average ~10% low, misleading the run-over-run quality comparisons this repo's delivery decisions rest on. (b) A judge returning '4' as a quoted string (or a bare JSON array) is persisted to dad_scores.jsonl, and the summary then raises TypeError/AttributeError on this and EVERY subsequent invocation — the eval is bricked until someone hand-edits the scores file, because the bad record is checkpointed.",
+     "recommendation": "In both scripts: parse with utils.extract_json; validate each rubric dimension coerces to int (int(s[d])), treating failure as a parse failure; retry a parse failure once with a fresh call; on final failure skip without mark_done (so a rerun retries) instead of persisting sentinel zeros; and exclude any legacy 'Parse error.' records from the aggregate denominators.",
+     "instances": [
+      "evals/score_dad.py:91-107",
+      "evals/score_sdf.py:60-75",
+      "evals/score_dad.py:121-126 (unvalidated aggregation)",
+      "evals/score_sdf.py:84-88 (unvalidated aggregation)"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified against evals/score_dad.py and evals/score_sdf.py in the worktree: both judges hand-strip fences then bare json.loads (score_dad.py:92-99, score_sdf.py:61-68), fall back to zero-sentinel scores + \"Parse error.\" (score_dad.py:100-102, score_sdf.py:69-70), and unconditionally append + checkpoint.mark_done (score_dad.py:104-107, score_sdf.py:72-75); the resume guard (score_dad.py:72,77) rebuilds `existing` from the output file itself, so zeros survive even checkpoint deletion. Aggregation is unvalidated exactly as claimed: a quoted \"4\" raises TypeError at sum(dim_scores)/dim_totals (score_dad.py:121,126; score_sdf.py:87), a bare JSON array raises AttributeError on s.get (score_dad.py:120), and since the persisted bad record is loaded into results on every invocation, the summary crashes every time until the file is hand-edited. utils.extract_json (shared/utils.py:68) exists and is documented as tolerating surrounding prose; it is used by sdf_pipeline layers 1/2/5 (including the in-pipeline layer-5 judge). Only trivial imprecision: dad_pipeline uses its own tolerant brace-slicing fallbacks rather than extract_json, which does not affect the core claim."
+    },
+    {
+     "title": "Layers 1-2 have no in-run retry for an unusable parse: one bad response crashes the run and discards the wave's in-flight paid siblings",
+     "file": "sdf_pipeline/layer2_subtypes.py",
+     "line": 59,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "layer1_document_types.py:44 and layer2_subtypes.py:59 call utils.extract_json bare — a JSONDecodeError (extract_json deliberately raises on truncated/malformed containers, shared/utils.py:107-111) propagates as an uncaught traceback. In layer 2 the exception surfaces through parallel_map (shared/utils.py:17-30), whose contract discards completed-but-unyielded results from sibling worker threads. Contrast step1_dilemmas.py:735-744, where an unusable 1b batch triggers a fresh-call retry with a consecutive-failure cap.",
+     "failure_scenario": "At temperature 1.0 one layer-2 response comes back truncated or malformed mid-array: the run dies with a raw JSONDecodeError traceback (fail-closed, but ungraceful for the non-engineer contributors who operate this), and with workers=8 up to 7 sibling calls in the same wave were billed but their results discarded — re-billed on --resume. A fresh call would almost certainly have succeeded.",
+     "recommendation": "Wrap the extract_json parse in a small bounded retry (fresh api.call_claude, up to 3 attempts, mirroring step 1b's consecutive_failures loop) inside generate_subtypes and layer 1's run(); raise SystemExit with a pointer to the raw output only after the retries are exhausted.",
+     "instances": [
+      "sdf_pipeline/layer1_document_types.py:44",
+      "sdf_pipeline/layer2_subtypes.py:59"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Audit prevalence rater silently counts parse failures as 'no patterns present', biasing prevalence below the RED-flag threshold",
+     "file": "evals/audit_sdf.py",
+     "line": 439,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "audit_sdf.py:434-440: rate_one catches bare Exception and returns set() with no print or counter; :442-446 does `total += 1; counts.update(ids)` for every result, so a failed rating deflates every pattern's prevalence; :451-453 flags RED only when prevalence > 0.30.",
+     "failure_scenario": "A templating defect genuinely present in ~33% of documents, rated over the default 80-doc sample with a ~10% judge parse-failure rate, measures ~30% and is not flagged; the audit prints 'no widespread defects' with zero indication that any ratings failed. This audit is the repo's stated corpus-level control (CLAUDE.md Key Design Decisions) for exactly the haiku-test2 failure mode it would here be masking.",
+     "recommendation": "Have rate_one return None on failure; tally failures separately, exclude them from `total`, print 'N of M docs unrated (parse failures)' beside the prevalence header, and warn loudly (or refuse a verdict) if failures exceed ~10% of the sample.",
+     "instances": [
+      "evals/audit_sdf.py:434-446"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Truncation gates test only stop_reason=='max_tokens'; other anomalous stop reasons are admitted with a stderr warning only",
+     "file": "dad_pipeline/step3_rewrite.py",
+     "line": 82,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "step3_rewrite.py:82, step2_responses.py:188, and pref_pipeline/run.py:166 all gate on `not text or stop_reason == 'max_tokens'`, while shared/api.py:484-487 treats anything outside ('end_turn', 'stop_sequence') as suspect and only warns. step2_responses.py:151 has the same asymmetry for scopes (non-max_tokens anomalies fall through to the content parse).",
+     "failure_scenario": "A completion ending with a future or unusual stop_reason (e.g. a refusal variant that still emits text, or a new API stop reason) passes the gate and becomes a training/rating record; the only trace is a stderr warning that scrolls past in an 8-worker run. Today refusals usually produce empty text (caught by the empty check), so this is an observation about robustness parity, not a live defect.",
+     "recommendation": "Align the caller gates with shared/api.py's own suspicion list: reject when `stop_reason not in ('end_turn', 'stop_sequence')` (still retrying-at-higher-tokens only for 'max_tokens'), in step2_responses.py, step3_rewrite.py, and pref_pipeline/run.py — and in the layer-3/4 fixes above when they adopt return_stop_reason.",
+     "instances": [
+      "dad_pipeline/step3_rewrite.py:82",
+      "dad_pipeline/step2_responses.py:188",
+      "pref_pipeline/run.py:166"
+     ],
+     "dimension": "failure-parity",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "structure-duplication",
+   "summary": "For a repo built largely by non-engineers, the structural discipline is unusually good: the checkpoint/append idiom was copied faithfully rather than mutated ad hoc, orchestrators are 92-94% covered by offline e2e tests, and design intent is documented inline. The debt is concentrated in four places. (a) The load-existing/filter-pending/append/mark-done idiom is hand-rolled seven times (SDF layers 2-5, DAD steps 2-3, pref), and the copies have quietly diverged on one safety-relevant detail: layers 2-4 gate pending work on the checkpoint alone, while layer 5, step 2, step 3, and pref also consult the output file — so an interrupt landing between append and mark_done re-bills and duplicates rows only in the SDF middle layers. A small `resumable_stage` helper in shared/utils.py can preserve every documented contract (main-thread writes, input order, failed-items-not-checkpointed) and be adopted one stage per PR with tests unchanged. (b) The three run.py mains share a ~35-line setup block (PIPELINE_OUTPUT_ROOT, resume-vs-create, snapshot fallback, api.init) that is extractable; stage gating and input-loading chains are genuinely different and should stay put. The triplication has already produced drift: dad validates --step/--stop-after, sdf's --layer accepts any int, and all three silently ignore --run-id without --resume — the one combination that re-bills a whole run. (c) The 23-file sys.path.insert boilerplate exists only because pyproject.toml has no [project] table; adding metadata plus `pip install -e .` in CI is additive and low-risk, and the inserts can be deleted in a follow-up. (d) Idiom drift (int-coerced vs raw `workers`, bracket vs .get config access) is minor and best fixed at single chokepoints (parallel_map) rather than by style sweeps. Recommended sequencing, cheapest and safest first: 1) S-sized fixes (CLI validation, workers coercion in parallel_map, pref `refined` field); 2) packaging metadata + CI install (additive); 3) orchestrator setup extraction (mechanically verified by the e2e suite); 4) the resumable-stage helper, adopted stage by stage starting with layer 4 (simplest shape) and finishing with layer 2 (wave loop) — each step reviewable by a non-expert contributor because it flips exactly one stage while the behavior-level tests stay green.",
+   "findings": [
+    {
+     "title": "Resume/checkpoint idiom duplicated across 7 stages with divergent crash-window semantics (layers 2-4 can re-bill and duplicate rows on resume)",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 30,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "layer4_rewrite.py:30 gates pending work on the checkpoint alone: `pending = [d for d in drafts if not checkpoint.is_done(d[\"doc_id\"])]`, then appends before marking (line 79 `utils.append_jsonl(record, output_path)` / line 80 `checkpoint.mark_done(record[\"doc_id\"])`). Layers 2 (layer2_subtypes.py:41) and 3 (layer3_draft.py:108) are identical. But layer 5 (layer5_score.py:58-61), step 2 (step2_responses.py:110-123), step 3 (step3_rewrite.py:41-45), and pref (pref_pipeline/run.py:129-140) each ALSO seed a done-set from the output jsonl (`existing_scores`, `done_keys`, `done_response_ids`, `done_ids`) — the same idiom, hand-copied 7 times, with the output-file consultation present in only 4 of them.",
+     "failure_scenario": "Ctrl-C or a crash lands between the append (layer4_rewrite.py:79) and mark_done (line 80). On --resume the doc is pending again: the rewrite call is re-billed and a second row with the same doc_id is appended to rewrites.jsonl. Layer 5 computes its pending list once up front, so both rows are scored (two more billed calls) and both score records enter `results` — with `sdf.near_dup_threshold` set to null the final corpus carries the document twice. In layer 3 the window is wider (N appends per subtype before one mark_done): the orphaned drafts keep their uuids and the regenerated subtype produces near-duplicate documents that flow through layers 4-5 at full cost. The stages that seed done-sets from the output file (5, step2, step3, pref) are immune — the divergence is invisible until someone pays for it.",
+     "recommendation": "Add `resumable_stage(items, *, checkpoint, key, worker, persist, workers)` to shared/utils.py next to parallel_map: pending = items whose key(item) is neither in a caller-supplied done-set nor checkpoint.is_done; iterate `zip(pending, parallel_map(worker, pending, workers), strict=True)`; call persist(item, result) on the main thread in input order; persist returns the iterable of checkpoint ids to mark (empty tuple = not checkpointed, so truncated/empty outputs retry on resume — step 3's contract). Seed the done-set from the stage's output jsonl in the helper so all stages get layer-5's idempotent resume. Adopt one stage per PR: layer 4 first (1 record/item, simplest), then layer 5 and step 3, then step 2 (persist returns per-sample `{pid}_s{i}` keys), layer 2 last (call the helper once per wave, keeping the avoid-note refresh loop). The existing tests (e.g. tests/test_dad_steps.py:290 test_resume_makes_no_calls) drive stages through run() and assert on files and stub_claude calls, so they pass unchanged.",
+     "instances": [
+      "sdf_pipeline/layer2_subtypes.py:38-41,108-120",
+      "sdf_pipeline/layer3_draft.py:105-108,179-185",
+      "sdf_pipeline/layer4_rewrite.py:27-30,75-80",
+      "sdf_pipeline/layer5_score.py:55-61,110-115",
+      "dad_pipeline/step2_responses.py:103-123,206-228",
+      "dad_pipeline/step3_rewrite.py:39-45,73-109",
+      "pref_pipeline/run.py:128-191"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Checked every cited file/line. Layer 4 (layer4_rewrite.py:30) gates pending on the checkpoint alone and appends (line 79) before mark_done (line 80), which persists per call — the crash window exists. Layers 2 (layer2_subtypes.py:41) and 3 (layer3_draft.py:108, with the wider N-appends-per-mark window at 182-185) share the checkpoint-only gate, while layer 5 (55-61), step 2 (108-123), step 3 (39-45), and pref (129-140) each also seed a done-set from the output jsonl — the 4-of-7 divergence is exactly as claimed. The downstream scenario holds: layer 5's one-shot pending list scores both duplicate rewrite rows and the corpus duplication is correctly conditioned on near_dup_threshold null (default 0.90 would usually absorb the duplicate content, and layer 2's disk-seeded dedup partially mitigates there — softening severity slightly but not refuting the re-billing or the structural claim)."
+    },
+    {
+     "title": "--run-id is silently ignored without --resume in all three orchestrators: a forgotten flag creates a fresh run and re-bills the whole pipeline",
+     "file": "sdf_pipeline/run.py",
+     "line": 39,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "sdf_pipeline/run.py:39-43: `if args.resume: run_dir = utils.resolve_run_dir(runs_root, args.run_id) ... else: run_dir = utils.create_run_dir(...)` — args.run_id is only read inside the resume branch; passing it alone raises no error. Identical in dad_pipeline/run.py:47-51 and pref_pipeline/run.py:103-107. Related drift: dad's --step has `choices=(1, 2, 3)` (dad run.py:30) and validates --stop-after (line 37-38), while sdf's --layer (sdf run.py:27) accepts any int — `--layer 6` creates a run dir, prints the banner, runs nothing, and reports \"Total API cost this session: $0.0000\".",
+     "failure_scenario": "A contributor resuming an interrupted full-scale run types `python dad_pipeline/run.py --config config.yaml --run-id 2026-07-01_14-30_full-scale` and forgets --resume. Instead of erroring, the tool mints a brand-new run directory, repoints the `latest` symlink away from the run they meant to finish, and starts step 1 from scratch — re-billing the entire run (~$9-10 at default DAD scale, far more at full scale) while the interrupted run sits untouched. Nothing in the output says the flag was ignored.",
+     "recommendation": "In each of the three main() functions add `if args.run_id and not args.resume: parser.error(\"--run-id requires --resume\")` (or fold this into the shared setup helper from the orchestrator-extraction finding), and give sdf's --layer `choices=range(1, 6)` to match dad's --step validation. Three-line change, directly testable via the existing _run_main pattern in tests/test_e2e_smoke.py.",
+     "instances": [
+      "sdf_pipeline/run.py:27,39-43",
+      "dad_pipeline/run.py:47-51",
+      "pref_pipeline/run.py:103-107"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Read all three orchestrators at the cited lines: args.run_id is consumed only inside the `if args.resume:` branch in sdf_pipeline/run.py:39-43, dad_pipeline/run.py:47-51, and pref_pipeline/run.py:103-107; passing --run-id alone raises no error or warning and the else branch mints a fresh run via create_run_dir, which repoints the `latest` symlink (shared/utils.py _update_latest_symlink), so the re-billing scenario is real. The drift detail also holds: dad's --step has choices=(1,2,3) and --stop-after validation (dad run.py:30, 37-38) while sdf's --layer (run.py:27) accepts any int, and --layer 6 skips every `if start_layer <= N` block, printing the banner and \"Total API cost this session: $0.0000\". Only nuance: the --run-id help text documents the with---resume constraint, but nothing enforces it at runtime."
+    },
+    {
+     "title": "Three run.py orchestrators triplicate a ~35-line run-setup block (output root, resume-vs-create, snapshot fallback, api.init)",
+     "file": "sdf_pipeline/run.py",
+     "line": 34,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "sdf_pipeline/run.py:34-66, dad_pipeline/run.py:42-74, and pref_pipeline/run.py:88-121 repeat verbatim: `root = Path(__file__).parent.parent`, `outputs_root = Path(os.environ.get(\"PIPELINE_OUTPUT_ROOT\", root / \"outputs\"))`, the resume-vs-create branch with warn_if_backend_changed, the prompts-snapshot fallback warning (sdf/dad), and `api.init(args.config, cost_log_path=run_dir / \"cost_log.jsonl\")`. The shared argparse flags (--config/--resume/--label/--run-id) are also declared three times. Genuinely different and NOT extractable: sdf's start-layer gating vs dad's start/stop-after window vs pref's single pair loop; the per-stage \"if X is None: load_jsonl(...)\" input chains (dad step 3 adds the legacy `kept` filter at dad run.py:100-101); pref's arm-freezing into inputs/arm_prompts.yaml (pref run.py:111-119).",
+     "failure_scenario": "Every cross-cutting fix must be applied three times and reviewed three times by non-expert contributors — this has already happened (the UTF-8 encoding sweep, commit 8da2626, and the backend-changed warning each touched all three files), and has already produced drift (--step validated in dad, --layer not in sdf; pref lacks the snapshot-fallback warning because it freezes arms instead). The next such fix — e.g. a change to how PIPELINE_OUTPUT_ROOT or cost_log_path is resolved — lands in one orchestrator and silently misses another, and the divergence only surfaces when a run writes to the wrong tree or logs costs to the wrong file.",
+     "recommendation": "Extract only the setup block: add `utils.setup_run(pipeline: str, args, config, snapshot_dirs=None) -> tuple[Path, Path]` (run_dir, prompts_dir) — or a small dataclass — that handles PIPELINE_OUTPUT_ROOT, resolve-vs-create, warn_if_backend_changed, the snapshot fallback warning, the --run-id/--resume validation, and api.init; plus a `add_common_args(parser)` for the four shared flags. Leave stage gating, input-loading chains, and pref's arm freezing in their run.py files — forcing those into a framework is where churn risk exceeds benefit. The e2e smoke tests (tests/test_e2e_smoke.py drives both mains via sys.argv monkeypatching; orchestrator coverage is 92-94%) verify the refactor mechanically.",
+     "instances": [
+      "sdf_pipeline/run.py:32-66",
+      "dad_pipeline/run.py:40-74",
+      "pref_pipeline/run.py:88-121"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "sdf_pipeline/run.py:34-66, dad_pipeline/run.py:42-74, and pref_pipeline/run.py:88-121 triplicate the run-setup block (output root via PIPELINE_OUTPUT_ROOT, resume-vs-create with warn_if_backend_changed, api.init with run-scoped cost_log_path) and re-declare the shared --config/--resume/--label/--run-id flags; sdf/dad additionally duplicate the prompts-snapshot fallback verbatim. Cross-cutting fixes must land three times and have already drifted: the backend-changed warning (d398716) initially missed pref_pipeline/run.py and was only added in follow-up 9629a23 after review caught the missed call site, and existing drift includes --step being choices-validated in dad while sdf's --layer is not. (Note: the UTF-8 sweep, 8da2626, touched only pref among the three orchestrators — sdf/dad's file I/O lives in shared/utils.py — so it is not an example of a three-file fix.)",
+     "verifier_notes": "Read all three orchestrators at the cited lines: the ~30-line setup block (root, PIPELINE_OUTPUT_ROOT fallback, resume-vs-create with warn_if_backend_changed, api.init with identical cost_log_path) is verbatim-duplicated in sdf/dad and near-duplicated in pref, the four argparse flags are declared three times, and the drift claims (--step choices in dad vs unvalidated --layer in sdf; pref lacking the snapshot fallback; dad's kept filter at 100-101) all check out. The failure scenario is directly evidenced by git history: d398716 added warn_if_backend_changed to sdf+dad only, and pref was patched in follow-up 9629a23 because review caught the missed call site. One evidence detail is wrong: commit 8da2626 (UTF-8 sweep) touched only pref_pipeline/run.py among the three orchestrators, not all three — sdf/dad route file I/O through shared/utils.py, which absorbed that fix."
+    },
+    {
+     "title": "Repo is not an installable package: sys.path.insert(0, ...) boilerplate in 23 files because pyproject.toml has no [project] table",
+     "file": "pyproject.toml",
+     "line": 1,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "pyproject.toml contains only [tool.pytest.ini_options] (with `pythonpath = [\".\"]`); there is no [project] metadata, so nothing is importable without the per-file hack. `sys.path.insert(0, str(Path(__file__).parent.parent))` appears in 23 files, and has already drifted: viewer/ui_pages/*.py needs `parent.parent.parent` (e.g. viewer/ui_pages/common.py:10) because it is one level deeper. CI (.github/workflows/ci.yml:26-28) installs only requirements.txt and relies on pytest's pythonpath; the byte-compile step (ci.yml:31) never executes imports, so a forgotten insert passes CI.",
+     "failure_scenario": "A non-engineer contributor adds a new module (say evals/new_check.py or a fourth viewer page) and forgets the boilerplate — or copies the two-parent version into the three-deep ui_pages/. pytest passes (pythonpath=\".\") and CI is green, but `python evals/new_check.py` or `streamlit run viewer/app.py` from a checkout raises ModuleNotFoundError: No module named 'shared' at runtime — an import failure the merge gate structurally cannot catch, discovered by the next person who runs the tool. Meanwhile the frontier-lab recipient sees a 23-file path hack as the first impression of the codebase.",
+     "recommendation": "Add to pyproject.toml: `[project]` with name=\"alignment-data-pipeline\", version, requires-python=\">=3.12\" (matching shared/__init__.py MIN_PYTHON), dependencies read dynamically from requirements.txt or listed inline; `[tool.setuptools.packages.find]` including shared, sdf_pipeline, dad_pipeline, pref_pipeline, evals, viewer (and viewer.ui_pages). Sequence in two PRs: (1) additive — metadata + `pip install -e .` added to ci.yml after the requirements step + README setup line; keep pytest `pythonpath = [\".\"]` (harmless, keeps `pytest` working in un-installed checkouts) and note PIPELINE_OUTPUT_ROOT is orthogonal (env-var based, unaffected). (2) after one green CI cycle, delete the sys.path.insert lines from the 18 library modules, keeping them temporarily in the five direct entry scripts (sdf/dad/pref run.py, viewer/app.py, pref_pipeline/rate.py) so contributors with stale venvs get a grace period; remove those last.",
+     "instances": [
+      "sdf_pipeline/run.py:9 (+ layer1-5)",
+      "dad_pipeline/run.py:16 (+ step1-3)",
+      "pref_pipeline/run.py:22, prefdata.py:13, rate.py:15",
+      "evals/score_sdf.py:9, score_dad.py:11, audit_sdf.py:41, diversity.py:51",
+      "viewer/loader.py:11, rendering.py:16, ui_pages/{common,compare,lineage,run_list}.py (parent.parent.parent variant)",
+      ".github/workflows/ci.yml:26-28 (install step to update)"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "pyproject.toml contains only [tool.pytest.ini_options] with pythonpath=[\".\"] (no [project] table, and no setup.py/setup.cfg exists), so imports of `shared` only work via the per-file hack or pytest. Grep confirms exactly 23 files with sys.path.insert, every cited file:line matches (sdf_pipeline/run.py:9, dad_pipeline/run.py:16, evals/score_sdf.py:9, etc.), and the 4 viewer/ui_pages files do carry the drifted parent.parent.parent variant (common.py:10). CI (.github/workflows/ci.yml:26-28) installs only requirements.txt and line 31 runs compileall, which byte-compiles without executing imports, so a forgotten insert would indeed pass the merge gate; the failure scenario is real because Python 3.12 puts only the script's own directory on sys.path, so `python evals/new_check.py` without the insert raises ModuleNotFoundError for `shared` (verified mechanism in evals/score_sdf.py:9-11)."
+    },
+    {
+     "title": "Idiom drift: dad stages int-coerce the workers knob, sdf stages do not; config access style varies per pipeline",
+     "file": "dad_pipeline/step2_responses.py",
+     "line": 206,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "dad_pipeline/step2_responses.py:206, step3_rewrite.py:73, and step1_dilemmas.py:766 read `workers = int(config.get(\"workers\", 1))`; sdf_pipeline/layer2_subtypes.py:108, layer3_draft.py:179, layer4_rewrite.py:75, layer5_score.py:110, and evals/audit_sdf.py:404 read the bare `config.get(\"workers\", 1)`. parallel_map (shared/utils.py:26) compares `workers <= 1` without coercion. Related access-style drift: required knobs use brackets (layer1_document_types.py:20 `config[\"sdf\"][\"document_types_count\"]`), nested optionals vary between `config[\"dad\"].get(\"responses\", {}).get(\"per_prompt\", 1)` (step2_responses.py:95) and `(config.get(\"pref\") or {}).get(\"arms\")` (pref_pipeline/run.py:51).",
+     "failure_scenario": "A contributor edits config.yaml to `workers: \"8\"` (quoted — an easy YAML slip). Every DAD stage runs normally, but the first SDF layer past layer 1 crashes with `TypeError: '<=' not supported between instances of 'str' and 'int'` inside parallel_map — after layer 1's API call has been billed. Same config, two pipelines, opposite behavior: exactly the kind of inconsistency that costs a non-expert contributor an afternoon. The bracket-vs-.get drift similarly means a missing required knob dies as a bare KeyError deep inside a stage after the run dir and manifest were already created.",
+     "recommendation": "Coerce once at the chokepoint: in shared/utils.py parallel_map, make the first line `workers = int(workers)` (and keep the `<= 1` serial path); then delete the per-site int() calls in the three dad stages so all eight call sites read identically as `config.get(\"workers\", 1)`. Do not attempt a repo-wide config-style sweep — the bracket-for-required / .get-for-optional split is defensible; just document that convention in CLAUDE.md's config section so review bots enforce it on new code.",
+     "instances": [
+      "shared/utils.py:26 (parallel_map, coercion point)",
+      "dad_pipeline/step2_responses.py:206",
+      "dad_pipeline/step3_rewrite.py:73",
+      "dad_pipeline/step1_dilemmas.py:766",
+      "sdf_pipeline/layer2_subtypes.py:108",
+      "sdf_pipeline/layer3_draft.py:179",
+      "sdf_pipeline/layer4_rewrite.py:75",
+      "sdf_pipeline/layer5_score.py:110",
+      "evals/audit_sdf.py:404"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "pref _load_prompts ignores the `refined` field its own help text and CLAUDE.md promise to accept",
+     "file": "pref_pipeline/run.py",
+     "line": 39,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "pref_pipeline/run.py:39 reads only two fields: `text = (r.get(\"user_message\") or r.get(\"prompt\") or \"\").strip()`, but the --prompts help string at lines 80-81 says \"JSONL of prompts (user_message/refined/prompt per record)\" and CLAUDE.md's Preference Pipeline section documents the same three-field contract (\"any JSONL with a `user_message`, `refined`, or `prompt` field\").",
+     "failure_scenario": "A teammate feeds a legacy prompts file keyed by `refined` (the documented interface, e.g. an old DAD step-1 export). Every record is skipped with a per-row warning and the run dies at pref_pipeline/run.py:99 with `No usable prompts in <path>` — no money is lost, but the user is told their documented-valid file is unusable, and the doc/code mismatch will be shipped to the receiving lab as-is.",
+     "recommendation": "One-line fix in _load_prompts: `r.get(\"user_message\") or r.get(\"refined\") or r.get(\"prompt\")` — or, if `refined` is genuinely dead, delete it from the argparse help (pref_pipeline/run.py:80-81) and from CLAUDE.md so the three sources agree. Add a one-record case to tests/test_pref_pipeline.py either way; decide the spec first per the repo's test policy.",
+     "instances": [
+      "pref_pipeline/run.py:39",
+      "pref_pipeline/run.py:80-81 (help text)",
+      "CLAUDE.md Preference Pipeline section"
+     ],
+     "dimension": "structure-duplication",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "god-file",
+   "summary": "dad_pipeline/step1_dilemmas.py (819 lines, 22 commits) is 4x the size of every other stage module (SDF layers run 75-188 lines; step2 is 231) because it hosts six separable concerns: spec vocabulary decks (lines 41-206), annotation shaping (208-256), corpus coverage verification (258-369), pure stratified sampling (372-538), generic JSON salvage (541-604), and a 182-line run() orchestration (638-819) that ruff scores C901=24 with 23 branches and 98 statements. The pure parts (sampling, coverage, decks) are well-tested and can move verbatim behind a small re-export facade — the public surface is narrow and fully mapped: run() (dad_pipeline/run.py:86), format_annotation/format_scenario (viewer/rendering.py:19), and generate_scenarios/coverage_tally/_TAXA_CATEGORIES/_TAXA_SUBCATEGORIES/_TRAP_FORM (tests/test_dad_steps.py). The risk concentrates in the parts that are NOT pure: the JSON salvage subsystem is the file's single fully-untested region (coverage lines 544-604) despite being the code that protects paid batch output, it silently lacks the strict=False control-character tolerance that step2 deliberately added for the identical failure mode, and the 1c fan-out has no exception fence, so one hard refine failure discards a whole batch's paid 1b+1c work before anything is checkpointed. The recommended sequence is therefore tests-first: (1) characterization tests for salvage and the retry loop, (2) extract shared/jsonparse.py (fixing strict=False and unifying five divergent parser copies across step1/step2/evals), (3) extract the sampling deck module, (4) extract the coverage checklist module, (5) decompose run() in place with the refine exception fence — every intermediate state keeps the existing test suite green via re-exports from step1_dilemmas.py.",
+   "findings": [
+    {
+     "title": "Step-1 JSON parsers reject literal control characters that step 2 deliberately tolerates (missing strict=False), silently re-billing batch drafts",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 564,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "All four json.loads calls in the step-1 parse stack use default strict=True: _salvage_objects line 564, _parse_json_array lines 578 and 583, _parse_json_object line 600. step2_responses.py lines 44-46 passes strict=False with the comment \"strict=False accepts literal newlines/tabs inside string values — the way a prose-heavy JSON object at temperature 1.0 most often goes invalid\" — and 1b drafts are exactly prose-heavy multi-paragraph user messages generated at the global temperature 1.0. The lesson was applied to step 2 but never back-ported to step 1.",
+     "failure_scenario": "The model emits a raw newline inside a draft's \"prompt\" string. Full-array parse (578) fails, bracket-slice retry (583) fails on the same character, and _salvage_objects' per-object json.loads (564) fails too, so the complete, paid draft is silently dropped and its scenario re-requested in a fresh 16k-max-token batch call (line 729). If every object in a batch has the defect, by_pid is empty and after three consecutive unusable batches (lines 741-744) the run dies via SystemExit with all those calls billed. In 1c the same defect discards the paid refine and silently ships the unrefined draft.",
+     "recommendation": "Add strict=False to the json.loads calls at lines 564, 578, 583, and 600 (mirroring step2_responses._parse_scope), plus a regression test whose stub reply contains a literal newline inside a string value. Longer term, fold into the shared parser module (see the duplication finding).",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:564 (_salvage_objects)",
+      "dad_pipeline/step1_dilemmas.py:578,583 (_parse_json_array)",
+      "dad_pipeline/step1_dilemmas.py:600 (_parse_json_object)",
+      "contrast: dad_pipeline/step2_responses.py:44-52 (strict=False with explanatory comment)"
+     ],
+     "dimension": "god-file",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Step-1 JSON parsers reject literal control characters that step 2 deliberately tolerates (missing strict=False): all four json.loads calls in dad_pipeline/step1_dilemmas.py use default strict=True (_salvage_objects line 564, _parse_json_array lines 578 and 584, _parse_json_object line 600), while step2_responses.py:_parse_scope (lines 46/52) passes strict=False precisely because prose-heavy JSON at temperature 1.0 most often goes invalid via literal newlines. A raw newline inside a 1b draft's \"prompt\" string defeats all three parse tiers, so the complete, paid draft is dropped (with only a generic \"parse/shape failure\"/\"will retry\" log that masks the cause) and its scenario re-requested in a fresh 16k-max-token batch call; if every object in three consecutive batches is defective the run dies via SystemExit (lines 741-744) with all calls billed. In 1c the same defect discards the paid refine and ships the unrefined draft (logged, not retried). No step-1 parser test covers control characters, though step 2 has one (tests/test_dad_steps.py:210).",
+     "verifier_notes": "Checked all cited lines in the current worktree: step-1's json.loads calls at step1_dilemmas.py:564 (_salvage_objects), 578/584 (_parse_json_array; the bracket-slice call is at 584, one line off the cited 583), and 600 (_parse_json_object) all use default strict=True, while step2_responses.py:46,52 pass strict=False with the exact quoted comment at lines 38-39. Empirically verified that strict=True raises \"Invalid control character\" on a literal newline in a string value while strict=False parses it, so a raw newline in a draft's \"prompt\" defeats all three step-1 fallbacks including the brace-matched salvage slice. The downstream mechanism is exact: the missing scenario is re-requested in a fresh 16k-token call (line 729), an all-bad batch increments consecutive_failures (741) with SystemExit after three (743-744) with all calls billed, and a failed 1c parse silently ships the unrefined draft (line 787). Only trivial citation offsets (584 vs 583; step-2 comment at 38-39 vs 44-46), which don't affect the claim. | Empirically reproduced: a literal newline inside a draft's \"prompt\" string makes all three step-1 parse tiers fail (strict=True throughout) while json.loads(..., strict=False) parses the same text; git shows commit 7d8b14a added strict=False to step 2 only, and step 2's own test comment calls raw newlines \"the historical cause of silently empty scopes,\" so reachability at the default temperature 1.0 is attested by the repo itself. Two detail corrections: _parse_json_array's second json.loads is at line 584 (583 is the try:), and the drops are not literally silent — the loop prints \"Batch N unusable\" / \"will retry\" and 1c prints \"refine call unusable — keeping the 1b draft\" — though the messages mask the root cause and the paid work is still discarded. The SystemExit path is correctly conditioned (needs every object in three consecutive batches defective); the common outcome is re-billed 16k-token batch calls plus unrefined 1b drafts shipping into the training corpus."
+    },
+    {
+     "title": "One failed 1c refine call discards the entire batch's paid 1b draft and sibling refines before anything is checkpointed",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 767,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "The zip over utils.parallel_map at lines 767-769 has no exception handling, and shared/utils.py:22-23 documents that \"If a call ultimately fails, the exception surfaces here\". Step 1 writes no records until after ALL refines complete — record assembly and append_jsonl(record, output_path) happen in the later loop at lines 771-815. The keep-the-1b-draft fallback (lines 783-787) only handles refine_draft returning None on parse failure, not a raised exception.",
+     "failure_scenario": "During an overnight full-scale run, one 1c refine hits a non-retryable API error (or a rate-limit storm exhausts tenacity's retries). The exception propagates out of run() before any record for the batch is written. On --resume, every scenario in that batch is redrafted: the 16k-token 1b batch call is re-billed and every sibling 1c refine that had already succeeded is re-billed too — the exact loss the per-record checkpoint convention exists to prevent.",
+     "recommendation": "Wrap the refine_draft call inside the _refine worker (lines 760-764) in try/except: log and return None so the existing keep-the-draft fallback at 783-787 applies, and count consecutive refine failures with an abort threshold mirroring the 1b loop's 3-strike rule (lines 741-744) so a systemic failure (bad key, dead endpoint) still stops the run instead of silently shipping 40 unrefined drafts. Add a test: dispatcher raises on one refine, asserts the batch's records are still written with draft_user_message absent for the failed one.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:767-769 (unfenced parallel_map consumption)",
+      "dad_pipeline/step1_dilemmas.py:813-815 (writes deferred until after all refines)"
+     ],
+     "dimension": "god-file",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified at dad_pipeline/step1_dilemmas.py: the zip over utils.parallel_map at lines 767-769 has no exception handling; refine_draft (lines 607-626) returns None only on parse/shape failure and lets api.call_claude exceptions propagate (shared/api.py retries only RateLimit/5xx/connection errors with stop_after_attempt(8), so non-retryable 4xx or exhausted retries raise). The only writes for the batch happen in the later loop (append_jsonl at line 815, after all refines are consumed), and neither run() nor dad_pipeline/run.py:86 catches the exception, so successful sibling refines held in refined_by_pid and the 16k-max-token 1b draft are lost; on --resume, accepted is rebuilt solely from dilemmas.jsonl (lines 659, 701), so the whole batch is re-drafted and re-refined. This directly violates the parallel_map docstring's contract that \"items already yielded are safely checkpointed\" (shared/utils.py:22-24); the lines-783-787 fallback covers only the None case exactly as claimed. | Verified all claims by reading the code: the zip at dad_pipeline/step1_dilemmas.py:767-769 consumes parallel_map with no exception handling, records are only written at line 815 after ALL refines complete, and the lines 783-787 fallback handles only refine_draft returning None (parse failure) — raised API exceptions propagate (shared/api.py raises immediately on non-retryable 4xx and after 8 tenacity attempts on rate-limit/5xx). The scenario is reachable under config.yaml defaults (refine: true, workers: 8, batch_size: 10); the 1b draft is never persisted (batches_path stores only scenario metadata, accepted rebuilds from output_path), so resume re-bills the 16k-token batch call plus completed sibling refines. Steps 2 and 3 checkpoint per item as they consume parallel_map, confirming step 1 violates the documented contract; no test covers a raised exception or crash mid-batch. Loss is bounded to one batch per incident (~1 draft call + up to 10 refines), and process interruption (Ctrl-C/machine death) mid-batch causes the same loss, which the finding's severity reasonably reflects."
+    },
+    {
+     "title": "step1_dilemmas.py is a six-concern 819-line module; run() alone is 182 lines at C901=24 — split into four modules with a re-export facade",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 638,
+     "severity": "medium",
+     "effort": "L",
+     "evidence": "Ruff: run() C901 24 (>10), PLR0912 23 branches, PLR0915 98 statements; generate_scenarios C901 12 / PLR0915 52. The file is 819 lines against 75-231 for every other pipeline stage in the repo, with the highest churn (22 commits). Distinct concerns by line range: vocabulary decks 41-206; annotation shaping 208-256; coverage verification (coverage_tally/checklist/print_checklist) 258-369; pure sampling (_deck/_share_deck/generate_scenarios/format_scenario) 372-538; generic JSON salvage 541-604; refine_draft/_next_id/run() orchestration 607-819. Public surface consumed elsewhere: run() (dad_pipeline/run.py:86); format_annotation, format_scenario (viewer/rendering.py:19); generate_scenarios, coverage_tally, run, _TAXA_CATEGORIES, _TAXA_SUBCATEGORIES, _TRAP_FORM (tests/test_dad_steps.py:18-193).",
+     "failure_scenario": "Concrete maintenance cost: every spec change to the vocabulary decks or checklist lands in the same file as the batch-retry money loop, so the automated PR review must re-reason about checkpoint/re-billing safety on every deck tweak (22 commits so far); non-engineer contributors editing a Counter threshold scroll past the paid-call orchestration, and a mis-scoped edit there re-bills runs at ~$10 per full-scale invocation. run()'s 24-branch body is also why its failure paths are the file's untested region.",
+     "recommendation": "PR sequence, every intermediate state green: PR1 — characterization tests for salvage + retry paths (no production change; see the coverage finding). PR2 — create shared/jsonparse.py (parse_json_array, parse_json_object, salvage_objects, strict=False parameter); step1 keeps aliases _parse_json_array = jsonparse.parse_json_array. PR3 — move lines 41-206 and 372-538 verbatim to dad_pipeline/scenario_deck.py; step1_dilemmas re-exports generate_scenarios, format_scenario, _TAXA_CATEGORIES, _TAXA_SUBCATEGORIES, _TRAP_FORM (keeps tests and viewer/rendering.py:19 green without touching them). PR4 — move coverage_tally/checklist/print_checklist/_norm_pair/_welfare_in_pairs verbatim to dad_pipeline/coverage_checklist.py, re-export coverage_tally. PR5 — decompose run() in place into _import_seeds(cfg, examples, output_path, id_start), _draft_batch(...) (1b call + parse + accept), _refine_batch(...) (1c fan-out, gaining the exception fence), and _assemble_record(...); run() becomes a ~40-line loop. PR6 (optional) — repoint tests/viewer imports at the new modules; keeping step1_dilemmas.py as a permanent thin facade is also acceptable since prompts/dad/step1_dilemmas.txt anchors the name. Verbatim moves: decks, sampling, coverage, format_annotation/format_scenario. Refactor required: JSON helpers (rename + strict param) and run() (closures over config/prompts_dir become parameters).",
+     "instances": [
+      "lines 41-206 vocabulary decks",
+      "lines 258-369 coverage checklist",
+      "lines 372-538 sampling",
+      "lines 541-604 JSON salvage",
+      "lines 638-819 run() orchestration",
+      "consumers: dad_pipeline/run.py:86, viewer/rendering.py:19, tests/test_dad_steps.py:18-193"
+     ],
+     "dimension": "god-file",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Every checkable assertion holds: file is 819 lines (other stages 75-231), 22 commits of churn, ruff reports run() C901=24/PLR0912=23/PLR0915=98 and generate_scenarios C901=12/PLR0915=52 (verified with uvx ruff --isolated), run() spans lines 638-819 (182 lines), the six concern line-ranges match def positions exactly, and all claimed consumers exist at the cited lines (dad_pipeline/run.py:86, viewer/rendering.py:19, tests/test_dad_steps.py:18-193). The paid batch-retry loop is inside run() as claimed, and its failure paths (unusable-batch retry, three-consecutive abort, call-budget exhaustion) are indeed untested — the only step-1 failure test is duplicate seed IDs, a negligible caveat to the scenario."
+    },
+    {
+     "title": "The file's untested 16% is exactly the money-path fallbacks: all of _salvage_objects, every parser fallback branch, and the batch retry loop",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 541,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "Coverage (84%) missing lines map to: 544-568 = the entire _salvage_objects body; 574-589 and 596-604 = every fence-strip and JSONDecodeError fallback in _parse_json_array/_parse_json_object; 712 = the max_calls SystemExit; 741-745 = the unusable-batch retry and 3-strike abort; 775-776 = the missing-draft re-request; 787 = the refine-failed keep-draft path; 624 = refine_draft's rejection return; 669 and 687 = the seed-import happy path (only duplicate-id rejection is tested, tests/test_dad_steps.py:164-179). CLAUDE.md's own testing rules require \"a malformed-response fallback test\" for every stage; step 1's exists only for a malformed annotation, never for malformed/truncated JSON transport.",
+     "failure_scenario": "A contributor 'simplifies' _salvage_objects or the retry accounting; the suite stays green, the automated review gate merges it, and the regression surfaces only in a paid run — truncated batches stop yielding their complete objects, every affected scenario is silently re-billed up to the 8x max_calls bound, or the 3-strike abort kills an overnight full-scale run. Nobody notices which behavior was lost because no test ever pinned it.",
+     "recommendation": "Make this PR1 of the split plan (lock behavior before moving code): (a) direct fixtures for _parse_json_array/_parse_json_object — truncated array, prose-wrapped object, fenced block, trailing garbage; (b) run()-level dispatcher tests: two garbage batches then a good one (asserts retry + consecutive_failures reset), three garbage batches (asserts SystemExit at line 744), a batch missing one scenario_id (asserts re-request at 775 and second call), a refine returning garbage (asserts keep-draft at 787 and no refinements.jsonl row); (c) seed happy path asserting AW-series continuation above the highest seed id.",
+     "instances": [
+      "lines 544-568 (all of _salvage_objects)",
+      "lines 574-589, 596-604 (parser fallbacks)",
+      "lines 712, 741-745, 775-776, 787 (retry loop)",
+      "lines 624, 651, 657, 669, 687 (refine rejection, template guards, seed import)",
+      "advisory branches 233-234, 279, 300, 326-327, 411, 419"
+     ],
+     "dimension": "god-file",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Five divergent hand-rolled copies of the fence-strip/JSON-recovery idiom across step1, step2, and three evals",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 571,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "The same strip-``` fences-then-recover pattern is implemented five times with four different behaviors: step1_dilemmas.py:571-604 (bracket slice + object salvage, strict default); step2_responses.py:36-54 (brace slice, strict=False); evals/audit_sdf.py:363-380 (JSONDecoder.raw_decode recovery); evals/score_dad.py:92-102 and evals/score_sdf.py:61-70 (fence strip only — on failure they record zero scores with \"Parse error.\" notes).",
+     "failure_scenario": "Robustness fixes learned at one site never propagate — this already happened once: strict=False was added to step 2 for the temperature-1.0 control-character failure and step 1 still lacks it (see the strict=False finding). Meanwhile score_dad/score_sdf silently write zero-score records for fenced-plus-prose judge outputs the other parsers would recover, skewing eval numbers downward with no error raised.",
+     "recommendation": "PR2 of the split plan: create shared/jsonparse.py exposing parse_json_array/parse_json_object/salvage_objects with the union of behaviors (fence strip, strict=False, bracket/brace slice, per-object salvage) and port step1 first (aliases keep its internal call sites unchanged). Migrate step2_responses._parse_scope, audit_sdf._parse_json_block, and the two scorer inline blocks in separate small PRs, each with a fixture test carried over from the old site's known failure mode.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:571-604",
+      "dad_pipeline/step2_responses.py:36-54",
+      "evals/audit_sdf.py:363-380",
+      "evals/score_dad.py:92-102",
+      "evals/score_sdf.py:61-70"
+     ],
+     "dimension": "god-file",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Read all five cited sites in the current worktree. step1_dilemmas.py:571-604 (_parse_json_array/_parse_json_object: fence strip, strict-default json.loads, bracket slice, _salvage_objects fallback), step2_responses.py:37-55 (_parse_scope: fence strip, strict=False, brace slice — with a comment confirming strict=False was added for the temperature-1.0 control-character failure that step 1 still lacks), audit_sdf.py:363-380 (fence strip + JSONDecoder.raw_decode recovery), and score_dad.py:92-102 / score_sdf.py:61-70 (fence strip only; on JSONDecodeError they write all-zero score records with \"Parse error.\" notes that flow into the aggregate averages, no error raised) all match the finding. The failure scenario holds: prose before/after a fenced judge block leaves a stray fence, fails the strict loads in the scorers, and yields silent zero scores where the other parsers' slice/raw_decode/salvage recovery would succeed. Only trivial imprecisions: step2's function spans 37-55 (not 36-54), and step 1 has two parser functions in the cited range."
+    },
+    {
+     "title": "_deck truncates `guaranteed` in declaration order, so small runs always draw the same fixed domain/surface-form subset",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 378,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "Line 378: `deck = list(guaranteed)[:n]` — when the deck is smaller than the guaranteed tuple, it keeps the FIRST n items in declaration order; the final rng.shuffle randomizes order but not membership. For domains (line 413, guaranteed=_THIN_DOMAINS), a count=2 dev run always deals \"Family / Relationships\" and \"Education / Parenting\". For surface forms (lines 442-443, guaranteed=_REQUIRED_SURFACE_FORMS), any deck under 5 slots can never deal \"already decided\" or \"third-party framing\". This contradicts the random-subset behavior the taxa comment (lines 424-426) promises and that tests assert for taxa.",
+     "failure_scenario": "Committed smoke runs (kept in git as reviewable examples of pipeline behavior per CLAUDE.md) and small pref/eval prompt sets systematically over-represent two thin domains and omit two of the five required surface forms, so reviewers evaluating the pipeline from small runs see a biased slice of what full-scale runs produce.",
+     "recommendation": "In _deck, shuffle a copy before truncating: `g = list(guaranteed); rng.shuffle(g); deck = g[:n]`. Extend the existing small-batch subset test (tests/test_dad_steps.py:29-40 style) to assert domain and surface-form subsets vary across seeds at n=2-4.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:378 (_deck truncation)",
+      "dad_pipeline/step1_dilemmas.py:413 (domains, guaranteed=_THIN_DOMAINS)",
+      "dad_pipeline/step1_dilemmas.py:442-443 (surface forms, guaranteed=_REQUIRED_SURFACE_FORMS)"
+     ],
+     "dimension": "god-file",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "mypy arg-type errors at the two call_claude→parser handoffs from the untyped str|tuple union return",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 620,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "shared/api.py:391-401 types call_claude as `-> str | tuple[str, str | None]` (tuple only when return_stop_reason=True). step1 passes the result straight into str-typed parsers at line 620 (_parse_json_object in refine_draft) and line 729→735 (_parse_json_array in the 1b loop), producing the two mypy arg-type errors in the lint evidence. Runtime-safe today because return_stop_reason defaults to False.",
+     "failure_scenario": "The persistent red mypy output trains contributors to treat type errors on this file as noise; a future edit that flips return_stop_reason=True at one call site (to add the truncation check CLAUDE.md prescribes) but forgets to unpack would crash the batch loop mid-run — and the pre-existing errors mean no new signal flags it.",
+     "recommendation": "Add @overload signatures to shared/api.call_claude keyed on return_stop_reason: Literal[True] -> tuple[str, str | None], default/Literal[False] -> str. Zero runtime change; clears both errors and makes any future tuple leak a hard mypy failure.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:620",
+      "dad_pipeline/step1_dilemmas.py:729-735",
+      "root cause: shared/api.py:401"
+     ],
+     "dimension": "god-file",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "tests",
+   "summary": "The core test suite is unusually strong for a contributor-built repo: 278 offline tests with a four-layer API guard (pytest-socket, fake keys, blocked retry seams, a recording stub_claude chokepoint that fails loudly on concurrent FIFO misuse), behavior-level assertions through each stage's public run(), real prompt templates in play, and disciplined checkpoint/resume \"zero API calls for completed work\" tests across most of SDF, DAD, and pref — including the money-protecting details (per-arm pref checkpointing, step-3 truncation retry ladder, layer-5 latent-beat fail-closed gate). conftest.py is exemplary and brittleness is low (constitution expectations are derived, uuid/timestamps asserted by shape). The gaps are concentrated and asymmetric: the two paid LLM-judge scripts (evals/score_sdf.py, score_dad.py) are at 0% and checkpoint parse failures as done; DAD step-1b's entire retry/budget-cap control loop and salvage parsers are uncovered; CLAUDE.md's own per-stage test triad is unmet in four specific spots (layer-4 resume, 2b truncation skip, layers 1-2 malformed, 1c fallback); and audit_sdf.py — the design-critical corpus-collapse detector — is 25% covered. Viewer/rate.py zero coverage is acceptable UI-only surface thanks to the deliberate loader/prefdata separation. CI runs the suite but measures no coverage; a floor of 75% over the non-viewer modules (currently 76.3%) is workable immediately and can ratchet to ~85% once the eval-judge and step-1b tests land.",
+   "findings": [
+    {
+     "title": "Paid LLM-judge scripts (score_sdf.py, score_dad.py) are 0% covered and checkpoint parse failures as permanently done",
+     "file": "evals/score_sdf.py",
+     "line": 75,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "Coverage report: evals/score_sdf.py 61/61 missed, evals/score_dad.py 83/83 missed. Both scripts strip code fences naively (score_sdf.py:61-65, score_dad.py:92-96) instead of using utils.extract_json (adopted pipeline-wide in PR #59 after a live 'Extra data' failure — see the regression comment at tests/test_sdf_layers.py:82), fall back to zero scores on JSONDecodeError (score_sdf.py:70), then unconditionally append the record and checkpoint.mark_done(doc_id) (score_sdf.py:74-75; score_dad.py:106-107).",
+     "failure_scenario": "The judge model appends one sentence after its JSON (the exact failure already seen live at SDF layer 2). json.loads raises, the paid call's result is recorded as alignment/realism/diversity = 0 with notes 'Parse error.', and the checkpoint marks the doc done — a re-run skips it forever. The eval summary silently reports a passing corpus as failing (or dilutes averages), and recovering requires hand-deleting checkpoint entries and re-billing the calls. No test would catch a regression here because none exists.",
+     "recommendation": "Extract the per-record scoring loop from each main() into a testable function (e.g. score_records(records, output_path, checkpoint, call=api.call_claude)), switch the parsing to shared.utils.extract_json, and on parse failure do NOT mark the checkpoint (mirror step3_rewrite's skip-without-checkpoint pattern, tested at tests/test_dad_steps.py:375). Add the standard triad with stub_claude: happy-path parse, malformed-response (assert not checkpointed and retried on rerun), and resume-with-zero-calls.",
+     "instances": [
+      "evals/score_sdf.py:61-75 (fence-strip parse, zero-score fallback, unconditional mark_done)",
+      "evals/score_dad.py:92-107 (identical pattern)"
+     ],
+     "dimension": "tests",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "All cited lines verified in current code: naive fence-strip (score_sdf.py:61-65, score_dad.py:92-96), zero-score fallback on JSONDecodeError (score_sdf.py:67-70, score_dad.py:98-102), unconditional append + checkpoint.mark_done (score_sdf.py:74-75, score_dad.py:106-107), and the skip-if-done gate (score_sdf.py:54, score_dad.py:77) makes the parse failure permanent across re-runs. Trailing prose after the JSON bypasses the fence strip and triggers exactly the \"Extra data\" failure documented as a live 2026-07-08 incident at tests/test_sdf_layers.py:81-84; utils.extract_json (shared/utils.py:68) exists and handles it. No test file references either script, and statement counts are exactly 61 and 83, matching the claimed 61/61 and 83/83 missed. Minor nit only: PR #59 adopted extract_json in SDF layers 1/2/5, not literally pipeline-wide (DAD uses its own bracket-slice parsing) — does not affect the core claim. | Read both scripts, shared/utils.py (extract_json, Checkpoint), tests/test_sdf_layers.py:82, and grepped tests/ — no test references either eval script, and all cited line numbers are exact. The failure scenario is reachable via the documented CLI eval commands: trailing prose after JSON (the live 2026-07-08 layer-2 failure) raises JSONDecodeError past the naive fence-strip, zero scores are recorded, and the record is skipped forever on re-run through BOTH the persisted checkpoint and the `existing` dict built from the output jsonl. extract_json was adopted in SDF layers 1/2/5 via PR #59 (fix/robust-json-extraction) but neither eval script uses it; the only unreproducible detail is the exact missed-statement counts (pytest-cov not installed), which doesn't affect the 0%-coverage core claim."
+    },
+    {
+     "title": "DAD step-1b batch retry loop, budget cap, and JSON salvage parsers are entirely untested",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 741,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "Coverage misses 544-568 (_salvage_objects brace-matching salvage), 574-589 (_parse_json_array fence/recovery paths), 596-604 (_parse_json_object salvage), 706-712 (max_calls SystemExit), 741-745 (unusable-batch retry + three-consecutive-failures abort), 775-776 (per-scenario miss re-queued), 787 (unusable 1c refine keeps the 1b draft). The existing malformed test (tests/test_dad_steps.py:110) only covers annotation-shape normalization on a successful parse — every path where the 16k-token batch call returns garbage, truncates, or drops scenarios is uncovered.",
+     "failure_scenario": "A refactor breaks the accepted-set bookkeeping (line 701) or the pending recomputation (line 707): every iteration re-drafts already-filled scenarios at max_tokens=16000 until the max_calls cap (8x the batch count) aborts the run — the most expensive single call in the DAD pipeline re-billed up to 8x per batch, with CI green. Similarly, a regression in _salvage_objects turns a truncated-but-salvageable batch into a total loss, and nothing detects that the three-failure SystemExit fires (or fails to fire).",
+     "recommendation": "Add to TestStep1Run using a stateful dispatcher: (1) first 1b reply is garbage, second succeeds — assert exactly 2 prompt_draft calls, batches.jsonl has one entry, all scenarios filled; (2) three garbage replies — assert SystemExit('Three consecutive unusable batches'); (3) a reply missing one scenario_id — assert only that scenario re-appears in the next call's scenarios_block; (4) refine returns garbage — assert the record keeps the 1b draft text (line 787). Add direct unit tests for _salvage_objects/_parse_json_array on truncated arrays and prose-wrapped objects.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:541-604 (salvage/parse helpers, 0 tests)",
+      "dad_pipeline/step1_dilemmas.py:706-745 (retry loop, max_calls cap, consecutive-failure abort)",
+      "dad_pipeline/step1_dilemmas.py:775-787 (per-scenario retry, 1c-unusable fallback)"
+     ],
+     "dimension": "tests",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "DAD step-1b's JSON salvage parsers and batch-failure handling are entirely untested: coverage misses _salvage_objects (544-568), _parse_json_array's fence-strip and bracket-recovery paths (574, 576, 580-589), _parse_json_object's fence-strip and salvage paths (596, 598, 602-604), the max_calls SystemExit raise (712-713), the unusable-batch retry and three-consecutive-failures abort (741-745), the per-scenario miss re-queue (775-776), and the unusable-1c-refine fallback (787). The existing malformed test (tests/test_dad_steps.py:110) only covers annotation-shape normalization on a successful parse. Consequences: a regression in _salvage_objects turns a truncated-but-salvageable 16k-token batch into a total loss with CI green; nothing verifies the three-failure abort or max_calls cap fires (or fails to fire); a dropped-scenario batch is never tested to re-queue. (A wholesale break of the accepted/pending loop bookkeeping would, however, be caught indirectly by existing happy-path and resume tests via SystemExit and call-count asserts.)",
+     "verifier_notes": "Ran the full 295-test suite under coverage (scoped to dad_pipeline/step1_dilemmas.py, coverage artifacts kept in scratchpad): missed lines 544-568, 574, 576, 580-589, 596, 598, 602-604, 712, 741-745, 775-776, 787 match the finding almost exactly — all salvage/fence-recovery parsers, the max_calls SystemExit, the unusable-batch retry and three-failure abort, the per-scenario miss re-queue, and the 1c-unusable fallback are untested, and the cited \"malformed\" test (tests/test_dad_steps.py:110) indeed only tests annotation normalization on a successful parse. Two detail corrections: the ranges 574-589/596-604/706-712 include a few covered happy-path lines (577-579, 599-601, 706-711), and the first failure scenario's \"CI green\" is overstated — a total break of the accepted-set/pending bookkeeping would fail existing happy-path/resume tests via SystemExit and call-count asserts. The salvage-regression and three-failure-abort scenarios are genuinely CI-invisible (zero coverage). | Verified in dad_pipeline/step1_dilemmas.py and tests/: the salvage/fence/recovery parsers (544-568, 573-576, 580-589, 595-598, 602-604), unusable-batch retry + three-failure abort (740-745), max_calls SystemExit (710-713), per-scenario miss re-queue (774-776), and 1c-unusable fallback (786-787) have zero test coverage — every stub returns clean json.dumps output, and the project's own CLAUDE.md mandates a malformed-response fallback test per stage. The paths are production-reachable (config.yaml: haiku, batch_size 10, max_tokens=16000; the code comments that truncation is the main cause of unusable output). However, the headline scenario is wrong: a broken accepted-set/pending recomputation would fail CI — test_drafts_scenarios_and_refines asserts exactly 3 calls and the max_calls SystemExit would propagate, and test_resume_makes_no_calls asserts zero calls on resume — and the claimed miss ranges over-count (happy-path lines 577-579 and 599-601 are covered)."
+    },
+    {
+     "title": "CLAUDE.md's per-stage test triad is unmet at four named points: layer-4 resume, 2b truncation skip, layers 1-2 malformed, 1c fallback",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 30,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "Layer 4 keeps a per-doc checkpoint (layer4_rewrite.py:24-30) but TestLayer4/TestLayer4Latent (tests/test_sdf_layers.py:147-171, 361-384) contain no resume test; the e2e resume test (tests/test_e2e_smoke.py:75-83) resumes at layer 5, and sdf_pipeline/run.py:105-107 then loads rewrites.jsonl directly — so layer4's checkpoint-skip branch executes in zero tests. DAD 2b's truncated/empty-draft skip guard (step2_responses.py:188-192) is uncovered per the coverage report (missing 189-192), as is the resume path that reuses an existing scope (line 165). SDF layers 1-2 have no malformed-response test at stage level: garbage output propagates extract_json's JSONDecodeError as an uncaught crash (layer1_document_types.py:44), a behavior asserted nowhere.",
+     "failure_scenario": "Layer 4 is the most expensive per-call stage (rewrite model + full constitution system prompt). If a refactor breaks its checkpoint keying (e.g. keys on subtype_id instead of doc_id), a --resume after a mid-layer-4 crash silently re-bills every completed rewrite — the exact failure class CLAUDE.md's third rule exists to prevent — and no test fails. For 2b: a regression in the stop_reason guard checkpoints a truncated draft, which step 3 then rewrites into the training corpus as a paid, silently-degraded record.",
+     "recommendation": "Four small tests: (1) TestLayer4: mark one of two doc_ids done in the checkpoint plus its row in rewrites.jsonl, run, assert exactly one call and both records returned; (2) TestStep2Run: dispatcher returns ('cut off', 'max_tokens') for 2b — assert responses.jsonl empty, checkpoint unmarked, and a rerun with a good reply makes only the 2b call (scope reused from scopes.jsonl, covering line 165); (3)+(4) TestLayer1/TestLayer2: stub_claude(['total garbage']) — assert pytest.raises(json.JSONDecodeError) and that no output file/checkpoint was written (pins the crash-then-resume contract).",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:30 — checkpoint skip path never executed by any test",
+      "dad_pipeline/step2_responses.py:188-192 — 2b truncation/empty skip guard untested",
+      "dad_pipeline/step2_responses.py:165 — resume-with-existing-scope branch untested",
+      "sdf_pipeline/layer1_document_types.py:44 and layer2_subtypes.py — garbage-response behavior untested at stage level"
+     ],
+     "dimension": "tests",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "audit_sdf.py is 25% covered: six of eight mechanical corpus checks and the whole paid --patterns flow are untested",
+     "file": "evals/audit_sdf.py",
+     "line": 383,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "Coverage misses 130-165 (audit_composition), 212-225 (audit_near_dups), 229-256 (audit_names incl. the watchlist and the Declaration whitelist), 260-278 (audit_phrases), 282-301 (audit_openings), 306-332 (audit_register), 385-459 (llm_pattern_scan: batch scan, consolidation-failure fallback at 421-424, prevalence flagging at 448-459), and 466-519 (main/resolve_input wiring). Only audit_markdown, audit_length_truncation, and _parse_json_block are tested (tests/test_audit_sdf.py).",
+     "failure_scenario": "CLAUDE.md names this audit the defense against the haiku-test2 failure mode (register collapse, name reuse, templated openings) that per-document judges cannot see. A regression in _NAME_RE, the >30% defect-flagging threshold, or the audit_names whitelist makes the audit print GOOD over a fingerprinted corpus; the team ships a collapsed corpus to the lab believing it was checked. The --patterns path additionally spends API money whose consolidation-failure fallback (report raw patterns, don't crash) has never executed.",
+     "recommendation": "The functions already take (records, report) — extend tests/test_audit_sdf.py with synthetic corpora per check: a name repeated in 3 docs must flag and 'Cambridge Declaration' must not (audit_names); a formulaic-opener corpus vs a varied one (audit_openings); a first-person-labeled-but-stiff corpus (audit_register). For llm_pattern_scan, use stub_claude with a dispatcher returning canned scan/consolidate/prevalence JSON and assert the flagged=true row appears only when is_defect and prevalence>0.30; add one test where consolidation returns garbage and assert report['patterns'] falls back to the raw list.",
+     "instances": [
+      "evals/audit_sdf.py:140-165, 212-332 (untested mechanical checks)",
+      "evals/audit_sdf.py:383-459 (untested paid LLM scan incl. fallbacks)"
+     ],
+     "dimension": "tests",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Traced the full test suite with a line tracer scoped to evals/audit_sdf.py: exactly 25% covered (78/311 executable statement lines), and the measured missed ranges match every claimed range — audit_composition, audit_near_dups, audit_names (incl. watchlist and Declaration whitelist), audit_phrases, audit_openings, audit_register, the entire llm_pattern_scan (incl. the consolidation-failure fallback at 421-424 and >30% flagging at 448-459), and main. tests/test_audit_sdf.py is the only test file touching the module and exercises only audit_markdown, audit_length_truncation, and _parse_json_block, so six of eight mechanical checks are untested as claimed. CLAUDE.md does name this audit the corpus-level defense against the haiku-test2 failure mode, so the failure scenario holds. Only trivial imprecisions: lines 130-137 are first_sentence (not audit_composition), and resolve_input actually lives at 63-74 (also uncovered) rather than inside 466-519."
+    },
+    {
+     "title": "CI runs the suite but measures no coverage; a 75% floor over non-viewer modules is workable today",
+     "file": ".github/workflows/ci.yml",
+     "line": 34,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "The required smoke job runs plain `pytest` (.github/workflows/ci.yml:34); pytest-cov is absent from requirements.txt and addopts (pyproject.toml:7). Total coverage is 58%, but that number is dominated by 961 statements of Streamlit UI (viewer/* 873 missed). Over the money-path modules — shared, sdf_pipeline, dad_pipeline, pref_pipeline, evals, excluding viewer/ — coverage is 76.3% today (78.2% also excluding pref_pipeline/rate.py, the other UI file).",
+     "failure_scenario": "Without a floor, the next contributor PR that adds an untested stage (the pattern that produced score_sdf.py/score_dad.py at 0%) merges green; CLAUDE.md's 'every PR adds tests' rule is currently enforced only by reviewer memory. Conversely, a naive whole-repo floor would either sit uselessly at 58% or force pointless Streamlit tests.",
+     "recommendation": "Add pytest-cov to requirements.txt and a .coveragerc with `[run] omit = viewer/*, pref_pipeline/rate.py, tests/*`. Gate CI with `pytest --cov=shared --cov=sdf_pipeline --cov=dad_pipeline --cov=pref_pipeline --cov=evals --cov-fail-under=75` (passes today at 78.2%). After the score_* and step-1b findings above land (~250 fewer missed statements), ratchet the floor to 85. Keep the plain-pytest local invocation unchanged so the suite stays ~2s for contributors.",
+     "instances": [],
+     "dimension": "tests",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Reproduced every core assertion: ci.yml:34 runs plain `pytest` in the required smoke job; pytest-cov is absent from requirements.txt and from pyproject.toml:7 addopts (and not installed). Running the 295-test suite under coverage from the worktree gives TOTAL exactly 58% (3468/1466), score_sdf.py and score_dad.py at 0% with zero test references, non-viewer coverage 76.3%, and 78.2% also excluding pref_pipeline/rate.py — so the proposed 75% non-viewer floor is workable and a whole-repo floor would sit at 58%. Only nit: viewer/* measured 942 stmts/868 missed vs the claimed 961/873 (likely Python 3.12-vs-3.14 tooling variance); this changes no derived percentage or the conclusion."
+    },
+    {
+     "title": "SDF e2e dispatcher identifies layers by max_tokens value and system_prompt truthiness instead of prompt content",
+     "file": "tests/test_e2e_smoke.py",
+     "line": 37,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "_sdf_dispatch routes on `kw[\"max_tokens\"] == 6000 and kw[\"system_prompt\"]` for layer 4 and `kw[\"max_tokens\"] == 6000` alone for layer 3 (tests/test_e2e_smoke.py:37-39), while the DAD dispatcher (line 88-99) routes on distinctive prompt text, which CLAUDE.md documents as the marker contract for template edits.",
+     "failure_scenario": "A contributor raises layer 3's token budget to 8000 (a plausible knob change): layer-3 calls fall through every branch and the test dies with 'Unrecognized SDF prompt' — loud but misleading, pointing at prompts when the change was a budget. Worse ordering hazards exist: if layer 4 ever stops receiving max_tokens=6000, its calls match the layer-5 `system_prompt` branch and receive a JSON score blob, failing far from the cause via the parse-fallback path.",
+     "recommendation": "Rekey _sdf_dispatch on stable prompt-text markers like the DAD dispatcher (e.g. the opening prose of layer3.txt/layer4.txt/layer5.txt, or simply kw['stage'] which stub_claude already records and every layer already passes — 'layer4', 'layer5', etc.), and note the marker source in the comment as done for DAD.",
+     "instances": [],
+     "dimension": "tests",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Zero coverage on viewer/, rate.py, and arm_win_counts is acceptable UI surface — keep the logic-extraction pattern that makes it so",
+     "file": "pref_pipeline/rate.py",
+     "line": 92,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "rate.py is a thin Streamlit shell: all rating/deblinding/export logic lives in prefdata.py (record_rating tested at tests/test_pref_pipeline.py:141-159), and the UI calls it in one line (rate.py:92). The viewer follows the same split — loader.py's cost/stats functions are tested (tests/test_viewer_loader.py) while app.py/rendering.py/ui_pages render only. Residual untested logic in the UI-adjacent layer: prefdata.arm_win_counts (prefdata.py:105-116, drives the deblinded tally shown to raters) and viewer/loader.py's run-listing/lineage reconstruction (38%, missing 168-418).",
+     "failure_scenario": "Concrete cost is bounded to developer/rater experience: a bug in arm_win_counts misreports arm wins on the completion screen (analysis is done from preferences.jsonl, which IS tested), and a loader regression breaks the run browser — no training data or paid work is touched. The real risk is drift: future contributors adding decision logic directly into rate.py or ui_pages where it becomes untestable.",
+     "recommendation": "Do not chase coverage here. Add one small test for arm_win_counts (a tie plus one decisive rating per arm) since it feeds the PREF_UNBLIND monitoring view, and record in CLAUDE.md's testing section that Streamlit files must stay logic-free (prefdata/loader pattern) so the 0%-UI carve-out in the coverage gate stays honest.",
+     "instances": [
+      "pref_pipeline/prefdata.py:105-116 (arm_win_counts untested)",
+      "viewer/loader.py 38% — run listing/lineage untested, viewer-only",
+      "viewer/app.py, viewer/rendering.py, viewer/ui_pages/* at 0% — render-only"
+     ],
+     "dimension": "tests",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "delivery",
+   "summary": "Delivery-readiness is solid where it matters most and thin on engineering process scaffolding. The good: secret hygiene is clean (.env gitignored and never tracked; all 231 committed files under outputs/ scanned free of API keys, usernames, and absolute paths; run manifests snapshot only config); CI is a genuine offline merge gate (deps install + compileall + pytest, deliberately secret-free so it runs on forks); and claude-code-review.yml is unusually well-engineered (verdict-verification step defeats the action's false-green, base-retarget handling, restricted tool allowlist). Docs are mostly accurate — I verified config.yaml defaults (3/2/1 SDF, dilemmas.count 40), MIN_PYTHON=(3,12) in shared/__init__.py, the 7 rubric dimensions with 3.5 threshold, the run-dir layout, and cost-log wiring — but README.md:31 materially misdescribes which constitution text feeds the alignment-critical SDF layers 4-5. The gaps: the repo is not installable (no [project] metadata; ten sys.path.insert hacks), not reproducible (floors-only requirements.txt, no lockfile, numpy missing, tqdm/jsonlines unused), and has zero lint/format/type/coverage tooling — no [tool.ruff] or [tool.mypy] anywhere, 541 ruff findings (430 line-length), 45/52 files unformatted, 69 mypy errors of which roughly a third trace to one @overload-fixable signature in shared/api.py. For a team of non-engineer contributors gated by automated Claude reviews, the highest-leverage moves are all autofix-first and small: a one-shot ruff format commit with .git-blame-ignore-revs, a ruff+format CI job, a narrow mypy config that is green from day one, a coverage floor at today's level, and encoding the repo's own PR policies (tests required, \"How to test\" section, prompt/test sync) into the review prompt so the machine enforces what CLAUDE.md currently only requests.",
+   "findings": [
+    {
+     "title": "No lockfile and floors-only requirements.txt; numpy missing, tqdm/jsonlines unused — delivered corpora are not reproducible against a recorded environment",
+     "file": "requirements.txt",
+     "line": 3,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "requirements.txt pins nothing exactly: `pandas`, `pyyaml`, `python-dotenv`, `tqdm`, `jsonlines`, `tenacity`, `faker` have no version constraint at all; the rest are floors (`anthropic>=0.96.0`, `streamlit>=1.40`, `openai>=1.40`). No lockfile exists anywhere (verified: no *.lock, setup.cfg, or pinned constraints file in the repo). `numpy` is imported directly by shared/textstats.py, shared/embeddings.py, and evals/diversity.py but is absent from requirements.txt (arrives only transitively via pandas). `tqdm` and `jsonlines` are listed but a repo-wide grep finds no import of either. CI (.github/workflows/ci.yml:28) installs from this same unpinned file.",
+     "failure_scenario": "The receiving lab (or CI, months from now) runs `pip install -r requirements.txt` and the resolver picks a new major of pandas/numpy/anthropic released after delivery; the pipeline crashes mid-run or the anthropic SDK renames a Messages.create parameter and every generation call fails — after the run directory is created and partial paid work is done. Nobody can reconstruct the environment the committed example runs were produced with, because no exact versions were ever recorded (run_manifest.json records config and git commit, not package versions).",
+     "recommendation": "Adopt a two-file scheme sized for non-engineers: rename requirements.txt to requirements.in (add `numpy`, delete `tqdm` and `jsonlines`), then generate a fully pinned lockfile with `uv pip compile requirements.in -o requirements.txt` (or `pip-compile`). CI and the README setup instructions keep installing from requirements.txt unchanged; contributors only touch requirements.in. Add one CLAUDE.md line: 'to add a dependency, edit requirements.in and rerun uv pip compile'. Optionally record installed versions into run_manifest.json (`importlib.metadata.distributions()`) so every run self-documents its environment.",
+     "instances": [
+      "requirements.txt:1-15 (floors-only, no lock)",
+      "shared/textstats.py, shared/embeddings.py, evals/diversity.py (direct numpy imports not declared)",
+      "requirements.txt:6-7 (tqdm, jsonlines unused)",
+      ".github/workflows/ci.yml:28 (CI installs unpinned)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified all assertions in the current tree: requirements.txt has 7 fully unconstrained deps and only floor constraints elsewhere (line 3 is unpinned pandas); git tracks no lockfile/constraints file (pyproject.toml holds only pytest config); numpy is imported directly at shared/textstats.py:20, shared/embeddings.py:23, evals/diversity.py:49 yet is absent from requirements.txt; tqdm and jsonlines appear nowhere in code; ci.yml:28 installs from the same unpinned file; and run_manifest.json (shared/utils.py:209-222) records git commit/config but no package versions, so delivered runs' environments are unrecorded. Failure scenario is mechanically plausible. Only trivial omission: the floors list also includes claude-agent-sdk>=0.2.0 and test-only pytest/pytest-socket floors, which doesn't affect the claim."
+    },
+    {
+     "title": "CI merge gate runs only compileall + pytest — no lint, no format check, no type check, no coverage floor; repo has no [tool.ruff] or formatter config at all",
+     "file": ".github/workflows/ci.yml",
+     "line": 30,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "ci.yml's single `smoke` job is checkout → pip install → `python -m compileall` (line 31) → `pytest` (line 34). pyproject.toml contains only `[tool.pytest.ini_options]` — no `[project]`, `[tool.ruff]`, or `[tool.mypy]` (verified via tomllib). Consequence already visible: ruff reports 541 issues (430 E501 line-length), `ruff format --check` would reformat 45 of 52 files, and real bug-class findings sit unflagged (B023 loop-variable capture at sdf_pipeline/layer2_subtypes.py:114, four B905 zip-without-strict, three DTZ005 naive datetimes).",
+     "failure_scenario": "Non-engineer contributors keep merging unformatted, lint-dirty code because nothing gates it — the Claude review prompt explicitly says 'Skip nitpicks, style preferences' (claude-code-review.yml:77), so no layer of the process ever pushes back. The debt compounds until formatter adoption means a repo-wide diff that breaks `git blame` and every open branch; meanwhile genuine bug-pattern lints like B023 ship to main unexamined.",
+     "recommendation": "Autofix-first adoption in one PR: (1) add to pyproject.toml:\n[tool.ruff]\nline-length = 100\ntarget-version = \"py312\"\n[tool.ruff.lint]\nselect = [\"E\", \"F\", \"W\", \"B\", \"C4\", \"SIM\", \"DTZ\"]\nignore = [\"E501\"]  # formatter owns wrapping\n(deliberately exclude C901/PLR complexity rules — wrong gate for non-engineers); (2) run `ruff check --fix . && ruff format .` as a single mechanical commit; (3) add that commit's SHA to a new .git-blame-ignore-revs and document `git config blame.ignoreRevsFile .git-blame-ignore-revs`; (4) append a `lint` job to ci.yml:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: astral-sh/ruff-action@v3\n      - run: ruff format --check .\nand make it a required check alongside smoke; (5) optional pre-commit for those who want it (repos: ruff-pre-commit, hooks: ruff + ruff-format) but never required — CI is the enforcement point. Add a CLAUDE.md policy line: 'run ruff check --fix . && ruff format . before every commit; CI rejects unformatted code'.",
+     "instances": [
+      ".github/workflows/ci.yml:30-34 (gate = compileall + pytest only)",
+      "pyproject.toml:1-7 (only pytest config exists)",
+      "sdf_pipeline/layer2_subtypes.py:114 (B023 loop-variable bug pattern, unflagged by any gate)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every citation in the worktree: ci.yml's smoke job is exactly checkout → pip install → compileall (lines 30-31) → pytest (lines 33-34) with no lint/format/type/coverage step; pyproject.toml holds only [tool.pytest.ini_options] and no ruff/mypy/flake8/black config exists anywhere; claude-code-review.yml:77 reads verbatim \"Skip nitpicks, style preferences, and pre-existing issues.\" Ran ruff (uvx): B023 at sdf_pipeline/layer2_subtypes.py:114 (loop var `note`), exactly 4 B905 and 3 DTZ005, and `ruff format --check` reports exactly 45 of 52 files would be reformatted. Only the aggregate count differs: I measure 658 issues (641 E501) repo-wide with E,W,F,B,DTZ rather than the claimed 541 (430 E501) — a ruff-version/selection artifact that understates, not overstates, the problem, so the core claim and scenario hold as stated."
+    },
+    {
+     "title": "69 mypy errors with no mypy config; roughly a third trace to call_claude's flag-dependent union return type poisoning every call site",
+     "file": "shared/api.py",
+     "line": 401,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "shared/api.py:391-401 declares `call_claude(..., return_stop_reason: bool = False, ...) -> str | tuple[str, str | None]`. Every downstream caller that passes the flag unpacks or strips the result, producing ~20 of the 69 errors: five `str-unpack` (dad_pipeline/step2_responses.py:145,171; step3_rewrite.py:58,67; pref_pipeline/run.py:151), eight `arg-type` on parse helpers (sdf_pipeline/layer1_document_types.py:44, layer2_subtypes.py:59, layer5_score.py:80, dad_pipeline/step1_dilemmas.py:620,735, evals/audit_sdf.py:398,418,437), and `union-attr` `.strip()` errors (evals/score_sdf.py:61, score_dad.py:92, sdf_pipeline/layer4_rewrite.py:52-55). Another 11 errors are one line — shared/api.py:230 iterating SDK content blocks without an isinstance(TextBlock) narrow. The repo has no [tool.mypy] section, so none of this is visible to contributors or CI.",
+     "failure_scenario": "A contributor flips a call site to `return_stop_reason=True` (or back) without updating the unpacking — the type system is silent because the union already type-errors everywhere, so the mistake is invisible until runtime: the code crashes AFTER the paid API call returns and BEFORE the result is checkpointed, so `--resume` re-bills that call. The class of bug mypy exists to catch is exactly the one the current signature makes uncheckable.",
+     "recommendation": "Three-step gradual adoption: (1) fix the root cause with typing.overload on call_claude — `@overload def call_claude(..., return_stop_reason: Literal[True], ...) -> tuple[str, str | None]` / `@overload ... Literal[False] = ... -> str` — which erases ~20 errors with zero runtime change; (2) fix shared/api.py:230 with `if isinstance(block, TextBlock)` (kills 11 errors) and add the two trivial var annotations (constitution_loader.py:146, audit_sdf.py:265,284,442); (3) add a deliberately narrow config that is green on day one:\n[tool.mypy]\npython_version = \"3.12\"\nfiles = [\"shared\", \"sdf_pipeline\", \"dad_pipeline\", \"pref_pipeline\", \"evals\"]\nexclude = [\"viewer\"]\nignore_missing_imports = true\nThe remaining ~15 errors live in viewer/ (excluded — 0%-tested Streamlit UI) and a handful of eval edge cases. Add `mypy` as a non-blocking CI step first, flip to required once green for two weeks.",
+     "instances": [
+      "shared/api.py:391-401 (union return signature)",
+      "shared/api.py:230 (11 union-attr errors, one isinstance fix)",
+      "dad_pipeline/step2_responses.py:145,171; dad_pipeline/step3_rewrite.py:58,67; pref_pipeline/run.py:151 (str-unpack)",
+      "sdf_pipeline/layer1_document_types.py:44, layer2_subtypes.py:59, layer5_score.py:80 (arg-type)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Dozens of mypy errors (45 across shared/sdf_pipeline/dad_pipeline/pref_pipeline/evals, 81 repo-wide, with mypy 2.2.0 + anthropic stubs and --ignore-missing-imports; exact total varies with environment and scope — the audited \"69\" is not reproducible) with no mypy config anywhere (no [tool.mypy], not in requirements or CI). About 19-20 errors (~40% of the pipeline-package total) trace to call_claude's flag-dependent union return type `str | tuple[str, str | None]` (shared/api.py:391-401) poisoning every call site that passes return_stop_reason — all 16 cited instance lines are exact, except layer4_rewrite.py:52 is arg-type rather than union-attr. Another 11 errors come from one line, shared/api.py:230, fixable with a single isinstance(TextBlock) narrow. The failure scenario stands: a flag/unpack mismatch crashes at runtime after the paid API call and before checkpointing, so --resume re-bills the call, and mypy cannot surface the regression because the identical error class already fires at every such call site.",
+     "verifier_notes": "Reproduced everything except the headline count. All 16 cited call-site errors match at the exact lines (5 str-unpack, 8 arg-type, union-attr .strip at score_sdf.py:61/score_dad.py:92/layer4_rewrite.py:55 — layer4:52 is arg-type, not union-attr), shared/api.py:230 yields exactly 11 union-attr errors, the union signature at api.py:391-401 is verbatim as claimed, and there is no mypy config in pyproject.toml/CI/requirements. However, mypy 2.2.0 with anthropic stubs finds 45 errors over the pipeline packages (81 repo-wide incl. viewer/), not 69 — the total is environment/scope-dependent; union-traced errors are 19-20 (~43% of 45). The failure scenario is mechanistically real: tuple unpack sits immediately after the paid call (e.g. step2_responses.py:145,171) with checkpointing later, so a flag/unpack mismatch crashes post-payment pre-checkpoint and --resume re-bills."
+    },
+    {
+     "title": "No coverage floor in CI, and the paid-run eval scripts are at 0% coverage despite CLAUDE.md's own tests-required policy",
+     "file": "pyproject.toml",
+     "line": 7,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "pyproject.toml:7 addopts has no coverage flags and ci.yml runs bare `pytest`. The coverage census shows the pipeline core is well protected (sdf layers 95-100%, dad steps 84-94%, shared/api.py 97%) but evals/score_dad.py and evals/score_sdf.py are 0% (83 and 61 untested statements — these scripts spend real API money and compute the pass/fail verdicts on delivered corpora), evals/audit_sdf.py is 25%, and pref_pipeline/rate.py plus all of viewer/ are 0-38%. Nothing prevents the well-covered core from silently regressing since no floor is enforced.",
+     "failure_scenario": "A contributor renames a rubric key or changes the judge-response format handling in evals/score_dad.py; CI stays green because the file has zero tests. The break surfaces only when someone runs a paid scoring pass — either it crashes after burning judge-call spend, or worse it mis-parses judge scores and reports a wrong pass rate for a corpus that is about to be delivered as training data.",
+     "recommendation": "Add pytest-cov to requirements(.in) and extend pyproject addopts: `--cov=shared --cov=sdf_pipeline --cov=dad_pipeline --cov=pref_pipeline --cov=evals --cov-fail-under=74` — the non-viewer tree sits at ~76% today, so 74 holds immediately and ratchets by policy (bump the floor whenever it comfortably clears; never lower without team agreement — add that sentence to CLAUDE.md's testing section). Deliberately exclude viewer/ (UI, mypy-excluded too). Then write the missing money-path tests for evals/score_dad.py and evals/score_sdf.py main() using the existing stub_claude fixture — both scripts route through shared.api.call_claude, so the established pattern (parse happy path, malformed judge response, resume-without-recall) applies directly.",
+     "instances": [
+      "pyproject.toml:7 (no cov flags)",
+      ".github/workflows/ci.yml:34 (bare pytest)",
+      "evals/score_dad.py (0%, 83 stmts), evals/score_sdf.py (0%, 61 stmts), evals/audit_sdf.py (25%)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "pyproject.toml:7 addopts has no coverage flags and ci.yml:34 runs bare pytest; no coverage tooling exists in requirements, config, or the venv, so no floor is enforced. No test in tests/ references score_dad or score_sdf, and AST statement counts match the claim exactly (83 and 61). score_dad.py makes paid judge calls via api.call_claude and computes the delivered-corpus pass rate; its JSONDecodeError fallback silently records all-zero scores and checkpoints the record, so the claimed failure scenario (green CI, then a paid run that mis-reports pass rate) holds and is if anything understated. audit_sdf.py partial coverage is plausible (7 tests / 72 lines against a 523-line module); the exact census percentages for well-covered modules could not be re-run read-only but are non-load-bearing."
+    },
+    {
+     "title": "claude-code-review.yml prompt does not encode the repo's own PR policies, so the only reviewer most PRs get never checks them; action pinned to mutable @v1 tag",
+     "file": ".github/workflows/claude-code-review.yml",
+     "line": 71,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "The review prompt (lines 71-77) asks only for 'Bugs, logic errors... Security issues... Clear violations of guidelines in any relevant CLAUDE.md' and then 'Skip nitpicks'. It never instructs the reviewer to verify the repo's three hard PR requirements from CLAUDE.md: tests must accompany pipeline changes ('a stage without tests is a stage that silently breaks at $50 a run'), the PR body must contain a 'How to test' section (explicitly noted as bypassed by `gh pr create --body`), and prompt-template placeholder changes must update tests/test_prompts_render.py. Per the merge-gate policy, claude[bot]'s approval can satisfy the required review with no human involved — so an approval here IS the merge gate. Both workflows also use `anthropics/claude-code-action@v1` (line 53; claude.yml:35), a mutable tag, and claude-code-review.yml:59 sets `allowed_bots: \"*\"`.",
+     "failure_scenario": "A contributor opens a PR from a Claude session that changes dad_pipeline/step2_responses.py with no test changes and a template-generated body missing 'How to test'. CI passes (existing tests untouched), the Claude review approves — its prompt told it to look for bugs, not policy — and since claude[bot] approval satisfies the branch-protection review requirement, the PR merges with zero human eyes. The untested stage change breaks the next $10 run. Separately, a compromised @v1 tag would execute attacker code in a job holding the org's CLAUDE_CODE_OAUTH_TOKEN.",
+     "recommendation": "Append a repo-policy block to the prompt in claude-code-review.yml (after line 77): 'Additionally verify, and request changes if violated: (1) any change under shared/, sdf_pipeline/, dad_pipeline/, pref_pipeline/, or evals/ includes corresponding changes under tests/ — check the diff file list; (2) the PR body contains a How to test section with runnable commands (read it with `gh pr view <n> --json body`); (3) if any prompts/ template changed its {placeholders}, tests/test_prompts_render.py changed in the same PR; (4) no stage change checkpoints failed work or re-does completed work on --resume (the checkpoint/resume contract in CLAUDE.md).' Add `Bash(gh pr view:*)` — already allowed — so (2) works. Separately: pin both workflows' `anthropics/claude-code-action` to a full commit SHA with a version comment, and narrow `allowed_bots: \"*\"` to the specific bots that push (e.g. `claude[bot]`).",
+     "instances": [
+      ".github/workflows/claude-code-review.yml:71-77 (generic focus list)",
+      ".github/workflows/claude-code-review.yml:53,59 (mutable @v1 tag, allowed_bots '*')",
+      ".github/workflows/claude.yml:35 (@v1 tag)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every assertion in the current files: the review prompt (.github/workflows/claude-code-review.yml:71-77) lists only bugs/security/CLAUDE.md-violations and \"Skip nitpicks\", with no instruction to check the three CLAUDE.md PR requirements (tests with pipeline changes, \"How to test\" body section, test_prompts_render.py updates); its \"changed code only\" scoping puts PR-body and missing-test checks outside the instructed scope, making the generic CLAUDE.md-violation bullet an unreliable indirect route. Both workflows use mutable anthropics/claude-code-action@v1 (claude-code-review.yml:53, claude.yml:35) with CLAUDE_CODE_OAUTH_TOKEN passed in, and allowed_bots: \"*\" is at line 59. The merge-gate mechanism is corroborated by the project memory (live-verified on PR #31): claude[bot] approval + smoke CI suffices for same-repo merges with no human review, so the failure scenario is mechanically possible. Minor caveat only: \"never checks them\" is a behavioral prediction — the reviewer could occasionally flag missing tests via the CLAUDE.md clause — but the core claim (policies not encoded in the prompt that constitutes the effective merge gate) holds as stated."
+    },
+    {
+     "title": "README misstates which constitution text feeds the alignment-critical SDF layers 4-5, plus smaller doc/config drift",
+     "file": "README.md",
+     "line": 31,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "README.md:31 says '`load_full_constitution()` joins the two markdown files for the system prompt at SDF's rewrite and scoring layers.' The code disagrees: sdf_pipeline/layer4_rewrite.py:26 and layer5_score.py:53 call `constitution_loader.load_constitution_with_principles()` (Claude constitution + distilled principles CSV — the sentient-beings reading is NOT sent), and shared/constitution_loader.py:81-84 explicitly documents load_full_constitution as 'no longer part of any generation call... kept for the viewer and legacy runs.' CLAUDE.md has the correct description. Related drift: README.md:174 claims 'Three safety layers' guard the test suite while tests/conftest.py:3 documents 'Four independent layers' (README omits the claude_code CLI seam); config.yaml:57-58 (`outputs.sdf_final`, `outputs.dad_final`) are dead keys — grep finds no code reading them (only `outputs.cost_log` at shared/api.py:109 and shared/embeddings.py:65 is used) — and they name pre-run-dir paths (`outputs/sdf/final/...`) that no longer exist.",
+     "failure_scenario": "An engineer at the receiving lab reads README:31 and concludes the sentient-beings reading was in-context for every rewrite and scoring call — a wrong model of exactly the corpus-shaping stages the delivery is about, leading to mis-attributed corpus properties or a wrong replication setup. The dead config keys compound it: someone 'fixes' their pipeline by pointing at `outputs/sdf/final/sdf_corpus.jsonl` and waits for a file that will never appear.",
+     "recommendation": "One doc-accuracy PR: rewrite README.md:31 to match constitution_loader.py's docstring (layers 4-5 receive constitution_claude.md + formatted principles CSV via load_constitution_with_principles; load_full_constitution is viewer/legacy only); change README.md:174 to 'four safety layers' matching conftest; delete config.yaml:57-58 or comment them '# unused — final paths are per-run (outputs/<pipeline>/runs/<run_id>/final/)'. Then add a CLAUDE.md policy line: 'README claims about which text reaches which API call must be updated in the same PR that changes the call' — this is the second constitution-plumbing doc drift (CLAUDE.md notes the DAD change already), so it recurs.",
+     "instances": [
+      "README.md:31 (stale loader claim)",
+      "README.md:174 vs tests/conftest.py:3 (three vs four safety layers)",
+      "config.yaml:57-58 (dead outputs.sdf_final/dad_final keys)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every cited location: README.md:31 makes the stale load_full_constitution claim verbatim; layer4_rewrite.py:26 and layer5_score.py:53 actually call load_constitution_with_principles, and constitution_loader.py:81-84's docstring explicitly says load_full_constitution is no longer sent by generation calls. README.md:174 says \"Three safety layers\" vs conftest.py:3's \"Four independent layers\" (README omits the claude_code CLI seam). config.yaml:57-58 sdf_final/dad_final keys have zero readers in any .py file (only outputs.cost_log is read, at shared/api.py:109 and shared/embeddings.py:65), and the paths they name don't exist — outputs/sdf/ and outputs/dad/ contain only runs/. All line numbers, mechanisms, and the instance list are accurate as stated."
+    },
+    {
+     "title": "Repo has no package metadata and is not installable; ten modules mutate sys.path at import time",
+     "file": "pyproject.toml",
+     "line": 1,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "pyproject.toml contains only `[tool.pytest.ini_options]` — no `[project]` table, no name/version/dependencies, no build system (verified via tomllib: tool keys = ['pytest'], project = None). Imports work only because every entry point hand-patches the path: `sys.path.insert(0, str(Path(__file__).parent.parent))` appears in sdf_pipeline/run.py:9 and at least nine other files (all of evals/, pref_pipeline/, and even library modules like sdf_pipeline/layer2_subtypes.py:7 that are not entry points), plus pytest's `pythonpath = [\".\"]` hack.",
+     "failure_scenario": "The receiving lab tries `pip install .` to vendor the pipeline into their training infra — it fails outright (no build metadata). Every script works only with cwd at repo root; running `python /abs/path/sdf_pipeline/run.py` from elsewhere half-works via the sys.path hack but then `--config config.yaml` and the relative `outputs/` tree resolve against the wrong directory. The path mutation in non-entry-point library modules also makes import behavior order-dependent and confuses type checkers and IDEs the lab will point at the code.",
+     "recommendation": "Add minimal metadata to pyproject.toml:\n[build-system]\nrequires = [\"setuptools>=68\"]\nbuild-backend = \"setuptools.build_meta\"\n[project]\nname = \"alignment-data-pipeline\"\nversion = \"0.1.0\"\nrequires-python = \">=3.12\"\ndynamic = [\"dependencies\"]\n[tool.setuptools.dynamic]\ndependencies = {file = \"requirements.txt\"}\n[tool.setuptools]\npackages = [\"shared\", \"sdf_pipeline\", \"dad_pipeline\", \"pref_pipeline\", \"evals\", \"viewer\"]\nThen change the setup docs to `pip install -e .`, delete the sys.path.insert lines from library modules first (safe — they're only imported after an entry point already patched the path), and from entry points last. Keep requires-python in sync with shared/__init__.py's MIN_PYTHON.",
+     "instances": [
+      "pyproject.toml (no [project]/build-system)",
+      "sdf_pipeline/run.py:9, sdf_pipeline/layer2_subtypes.py:7, sdf_pipeline/layer3_draft.py:9, evals/score_sdf.py:9, evals/score_dad.py:11, evals/audit_sdf.py:41, evals/diversity.py:51, pref_pipeline/run.py:22, pref_pipeline/rate.py:15, pref_pipeline/prefdata.py:13 (sys.path mutation)"
+     ],
+     "dimension": "delivery",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Repo has no package metadata and is not pip-installable (pyproject.toml contains only [tool.pytest.ini_options]; no [project], [build-system], setup.py, or setup.cfg), and 23 modules — every entry point plus non-entry-point library modules across sdf_pipeline/, dad_pipeline/, evals/, pref_pipeline/, and viewer/ — mutate sys.path at import time (sys.path.insert(0, ...)), with pytest relying on pythonpath=[\".\"]. A lab running `pip install .` fails for lack of build metadata; running scripts from outside the repo root fails on the cwd-relative default `--config config.yaml` (though the outputs/ and prompts/ trees are correctly anchored to the repo root via __file__), and the import-time path mutation in library modules makes import behavior order-dependent and confuses type checkers/IDEs.",
+     "verifier_notes": "Verified pyproject.toml has only [tool.pytest.ini_options] (incl. pythonpath=[\".\"]), no [project]/[build-system]/setup.py/setup.cfg, so pip install . cannot yield a usable package; all ten cited sys.path.insert file:line pairs are exact. Two detail corrections: the true mutation count is 23 files (the list omits all of dad_pipeline/ and viewer/, e.g. dad_pipeline/run.py:16, viewer/loader.py:11), and the outputs/ tree is anchored to Path(__file__).parent.parent in all three orchestrators (sdf_pipeline/run.py:34-36, dad_pipeline/run.py:42-44, pref_pipeline/run.py:89-91), not cwd — only the default --config config.yaml is cwd-relative, so running from elsewhere fails fast on config load rather than half-working and writing outputs to the wrong place."
+    },
+    {
+     "title": "Stale root-level working reports and internal references ship with the delivery",
+     "file": "sdf-notebook-port-report.md",
+     "line": 3,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "sdf-notebook-port-report.md:3 (repo root, 44KB) states '**Status:** implemented locally on `main`, uncommitted, awaiting review (this report)' — the work has long since merged, so the banner is false in the delivered tree. Its 30KB companion sdf-pipeline-walkthrough.md and git-workflow-guide.md also sit at the root, undocumented by CLAUDE.md's directory map. .env.example:3 says 'Ask Oliver for an API key' and README.md:138 repeats '(ask Oliver)' — an instruction that dead-ends for anyone outside the original team.",
+     "failure_scenario": "A lab engineer skimming the delivered root reads 'uncommitted, awaiting review' and reasonably concludes the tree is missing pending work, spending time chasing a phantom diff; a new user follows .env.example and has no path to a key. Stale status text at the top level also signals unmaintained docs and taints trust in the accurate ones.",
+     "recommendation": "Before delivery: move the two SDF design reports into context_docs/ (their content is genuinely valuable history — the belief-implantation rejection rationale) with a one-line 'historical design record, describes the state as of commit 9609e1f' banner replacing the stale status line; move git-workflow-guide.md to a docs/ or .github/ location or fold it into CONTRIBUTING.md; replace 'Ask Oliver' in .env.example:3 and README.md:138 with a role-based instruction ('ask the project maintainer / see the team key-distribution doc').",
+     "instances": [
+      "sdf-notebook-port-report.md:3 (stale 'uncommitted' status)",
+      "sdf-pipeline-walkthrough.md (root-level working note)",
+      "git-workflow-guide.md (root-level, absent from CLAUDE.md directory map)",
+      ".env.example:3 and README.md:138 ('Ask Oliver')"
+     ],
+     "dimension": "delivery",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  }
+ ],
+ "verdict_counts": {
+  "UNVERIFIED": 25,
+  "CONFIRMED": 21,
+  "CONFIRMED_WITH_CORRECTIONS": 6
+ }
+}
