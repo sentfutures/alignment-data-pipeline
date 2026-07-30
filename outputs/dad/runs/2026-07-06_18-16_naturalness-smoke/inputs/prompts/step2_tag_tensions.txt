@@ -1,9 +1,0 @@
-You are tagging a user message for a response-generation pipeline about dilemmas that touch the welfare of animals and other sentient beings. Below is an index of recurring tensions. Identify which tensions are genuinely in play in this message — usually 2 to 4. Name a tension only if the facts of the message actually raise it; do not tag tensions the message merely gestures at.
-
-TENSION INDEX:
-{tension_index}
-
-USER MESSAGE:
-{user_message}
-
-Return a JSON array of tension names, copied exactly as they appear in the index, most central first. Return only the JSON array.
