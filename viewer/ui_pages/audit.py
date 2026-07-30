@@ -95,17 +95,6 @@ def _cluster_bars(sizes: list) -> alt.Chart:
         y="size:Q").properties(height=210)
 
 
-def _cloud_scatter(cloud: list) -> alt.Chart:
-    # No axis titles: the axes are PCA layout directions with no nameable
-    # meaning ("PC1"/"PC2" read as jargon) — only the distances between dots
-    # carry information, which the captions say.
-    return alt.Chart(pd.DataFrame(cloud)).mark_circle(size=70, color="#D97757").encode(
-        x=alt.X("x:Q", title=None, axis=alt.Axis(labels=False, ticks=False)),
-        y=alt.Y("y:Q", title=None, axis=alt.Axis(labels=False, ticks=False)),
-        tooltip=[alt.Tooltip("id", title="record"), alt.Tooltip("snippet", title="text")],
-    ).properties(height=210)
-
-
 def _shared_phrase_bars(top_shared: dict) -> alt.Chart | None:
     """Horizontal bar of the most over-represented phrases (n-gram → #prompts
     sharing it) — the lexical section's interpretable counterpart to the
@@ -282,12 +271,6 @@ def _resp_label(pid: str) -> str:
     ids = [gids.get("response"), gids.get("example")]
     return " · ".join(x for x in ids if x) or pid
 
-
-# The reasoning-library retrieval picture (per-record 2a.5 pulls, all entry
-# ids, id -> transferable move) — rides the reasons chart, the per-record
-# breakdowns, and the trigger-count toggle.
-pulls, library_ids, lib_moves = (loader.dad_library_info(run.run_dir)
-                                 if run.pipeline == "dad" else ({}, [], {}))
 
 # --- Headline: the two-judge Pareto pair (the dataset's usefulness, up top) ---
 def _render_pareto() -> None:
@@ -534,7 +517,7 @@ def _slug(title: str) -> str:
 
 # Sections measured by the eval but deliberately not displayed on this page
 # (their data stays in the report JSON and the terminal output).
-_NOT_DISPLAYED = ("Structural variation",)
+_NOT_DISPLAYED = ()
 # Display names for the Diversity subsections, matching the bolded dimensions
 # in the Diversity header caption. Report titles stay untouched (they are the
 # anchors, skip-list keys, and cross-run identifiers); this is presentation only.
@@ -545,13 +528,21 @@ _DISPLAY_TITLES = {
 }
 # Paid-pass sections rendered by custom views above, not the generic group loop.
 _PAID_COMPANIONS = ("Delivery quality", "Welfare impact", "Showcase examples")
-# Retired paid sections (the considerations extraction chain and its precursors,
-# replaced by the two holistic judges) — old reports still carry their data, but
-# nothing renders it anymore: not the group loop, not the verdict summary.
+# Retired sections — old reports still carry their data, but nothing renders
+# it anymore: not the group loop, not the verdict summary. Two waves: the
+# considerations extraction chain (replaced by the two holistic judges,
+# 2026-07-29) and the health-check tail (retired 2026-07-30 — no longer
+# checked; tracked tics/moves and the tic-candidates queue stay live).
 _RETIRED_SECTIONS = ("Valuable welfare considerations", "Important considerations",
                      "Welfare reasoning", "Welfare considerations",
                      "Moral-patient reasons", "Humane alternatives",
-                     "Response stance", "Reasoning-composition")
+                     "Response stance", "Reasoning-composition",
+                     "Structural skeletons", "Openers & closers",
+                     "Unrealized dealt details", "Locale / taxa plausibility",
+                     "Length-class realization", "Lexical diversity",
+                     "Structural variation", "Response openings",
+                     "Style fingerprint", "Insider-vocabulary leak",
+                     "Reasoning-library selection", "Reasoning-library coverage")
 # Sections whose detail lines are replaced by a richer custom view below, so
 # the generic gray-caption dump is suppressed for them. "Stock phrases" is the
 # legacy pre-tics name; old reports keep it.
@@ -832,49 +823,6 @@ def _render_section(section: dict) -> None:
         _section_table(section)
     suppress_detail = title.startswith(_CUSTOM_DETAIL)
 
-    if title.startswith("Reasoning-library selection"):
-        if pulls:
-            # Per-record retrieval width — how many library rows 2a.5 pulled for
-            # each response. Lives here (under the Health check) with the rest of
-            # the library picture, not up in the dataset-usefulness detail.
-            pull_rows = _label_responses(rendering.audit_pull_count_rows(pulls))
-            if pull_rows:
-                st.caption("Library rows pulled at 2a.5 per record — hover a bar for "
-                           "which entries.")
-                st.altair_chart(
-                    alt.Chart(pd.DataFrame(pull_rows)).mark_bar(
-                        color=rendering.AUDIT_PULL_COLOR).encode(
-                        x=alt.X("record:N", title="record"),
-                        y=alt.Y("count:Q", title="rows pulled"),
-                        tooltip=[alt.Tooltip("record", title="record"),
-                                 alt.Tooltip("count", title="rows pulled"),
-                                 alt.Tooltip("entries", title="which entries")],
-                    ),
-                    use_container_width=True)
-        if pulls and library_ids:
-            # Corpus-level trigger counts, behind a toggle so the page stays
-            # compact.
-            if st.toggle("Reasoning-library trigger counts — every entry across "
-                         "this corpus", value=False, key="lib_trigger_counts"):
-                trigger_rows = rendering.audit_trigger_count_rows(pulls, library_ids,
-                                                                  lib_moves)
-                st.caption(f"Cases (of {len(pulls)} scoped) whose 2a.5 selection "
-                           "pulled each entry, in library order — zero bars are "
-                           "entries this corpus never triggered. Hover for the "
-                           "entry's transferable move.")
-                st.altair_chart(
-                    alt.Chart(pd.DataFrame(trigger_rows)).mark_bar(
-                        color=rendering.AUDIT_PULL_COLOR).encode(
-                        x=alt.X("entry:N", title="library entry", sort=library_ids),
-                        y=alt.Y("cases:Q", title="cases pulled"),
-                        tooltip=[alt.Tooltip("entry", title="entry"),
-                                 alt.Tooltip("cases", title="cases"),
-                                 alt.Tooltip("move", title="transferable move")],
-                    ),
-                    use_container_width=True)
-        if pulls:
-            suppress_detail = True  # the per-record chart above replaces the raw dump
-
     if title.startswith("Response lengths"):
         chart_rows = _label_responses(rendering.audit_length_chart_rows(
             (report.get("response_lengths") or {}).get("per_case") or {}))
@@ -1042,46 +990,6 @@ def _render_section(section: dict) -> None:
                 st.dataframe(pd.DataFrame(cand_rows), width="stretch", hide_index=True)
             suppress_detail = True  # the table replaces the gray caption dump
 
-    if title.startswith("Lexical diversity — prompts"):
-        st.caption("Measures how varied the WORDING of the prompts is — the phrases the corpus "
-                   "over-uses, scored over character n-grams. This is about how the prompts are "
-                   "written, not what they are about; subject matter is measured under Meanings "
-                   "and topics in the Composition and Diversity Analysis block.")
-        ld = report.get("lexical_diversity") or {}
-        if ld.get("cloud"):
-            st.markdown(f"**Surface-form layout** — near-dup>0.90 (char n-gram) "
-                        f"{ld.get('over_0.90', 0):.0%} · style Vendi ratio "
-                        f"{ld.get('style_vendi_ratio', 0):.2f}")
-            st.caption("Same charts as the semantic section, but in char-n-gram (writing form) "
-                       "space: nearest-neighbour redundancy (dashed line = >0.90) · document "
-                       "cloud (2-D PCA of surface features; hover for the record). The over-used "
-                       "phrase list is demoted (mostly common English) — see the **Style "
-                       "fingerprint** section for curated tic/move reuse.")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.altair_chart(_nn_hist(ld.get("nn_sims") or [], 0.90,
-                                         "nearest-neighbour surface cosine"),
-                                use_container_width=True)
-            with c2:
-                st.altair_chart(_cloud_scatter(ld["cloud"]), use_container_width=True)
-
-    if title.startswith("Style fingerprint"):
-        fp = (report.get("style_fingerprint") or {}).get("pipeline") or {}
-        if fp.get("points"):
-            st.caption("Each dot is one response in curated-feature space (tracked tics + "
-                       "rhetorical moves — no common words); dots that overlap share a "
-                       "tic/move fingerprint. Dashed line on the histogram = near-twin >0.95.")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.altair_chart(_nn_hist([p["nn"] for p in fp["points"]], 0.95,
-                                         "nearest-neighbour fingerprint cosine"),
-                                use_container_width=True)
-            with c2:
-                st.altair_chart(_cloud_scatter(
-                    [{"id": p["id"], "x": p["x"], "y": p["y"],
-                      "snippet": ", ".join(p["features"]) or "(no tics/moves)"}
-                     for p in fp["points"]]), use_container_width=True)
-
     if not suppress_detail:
         for line in section.get("detail", []):
             st.caption(line)
@@ -1227,14 +1135,11 @@ st.caption("An honest accounting of the **stylistic footprint** this data would 
 _render_health_overview()
 
 # _NOT_DISPLAYED sections are deliberately hidden (still measured — report JSON
-# and terminal keep them); _RETIRED_SECTIONS are old reports' considerations-era
-# paid sections, whose data stays in the JSON but is never rendered.
-# Insider-vocabulary leak is bucketed "response" but rendered LAST (after the
-# group loop) — scaffolding-bleed is the closing note of the health check.
-_RENDER_LAST = ("Insider-vocabulary leak",)
+# and terminal keep them); _RETIRED_SECTIONS are sections older reports carry
+# whose data stays in the JSON but is never rendered.
 _SKIP_SECTIONS = (("Response lengths",)  # lengths promoted under Delivery quality
                   + _RETIRED_SECTIONS + _DIVERSITY_PROMOTED
-                  + _PAID_COMPANIONS + _NOT_DISPLAYED + _RENDER_LAST)
+                  + _PAID_COMPANIONS + _NOT_DISPLAYED)
 _GROUP_HEADERS = {
     "prompt": "Prompt side — the shipped user messages",
     "response": "Response side — final replies vs the plain-Claude control",
@@ -1254,11 +1159,6 @@ for group in rendering.AUDIT_GROUP_ORDER:
         continue
     st.header(_GROUP_HEADERS[group])
     for section in group_sections:
-        _render_section(section)
-
-# Rendered last: scaffolding-vocabulary bleed — the closing check.
-for section in sections:
-    if section.get("title", "").startswith(_RENDER_LAST):
         _render_section(section)
 
 common.json_block(report, f"audit_{run.run_id}", "Raw report JSON")

@@ -162,8 +162,8 @@ def audit_section_table(section: dict) -> list[dict]:
     Genuine pipeline-vs-plain sections (at least half the rows carry both arms)
     render the packed ``pipeline X / plain Y`` value as two columns so the arms
     scan down instead of colliding in one cell; single-arm and non-arm sections
-    (openings, jargon summaries, diversity) keep one ``value`` column. Pure (no
-    streamlit) so it stays testable."""
+    (e.g. diversity) keep one ``value`` column. Pure (no streamlit) so it
+    stays testable."""
     rows = section.get("rows") or []
     keep_verdict = any(r.get("verdict") for r in rows)
     keep_note = any(r.get("note") for r in rows)
@@ -252,40 +252,11 @@ AUDIT_GROUP_ORDER = ("prompt", "response", "library", "paid", "other")
 # evals/audit_dad.py stamped `group`/`gloss` on each section. New sections need
 # no entry here — the eval's fields win whenever present.
 AUDIT_SECTION_META = {
-    "Structural skeletons": ("prompt", "Do many user prompts share one plot skeleton "
-                             "(e.g. 'must produce something by a deadline')? 'other' is "
-                             "the healthy bucket."),
-    "Openers & closers": ("prompt", "Do the user prompts keep starting and ending the "
-                          "same way? Counts distinct first-three-words at each end."),
-    "Unrealized dealt details": ("prompt", "When a scenario was dealt a frontier frame, "
-                                 "does the shipped prompt actually mention it? A flag is "
-                                 "a prompt to eyeball, not a hard failure."),
-    "Locale / taxa plausibility": ("prompt", "Flags animal-practice × region pairings "
-                                   "that don't cohere (e.g. fur farming in the tropics)."),
-    "Length-class realization": ("prompt", "Each prompt was dealt a target length class "
-                                 "— did the shipped text land inside its band?"),
-    "Insider-vocabulary leak": ("response", "Academic/EA vocabulary leaking into "
-                                "user-facing replies. What the pipeline ADDS over plain "
-                                "Claude is scaffolding bleed, not model style."),
     "Response lengths": ("response", "Are pipeline replies much longer than plain "
                          "Claude's to the same prompts? The median ratio carries the "
                          "verdict."),
     "Stock phrases": ("response", "Recurring pet phrases across responses, in both "
                       "arms. The pipeline-vs-plain gap is the training-data signal."),
-    "Lexical diversity": ("response", "How varied the wording is. Distinct-n = share of "
-                          "n-word runs used only once (higher = more varied); Self-BLEU "
-                          "= how much the corpus echoes itself (lower is better). "
-                          "Compare arms and runs, never absolutes."),
-    "Structural variation": ("response", "Does every reply take the same visual shape "
-                             "(paragraphs, bullets, headings)? Only visible over the set."),
-    "Response openings": ("response", "Do responses keep opening with the same move? "
-                          "'other' is the healthy bucket; hint-echo = parroting the "
-                          "opening-hint card's wording."),
-    "Reasoning-library selection": ("library", "How many reasoning-library rows the "
-                                    "retrieval call pulled per case; the full-library "
-                                    "fallback should be rare."),
-    "Reasoning-library coverage": ("library", "Which library entries this corpus ever "
-                                   "pulled. Never-selected entries are starved moves."),
 }
 
 
@@ -419,37 +390,6 @@ def audit_delivery_pareto_rows(delivery_per_case: dict,
                          "note": d.get("note", ""),
                          "welfare_note": (w or {}).get("note", "")})
     return rows
-
-
-# Library-retrieval marks ride the reason charts in a light blue that belongs
-# to neither arm (terracotta plain / green pipeline) — pulls are scaffolding
-# provenance, not reasons.
-AUDIT_PULL_COLOR = "#74A9CF"
-
-
-def audit_pull_count_rows(pulls: dict, labels: dict | None = None) -> list[dict]:
-    """Per-record library-pull rows ({pid: [entry ids]}) for the 2a.5 selection
-    section's bar chart: one row per record with the pull count and the joined
-    ids so the hover tooltip can show WHICH entries were pulled."""
-    return [{"record": audit_record_label(pid, labels),
-             "count": len(pulls[pid]),
-             "entries": ", ".join(pulls[pid])}
-            for pid in sorted(pulls)]
-
-
-def audit_trigger_count_rows(pulls: dict, library_ids: list[str],
-                             moves: dict | None = None) -> list[dict]:
-    """Corpus-level trigger counts: one row per library entry, in library
-    order, counting the CASES that pulled it (per-case dedup, matching the
-    audit's coverage numbers). Never-pulled entries stay in with count 0 —
-    the gaps are the signal."""
-    fires: dict[str, int] = {}
-    for ids in pulls.values():
-        for eid in set(ids):
-            fires[eid] = fires.get(eid, 0) + 1
-    return [{"entry": eid, "cases": fires.get(eid, 0),
-             "move": (moves or {}).get(eid, "")}
-            for eid in library_ids]
 
 
 def list_templates(run_dir: Path, git_commit: str | None, pipeline: str) -> list[Template]:

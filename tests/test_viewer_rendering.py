@@ -206,19 +206,6 @@ class TestAuditDeliveryPareto:
         assert rendering.audit_delivery_pareto_rows(delivery_pc) == []
 
 
-class TestAuditLibraryRows:
-    def test_trigger_count_rows_dedup_library_order_and_zeros(self):
-        pulls = {"p1": ["C1", "C1", "C2"], "p2": ["C1"]}  # per-case dedup
-        rows = rendering.audit_trigger_count_rows(pulls, ["C1", "C2", "C3"], {"C1": "move1"})
-        assert rows == [{"entry": "C1", "cases": 2, "move": "move1"},
-                        {"entry": "C2", "cases": 1, "move": ""},
-                        {"entry": "C3", "cases": 0, "move": ""}]  # never-pulled stays, count 0
-
-    def test_pull_count_rows(self):
-        assert rendering.audit_pull_count_rows({"p1": ["C1", "C2"]}) == \
-            [{"record": "p1", "count": 2, "entries": "C1, C2"}]
-
-
 class TestAuditChartRows:
     def test_length_rows_wide_form_keeps_missing_plain_as_none(self):
         per_case = {"AW-0002": {"pipeline": 500, "plain": 200},
@@ -234,27 +221,6 @@ class TestAuditChartRows:
     def test_arm_columns_and_colors_stay_paired(self):
         assert len(rendering.AUDIT_ARM_COLUMNS) == len(rendering.AUDIT_ARM_COLORS)
         assert rendering.AUDIT_ARM_COLUMNS[0] == "plain Claude"
-
-    def test_pull_count_rows_carry_counts_and_joined_entry_ids(self):
-        pulls = {"AW-0002": ["C1", "M5", "T3"], "AW-0001": ["C3"]}
-        rows = rendering.audit_pull_count_rows(pulls, {"AW-0001": "E-0042"})
-        # sorted by prompt id, labeled like the other per-record chart rows
-        assert rows == [
-            {"record": "E-0042", "count": 1, "entries": "C3"},
-            {"record": "AW-0002", "count": 3, "entries": "C1, M5, T3"},
-        ]
-
-    def test_trigger_counts_dedupe_per_case_and_keep_zero_entries(self):
-        pulls = {"AW-0001": ["C1", "C1", "T3"], "AW-0002": ["C1"]}
-        rows = rendering.audit_trigger_count_rows(
-            pulls, ["C1", "M5", "T3"], {"C1": "move one", "M5": "move five"})
-        # library order, per-case dedup (C1 fired in 2 CASES, not 3 pulls),
-        # never-pulled entries stay in at zero
-        assert rows == [
-            {"entry": "C1", "cases": 2, "move": "move one"},
-            {"entry": "M5", "cases": 0, "move": "move five"},
-            {"entry": "T3", "cases": 1, "move": ""},
-        ]
 
     def test_labels_map_records_to_example_gids_with_fallback(self):
         # per_case stays keyed by prompt_id; labels swap in the stable example
@@ -275,13 +241,7 @@ class TestAuditSectionMeta:
     # Every section title the current audit emits must resolve through the
     # title fallback (old reports carry no group/gloss fields).
     CURRENT_TITLES = [
-        "Structural skeletons", "Openers & closers",
-        "Unrealized dealt details (frontier frame)", "Locale / taxa plausibility",
-        "Length-class realization", "Insider-vocabulary leak (responses)",
         "Response lengths (vs plain baseline)", "Stock phrases (responses)",
-        "Lexical diversity (responses)", "Structural variation (responses)",
-        "Response openings (drafts)", "Response openings (finals)",
-        "Reasoning-library selection (2a.5)", "Reasoning-library coverage",
     ]
 
     def test_field_wins_over_title_fallback(self):
