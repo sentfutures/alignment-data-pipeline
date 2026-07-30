@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang='en'>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<meta name='color-scheme' content='only light'>
+<title>Teaching models to reason about animal welfare</title>
+<style>
+:root{color-scheme:only light;
+--surface-0:#ffffff;--surface-1:#faf9f6;--surface-2:#f2f1ec;
+--border:#dcd9cf;--hairline:#ebe9e1;--grid:#e6e4dc;--axis:#c9c6ba;
+--text-primary:#12110f;--text-secondary:#4a4844;--text-muted:#6e6c62;
+--link:#1c5cab;--link-rule:#b7d3f6;
+--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;
+--series-5:#e87ba4;--series-6:#008300;--series-7:#4a3aa7;--series-8:#e34948;
+--good:#0ca30c;--warn:#fab219;--bad:#d03b3b;
+--good-ink:#0a6b12;--warn-ink:#7a4d00;--bad-ink:#a52222;
+--good-wash:#eaf6ea;--warn-wash:#fdf3dc;--bad-wash:#fbeceb;
+--mark:#fdf0bf}
+*{box-sizing:border-box}
+html{--serif:ui-serif,Charter,"Bitstream Charter","Iowan Old Style","Source Serif 4","Charis SIL",Georgia,serif;
+--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);
+font:1.0625rem/1.62 var(--serif);-webkit-text-size-adjust:100%}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:12px;top:12px;z-index:20;background:var(--surface-0);padding:8px 12px;
+border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
+
+/* Shell: a sticky rail, a prose measure, and a figure track that bleeds past it. */
+.shell{display:grid;grid-template-columns:12.5rem minmax(0,50rem);column-gap:3.5rem;
+max-width:1120px;margin:0 auto;padding:44px 28px 110px}
+.rail{grid-column:1;position:sticky;top:32px;align-self:start;font:500 .78rem/1.45 var(--sans)}
+main{grid-column:2;min-width:0}
+section{display:grid;grid-template-columns:[text-start] minmax(0,38rem) [text-end] 1fr [full-end]}
+section>*{grid-column:text-start/text-end}
+section>figure,section>.tiles,section>.scroll,section>.pair,section>details{
+grid-column:text-start/full-end}
+section+section{margin-top:5rem}
+header.top{margin-bottom:3.2rem}
+
+/* Type: the serif argues, the sans measures. */
+h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
+text-wrap:balance;font-variant-numeric:proportional-nums}
+h2{font:600 1.55rem/1.2 var(--serif);letter-spacing:-.011em;margin:0 0 .4rem;text-wrap:balance}
+h3{font:600 1.1rem/1.3 var(--serif);margin:2.3rem 0 .3rem;text-wrap:balance}
+h4{font:650 .82rem/1.35 var(--sans);margin:1.5rem 0 .4rem;color:var(--text-primary)}
+p{margin:0 0 1.05em;color:var(--text-secondary);text-wrap:pretty}
+ul{color:var(--text-secondary);padding-left:20px;margin:0 0 1.05em}li{margin:.3em 0}
+.lede{font:1.22rem/1.5 var(--serif);color:var(--text-primary);margin:0 0 1.1rem;max-width:40rem}
+.dek{font:.9rem/1.5 var(--sans);color:var(--text-muted);margin:0 0 1.4rem;max-width:44rem}
+.eyebrow{display:block;font:650 .68rem/1 var(--sans);text-transform:uppercase;
+letter-spacing:.1em;color:var(--text-muted);margin-bottom:.7rem}
+.meta{font:.8rem/1.55 var(--sans);color:var(--text-muted);margin:1.2rem 0 0;
+padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
+.muted{color:var(--text-muted);font:.84rem/1.5 var(--sans)}
+.mono{font-family:var(--mono);font-size:.86em}
+
+/* Rail: section numbers live here, so headings stay plain English. */
+.rail ol{list-style:none;margin:0;padding:0;counter-reset:sec}
+.rail li{display:grid;grid-template-columns:1.3em 1fr;gap:7px;margin:0 0 .62rem}
+.rail li::before{counter-increment:sec;content:counter(sec);color:var(--text-muted);
+font-variant-numeric:tabular-nums;text-align:right;font-size:.72rem;line-height:1.6}
+.rail li.nonum::before{content:"";counter-increment:none}
+.rail a{color:var(--text-secondary);text-decoration:none}
+.rail a:hover{color:var(--text-primary)}
+.rail a[aria-current=true]{color:var(--text-primary);font-weight:650}
+.rail .away{margin-top:1.3rem;padding-top:.9rem;border-top:1px solid var(--hairline)}
+.rail .away a{color:var(--link)}
+
+/* Numbers. Direction is a labelled chip, never a colored numeral. */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;
+border-top:1px solid var(--border);padding-top:1rem;margin:1.4rem 0 1.6rem}
+.tile-v{font:650 1.9rem/1.04 var(--sans);letter-spacing:-.022em;
+font-variant-numeric:proportional-nums}
+.tile-l{font:.82rem/1.35 var(--sans);color:var(--text-secondary);margin-top:.4rem}
+.tile-s{font:.74rem/1.4 var(--sans);color:var(--text-muted);margin-top:.35rem}
+.tile-f{margin-top:.5rem}
+.tile.hero{grid-column:span 1}.tile.hero .tile-v{font-size:2.9rem}
+
+/* Figures. The title is a caption, not a heading; the caption states the finding. */
+figure{margin:1.6rem 0 1.9rem}
+.fig-t{font:650 .84rem/1.35 var(--sans);color:var(--text-primary);margin-bottom:.15rem}
+.fig-n{font:.78rem/1.5 var(--sans);color:var(--text-muted);margin:0 0 .5rem;max-width:52ch}
+.fig-c{font:.8rem/1.55 var(--sans);color:var(--text-secondary);margin-top:.5rem;max-width:58ch}
+.chart{width:100%;max-width:800px;height:auto;overflow:visible;display:block;margin:.2rem 0}
+.lab,.val,.muted-svg,.seg-l{font-family:var(--sans)}
+.lab{font-size:11.5px;fill:var(--text-secondary)}
+.val{font-size:11px;fill:var(--text-muted);font-variant-numeric:tabular-nums}
+.val.strong{fill:var(--text-primary);font-weight:650}
+.key-in{font-style:italic}
+.seg-l{font-size:11px;fill:var(--surface-0);font-weight:650}
+.muted-svg{font-size:11px;fill:var(--text-muted)}
+.grid{stroke:var(--grid);stroke-width:1;shape-rendering:crispEdges}
+.axis{stroke:var(--axis);stroke-width:1;shape-rendering:crispEdges}
+.rule{stroke:var(--text-muted);stroke-width:1;stroke-dasharray:4 3}
+.legend{font:.76rem/1.4 var(--sans);color:var(--text-secondary);display:flex;gap:1rem;
+flex-wrap:wrap;margin:.1rem 0 .2rem}
+.legend .key{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+
+/* Tables: hairlines and alignment, no fills. */
+.scroll{overflow-x:auto;margin:1rem 0 1.2rem}
+table{border-collapse:collapse;width:100%;font:.83rem/1.5 var(--sans);
+font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--hairline);
+vertical-align:top}
+th:first-child,td:first-child{padding-left:0}
+th{color:var(--text-muted);font-weight:600;font-size:.76rem;
+border-bottom:1.5px solid var(--border)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.ctr,th.ctr{text-align:center}
+tbody tr:last-child td{border-bottom:0}
+td b{color:var(--text-primary)}
+
+code{font-family:var(--mono);font-size:.88em;color:var(--text-primary);word-break:break-word}
+td code,th code,.meta code{background:var(--surface-2);padding:1px 4px}
+pre{font-family:var(--mono);background:var(--surface-1);border:0;
+border-left:2px solid var(--border);padding:.9rem 1.1rem;overflow-x:auto;
+font-size:.79rem;line-height:1.65;color:var(--text-primary)}
+.chip{font:700 .66rem/1.5 var(--sans);text-transform:uppercase;letter-spacing:.07em;
+padding:.15rem .4rem;background:var(--surface-2);color:var(--text-secondary);
+white-space:nowrap}
+.chip.good{background:var(--good-wash);color:var(--good-ink)}
+.chip.warn{background:var(--warn-wash);color:var(--warn-ink)}
+.chip.bad{background:var(--bad-wash);color:var(--bad-ink)}
+blockquote{margin:1rem 0 1.3rem;white-space:pre-wrap;font-size:1.02rem;line-height:1.55;
+color:var(--text-primary);padding-left:1.15rem;border-left:2px solid var(--border)}
+.warn-note{color:var(--text-primary);border-left:3px solid var(--warn);
+background:var(--warn-wash);padding:.55rem .8rem;font-size:.92rem;margin:1rem 0}
+.bad-note{color:var(--text-primary);border-left:3px solid var(--bad);
+background:var(--bad-wash);padding:.55rem .8rem;font-size:.92rem;margin:1rem 0}
+details{margin:1rem 0;border-top:1px solid var(--hairline);padding-top:.6rem}
+summary{font:600 .84rem/1.5 var(--sans);cursor:pointer;color:var(--text-secondary)}
+summary:hover{color:var(--text-primary)}
+summary .sum-m{color:var(--text-muted);font-weight:400}
+.det-body{padding-top:.5rem}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.1rem 0}
+.pane{min-width:0}
+.pane-h{margin-top:0;color:var(--text-muted)}
+.resp{white-space:pre-wrap;font-size:.94rem;line-height:1.6;color:var(--text-primary);
+border-left:2px solid var(--hairline);padding-left:.9rem}
+.pane.pipeline .resp{border-left-color:var(--series-3)}
+.pane.plain .resp{border-left-color:var(--series-2)}
+mark{background:var(--mark);color:inherit;padding:0 .1em}
+a{color:var(--link);text-decoration:underline;text-decoration-thickness:1px;
+text-underline-offset:2px;text-decoration-color:var(--link-rule)}
+a:hover{text-decoration-color:var(--link)}
+a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--link);
+outline-offset:2px}
+footer.foot{margin-top:5rem;padding-top:1rem;border-top:1px solid var(--border);
+font:.78rem/1.6 var(--sans);color:var(--text-muted)}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.6rem;margin:1.6rem 0 0}
+.card{border-top:2px solid var(--text-primary);padding-top:.9rem}
+.card.soon{border-top-color:var(--border)}
+.card h3{margin:0 0 .3rem;font-size:1.22rem}
+.card .card-k{font:650 .68rem/1 var(--sans);text-transform:uppercase;letter-spacing:.1em;
+color:var(--text-muted);margin-bottom:.5rem}
+.card p{font-size:.95rem;margin-bottom:.7rem}
+.card .card-n{font:.8rem/1.6 var(--sans);color:var(--text-secondary);
+border-top:1px solid var(--hairline);padding-top:.6rem;margin:0 0 .7rem}
+.card .card-go{font:650 .86rem/1.4 var(--sans)}
+#tip{position:fixed;pointer-events:none;opacity:0;background:var(--text-primary);
+color:var(--surface-0);font:12px/1.4 var(--sans);padding:5px 8px;transition:opacity .1s;
+z-index:9;max-width:320px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:1080px){.shell{grid-template-columns:minmax(0,1fr);max-width:52rem;
+row-gap:0}.rail{position:static;grid-column:1;margin-bottom:2.4rem}
+.rail ol{display:flex;flex-wrap:wrap;gap:.3rem 1.3rem}.rail li{margin:0}
+.rail .away{width:100%;margin-top:.8rem}main{grid-column:1}}
+@media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
+section>*{grid-column:1}.pair{grid-template-columns:1fr}
+.cards{grid-template-columns:1fr}}
+@media (max-width:620px){body{font-size:1rem}.shell{padding:26px 16px 70px}
+h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
+.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}}
+@media print{
+@page{margin:16mm 14mm}
+:root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
+body{font-size:10.5pt;line-height:1.5}
+.rail,#tip,.skip{display:none}
+.shell,section{display:block;max-width:none}
+p,ul,.dek,.fig-c,.fig-n,.lede{max-width:none}
+h1,h2,h3,h4,.fig-t,.dek{break-after:avoid-page}
+figure,.tiles,table,.pair,blockquote,.card{break-inside:avoid-page}
+tr,li{break-inside:avoid}
+thead{display:table-header-group}
+details{display:block}details>div{display:block!important}summary{list-style:none}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr)}
+main a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em;
+color:#555;word-break:break-all}
+.chip,rect,circle,path,line{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+a{color:var(--text-primary)}}
+</style>
+<a class='skip' href='#main'>Skip to content</a>
+<div class='shell'>
+<nav class='rail' aria-label='Sections'><ol><li><a href='#why'>Why this data is missing</a></li><li><a href='#routes'>Two routes</a></li><li><a href='#measurement'>How both are measured</a></li><li><a href='#limits'>What this does not show</a></li><li><a href='#reading'>Reading the reports</a></li></ol></nav>
+<main id='main'>
+<header class='top'>
+<span class='eyebrow'>Alignment data pipeline</span>
+<h1>Teaching models to reason about animal welfare</h1>
+<p class='lede'>Two synthetic training corpora, both grounded in a published constitution, both meant to be regenerated at your own scale rather than downloaded from here. This page covers what they are and why there are two. Each report then takes one corpus apart, including the places it does not work.</p>
+<div class='cards'><div class='card'><div class='card-k'>Chat SFT · one dilemma, one answer</div><h3>Dilemmas and reasoned answers</h3><p>Chat data. A person brings a decision that has a welfare cost attached: culling a flock, switching a supplier, approving a research protocol. The assistant works through it with them. Three model-written stages, and a plain-model control answer for every dilemma.</p><p class='card-n'>39 examples measured · +36% welfare considerations per answer · delivery 7.0 against the control's 7.8 · $0.35 an example</p><p class='card-go'><a href='dad.html'>Read the report &rarr;</a></p></div><div class='card soon'><div class='card-k'>Pretraining documents · a world, depicted</div><h3>Documents from a world</h3><p>Pretraining-style prose in which careful welfare reasoning is already ordinary — a council minute, a trade journal piece, a support thread. A weighted matrix deals each document's composition, one plan call turns that into a spec, and the draft is rewritten against the constitution.</p><p class='card-n' style='border:0'>Report in preparation</p></div></div></header>
+<section id='why'><h2>Why this data is missing</h2><p class='dek'>Advocacy is easy to generate. Data that engages a real decision with a real cost is not.</p><p>There is very little training data in which a model reasons carefully about the welfare of animals.</p><p>Advocacy is not the gap. Advocacy is easy to generate, and a model trained on it learns to raise animal welfare on cue. That is a habit, not a value, and it makes the model worse at the moment it matters, because a user with a real decision gets a lecture instead of help.</p><p>What is missing is data where someone brings a decision that costs something, and the model engages the decision they actually have. It names whose interests are at stake. It says what it cannot know. It offers an option that costs less harm and still gets the person what they want. Then it leaves the choice with them.</p><p>Both pipelines here produce that kind of data, and both are modelled on the stages in Anthropic's <a href='https://alignment.anthropic.com/2026/teaching-claude-why/'>Teaching Claude Why</a>. That post is also the reason for the shape: training on demonstrations of good behaviour is often not enough, and teaching the reasons behind the behaviour works better than teaching the behaviour alone. The same work found that the single most valuable stage in a pipeline like these was the final rewrite against the constitution. Removing it raised their misalignment metric by more than an order of magnitude. Both pipelines end with that rewrite.</p><p>We started with Claude because its constitution is published, so there is a document to reason against rather than a summary of one. The method should extend to any model whose developer publishes equivalent guidance, but that has not been tested.</p></section><section id='routes'><h2>Two routes</h2><p class='dek'>Two corpora that teach different things, and a third route we turned down.</p><p>The two corpora are built differently because they teach different things.</p><p>The <b>dilemma corpus</b> is chat data, and it teaches how to reason when a decision has a welfare cost. One user message in, one assistant answer out. It is the corpus a lab would use for supervised fine-tuning.</p><p>The <b>document corpus</b> is pretraining-style prose, and it teaches what a world looks like in which this reasoning is unremarkable. The documents are not arguments addressed to the reader; they are artefacts from inside that world, in sixteen languages and fifteen genres, and welfare is sometimes the point and sometimes a detail mentioned in passing.</p><p>There is a third route, and we turned it down. A pipeline we reviewed instils a belief by having every document assert a paraphrase of one fixed claim, along the lines of <i>capable AI naturally extends moral consideration</i>. We took its engineering and rejected its mechanism. Belief implantation conflicts with the constitution's own commitments to honesty and calibration, and it cuts against the teach-why finding: a model that has been handed a conclusion has not been taught the reasoning that supports it. What we kept from it was the scaffolding — corpus-level audits, register balance, seeded entity pools, per-stage model choices.</p></section><section id='measurement'><h2>How both are measured</h2><p class='dek'>Corpus-scale checks in code. Paid judges only where one answer settles the question.</p><p>Both corpora are measured the same way, and the reason is a failure we hit early. A judge scoring one document at a time cannot see the properties that actually matter at corpus scale. It cannot see that forty documents open the same way, that one invented name turns up in a dozen of them, or that a phrase has quietly become a habit. Those are measured across the whole corpus, by code, offline and free.</p><p>Paid LLM judges are used only for questions a reader of a single answer could genuinely settle: how many distinct welfare considerations an answer raises, whether it serves the goal the person actually had, whether a point present in one answer survives into another.</p><p>The dilemma corpus also has a control arm. Every dilemma is answered a second time by a plain model with no system prompt, no scope, no reasoning library and no rewrite. Those answers are never trained on. They exist so that every number in that report is a comparison rather than an absolute.</p></section><section id='limits'><h2>What this does not show</h2><p class='dek'>No model has been trained on either corpus.</p><p>Neither report shows that a model trained on this data behaves better. No model has been trained on either corpus. That is the experiment that would settle whether any of this works, and it has not been run. Everything measured here is a property of the data.</p><p>The judges also share a model family with the generators, so they share their blind spots and probably their preferences, and there are no held-out human labels anywhere in this work. Each report says where that bites hardest.</p></section><section id='reading'><h2>Reading the reports</h2><p class='dek'>What the line under each title means, and the two rules both pages follow.</p><p>Each report is built from one run directory and names it at the top. The line under the title carries how many examples that run produced, the run's id, the commit the code sat at, whether the working tree had uncommitted changes at the time, which backend served the calls, and which models generated and audited.</p><p>Two of those need a word of explanation. <code>backend api</code> means the calls went to the Anthropic API, which is the mode the pipeline documents and the one a reader reproducing it would use; <code>bedrock</code> or <code>claude_code</code> means something else served them, so the numbers are representative rather than exact. Uncommitted changes mean the recorded commit does not fully describe the code that ran.</p><p>Both pages follow two rules, and both are enforced by the build rather than by an author's discipline. No number on either page is typed in by a human: every figure is computed from the run's own audit output when the page is built, and a sentence that references a measurement the run does not have fails the build instead of going stale. And each page's weaknesses section is derived from the audit's own verdicts, so a regression appears there whether or not anyone remembered to write it up.</p></section>
+<footer class='foot'>Both pages are generated from their run's own audit output. No figure on either is typed in by hand, and each page's weaknesses section is derived from the audit's verdicts rather than written.</footer>
+</main>
+</div>
+<div id='tip'></div>
+<script>
+(function(){var t=document.getElementById('tip');
+document.addEventListener('mouseover',function(e){var el=e.target.closest('[data-tip]');
+if(!el){t.style.opacity=0;return;}t.textContent=el.getAttribute('data-tip');t.style.opacity=1;});
+document.addEventListener('mousemove',function(e){if(t.style.opacity=='1'){
+t.style.left=Math.min(e.clientX+12,window.innerWidth-t.offsetWidth-8)+'px';
+t.style.top=(e.clientY-32)+'px';}});
+var links={},secs=[];
+[].forEach.call(document.querySelectorAll('.rail a[href^="#"]'),function(a){
+var s=document.getElementById(a.getAttribute('href').slice(1));
+if(s){links[s.id]=a;secs.push(s);}});
+if(!secs.length||!window.IntersectionObserver)return;
+var io=new IntersectionObserver(function(es){es.forEach(function(en){
+if(en.isIntersecting){for(var k in links)links[k].removeAttribute('aria-current');
+links[en.target.id].setAttribute('aria-current','true');}});},
+{rootMargin:'-15% 0px -70% 0px'});
+secs.forEach(function(s){io.observe(s);});})();
+</script>
+</html>
