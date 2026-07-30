@@ -369,7 +369,7 @@ names = (audit.get("names") or {})
 wl = {k: v for k, v in (names.get("watchlist") or {}).items() if v}
 A(f"<p class='muted'>Model-favourite invented-name watchlist "
   f"(Elara / Meridian / Thorne / Voss / Vance / Aris / Kael / Solace): "
-  f"{'; '.join(f'{k} ×{v}' for k, v in wl.items()) if wl else 'no hits across 477 documents'}. "
+  f"{'; '.join(f'{k} ×{v}' for k, v in wl.items()) if wl else f'no hits across {N} documents'}. "
   f"The broader repeated-name table this audit also produces is omitted here: its capitaliser "
   f"heuristic has an English-only stopword list, so in a 16-language corpus it returns mostly "
   f"place names and common noun phrases (Nueva York, San Francisco, Die Frage) rather than "
@@ -395,6 +395,16 @@ if curve.get("points"):
     proj_ns = [last_n, 700, 1000, 2000, 3000, 5000]
     pw = [(n, P["C"] * n ** P["a"]) for n in proj_ns]
     lg = [(n, L["b"] + L["m"] * math.log(n)) for n in proj_ns]
+
+    def r2(fitted):
+        actual = [v for _, v in meas]
+        grand = st.mean(actual)
+        ss_tot = sum((v - grand) ** 2 for v in actual)
+        ss_res = sum((v - f) ** 2 for (_, v), f in zip(meas, fitted))
+        return 1 - ss_res / ss_tot if ss_tot else 1.0
+
+    pw_r2 = r2([P["C"] * n ** P["a"] for n, _ in meas])
+    lg_r2 = r2([L["b"] + L["m"] * math.log(n) for n, _ in meas])
     A("<h3>Does scaling the run buy more diversity? Not much &mdash; and this is the number to plan against</h3>")
     A("<p>The same metric computed over nested random subsets of this one corpus, which is the right "
       "question for &ldquo;what would this pipeline give us if we ran it bigger&rdquo;. Marginal "
@@ -409,8 +419,8 @@ if curve.get("points"):
     A("<p class='muted'><b>Legend.</b> Solid blue: measured, averaged over five random draws at each "
       "size. Dashed: the two fitted forms extrapolated beyond the data. Both are shown because they "
       "disagree, and the disagreement is the honest answer.</p>")
-    A(table(["corpus size", "power-law fit (R² 0.981)", "logarithmic fit (R² 0.998)", "effective documents per 1,000 generated"],
-            [["477 (measured)", f"{last_v:.0f}", f"{last_v:.0f}", f"{1000*last_v/last_n:.0f}"]] +
+    A(table(["corpus size", f"power-law fit (R² {pw_r2:.3f})", f"logarithmic fit (R² {lg_r2:.3f})", "effective documents per 1,000 generated"],
+            [[f"{last_n} (measured)", f"{last_v:.0f}", f"{last_v:.0f}", f"{1000*last_v/last_n:.0f}"]] +
             [[f"{n:,}", f"{P['C']*n**P['a']:.0f}", f"{L['b']+L['m']*math.log(n):.0f}",
               f"{1000*(L['b']+L['m']*math.log(n))/n:.0f} – {1000*(P['C']*n**P['a'])/n:.0f}"]
              for n in (1000, 5000)]))
@@ -429,22 +439,25 @@ if curve.get("points"):
       "and the axis <i>values</i> leave, not by how many combinations exist. Widening the axes is the "
       "lever the curve responds to; adding documents is not.</p>")
 
-A("<h3>Where the crowding comes from: not the rewrite</h3>")
-A("<p>The obvious suspect for semantic convergence is the layer-4 rewrite &mdash; one model pass over "
-  "every document is exactly the kind of step that could sand them toward each other. It is not the "
-  "cause. Measuring the same 477 documents before and after the Opus 5 rewrite with one consistent "
-  "method:</p>")
-A(table(["stage", "effective distinct documents", "mean nearest-neighbour cosine",
-         "share with a neighbour above 0.80"],
-        [["layer 3 drafts (pre-rewrite)", "41.9", "0.694", "3.8%"],
-         ["final (post Opus 5 rewrite)", "42.5", "0.697", "3.4%"]]))
-A("<p>Flat, or marginally better &mdash; the rewrite slightly <i>reduces</i> the share of documents "
-  "with a close neighbour. So the crowding is inherited from the drafts, which means it originates "
-  "upstream in what the matrix deals and what the plan does with it, not in the alignment-critical "
-  "pass. That is where section 5 picks up. (These absolute figures come from a single ad-hoc "
-  "implementation applied identically to both stages, so only the delta between the two rows is "
-  "meaningful; they are not comparable to the standing diversity eval's numbers above, which "
-  "normalise differently.)</p>")
+prewrite = excerpts.get("prewrite_diversity")
+if prewrite:
+    pre, post = prewrite["pre"], prewrite["post"]
+    A("<h3>Where the crowding comes from: not the rewrite</h3>")
+    A("<p>The obvious suspect for semantic convergence is the layer-4 rewrite &mdash; one model pass over "
+      "every document is exactly the kind of step that could sand them toward each other. It is not the "
+      f"cause. Measuring the same {N} documents before and after the Opus 5 rewrite with one consistent "
+      "method:</p>")
+    A(table(["stage", "effective distinct documents", "mean nearest-neighbour cosine",
+             "share with a neighbour above 0.80"],
+            [["layer 3 drafts (pre-rewrite)", f"{pre['vendi']:.1f}", f"{pre['cosine']:.3f}", f"{pre['close_frac']:.1%}"],
+             ["final (post Opus 5 rewrite)", f"{post['vendi']:.1f}", f"{post['cosine']:.3f}", f"{post['close_frac']:.1%}"]]))
+    A("<p>Flat, or marginally better &mdash; the rewrite slightly <i>reduces</i> the share of documents "
+      "with a close neighbour. So the crowding is inherited from the drafts, which means it originates "
+      "upstream in what the matrix deals and what the plan does with it, not in the alignment-critical "
+      "pass. That is where section 5 picks up. (These absolute figures come from a single ad-hoc "
+      "implementation applied identically to both stages, so only the delta between the two rows is "
+      "meaningful; they are not comparable to the standing diversity eval's numbers above, which "
+      "normalise differently.)</p>")
 A("</section>")
 
 # ---- 2 realism
@@ -480,7 +493,7 @@ if indep_scores["realism"]:
     A(table(["judge / dimension", "n", "mean", "std dev", "distribution (score: documents)"], rows))
     A("<p>The gating judge sees each document beside its spec; the spec-blind judge sees only the "
       "document. Both may be answering their own question correctly &mdash; but a gate whose "
-      "alignment score takes only two adjacent values across 477 documents, and never once falls "
+      f"alignment score takes only two adjacent values across {len(l5['alignment'])} documents, and never once falls "
       "below its configured threshold of 7, cannot discriminate. The corpus is ungated in practice.</p>")
     abl = maybe_json(RUN / "audit" / "realism_ablation.json")
     if abl.get("n"):

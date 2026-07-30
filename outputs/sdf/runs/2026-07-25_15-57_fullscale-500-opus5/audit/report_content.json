@@ -85,6 +85,11 @@
     }
   ],
 
+  "prewrite_diversity": {
+    "pre": { "vendi": 41.9, "cosine": 0.694, "close_frac": 0.038 },
+    "post": { "vendi": 42.5, "cosine": 0.697, "close_frac": 0.034 }
+  },
+
   "weaknesses": [
     {
       "title": "The finding that matters most: a plan may silently discard its dealt cards",
