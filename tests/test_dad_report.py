@@ -267,12 +267,32 @@ class TestBuildPage:
         assert headings and not any(h[0].isdigit() for h in headings)
         assert "counter(sec)" in html  # the rail supplies them instead
 
-    def test_links_to_its_sibling_when_given_one(self):
+    def test_the_rail_opens_with_the_back_link(self):
+        """The back-link is the one bit of cross-page navigation, and it sits at the top
+        of the rail rather than in the footer so it stays reachable once a reader is
+        deep in the page."""
         html = build(audit=AUDIT_FULL, sibling=("index.html", "Overview"))
-        assert "href='index.html'" in html
+        rail = re.search(r"<nav class='rail'.*?</nav>", html, re.S).group(0)
+        assert "href='index.html'" in rail
+        assert rail.index("index.html") < rail.index("href='#gap'")
+        assert ">Contents<" in rail
 
     def test_no_sibling_renders_no_dead_link(self):
         assert "index.html" not in build(audit=AUDIT_FULL)
+
+    def test_no_eyebrow(self):
+        """The uppercase kicker over the title read as generated; it is gone, and the
+        page's only uppercase treatment is now the chip."""
+        assert "eyebrow" not in build(audit=AUDIT_FULL)
+
+    def test_anchored_sections_land_with_headroom(self):
+        """A rail link used to drop the heading flush against the top of the viewport,
+        and under the sticky rail's own offset."""
+        html = build(audit=AUDIT_FULL)
+        assert "scroll-behavior:smooth" in html
+        assert re.search(r"section\{[^}]*scroll-margin-top:[\d.]+rem", html)
+        reduced = html[html.find("@media (prefers-reduced-motion:reduce)"):][:120]
+        assert "scroll-behavior:auto" in reduced
 
 
 class TestScoreboard:
@@ -516,6 +536,14 @@ class TestRenderPrimitives:
         assert "no" in R.hbar([]).lower()
         assert "<svg" not in R.grouped_hbar([], series=[("a", "red")])
         assert "<svg" not in R.segbar([("kept", 0, "red")])
+
+    def test_segbar_labels_live_in_the_legend_not_on_the_fill(self):
+        """Surface-coloured text on the arm fills was 2.5:1 on the green — a fail on
+        cream, and already a fail on white."""
+        html = R.segbar([("kept", 439, R.PLAIN), ("added", 260, R.PIPELINE)])
+        svg = html[:html.find("</svg>")]
+        assert "<text" not in svg
+        assert "kept · 439" in html and "added · 260" in html
 
     def test_zero_values_do_not_divide_by_zero(self):
         assert "<svg" in R.hbar([("a", 0), ("b", 0)])

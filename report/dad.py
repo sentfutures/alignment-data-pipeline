@@ -50,7 +50,6 @@ TOC = [
     ("appendix", "Appendix"),
 ]
 
-EYEBROW = "Synthetic training data · dilemma SFT"
 
 _STAGE_KNOBS = ("scenario_model", "prompt_draft_model", "prompt_gate_model",
                 "prompt_refine_model", "response_scope_model", "response_select_model",
@@ -1059,7 +1058,6 @@ def body(*, audit, content, diversity=None, manifest=None, corpus=None, baseline
     meta = f"{n_note} · {meta}"
     head = {
         "title": C.fill(content["title"], f).strip(),
-        "eyebrow": EYEBROW,
         "lede": C.fill(content["lede"], f).strip(),
         "hero": hero_tiles(audit, f, cons),
         "meta_line": meta,

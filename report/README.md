@@ -6,9 +6,9 @@ file you can host anywhere, email, or open offline from the filesystem.
 
 | Page | File | What it is |
 |---|---|---|
-| Hub | `index.html` | What the two corpora are and why there are two. Everything true of both, met once: why this data is missing, the *Teaching Claude Why* grounding, the two routes and the one we turned down, the shared measurement philosophy, the shared limits, how to read a provenance line. |
+| Landing | `index.html` | A large hero, two buttons for the two reports, then three sections: why this data is missing, the two corpora (including the belief-implantation route we turned down), and what neither report shows. Deliberately short (~680 words) and deliberately rail-less — `document(layout="landing")` drops the contents list but keeps the shell's grid, so the rail column is reserved and simply left empty: the content lands on the same left edge, at the same width, on both pages, and clicking into a report makes the contents appear *beside* the prose instead of shoving it sideways. Everything ranges left; only the vertical rhythm and the hero's type scale differ from a report. Anything a reader only needs *while reading a report* lives on that report's page: the provenance conventions, the measurement philosophy and the build rules are all stated there, so repeating them here was duplication. |
 | DAD | `dad.html` | The dilemma corpus in detail: the gap, one worked example in full, what the numbers say, how it is built, its stylistic footprint, how it is measured, where it is weak, how to run it, an appendix. |
-| SDF | *not built yet* | The document corpus. The hub already introduces it and says the report is in preparation. `report/sdf.py` + `content_sdf.md` are the shape it would take; see the notes at the bottom of this file. |
+| SDF | *not built yet* | The document corpus. The landing page already introduces it and says the report is in preparation. `report/sdf.py` + `content_sdf.md` are the shape it would take; see the notes at the bottom of this file. |
 
 These are **not** the Streamlit corpus-audit page. That is an internal review tool
 organised by what the eval measured; these are organised by what a reader needs to
@@ -46,11 +46,11 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 
 | File | Role |
 |---|---|
-| `content_shared.md` | **Hub prose.** |
+| `content_shared.md` | **Landing-page prose.** |
 | `content_dad.md` | **DAD prose.** The file to iterate on for that page. |
 | `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, the CLI parser. Everything both pages use. |
 | `dad.py` | The DAD page: `CONTENT_IDS`, `TOC`, `facts()`, the section builders, `derived_warnings()`. |
-| `hub.py` | The hub page. |
+| `hub.py` | The landing page. |
 | `render.py` | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge. |
 | `build_report.py` | The CLI. |
 
@@ -58,6 +58,13 @@ Each pipeline module exposes `body()` (returning sections, rail entries and head
 fields) and `build()`. `document()` is called once, by `build()`. That is what would make
 a single combined page a short function rather than a refactor, and it costs nothing
 today.
+
+Cross-page navigation is one link. `build()` takes `sibling=(href, label)` and renders it
+as a `‹ Overview` back-link at the **top** of the report page's contents rail, above a
+`CONTENTS` label — the one place that stays reachable once a reader is deep in the page,
+and the reason the section list starts below the fold of the masthead. The landing page
+has no rail and needs no back-link. There is no tab bar: a tab that 404s when a file
+travels alone is a lie about the artefact.
 
 ## The rules
 
@@ -68,7 +75,7 @@ an explicit degraded string — `{{substance_clause}}`, `{{delivery_clause}}`,
 `{{library_clause}}`, `{{footprint_regressions}}`. A run missing the paid pass renders
 "no measured delivery comparison on this run" where the finding would be, so the sentence
 survives and its claim does not. Do not add a bare conditional number to prose; add a
-clause to `facts()`. The hub interpolates nothing at all — it has no run of its own, so a
+clause to `facts()`. The landing page interpolates nothing at all — it has no run of its own, so a
 placeholder there is a build error.
 
 **2. The weaknesses section is derived, not written.** Every BAD/OK verdict in the audit,
@@ -90,11 +97,20 @@ example (or `auto`), so a rebuild reproduces the same case without a command-lin
   from the filesystem, and artifact hosts' CSP blocks external origins. Charts are inline
   `<svg>`; the only JS is a tooltip handler and a rail scroll-spy. Enforced by
   `test_is_self_contained`.
-- **One theme, light.** `render.py` declares `color-scheme:only light` and emits a
+- **One theme, aged paper.** `render.py` declares `color-scheme:only light` and emits a
   matching `<meta>`. `only` is load-bearing: it opts the page out of Chrome-Android and
   Samsung Internet's auto-darkening, which `prefers-color-scheme` does not cover. These
   are printed and screenshotted artefacts, and a viewer's OS preference is not a signal
   about how a published document should look. `test_is_light_mode_only` pins it.
+- **The palette is contrast-verified, not eyeballed.** The page is `#f7f4ea` warm cream,
+  panels `#f1ebdd`, code and table heads `#e9e1cd`, rules `#cec3a6`.
+  `test_text_contrast_meets_wcag_aa` recomputes WCAG ratios from the CSS tokens
+  themselves and fails if any text-on-surface pair drops below 4.5:1, so darkening a
+  surface without darkening its ink breaks the suite rather than shipping. Cream is much
+  less forgiving than white in two specific ways, both handled: the old `#dcd9cf` border
+  fell to 1.19:1 and was replaced, and the pale chip washes only reach ~1.15:1 against
+  the page, so every chip carries a tinted `--*-edge` hairline. `segbar()` draws no text
+  inside its bars for the same reason — surface-coloured labels were 2.5:1 on the green.
 - **Reserved status colours.** `--good`/`--warn`/`--bad` are not series hues. They used to
   be — `--good` was byte-identical to `--series-3`, the pipeline's own colour, so the
   palette quietly editorialised "pipeline = good". `test_status_colors_are_not_series_colors`
@@ -118,17 +134,17 @@ example (or `auto`), so a rebuild reproduces the same case without a command-lin
 pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_hub.py
 ```
 
-102 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
+116 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
 placeholder contract, the provenance floor, the warnings table); `test_dad_report.py`
 covers the DAD page along four risk axes — degradation, self-containment, candour, colour
-integrity; `test_report_hub.py` covers the hub, whose distinctive risk is a link to a page
-nobody has built.
+integrity; `test_report_hub.py` covers the landing page, whose distinctive risks are a link to a
+page nobody has built and a stray placeholder.
 
 ## Adding the SDF page
 
 `report/render.py` and `report/common.py` are already pipeline-agnostic, so an SDF page is
 a new `report/sdf.py` + `report/content_sdf.md`, plus `sdf_href="sdf_report.html"` passed
-to the hub. Two things to know before starting:
+to the landing page. Two things to know before starting:
 
 - **`derived_warnings()` cannot be shared.** `evals/audit_dad.py` records its verdicts
   into `sections[].rows[]`; `evals/audit_sdf.py` only prints them. So

@@ -38,8 +38,7 @@ def main():
             C.die("--dad-run is required to build the DAD page")
         kwargs = dad.load_inputs(args.dad_run, args.content or [DAD_CONTENT])
         audit = kwargs["audit"]
-        html = dad.build(example=args.example,
-                         sibling=("index.html", "Overview and the SDF corpus"), **kwargs)
+        html = dad.build(example=args.example, sibling=("index.html", "Overview"), **kwargs)
         C.write(out_dir / "dad.html", html,
                 label=f"n={audit.get('n_prompts')} "
                       f"delivery={'yes' if audit.get('delivery') else 'NO'} "

@@ -145,6 +145,25 @@ def tiles(items):
     return f"<div class='tiles'>{''.join(kept)}</div>"
 
 
+def buttons(entries):
+    """A centred row of destinations. entries: [(label, href_or_None, note)].
+
+    ``href=None`` renders a span rather than an anchor, so a report nobody has built yet
+    keeps the row's symmetry without being clickable — a dead link is worse than a
+    visibly unavailable one.
+    """
+    out = []
+    for label, href, note in entries:
+        inner = (f"<span class='btn-l'>{esc(label)}</span>"
+                 + (f"<span class='btn-n'>{esc(note)}</span>" if note else ""))
+        if href:
+            out.append(f"<a class='btn' href='{esc(href)}'>{inner}"
+                       f"<span class='btn-a' aria-hidden='true'>&rarr;</span></a>")
+        else:
+            out.append(f"<span class='btn off'>{inner}</span>")
+    return f"<div class='btns'>{''.join(out)}</div>" if out else ""
+
+
 def table(headers, rows, cls="", align=""):
     """Cells are escaped; wrap pre-built markup in Raw() to pass it through.
 
@@ -288,10 +307,14 @@ def _legend(series):
 
 
 def segbar(segments, *, width=W, height=30):
-    """One bar split into proportional labelled segments — the whole-corpus view of
+    """One bar split into proportional segments — the whole-corpus view of
     kept/weakened/dropped/added, which as 39 unlabelled columns was unreadable.
 
     segments: [(name, value, color)]
+
+    Names and counts live in the legend below the bar, not inside it. Segment labels
+    drawn on the fill were surface-coloured text at 2.5:1 on the green and 2.8:1 on the
+    terracotta — a fail on cream and already a fail on white.
     """
     segments = [(n, v, c) for n, v, c in segments if v]
     total = sum(v for _, v, _ in segments)
@@ -303,9 +326,6 @@ def segbar(segments, *, width=W, height=30):
         w = width * val / total
         out.append(f"<rect x='{x:.1f}' y='0' width='{max(w - 2, 1):.1f}' height='{height}' "
                    f"fill='{color}' data-tip='{esc(name)}: {val} ({val / total:.0%})'/>")
-        if w > 68:
-            out.append(f"<text x='{x + 9:.1f}' y='{height / 2 + 4:.0f}' class='seg-l'>"
-                       f"{esc(name)} {val}</text>")
         x += w
     out.append("</svg>")
     return "".join(out) + _legend([(f"{n} · {v}", c) for n, v, c in segments])
@@ -458,17 +478,23 @@ def quote(text):
 
 
 CSS = """
+/* Aged paper, one theme. Every text-on-surface pair below clears WCAG AA (4.5:1) and
+   tests/test_report_common.py::test_text_contrast_meets_wcag_aa recomputes them from
+   these tokens, so darkening a surface without darkening its ink fails the suite. On
+   cream the rules and the chip washes both need to be markedly stronger than they were
+   on white, where a 1.1:1 wash still read as a chip. */
 :root{color-scheme:only light;
---surface-0:#ffffff;--surface-1:#faf9f6;--surface-2:#f2f1ec;
---border:#dcd9cf;--hairline:#ebe9e1;--grid:#e6e4dc;--axis:#c9c6ba;
---text-primary:#12110f;--text-secondary:#4a4844;--text-muted:#6e6c62;
---link:#1c5cab;--link-rule:#b7d3f6;
+--surface-0:#f7f4ea;--surface-1:#f1ebdd;--surface-2:#e9e1cd;
+--border:#cec3a6;--hairline:#ded5be;--grid:#e1d9c4;--axis:#bcaf90;
+--text-primary:#1a1712;--text-secondary:#4a443c;--text-muted:#675f54;
+--link:#1b5aa8;--link-rule:#a9c6e8;
 --series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;
 --series-5:#e87ba4;--series-6:#008300;--series-7:#4a3aa7;--series-8:#e34948;
 --good:#0ca30c;--warn:#fab219;--bad:#d03b3b;
 --good-ink:#0a6b12;--warn-ink:#7a4d00;--bad-ink:#a52222;
---good-wash:#eaf6ea;--warn-wash:#fdf3dc;--bad-wash:#fbeceb;
---mark:#fdf0bf}
+--good-wash:#dcecd0;--warn-wash:#f4e4c2;--bad-wash:#f4dbd5;
+--good-edge:#b6d3a4;--warn-edge:#dcc48c;--bad-edge:#e0b3aa;
+--mark:#f2e39c}
 *{box-sizing:border-box}
 html{--serif:ui-serif,Charter,"Bitstream Charter","Iowan Old Style","Source Serif 4","Charis SIL",Georgia,serif;
 --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -480,16 +506,50 @@ font:1.0625rem/1.62 var(--serif);-webkit-text-size-adjust:100%}
 border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
 
 /* Shell: a sticky rail, a prose measure, and a figure track that bleeds past it. */
-.shell{display:grid;grid-template-columns:12.5rem minmax(0,50rem);column-gap:3.5rem;
-max-width:1120px;margin:0 auto;padding:44px 28px 110px}
-.rail{grid-column:1;position:sticky;top:32px;align-self:start;font:500 .78rem/1.45 var(--sans)}
+html{scroll-behavior:smooth}
+.shell{display:grid;grid-template-columns:12.5rem minmax(0,50rem);column-gap:5rem;
+max-width:1170px;margin:0 auto;padding:44px 28px 110px}
+/* The rail column is reserved on EVERY page, including the landing page, which simply
+   leaves it empty. So the content column lands on exactly the same left edge at exactly
+   the same width on both, and clicking into a report makes the contents appear beside
+   the text rather than shoving it sideways.
+   margin-top floats the rail just below the height of the title; sticky then parks it at
+   `top` once the header has scrolled away. */
+.rail{grid-column:1;position:sticky;top:3.5rem;align-self:start;margin-top:5.5rem;
+font:500 .78rem/1.45 var(--sans)}
 main{grid-column:2;min-width:0}
-section{display:grid;grid-template-columns:[text-start] minmax(0,38rem) [text-end] 1fr [full-end]}
+section{display:grid;grid-template-columns:[text-start] minmax(0,38rem) [text-end] 1fr [full-end];
+scroll-margin-top:4.5rem}
 section>*{grid-column:text-start/text-end}
-section>figure,section>.tiles,section>.scroll,section>.pair,section>details{
+section>figure,section>.tiles,section>.scroll,section>.pair,section>details,section>.cards{
 grid-column:text-start/full-end}
 section+section{margin-top:5rem}
 header.top{margin-bottom:3.2rem}
+/* The landing page: same grid, same column, no rail in it. Only the vertical rhythm and
+   the hero's type scale differ — prose sits on the same 38rem measure the reports use,
+   and the cards bleed to the full column exactly as a report's figures do. Everything
+   ranges left; the column is centred in the viewport, the type inside it is not. */
+.shell.solo{padding-top:8rem}
+.shell.solo section+section{margin-top:5.5rem}
+.shell.solo header.top{margin-bottom:7rem}
+.shell.solo h1{font-size:3.9rem;line-height:1.03;letter-spacing:-.03em;margin:0 0 .9rem}
+.shell.solo .lede{font-size:1.3rem;line-height:1.45;max-width:48ch;margin:0;
+color:var(--text-secondary)}
+.shell.solo h2{font-size:1.5rem;margin:0 0 .5rem}
+.shell.solo .dek{max-width:52ch;margin:0 0 2rem}
+.shell.solo .cards{margin-top:2.2rem}
+/* Buttons: the primary is ink-on-paper reversed (16.2:1); the unavailable one keeps the
+   row's shape with a dashed edge and muted ink (5.3:1) and is not an anchor. */
+.btns{display:flex;gap:1rem;flex-wrap:wrap;margin:3rem 0 0}
+.btn{display:inline-flex;align-items:baseline;gap:.55rem;font:600 .95rem/1.3 var(--sans);
+padding:.85rem 1.4rem;text-decoration:none;min-width:15rem;justify-content:center}
+a.btn{background:var(--text-primary);color:var(--surface-0);border:1px solid var(--text-primary)}
+a.btn:hover{background:var(--surface-0);color:var(--text-primary)}
+.btn.off{border:1px dashed var(--border);color:var(--text-muted);
+flex-direction:column;align-items:center;gap:.15rem}
+.btn-l{white-space:nowrap}
+.btn-n{font:400 .76rem/1.3 var(--sans);opacity:.9}
+.btn-a{font-size:1.05em;line-height:1}
 
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
@@ -501,8 +561,6 @@ p{margin:0 0 1.05em;color:var(--text-secondary);text-wrap:pretty}
 ul{color:var(--text-secondary);padding-left:20px;margin:0 0 1.05em}li{margin:.3em 0}
 .lede{font:1.22rem/1.5 var(--serif);color:var(--text-primary);margin:0 0 1.1rem;max-width:40rem}
 .dek{font:.9rem/1.5 var(--sans);color:var(--text-muted);margin:0 0 1.4rem;max-width:44rem}
-.eyebrow{display:block;font:650 .68rem/1 var(--sans);text-transform:uppercase;
-letter-spacing:.1em;color:var(--text-muted);margin-bottom:.7rem}
 .meta{font:.8rem/1.55 var(--sans);color:var(--text-muted);margin:1.2rem 0 0;
 padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
 .muted{color:var(--text-muted);font:.84rem/1.5 var(--sans)}
@@ -517,8 +575,12 @@ font-variant-numeric:tabular-nums;text-align:right;font-size:.72rem;line-height:
 .rail a{color:var(--text-secondary);text-decoration:none}
 .rail a:hover{color:var(--text-primary)}
 .rail a[aria-current=true]{color:var(--text-primary);font-weight:650}
-.rail .away{margin-top:1.3rem;padding-top:.9rem;border-top:1px solid var(--hairline)}
-.rail .away a{color:var(--link)}
+.rail .back{margin:0 0 1rem}
+.rail .back a{color:var(--link);text-decoration:none}
+.rail .back a:hover{text-decoration:underline}
+.rail .rail-h{font:650 .66rem/1 var(--sans);text-transform:uppercase;letter-spacing:.1em;
+color:var(--text-muted);margin:0 0 .8rem;padding-top:.9rem;
+border-top:1px solid var(--hairline)}
 
 /* Numbers. Direction is a labelled chip, never a colored numeral. */
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;
@@ -536,12 +598,11 @@ figure{margin:1.6rem 0 1.9rem}
 .fig-n{font:.78rem/1.5 var(--sans);color:var(--text-muted);margin:0 0 .5rem;max-width:52ch}
 .fig-c{font:.8rem/1.55 var(--sans);color:var(--text-secondary);margin-top:.5rem;max-width:58ch}
 .chart{width:100%;max-width:800px;height:auto;overflow:visible;display:block;margin:.2rem 0}
-.lab,.val,.muted-svg,.seg-l{font-family:var(--sans)}
+.lab,.val,.muted-svg{font-family:var(--sans)}
 .lab{font-size:11.5px;fill:var(--text-secondary)}
 .val{font-size:11px;fill:var(--text-muted);font-variant-numeric:tabular-nums}
 .val.strong{fill:var(--text-primary);font-weight:650}
 .key-in{font-style:italic}
-.seg-l{font-size:11px;fill:var(--surface-0);font-weight:650}
 .muted-svg{font-size:11px;fill:var(--text-muted)}
 .grid{stroke:var(--grid);stroke-width:1;shape-rendering:crispEdges}
 .axis{stroke:var(--axis);stroke-width:1;shape-rendering:crispEdges}
@@ -570,12 +631,14 @@ td code,th code,.meta code{background:var(--surface-2);padding:1px 4px}
 pre{font-family:var(--mono);background:var(--surface-1);border:0;
 border-left:2px solid var(--border);padding:.9rem 1.1rem;overflow-x:auto;
 font-size:.79rem;line-height:1.65;color:var(--text-primary)}
+/* The hairline is load-bearing on cream: the washes only reach ~1.15:1 against the
+   page, so without an edge a chip stops reading as a chip. */
 .chip{font:700 .66rem/1.5 var(--sans);text-transform:uppercase;letter-spacing:.07em;
-padding:.15rem .4rem;background:var(--surface-2);color:var(--text-secondary);
-white-space:nowrap}
-.chip.good{background:var(--good-wash);color:var(--good-ink)}
-.chip.warn{background:var(--warn-wash);color:var(--warn-ink)}
-.chip.bad{background:var(--bad-wash);color:var(--bad-ink)}
+padding:.1rem .38rem;background:var(--surface-2);color:var(--text-secondary);
+border:1px solid var(--border);white-space:nowrap}
+.chip.good{background:var(--good-wash);color:var(--good-ink);border-color:var(--good-edge)}
+.chip.warn{background:var(--warn-wash);color:var(--warn-ink);border-color:var(--warn-edge)}
+.chip.bad{background:var(--bad-wash);color:var(--bad-ink);border-color:var(--bad-edge)}
 blockquote{margin:1rem 0 1.3rem;white-space:pre-wrap;font-size:1.02rem;line-height:1.55;
 color:var(--text-primary);padding-left:1.15rem;border-left:2px solid var(--border)}
 .warn-note{color:var(--text-primary);border-left:3px solid var(--warn);
@@ -615,16 +678,22 @@ border-top:1px solid var(--hairline);padding-top:.6rem;margin:0 0 .7rem}
 #tip{position:fixed;pointer-events:none;opacity:0;background:var(--text-primary);
 color:var(--surface-0);font:12px/1.4 var(--sans);padding:5px 8px;transition:opacity .1s;
 z-index:9;max-width:320px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-@media (max-width:1080px){.shell{grid-template-columns:minmax(0,1fr);max-width:52rem;
-row-gap:0}.rail{position:static;grid-column:1;margin-bottom:2.4rem}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}
+*{transition:none!important;animation:none!important}}
+@media (max-width:1120px){.shell{grid-template-columns:minmax(0,1fr);max-width:52rem;
+row-gap:0}.rail{position:static;grid-column:1;margin:0 0 2.4rem}
 .rail ol{display:flex;flex-wrap:wrap;gap:.3rem 1.3rem}.rail li{margin:0}
-.rail .away{width:100%;margin-top:.8rem}main{grid-column:1}}
+.rail .rail-h{margin-bottom:.5rem}main{grid-column:1}}
 @media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
 section>*{grid-column:1}.pair{grid-template-columns:1fr}
 .cards{grid-template-columns:1fr}}
 @media (max-width:620px){body{font-size:1rem}.shell{padding:26px 16px 70px}
 h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
+.shell.solo{padding-top:3.2rem}.shell.solo h1{font-size:2.3rem}
+.shell.solo .lede{font-size:1.1rem}.shell.solo h2{font-size:1.3rem}
+.shell.solo header.top{margin-bottom:4rem}
+.shell.solo section+section{margin-top:3.5rem}
+.btns{flex-direction:column;gap:.7rem}.btn{min-width:0;width:100%}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}}
 @media print{
 @page{margin:16mm 14mm}
@@ -665,28 +734,37 @@ secs.forEach(function(s){io.observe(s);});})();
 """
 
 
-def document(*, title, toc, body, eyebrow="", heading=None, lede="", hero="", meta_line="",
-             sibling=None, footer=""):
+def document(*, title, toc, body, heading=None, lede="", hero="", meta_line="",
+             sibling=None, footer="", layout="article"):
     """The shell. One file, one theme, no external anything.
 
-    ``sibling`` is (href, label) for the companion report — one link in the rail, not
-    a tab bar: a tab that 404s when the file travels alone is a lie about the artefact.
+    ``layout='landing'`` drops the rail and centres one column with a larger hero: a
+    landing page's job is the hero and the two links out of it, and a contents list for
+    four short sections is furniture.
+
+    ``sibling`` is (href, label) for the companion page, rendered as a back-link at the
+    TOP of the rail — the one place that stays reachable once a reader is deep in the
+    page. Not a tab bar: a tab that 404s when the file travels alone is a lie about the
+    artefact.
     """
-    items = []
-    for i, l in toc:
-        cls = " class='nonum'" if i in ("summary", "appendix") else ""
-        items.append(f"<li{cls}><a href='#{i}'>{esc(l)}</a></li>")
-    away = (f"<div class='away'><a href='{esc(sibling[0])}'>{esc(sibling[1])} &rarr;</a></div>"
-            if sibling else "")
+    rail = ""
+    if layout != "landing" and toc:
+        items = []
+        for i, l in toc:
+            cls = " class='nonum'" if i in ("summary", "appendix") else ""
+            items.append(f"<li{cls}><a href='#{i}'>{esc(l)}</a></li>")
+        back = (f"<p class='back'><a href='{esc(sibling[0])}'>&lsaquo; {esc(sibling[1])}</a></p>"
+                if sibling else "")
+        rail = (f"<nav class='rail' aria-labelledby='rail-h'>{back}"
+                f"<p class='rail-h' id='rail-h'>Contents</p>"
+                f"<ol>{''.join(items)}</ol></nav>\n")
     return (f"<!DOCTYPE html>\n<html lang='en'>\n<meta charset='utf-8'>\n"
             f"<meta name='viewport' content='width=device-width,initial-scale=1'>\n"
             f"<meta name='color-scheme' content='only light'>\n"
             f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
             f"<a class='skip' href='#main'>Skip to content</a>\n"
-            f"<div class='shell'>\n"
-            f"<nav class='rail' aria-label='Sections'><ol>{''.join(items)}</ol>{away}</nav>\n"
+            f"<div class='shell{'' if rail else ' solo'}'>\n{rail}"
             f"<main id='main'>\n<header class='top'>\n"
-            + (f"<span class='eyebrow'>{esc(eyebrow)}</span>\n" if eyebrow else "")
             + f"<h1>{esc(heading if heading is not None else title)}</h1>\n"
             + (f"<p class='lede'>{inline_md(lede)}</p>\n" if lede else "")
             + hero

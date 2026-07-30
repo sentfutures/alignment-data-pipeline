@@ -8,9 +8,12 @@ go stale against the run it claims to describe.
 Fully offline — nothing here touches the network or the API.
 """
 
+import re
+
 import pytest
 
 from report import common as C
+from report import render as R
 
 IDS = ("title", "lede", "body")
 
@@ -150,6 +153,62 @@ class TestCost:
 
     def test_no_costs_is_empty(self):
         assert C.stage_cost_table([], (("a", "A"),)) == ""
+
+
+def _tokens():
+    return dict(re.findall(r"--([a-z0-9-]+):(#[0-9a-fA-F]{6})", R.CSS))
+
+
+def _ratio(fg, bg):
+    """WCAG 2.1 relative-luminance contrast ratio."""
+    def lum(hex_):
+        chans = []
+        for i in (1, 3, 5):
+            c = int(hex_[i:i + 2], 16) / 255
+            chans.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
+        r, g, b = chans
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    a, b = lum(fg), lum(bg)
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+
+
+class TestPalette:
+    """The page is aged paper, which is a much less forgiving background than white:
+    a pale wash that read as a chip on #fff reaches 1.15:1 on cream. Recomputing the
+    ratios here means darkening a surface without darkening its ink fails the suite
+    rather than shipping."""
+
+    # (ink token, surface token) pairs that carry real text at normal size.
+    TEXT_PAIRS = [
+        ("text-primary", "surface-0"), ("text-secondary", "surface-0"),
+        ("text-muted", "surface-0"), ("text-muted", "surface-1"),
+        ("text-muted", "surface-2"), ("text-secondary", "surface-1"),
+        ("link", "surface-0"),
+        ("good-ink", "good-wash"), ("warn-ink", "warn-wash"), ("bad-ink", "bad-wash"),
+    ]
+
+    def test_text_contrast_meets_wcag_aa(self):
+        t = _tokens()
+        for ink, surface in self.TEXT_PAIRS:
+            assert ink in t and surface in t, f"missing token: {ink} / {surface}"
+            r = _ratio(t[ink], t[surface])
+            assert r >= 4.5, f"--{ink} on --{surface} is {r:.2f}:1, below AA's 4.5"
+
+    def test_the_page_is_paper_not_white(self):
+        assert _tokens()["surface-0"].lower() != "#ffffff"
+
+    def test_rules_are_visible_against_the_paper(self):
+        """On cream the old #dcd9cf border fell to 1.19:1 and effectively vanished."""
+        t = _tokens()
+        assert _ratio(t["border"], t["surface-0"]) >= 1.4
+        assert _ratio(t["hairline"], t["surface-0"]) >= 1.2
+
+    def test_chips_carry_an_edge_because_the_washes_alone_do_not_separate(self):
+        t = _tokens()
+        for state in ("good", "warn", "bad"):
+            assert _ratio(t[f"{state}-wash"], t["surface-0"]) < 1.4  # the reason for the edge
+            assert f"--{state}-edge" in R.CSS
+            assert f"border-color:var(--{state}-edge)" in R.CSS
 
 
 class TestMetaLine:

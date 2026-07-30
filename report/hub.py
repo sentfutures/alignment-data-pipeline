@@ -16,19 +16,12 @@ from report import common as C
 from report import render as R
 
 CONTENT_IDS = (
-    "title", "lede", "dad_card", "sdf_card", "why", "routes", "measurement", "limits",
-    "reading",
+    "title", "lede", "dad_card", "sdf_card", "why", "corpora", "limits",
 )
 
-TOC = [
-    ("why", "Why this data is missing"),
-    ("routes", "Two routes"),
-    ("measurement", "How both are measured"),
-    ("limits", "What this does not show"),
-    ("reading", "Reading the reports"),
-]
-
-EYEBROW = "Alignment data pipeline"
+# A landing page carries no contents list: its job is the hero and the two links out of
+# it, and a rail for four short sections is furniture.
+TOC = []
 
 
 def load_inputs(content_paths, dad_run=None, sdf_run=None):
@@ -95,34 +88,61 @@ def _sdf_numbers(audit, diversity):
     return " · ".join(R.esc(b) for b in bits)
 
 
+def _split_around_cards(html):
+    """Split rendered prose into what goes above the cards and what goes below.
+
+    The dek plus the first paragraph introduce the two corpora; everything after that is
+    commentary on them, so the cards belong in between. Falls back to putting all of it
+    above, which is how it renders if someone writes a single block.
+    """
+    parts = html.split("</p>")
+    above = 0
+    for i, part in enumerate(parts):
+        above = i + 1
+        if "class='dek'" not in part:
+            break
+    if above >= len(parts) - 1:
+        return html, ""
+    return "</p>".join(parts[:above]) + "</p>", "</p>".join(parts[above:])
+
+
 def body(*, content, dad_audit=None, dad_costs=None, dad_manifest=None, dad_diversity=None,
          dad_run_id="", sdf_audit=None, sdf_diversity=None, sdf_run_id="", dad_href="dad.html",
          sdf_href=None):
-    f = {}  # the hub interpolates nothing: it has no run of its own to be stale about
-    cards = R.Raw("<div class='cards'>"
-                  + _card(kicker="Chat SFT · one dilemma, one answer",
-                          prose_html=C.prose(content, "dad_card", f),
-                          numbers=_dad_numbers(dad_audit, dad_costs, dad_manifest, dad_diversity),
-                          href=dad_href if dad_audit else None,
-                          go="Read the report" if dad_audit else "No run built yet")
-                  + _card(kicker="Pretraining documents · a world, depicted",
-                          prose_html=C.prose(content, "sdf_card", f),
-                          numbers=_sdf_numbers(sdf_audit, sdf_diversity),
-                          href=sdf_href,
-                          go="Read the report" if sdf_href else "Report in preparation")
-                  + "</div>")
+    f = {}  # the landing page interpolates nothing: it has no run of its own to be stale
+    dad_live = bool(dad_audit)
+    # The hero is the two destinations. An unbuilt report keeps the row's shape without
+    # being clickable; the card below it says the same thing in words.
+    hero = R.buttons([
+        ("The dilemma corpus", dad_href if dad_live else None,
+         "" if dad_live else "no run built yet"),
+        ("The document corpus", sdf_href, "" if sdf_href else "report in preparation"),
+    ])
+    cards = ("<div class='cards'>"
+             + _card(kicker="Chat SFT · one dilemma, one answer",
+                     prose_html=C.prose(content, "dad_card", f),
+                     numbers=_dad_numbers(dad_audit, dad_costs, dad_manifest, dad_diversity),
+                     href=dad_href if dad_live else None,
+                     go="Read the report" if dad_live else "No run built yet")
+             + _card(kicker="Pretraining documents · a world, depicted",
+                     prose_html=C.prose(content, "sdf_card", f),
+                     numbers=_sdf_numbers(sdf_audit, sdf_diversity),
+                     href=sdf_href,
+                     go="Read the report" if sdf_href else "Report in preparation")
+             + "</div>")
+    # The corpora section's prose is split around the cards: whatever precedes the first
+    # blank line after the dek introduces them, and the rest (the third route we turned
+    # down) reads better once the reader has seen what the two are.
+    lead, rest = _split_around_cards(C.prose(content, "corpora", f))
     sections = [
         C.section("why", "Why this data is missing", C.prose(content, "why", f)),
-        C.section("routes", "Two routes", C.prose(content, "routes", f)),
-        C.section("measurement", "How both are measured", C.prose(content, "measurement", f)),
+        C.section("corpora", "The two corpora", lead, cards, rest),
         C.section("limits", "What this does not show", C.prose(content, "limits", f)),
-        C.section("reading", "Reading the reports", C.prose(content, "reading", f)),
     ]
     head = {
         "title": content["title"].strip(),
-        "eyebrow": EYEBROW,
         "lede": content["lede"].strip(),
-        "hero": str(cards),
+        "hero": hero,
         "meta_line": "",
         "footer": "Both pages are generated from their run's own audit output. No figure on "
                   "either is typed in by hand, and each page's weaknesses section is derived "
@@ -133,4 +153,4 @@ def body(*, content, dad_audit=None, dad_costs=None, dad_manifest=None, dad_dive
 
 def build(**kwargs):
     body_html, toc, head = body(**kwargs)
-    return R.document(toc=toc, body=body_html, **head)
+    return R.document(toc=toc, body=body_html, layout="landing", **head)
