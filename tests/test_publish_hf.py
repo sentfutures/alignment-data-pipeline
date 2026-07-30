@@ -51,6 +51,33 @@ KNOWN_AUDIT_FILES = {
     "report_content.json": REPORT_CONTENT,
 }
 
+# A fully-merged verdict — what merge_state returns on a clean main checkout.
+MERGED_STATE = {
+    "branch": "main", "head": "4abd78b", "head_merged": True, "ahead": 0,
+    "run_commit": "4abd78b", "run_commit_merged": True,
+    "fetched": True, "notes": [],
+}
+
+
+def unmerged_state(branch="declan/wip", commit="deadbee", ahead=3, **over):
+    """merge_state's verdict for a run whose code never reached origin/main."""
+    return {**MERGED_STATE, "branch": branch, "head": commit, "ahead": ahead,
+            "head_merged": False, "run_commit": commit,
+            "run_commit_merged": False, **over}
+
+
+@pytest.fixture(autouse=True)
+def _default_merged(monkeypatch):
+    """Pin merge_state to "merged" for every test in this module.
+
+    Without this the real helper runs, and the suite's result would depend on
+    the branch the developer happens to be on — green on main, and blocked on a
+    typed confirmation everywhere else. Tests that exercise the guard override
+    this with their own monkeypatch.
+    """
+    monkeypatch.setattr(publish_hf, "merge_state",
+                        lambda commit, fetch=True: dict(MERGED_STATE))
+
 
 def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MANIFEST,
                   include_html=True, extra_audit_files=None):
@@ -996,3 +1023,261 @@ class TestSiblingPreservation:
         )
         fm = yaml.safe_load(card.split("---\n")[1])
         assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+
+
+class TestUnmergedGuard:
+    """The pre-flight provenance gate. It warns and asks rather than refusing:
+    the HF write token lives on contributors' laptops, so a hard block would
+    push an unmerged publish out of this script — and out of the only place
+    that records provenance at all. What makes it stick is the card stamp.
+    """
+
+    def _unmerged(self, monkeypatch, **over):
+        state = unmerged_state(**over)
+        monkeypatch.setattr(publish_hf, "merge_state",
+                            lambda commit, fetch=True: dict(state))
+        return state
+
+    def test_merged_run_publishes_silently(self, tmp_path, monkeypatch, stub_hf, capsys):
+        """The default path must stay quiet — a warning that also fires on
+        merged runs is one people learn to type straight past."""
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+
+        err = capsys.readouterr().err
+        assert "NOT been merged" not in err
+        card = (staging_dir / "README.md").read_text()
+        assert "unmerged branch" not in card.lower()
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert "unmerged" not in sidecar
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert upload["commit_message"] == \
+            "Publish sdf: 2026-07-25_15-57_fullscale-500-opus5"
+
+    def test_non_interactive_without_flag_refuses_before_any_hub_call(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """An agent, a pipe, or a CI job has nobody to answer a prompt. It must
+        exit naming the flag, and must not have touched the Hub first."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+
+        with pytest.raises(SystemExit) as excinfo:
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+        assert "--allow-unmerged" in str(excinfo.value)
+
+    def test_interactive_yes_proceeds(self, tmp_path, monkeypatch, stub_hf):
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+        assert any(c["fn"] == "upload_folder" for c in calls)
+
+    def test_interactive_anything_else_aborts_with_no_hub_call(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """Only the exact word publishes. 'y' is a reflex; 'yes' is a decision."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "y")
+
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+
+    def test_allow_unmerged_publishes_and_stamps_everything(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """The durable half of the guard: the card, the persisted sidecar, and
+        the Hub commit message all record that this was unmerged."""
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/wip", commit="deadbee")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        err = capsys.readouterr().err
+        assert "NOT been merged" in err
+        assert "declan/wip" in err
+
+        card = (staging_dir / "README.md").read_text()
+        assert "Published from an unmerged branch" in card
+        assert "`declan/wip`" in card and "`deadbee`" in card
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"] == {"branch": "declan/wip", "commit": "deadbee"}
+
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "(unmerged branch declan/wip)" in upload["commit_message"]
+
+    def test_stamp_survives_a_run_with_no_curated_title(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The sidecar used to be written only when a run had a curated
+        title/subtitle. The stamp has to be written regardless, or a run
+        without report_content.json publishes with no warning on its card."""
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"]["branch"] == "declan/wip"
+        assert "title" not in sidecar
+        assert "Published from an unmerged branch" in \
+            (staging_dir / "README.md").read_text()
+
+    def test_dry_run_shows_the_warning_and_stamp_without_prompting(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """A preview that hid the warning would be the wrong preview — but
+        --dry-run publishes nothing, so there is nothing to confirm."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input",
+                            lambda _prompt: pytest.fail("--dry-run must not prompt"))
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--dry-run")
+
+        captured = capsys.readouterr()
+        assert "NOT been merged" in captured.err
+        assert "Published from an unmerged branch" in captured.out
+
+    def test_dry_run_does_not_contact_the_remote(self, tmp_path, monkeypatch, stub_hf):
+        """--dry-run is documented as making zero network calls, and a git fetch
+        would break that promise just as surely as a Hub call."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        seen = {}
+
+        def record(commit, fetch=True):
+            seen["fetch"] = fetch
+            return dict(MERGED_STATE)
+
+        monkeypatch.setattr(publish_hf, "merge_state", record)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--dry-run")
+        assert seen["fetch"] is False
+
+    def test_unknown_provenance_is_treated_as_unmerged(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """An unverifiable claim is not a safe one: a manifest with no git
+        commit, or a commit this clone has never seen, must warn rather than
+        sail through."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["commit deadbee is not in this clone (never pushed?)"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+
+    def test_unverifiable_is_not_reported_as_definitely_unmerged(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """Both verdicts block, but they must not read the same. Claiming a run
+        is unmerged when the truth is "couldn't tell" teaches people the warning
+        is inaccurate, which is how a guardrail loses its authority."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf()
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["commit deadbee is not in this clone"])
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
+        err = capsys.readouterr().err
+        assert "could NOT be verified against main" in err
+        assert "has NOT been merged" not in err
+
+    def test_notes_reach_the_operator(self, tmp_path, monkeypatch, stub_hf, capsys):
+        """merge_state's plain-English reasons are the only explanation of an
+        unknown verdict, so they must be printed, not swallowed."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf()
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["this clone has no origin/main reference to compare against"])
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
+        assert "no origin/main reference" in capsys.readouterr().err
+
+    def test_stamp_names_the_branch_the_data_was_generated_on(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """A run generated on one branch can be published from another. The card
+        speaks about the code behind the corpus, so it must name the generating
+        branch (v3 manifests' git_branch), not whatever is checked out now."""
+        run_dir, _ = make_run_dir(
+            tmp_path,
+            manifest={**MANIFEST, "git_branch": "aidan/local-only",
+                      "git_commit": "cafe123"},
+        )
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/publishing-from-here",
+                       commit="cafe123")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        card = (staging_dir / "README.md").read_text()
+        assert "`aidan/local-only`" in card
+        assert "declan/publishing-from-here" not in card
+
+    def test_pre_v3_manifest_falls_back_to_the_live_branch(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """No existing manifest records git_branch, so the fallback is the
+        common case, not an edge case."""
+        run_dir, _ = make_run_dir(tmp_path)   # MANIFEST has no git_branch
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/wip")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+        assert "`declan/wip`" in (staging_dir / "README.md").read_text()
+
+    def test_siblings_own_stamp_survives_the_other_pipeline_publishing(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The card is regenerated whole from the sibling's Hub metadata. A
+        stamp derived from live git would both mislabel the sibling and erase
+        its own warning — which is why it rides in card_meta.json."""
+        run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
+                                  include_html=False)
+        staging_dir = tmp_path / "staged"
+        sibling = dict(SIBLING_SDF_FILES)
+        sibling["sdf/card_meta.json"] = {
+            **SIBLING_SDF_FILES["sdf/card_meta.json"],
+            "unmerged": {"branch": "aidan/experiment", "commit": "cafe123"},
+        }
+        stub_hf(repo_files=sibling)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+
+        card = (staging_dir / "README.md").read_text()
+        assert "`aidan/experiment`" in card
+        # ...and the dad section being published, which IS merged, stays clean.
+        assert card.count("Published from an unmerged branch") == 1

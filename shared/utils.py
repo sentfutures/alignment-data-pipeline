@@ -274,12 +274,22 @@ def new_run_id(label: str) -> str:
     return f"{datetime.now().strftime('%Y-%m-%d_%H-%M')}_{safe_label}"
 
 
-def _git_status() -> tuple[str | None, bool, list[str]]:
-    """Return (short_commit, dirty, dirty_files) for the repo, or (None, False, []) outside git."""
+def _git_status() -> tuple[str | None, str | None, bool, list[str]]:
+    """Return (short_commit, branch, dirty, dirty_files) for the repo, or
+    (None, None, False, []) outside git.
+
+    branch is the literal "HEAD" on a detached checkout (CI's actions/checkout
+    leaves one), so it records where the run came from without pretending a
+    detached HEAD is a branch name.
+    """
     cwd = Path(__file__).parent
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, encoding="utf-8", check=True, cwd=cwd,
+        ).stdout.strip()
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True, text=True, encoding="utf-8", check=True, cwd=cwd,
         ).stdout.strip()
         porcelain = subprocess.run(
@@ -287,9 +297,107 @@ def _git_status() -> tuple[str | None, bool, list[str]]:
             capture_output=True, text=True, encoding="utf-8", check=True, cwd=cwd,
         ).stdout
         dirty_files = [line[3:].strip() for line in porcelain.splitlines() if line.strip()]
-        return commit, bool(dirty_files), dirty_files
+        return commit, branch, bool(dirty_files), dirty_files
     except Exception:
-        return None, False, []
+        return None, None, False, []
+
+
+MAIN_REF = "origin/main"
+# git fetch talks to GitHub; a hung network must not wedge a publish.
+_FETCH_TIMEOUT_S = 20
+
+
+def _git(*args: str, cwd: Path | None = None,
+         timeout: int | None = None) -> subprocess.CompletedProcess:
+    """Run a git command in the repo. Never raises: check the returncode."""
+    return subprocess.run(
+        ["git", *args],
+        capture_output=True, text=True, encoding="utf-8",
+        cwd=cwd or Path(__file__).parent, timeout=timeout,
+    )
+
+
+def merge_state(run_commit: str | None, *, fetch: bool = True,
+                repo: Path | None = None) -> dict:
+    """Merge state of this checkout, and of the commit a run was generated from,
+    relative to origin/main.
+
+    Returns a dict with:
+      branch, head             -- current checkout ("HEAD" if detached)
+      head_merged              -- is HEAD reachable from origin/main?
+      ahead                    -- commits on HEAD not in origin/main (None if unknown)
+      run_commit               -- the commit echoed back, for callers' messages
+      run_commit_merged        -- is run_commit reachable from origin/main?
+      fetched                  -- was origin/main refreshed from the remote?
+      notes                    -- plain-English reasons anything is unknown
+
+    Both *_merged fields are None when the answer could not be determined (no
+    repo, no origin/main, a commit this clone has never seen). Callers MUST
+    treat None as NOT merged: an unverifiable provenance claim is not a safe
+    one. `fetch=False` skips the network entirely, at the cost of comparing
+    against a possibly stale origin/main (see the note it records). `repo`
+    overrides which checkout is inspected (defaults to this file's own).
+    """
+    def git(*args: str, timeout: int | None = None):
+        return _git(*args, cwd=repo, timeout=timeout)
+
+    state = {
+        "branch": None, "head": None, "head_merged": None, "ahead": None,
+        "run_commit": run_commit, "run_commit_merged": None,
+        "fetched": False, "notes": [],
+    }
+
+    head = git("rev-parse", "--short", "HEAD")
+    if head.returncode != 0:
+        state["notes"].append(
+            "not a git checkout, so nothing about this run's provenance could "
+            "be verified")
+        return state
+    state["head"] = head.stdout.strip()
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch.returncode == 0:
+        state["branch"] = branch.stdout.strip()
+
+    if fetch:
+        try:
+            fetched = git("fetch", "--quiet", "origin", "main",
+                           timeout=_FETCH_TIMEOUT_S)
+            state["fetched"] = fetched.returncode == 0
+        except subprocess.SubprocessError:
+            state["fetched"] = False
+        if not state["fetched"]:
+            state["notes"].append(
+                f"could not reach the remote, so {MAIN_REF} may be out of date")
+    else:
+        state["notes"].append(
+            f"the remote was not contacted, so {MAIN_REF} may be out of date")
+
+    if git("rev-parse", "--verify", "--quiet", MAIN_REF).returncode != 0:
+        state["notes"].append(
+            f"this clone has no {MAIN_REF} reference to compare against")
+        return state
+
+    state["head_merged"] = git(
+        "merge-base", "--is-ancestor", "HEAD", MAIN_REF).returncode == 0
+    count = git("rev-list", "--count", f"{MAIN_REF}..HEAD")
+    if count.returncode == 0 and count.stdout.strip().isdigit():
+        state["ahead"] = int(count.stdout.strip())
+
+    if not run_commit:
+        state["notes"].append(
+            "this run's manifest records no git commit, so the code that "
+            "generated it cannot be identified")
+        return state
+    # A commit that only ever existed on someone's laptop is absent here, which
+    # is a different problem from "on a branch" and needs saying differently.
+    if git("cat-file", "-e", f"{run_commit}^{{commit}}").returncode != 0:
+        state["notes"].append(
+            f"commit {run_commit} is not in this clone (never pushed?), so it "
+            "could not be checked")
+        return state
+    state["run_commit_merged"] = git(
+        "merge-base", "--is-ancestor", run_commit, MAIN_REF).returncode == 0
+    return state
 
 
 def _update_latest_symlink(parent: Path, run_dir: Path) -> None:
@@ -343,13 +451,14 @@ def create_run_dir(
         for name, src in snapshot_dirs.items():
             shutil.copytree(src, run_dir / "inputs" / name)
 
-    commit, dirty, dirty_files = _git_status()
+    commit, branch, dirty, dirty_files = _git_status()
     manifest = {
-        "manifest_version": 2,
+        "manifest_version": 3,
         "run_id": run_dir.name,
         "label": label,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "git_commit": commit,
+        "git_branch": branch,
         "git_dirty": dirty,
         "git_dirty_files": dirty_files,
         "inputs_snapshot": bool(snapshot_dirs),

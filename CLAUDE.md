@@ -65,7 +65,8 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 - Publishing one pipeline **regenerates the whole card**, so the script fetches the sibling's metadata off the Hub (`fetch_sibling`) to rebuild its section. Its corpus and HTML are never downloaded or re-uploaded.
 - `delete_patterns` is scoped to `<pipeline>/audit/*`. A bare `audit/*` would delete the *sibling* dataset's audit files on every publish.
 - **Tags are repo-wide**, so prefix them per dataset (`sdf-v1-…`, `dad-v1-…`). The pre-multi-config `v1-fullscale-500-opus5` tag predates this convention.
-- `--dry-run` makes zero network calls, so it cannot see a sibling already on the Hub and says so — the preview shows only the pipeline being published.
+- `--dry-run` makes zero network calls, so it cannot see a sibling already on the Hub and says so — the preview shows only the pipeline being published. (It therefore also skips the `git fetch` the merge check would otherwise do, and says `origin/main` may be stale.)
+- **An unmerged publish warns and asks, and is recorded on the card.** Before staging, the script checks whether the current `HEAD` and the run's own `git_commit` are reachable from `origin/main` (`utils.merge_state`). If either isn't — or can't be verified — it prints what's unmerged and requires a typed `yes`; with no TTY it exits telling you to pass `--allow-unmerged`. Proceeding stamps "published from an unmerged branch" into the dataset card's provenance block and into the Hub commit message. The stamp persists in `<pipeline>/card_meta.json`, so it survives the sibling's next publish regenerating the card, and clears itself once that pipeline publishes something merged. A **dirty tree at run time is context, never a trigger** — every run so far has been dirty, and a warning that fires on all of them is one people learn to ignore. This is a guardrail against accidents, not an access control: the write token is on contributors' laptops, so anyone can bypass the script entirely — which is exactly why the card, not the terminal, carries the record.
 
 ```bash
 # Stages final/{sdf,dad}_corpus.jsonl + run_manifest.json + audit/*.{json,jsonl,html}
@@ -76,6 +77,8 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 # runs whose real generation stages were all Opus). Requires a Hub token with
 # write access to the target repo/org, one time (`huggingface-cli login`, or
 # HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
+# An unmerged run prompts for confirmation first (--allow-unmerged skips the
+# prompt; the card records it either way).
 REPO=sentientfutures/animal-welfare-mid-training-datasets
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
@@ -86,7 +89,7 @@ python evals/publish_hf.py --input outputs/dad/runs/<run_id> --repo-id $REPO \
 
 ## Run Organization
 
-Each pipeline invocation creates a fresh run directory `outputs/{sdf,dad}/runs/<YYYY-MM-DD_HH-MM>_<label>/` containing the per-stage dirs (`layer12`, `layer3`–`layer5` / `step1`–`step3`; steps 2–3 keep explicit checkpoints, step 1 resumes from its own append-only jsonl files; DAD runs also hold `baseline/` — a plain-model response per dilemma serving as the viewer’s control arm and as the advisory "first take" in the 2b prompt, never trained on; toggled by `dad.baseline.enabled`, see `dad_pipeline/baseline.py`), `final/`, `run_manifest.json` (label, git commit, model, full config snapshot), and a per-run `cost_log.jsonl`. This keeps outputs from separate runs isolated — checkpoints live inside the run dir, so `--resume` (latest run by default, or `--run-id`) continues exactly one run. The label is purely descriptive (`dev` by default; scale knobs stay in `config.yaml`). An `outputs/<pipeline>/latest` symlink always points at the most recent run (gitignored, as are `local_*` run dirs, for every pipeline including pref). Run-scoping helpers (`create_run_dir`, `resolve_run_dir`) live in `shared/utils.py`.
+Each pipeline invocation creates a fresh run directory `outputs/{sdf,dad}/runs/<YYYY-MM-DD_HH-MM>_<label>/` containing the per-stage dirs (`layer12`, `layer3`–`layer5` / `step1`–`step3`; steps 2–3 keep explicit checkpoints, step 1 resumes from its own append-only jsonl files; DAD runs also hold `baseline/` — a plain-model response per dilemma serving as the viewer’s control arm and as the advisory "first take" in the 2b prompt, never trained on; toggled by `dad.baseline.enabled`, see `dad_pipeline/baseline.py`), `final/`, `run_manifest.json` (label, git commit + branch + dirty state, model, full config snapshot; `manifest_version` 3 added `git_branch`, so every earlier run has a commit but no branch), and a per-run `cost_log.jsonl`. This keeps outputs from separate runs isolated — checkpoints live inside the run dir, so `--resume` (latest run by default, or `--run-id`) continues exactly one run. The label is purely descriptive (`dev` by default; scale knobs stay in `config.yaml`). An `outputs/<pipeline>/latest` symlink always points at the most recent run (gitignored, as are `local_*` run dirs, for every pipeline including pref). Run-scoping helpers (`create_run_dir`, `resolve_run_dir`) live in `shared/utils.py`.
 
 ## Scale / Cost
 
