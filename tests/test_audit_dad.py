@@ -365,10 +365,13 @@ def test_audit_lengths_delegates_for_run_dir_and_skips_for_bare(tmp_path):
 
 # --- response lengths & moral-patient reasons (vs plain baseline) ----------
 
-def _write_run_with_responses(tmp_path, pairs):
+def _write_run_with_responses(tmp_path, pairs, user_message=None):
     """Run dir with final corpus + step3 rewrites (the record_id→prompt_id
-    join) + baseline arm. pairs: [(prompt_id, pipeline_text, plain_text|None)]."""
-    run = _write_run(tmp_path, [{"prompt_id": p, "user_message": f"dilemma {p}"}
+    join) + baseline arm. pairs: [(prompt_id, pipeline_text, plain_text|None)].
+    `user_message` overrides the stub dilemma text for every record (the
+    showcase pass validates its prompt span against it)."""
+    run = _write_run(tmp_path, [{"prompt_id": p,
+                                 "user_message": user_message or f"dilemma {p}"}
                                 for p, _, _ in pairs])
     (run / "final").mkdir()
     (run / "step3").mkdir()
@@ -1224,23 +1227,39 @@ def _impact_scope_win(pipe_marker):
     return impact
 
 
-def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, stub_claude):
-    # Nomination comes from the welfare judge's per-DIMENSION gaps (here
-    # patient_scope 95 vs 60, everything else equal), gated on delivery not
-    # sacrificed and comparable length. The judge's highlights are validated by
-    # exact substring match against each response — a span that doesn't locate
-    # is dropped, and the example ships with only the verbatim ones. Judge
-    # calls run on the evals judge_model.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)])
+_COHERENT = ('{"stake_clear": true, "spans_contrast": true, "reader_gets_it": true, '
+             '"the_catch": "the pipeline named the bycatch"}')
+
+
+def _showcase_dispatch(select=None, coherence=_COHERENT, impact_marker="P" * 260):
+    """Dispatcher for the showcase pass: the selection call, the coherence-gate
+    call, and the two judges underneath. Both showcase calls are keyed on their
+    opening prose."""
+    select = select or ('{"fit": 9, "summary": "plain missed the bycatch", '
+                        '"prompt_highlight": "' + "U" * 10 + '", '
+                        '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"], '
+                        '"plain_highlights": ["' + "B" * 10 + '", "ALSO NOT THERE"]}')
 
     def dispatch(user_message, **kw):
         if user_message.startswith("You are selecting a SHOWCASE example"):
-            return ('{"fit": 9, "summary": "plain missed the bycatch", '
-                    '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"], '
-                    '"plain_highlights": ["' + "B" * 10 + '", "ALSO NOT THERE"]}')
-        return _judges_dispatch(impact=_impact_scope_win("P" * 260))(user_message, **kw)
+            return select
+        if user_message.startswith("Below are highlighted excerpts"):
+            return coherence
+        return _judges_dispatch(impact=_impact_scope_win(impact_marker))(user_message, **kw)
+    return dispatch
 
-    calls = stub_claude(dispatch)
+
+def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, stub_claude):
+    # Nomination comes from the welfare judge's per-DIMENSION gaps (here
+    # patient_scope 95 vs 60, everything else equal), gated on delivery not
+    # sacrificed and comparable length. Every span is validated by exact
+    # substring match against ITS OWN surface — prompt spans against the user
+    # message, plain against plain, pipeline against pipeline — so a span that
+    # doesn't locate is dropped. Judge calls run on the evals judge_model.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
+                                    user_message="ask " + "U" * 10 + " end")
+
+    calls = stub_claude(_showcase_dispatch())
     report = {}
     cfg = {"workers": 1, "model": "global-m", "evals": {"judge_model": "judge-m"}}
     audit_dad.audit_judges(run, cfg, report)
@@ -1252,17 +1271,67 @@ def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, 
     assert ex["label"] == audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"]
     assert ex["highlights"] == ["P" * 12]              # non-verbatim span dropped
     assert ex["plain_highlights"] == ["B" * 10]        # validated against PLAIN text
+    assert ex["prompt_highlights"] == ["U" * 10]       # validated against the PROMPT
     assert ex["summary"] == "plain missed the bycatch"
+    assert ex["the_catch"] == "the pipeline named the bycatch"
     assert ex["pipeline_response"] == "P" * 260 and ex["plain_response"] == "B" * 250
     assert ex["welfare_dimension"] == {"pipeline": 95, "plain": 60}
-    assert ex["delivery_gap"] == 0 and ex["length_ratio"] == 1.04
+    # both axes ride along as gaps, so the viewer never recomputes them
+    assert ex["welfare_gap"] > 0 and ex["delivery_gap"] == 0
+    assert ex["welfare_overall"] == {"pipeline": 84.25, "plain": 82.5}
+    assert ex["delivery_overall"]["pipeline"] == ex["delivery_overall"]["plain"]
+    assert ex["length_ratio"] == 1.04
     showcase_calls = [c for c in calls
                       if c["user_message"].startswith("You are selecting a SHOWCASE")]
     assert len(showcase_calls) == 1 and showcase_calls[0]["model"] == "judge-m"
     # the category brief names the winning dimension for the judge
     assert "IMPROVED PATIENT SCOPE" in showcase_calls[0]["user_message"]
+    # the coherence gate is a SEPARATE call that sees only the spans — never the
+    # responses, so it cannot fill the gap from context the reader won't have
+    gate = next(c for c in calls
+                if c["user_message"].startswith("Below are highlighted excerpts"))
+    assert "P" * 12 in gate["user_message"] and "B" * 10 in gate["user_message"]
+    assert "P" * 260 not in gate["user_message"]
+    assert "B" * 250 not in gate["user_message"]
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
     assert audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"] in rows
+
+
+@pytest.mark.parametrize("verdict", [
+    '{"stake_clear": false, "spans_contrast": true, "reader_gets_it": true, "the_catch": "x"}',
+    '{"stake_clear": true, "spans_contrast": false, "reader_gets_it": true, "the_catch": "x"}',
+    '{"stake_clear": true, "spans_contrast": true, "reader_gets_it": false, "the_catch": "x"}',
+    '{"stake_clear": true, "spans_contrast": true, "reader_gets_it": true, "the_catch": ""}',
+    "not json at all",
+])
+def test_showcase_drops_an_example_whose_spans_dont_tell_the_story(tmp_path, stub_claude, verdict):
+    # The coherence gate is fail-closed on every axis: spans that don't set up
+    # the stake, don't contrast, or leave the reader unable to name the catch
+    # ship nothing. Regression guard for R-0854 (thoroughbred resale), which
+    # shipped with plain and pipeline spans making the same recommendation.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
+                                    user_message="ask " + "U" * 10 + " end")
+    stub_claude(_showcase_dispatch(coherence=verdict))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+
+
+def test_showcase_needs_a_locatable_prompt_span(tmp_path, stub_claude):
+    # No prompt span means the exhibit can't establish what was asked, so the
+    # candidate is skipped before the (paid) coherence gate is even called.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
+                                    user_message="ask " + "U" * 10 + " end")
+    calls = stub_claude(_showcase_dispatch(
+        select='{"fit": 9, "summary": "s", "prompt_highlight": "NOT IN THE PROMPT", '
+               '"highlights": ["' + "P" * 12 + '"], "plain_highlights": []}'))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+    assert not any(c["user_message"].startswith("Below are highlighted excerpts")
+                   for c in calls)
 
 
 def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):

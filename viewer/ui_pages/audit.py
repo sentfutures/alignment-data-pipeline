@@ -755,9 +755,10 @@ def _render_showcase() -> None:
               anchor=_slug("Showcase examples (LLM)"))
     st.caption("Up to three concrete cases, each the biggest pipeline win on one welfare "
                "dimension — with delivery quality not sacrificed and the pipeline answer "
-               "at most 10% longer, so the win is substance, not volume. The "
-               "**highlighted text** is the exact evidence; open a case for the prompt "
-               "and the side-by-side excerpts.")
+               "at most 10% longer, so the win is substance, not volume. Open a case and "
+               "read only the **highlighted** text: it is chosen so those spans alone "
+               "carry the story, and a second judge that sees nothing but the highlights "
+               "has to be able to name what the pipeline caught or the case is dropped.")
     # `fit` is the showcase judge's own 0-10 field, so it keeps its x10; the
     # delivery numbers come from the delivery judge, which grades on 0-100 from
     # 2026-07-28 (older reports are 0-10 — score_max says which).
@@ -765,22 +766,32 @@ def _render_showcase() -> None:
     for ex in examples:
         gid = _resp_label(ex["prompt_id"])
         st.markdown(f"#### {ex['label']} — {gid}")
+        # The three numbers a reader can act on: which dimension drove the pick,
+        # then each axis as a pipeline-minus-plain GAP (the judged-fit score is
+        # a selection internal — it says how easy the case was to explain, not
+        # anything about the data — so it stays out of the display).
         bits = []
         wd = ex.get("welfare_dimension") or {}
         if None not in (wd.get("pipeline"), wd.get("plain")):
-            bits.append(f"{ex.get('dimension', '').replace('_', ' ')} "
+            bits.append(f"**{ex.get('dimension', '').replace('_', ' ')}** "
                         f"{wd['pipeline']:g} vs plain {wd['plain']:g}")
-        d = ex.get("delivery") or {}
-        if None not in (d.get("pipeline"), d.get("plain")):
-            bits.append(f"delivery {d['pipeline'] * _sc:.0f}% vs {d['plain'] * _sc:.0f}%")
-        if ex.get("fit") is not None:
-            bits.append(f"judged fit {ex['fit'] * 10}%")
+        if ex.get("welfare_gap") is not None:
+            bits.append(f"welfare impact **{ex['welfare_gap'] * _sc:+.0f}%**")
+        if ex.get("delivery_gap") is not None:
+            bits.append(f"delivery **{ex['delivery_gap'] * _sc:+.0f}%**")
         if bits:
-            st.caption(" · ".join(bits))
+            st.caption(" · ".join(bits) + "  *(vs the plain-Claude control)*")
         st.markdown(ex["summary"])
         with st.expander(f"See the evidence — {gid}", expanded=False):
+            st.caption("Scanning just the **highlighted** text tells the story: what was "
+                       "asked, what plain Claude said about it, what the pipeline caught.")
             st.markdown("**The user asked:**")
-            st.markdown(f"> {ex.get('user_message', '').strip()}")
+            _pq = ex.get("user_message", "").strip()
+            _pspans = ex.get("prompt_highlights") or []
+            if _pspans:
+                st.markdown(_highlighted_html(_pq, _pspans), unsafe_allow_html=True)
+            else:
+                st.markdown(f"> {_pq}")
             pipe_x = rendering.showcase_excerpt(ex.get("pipeline_response", ""),
                                                 ex.get("highlights"))
             plain_x = rendering.showcase_excerpt(ex.get("plain_response", ""),
