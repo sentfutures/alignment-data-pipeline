@@ -1521,6 +1521,63 @@ def test_showcase_tolerates_a_sub_point_delivery_dip(tmp_path, stub_claude):
     assert run_with(95) == [], "a 5-point delivery cost must be gated out"
 
 
+def test_showcase_pins_bypass_the_gates_but_not_the_write_up_checks(tmp_path, stub_claude):
+    # A human who has read both responses has already done the job the
+    # eligibility gates do, so a pinned record ships even when it is far longer,
+    # costs delivery, and barely moves overall welfare. The story writer and the
+    # coherence gate still run, because those check what a reader will see.
+    long_pipe = _PIPE_TEXT + "P" * 900          # ~4x plain: way past the length gate
+    run = _write_run_with_responses(tmp_path, [("AW-0001", long_pipe, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+
+    def impact(user_message):
+        pipeline = long_pipe[:120] in user_message
+        # a dimension win, but overall welfare moves only a point (gate would reject)
+        return ('{"patient_scope": %d, "magnitude_sizing": 80, "counterfactual_impact": 80, '
+                '"harm_contribution": 80, "epistemic_accuracy": 80, "bottom_line_coherence": 80, '
+                '"welfare_impact": %d, "impact_note": "n"}'
+                % (95 if pipeline else 40, 86 if pipeline else 85))
+
+    def delivery(msg):
+        score = 80 if long_pipe[:120] in msg else 95      # -15: a real delivery cost
+        return ('{"delivery_quality": %d, "goal_responsiveness": %d, "proportionality": %d, '
+                '"tone": %d, "calibration": %d, "quality_note": "n"}' % ((score,) * 5))
+
+    def dispatch(user_message, **kw):
+        sysp = kw.get("system_prompt") or ""
+        if sysp.startswith("You are evaluating the delivery quality"):
+            return delivery(user_message)
+        if user_message.startswith("You are writing a SHOWCASE example"):
+            return json.dumps({"fit": 9, "story": _STORY,
+                               "quotes": [{"text": "died by crushing on deck",
+                                           "source": "pipeline"}]})
+        if user_message.startswith("Below is a short account"):
+            return _COHERENT
+        return _judges_dispatch(impact=impact)(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    # unpinned: every gate rejects it, and no paid showcase call is made
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+    # pinned by prompt id: ships
+    audit_dad.audit_showcase(run, {"workers": 1}, report, pins=["AW-0001"])
+    assert [e["prompt_id"] for e in report["showcase"]["examples"]] == ["AW-0001"]
+    assert report["showcase"]["curated"] == ["AW-0001"]
+
+
+def test_showcase_pin_warns_on_an_unknown_record(tmp_path, stub_claude, capsys):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    stub_claude(_showcase_dispatch(impact_marker=_PIPE_TEXT))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report, pins=["R-9999"])
+    assert report["showcase"]["examples"] == []
+    assert "R-9999" in capsys.readouterr().out
+
+
 def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):
     # Two records with a clear patient_scope win, both ineligible: AW-0001 is
     # 2x plain's length (cap is 1.10x), AW-0002 is written in a non-Latin

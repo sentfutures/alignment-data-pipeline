@@ -753,6 +753,10 @@ def _render_showcase() -> None:
         return
     st.header("Where the pipeline made it better",
               anchor=_slug("Showcase examples (LLM)"))
+    if (report.get("showcase") or {}).get("curated"):
+        st.caption("These cases were **chosen by hand** from the audit's candidate pool after "
+                   "reading both responses, so the automatic eligibility ranking does not "
+                   "apply to them; the write-up checks below still do.")
     st.caption("Up to three concrete cases, each the biggest pipeline win on one welfare "
                "dimension — with delivery quality not sacrificed and the pipeline answer at "
                "most 10% longer, so the win is substance, not volume. Each is written to "

@@ -2486,13 +2486,21 @@ _SHOWCASE_COHERENCE_PROMPT = (
 _SHOWCASE_MIN_FIT = 5
 # Readability gate: at most 10% longer than plain — a longer answer "wins" too
 # easily to be evidence.
-_SHOWCASE_MAX_LENGTH_RATIO = 1.10
+# Sweep evidence (archetype200, 2026-07-30): a 1.10 ceiling excluded the corpus's
+# single best case — R-0780, where switching 4,000 weekly meals from farmed
+# salmon to sardines multiplies the individual fish killed by orders of magnitude
+# — and also excluded R-0777, which ran 1.21x while scoring +14.8 on DELIVERY,
+# i.e. a case that was better on manner too. The gate exists to stop wins bought
+# with length; at 1.25x, with the delivery gate still live, that job is done.
+_SHOWCASE_MAX_LENGTH_RATIO = 1.25
 # Delivery may dip by up to this many points, not more. A hard `>= 0` was false
 # precision: the delivery judge's own paired-difference SD is several points, so
 # a sub-point dip is noise, and treating it as "the pipeline sacrificed
 # delivery" cost us every large harm-contribution case in the archetype200 run
-# (R-0877 won that dimension 95 vs 45 and was excluded over 0.9 points).
-_SHOWCASE_MAX_DELIVERY_COST = 1.0
+# (R-0877 won that dimension 95 vs 45 and was excluded over 0.9 points). Widened
+# again after the curation sweep: R-0780 costs 2.2 points of delivery and is the
+# clearest welfare win in the corpus.
+_SHOWCASE_MAX_DELIVERY_COST = 2.5
 # The win has to be worth a reader's attention on BOTH counts: a large gap on
 # the dimension being showcased, and a material gap on overall welfare impact.
 # The second is what stops a case whose own conclusion is that nothing much is
@@ -2594,11 +2602,21 @@ def _record_in_english(dilemma_rec: dict, text: str) -> bool:
     return sum(c.isascii() for c in letters) / len(letters) >= 0.9
 
 
-def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
+def audit_showcase(run_dir: Path | None, config: dict, report: dict,
+                   pins: list | None = None) -> None:
     """Pick up to three showcase examples, one per winning welfare
     sub-dimension (paid: one judge call per candidate, capped at
     _SHOWCASE_MAX_JUDGE_CALLS). Needs the --judges data already in the report
-    (per-case delivery + welfare impact, with dimension grades)."""
+    (per-case delivery + welfare impact, with dimension grades).
+
+    `pins` (from --showcase-records) names records a human has read and chosen.
+    Pinned records skip the eligibility gates and the ranking — the gates exist
+    to stop a MACHINE picking a case that flatters the pipeline, and a person who
+    read both responses has already done that job better. They still go through
+    the story writer and the coherence gate, because those check the write-up a
+    reader will actually see. Pins are per-run (they name this run's gids), so
+    they belong on the command line, never in committed config.
+    """
     from shared import api
 
     delivery_pc = (report.get("delivery") or {}).get("per_case") or {}
@@ -2663,14 +2681,25 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
             g = dim_gap(pid, dim)
             if g is not None and g >= _SHOWCASE_MIN_DIMENSION_GAP:
                 candidates.append((g, dgap(pid), pid, dim))
-    # harm_contribution first, then by gap size. Two reasons: it is the only
-    # dimension that detects the response ADDING or HIDING harm — the sycophancy
-    # failure mode, and the only route to genuinely negative impact — so it is
-    # the most decision-relevant thing a reader can be shown; and a story
-    # written to that brief quotes the sentences where the harm is named, which
-    # verify cleanly, where the same record written to a broader brief (patient
-    # scope, magnitude) tends to paraphrase and fail verification.
-    candidates.sort(key=lambda c: (c[3] != "harm_contribution", -c[0], -c[1]))
+    candidates.sort(key=lambda c: (-c[0], -c[1]))
+
+    # A pinned run replaces the ranked pool: one candidate per named record, on
+    # that record's biggest-gap dimension, gates bypassed.
+    if pins:
+        wanted, missing = [], []
+        for name in pins:
+            pid = next((p for p in impact_pc
+                        if p == name or _disp_id(report, p) == name
+                        or _disp_id(report, p, "example") == name), None)
+            if pid is None or pid not in pipe or pid not in plain:
+                missing.append(name)
+                continue
+            dims = [(dim_gap(pid, d) or 0, d) for d in _IMPACT_DIMENSIONS]
+            g, dim = max(dims)
+            wanted.append((g, dgap(pid) or 0.0, pid, dim))
+        if missing:
+            print(f"  WARNING: --showcase-records not found in this run: {', '.join(missing)}")
+        candidates = wanted
 
     used_pids: set = set()
     used_dims: set = set()
@@ -2683,9 +2712,9 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
     examples: list = []
     calls = 0
     for g, dg, pid, dim in candidates:
-        if len(examples) >= 3 or calls >= _SHOWCASE_MAX_JUDGE_CALLS:
+        if len(examples) >= max(3, len(pins or [])) or calls >= _SHOWCASE_MAX_JUDGE_CALLS:
             break
-        if pid in used_pids or dim in used_dims or tries.get(pid, 0) >= 2:
+        if pid in used_pids or (dim in used_dims and not pins) or tries.get(pid, 0) >= 2:
             continue
         tries[pid] = tries.get(pid, 0) + 1
 
@@ -2776,6 +2805,7 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
         used_dims.add(dim)
 
     report["showcase"] = {"examples": examples, "rejected": rejected,
+                          "curated": list(pins) if pins else None,
                           "model": judge_model or config.get("model")}
     sec = _section(report, "Showcase examples (LLM)", group="paid",
                    gloss="Up to three concrete pipeline-beats-plain cases, one per winning "
@@ -3176,6 +3206,11 @@ def main() -> None:
                              "baseline (costs API calls)")
     parser.add_argument("--config", default="config.yaml",
                         help="Config for --judges (model/workers)")
+    parser.add_argument("--showcase-records", default=None,
+                        help="Comma-separated record ids (R-/E- gids or prompt ids) to use as "
+                             "the showcase examples instead of the ranked pool. For a human "
+                             "who has read the cases: the eligibility gates and ranking are "
+                             "skipped, the write-up checks still apply. Per-run by nature.")
     args = parser.parse_args()
 
     records, report_dir, run_dir = resolve_input(args.input)
@@ -3233,7 +3268,9 @@ def main() -> None:
         cfg = utils.load_config(args.config)
         audit_judges(run_dir, cfg, report)
         print()
-        audit_showcase(run_dir, cfg, report)
+        audit_showcase(run_dir, cfg, report,
+                       pins=[x.strip() for x in args.showcase_records.split(",") if x.strip()]
+                       if args.showcase_records else None)
         print()
         audit_move_candidates(run_dir, cfg, report)
         print()
