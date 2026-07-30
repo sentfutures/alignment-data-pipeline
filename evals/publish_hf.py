@@ -111,32 +111,83 @@ def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     )
 
 
-def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path,
+def flatten_dad_corpus(src: Path, dst: Path, source_run: str,
+                       append: bool = False) -> int:
+    """Write the published form of a DAD corpus: one flat record per example
+    (example_gid, user_prompt, assistant_response, source_run) instead of the
+    training format's messages array, so the Hub viewer shows one readable
+    column per field with no role/content nesting. source_run names the run
+    that generated the row — with several runs concatenated into one published
+    corpus (append=True for every run after the first) it is the only per-row
+    provenance. The run's own final/dad_corpus.jsonl keeps the SFT chat shape
+    — only the staged copy is flattened. A record without a user+assistant
+    string pair aborts the publish rather than uploading a mangled row.
+    Returns the number of records written.
+    """
+    n = 0
+    with open(src, encoding="utf-8") as fin, \
+         open(dst, "a" if append else "w", encoding="utf-8") as fout:
+        for line_no, line in enumerate(fin, start=1):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            by_role: dict = {}
+            for msg in record.get("messages") or []:
+                if isinstance(msg, dict):
+                    by_role.setdefault(msg.get("role"), msg.get("content"))
+            if not (isinstance(by_role.get("user"), str)
+                    and isinstance(by_role.get("assistant"), str)):
+                rid = record.get("example_gid") or record.get("record_id") \
+                    or f"line {line_no}"
+                raise SystemExit(
+                    f"{src}: record {rid} has no user+assistant message pair "
+                    f"— refusing to publish a mangled row"
+                )
+            fout.write(json.dumps({
+                "example_gid": record.get("example_gid"),
+                "source_run": source_run,
+                "user_prompt": by_role["user"],
+                "assistant_response": by_role["assistant"],
+            }, ensure_ascii=False) + "\n")
+            n += 1
+    return n
+
+
+def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
               pipeline_tag: str) -> dict:
-    """Copy the publishable subset of a run dir into staging_dir/<pipeline_tag>/.
+    """Copy the publishable subset of run dir(s) into staging_dir/<pipeline_tag>/.
 
     The per-pipeline subdirectory is what lets one repo hold both corpora as
     separate HF configs. Returns a manifest dict of what was staged, used both
     for the dataset card and for logging what --dry-run would have uploaded.
+
+    With ONE run dir the layout is the original single-run shape
+    (run_manifest.json + audit/*). With several (DAD only — enforced in
+    main()), the flattened corpora are concatenated into one jsonl whose
+    source_run column carries per-row provenance, and the per-run files move
+    under run-scoped paths so they can't collide: manifests/<run_id>.json and
+    audit/<run_id>/*.
     """
-    # Refuse a --staging-dir that equals or contains run_dir, OR either of the
-    # two specific subtrees this function reads from (final/, audit/): rmtree
-    # below would delete data we're about to read before the copy even runs.
-    # Checking only run_dir itself isn't enough — a --staging-dir pointing at
-    # run_dir/final or run_dir/audit directly (an easy typo, since those are
-    # real, well-known subdirectory names on every run) would slip past a
-    # run_dir-only check while still destroying the corpus or audit reports.
+    # Refuse a --staging-dir that equals or contains any run dir, OR either of
+    # the two specific subtrees this function reads from (final/, audit/):
+    # rmtree below would delete data we're about to read before the copy even
+    # runs. Checking only run_dir itself isn't enough — a --staging-dir
+    # pointing at run_dir/final or run_dir/audit directly (an easy typo, since
+    # those are real, well-known subdirectory names on every run) would slip
+    # past a run_dir-only check while still destroying the corpus or audit
+    # reports.
     staging_real = staging_dir.resolve()
-    for guarded, label in (
-        (run_dir.resolve(), "the run directory"),
-        ((run_dir / "final").resolve(), "the run's final/ directory"),
-        ((run_dir / "audit").resolve(), "the run's audit/ directory"),
-    ):
-        if guarded.is_relative_to(staging_real):
-            raise SystemExit(
-                f"--staging-dir {staging_dir} equals or contains {label} ({guarded}) "
-                f"— refusing to delete it. Pick a --staging-dir outside the run."
-            )
+    for run_dir in run_dirs:
+        for guarded, label in (
+            (run_dir.resolve(), "the run directory"),
+            ((run_dir / "final").resolve(), "the run's final/ directory"),
+            ((run_dir / "audit").resolve(), "the run's audit/ directory"),
+        ):
+            if guarded.is_relative_to(staging_real):
+                raise SystemExit(
+                    f"--staging-dir {staging_dir} equals or contains {label} ({guarded}) "
+                    f"— refusing to delete it. Pick a --staging-dir outside the run."
+                )
 
     # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
     # --input) must reflect only THIS run — otherwise leftover files from an
@@ -148,35 +199,52 @@ def stage_run(run_dir: Path, corpus_name: str, staging_dir: Path,
     # Everything for this run lives under <staging>/<pipeline_tag>/ so the
     # sibling pipeline can occupy its own sibling directory in the same repo.
     dataset_dir = utils.ensure_dir(staging_dir / pipeline_tag)
+    multi = len(run_dirs) > 1
     staged: dict = {"pipeline": pipeline_tag, "corpus_file": None,
-                    "manifest_file": None, "audit_files": [], "n_docs": 0}
+                    "manifest_file": None, "audit_files": [], "n_docs": 0,
+                    "runs": []}
 
-    corpus_src = run_dir / "final" / corpus_name
     corpus_dst = dataset_dir / corpus_name
-    shutil.copy2(corpus_src, corpus_dst)
+    for i, run_dir in enumerate(run_dirs):
+        manifest = _load_json(run_dir / "run_manifest.json") or {}
+        run_id = manifest.get("run_id") or run_dir.name
+
+        corpus_src = run_dir / "final" / corpus_name
+        if corpus_name == "dad_corpus.jsonl":
+            n = flatten_dad_corpus(corpus_src, corpus_dst, source_run=run_id,
+                                   append=(i > 0))
+        else:
+            shutil.copy2(corpus_src, corpus_dst)
+            with open(corpus_dst, encoding="utf-8") as f:
+                n = sum(1 for _ in f)
+        staged["n_docs"] += n
+        staged["runs"].append({"run_id": run_id, "n_docs": n})
+
+        manifest_src = run_dir / "run_manifest.json"
+        if manifest_src.exists():
+            if multi:
+                dst = utils.ensure_dir(dataset_dir / "manifests") / f"{run_id}.json"
+            else:
+                dst = dataset_dir / "run_manifest.json"
+                staged["manifest_file"] = "run_manifest.json"
+            shutil.copy2(manifest_src, dst)
+
+        audit_src = run_dir / "audit"
+        if audit_src.is_dir():
+            audit_dst = utils.ensure_dir(
+                dataset_dir / "audit" / run_id if multi else dataset_dir / "audit")
+            # *.jsonl too: evals/audit_dad.py writes audit/tic_candidates.jsonl
+            # and audit/reason_failures.jsonl for DAD runs — a fixed
+            # *.json/*.html pattern silently dropped both.
+            for pattern in ("*.json", "*.jsonl", "*.html"):
+                for f in sorted(audit_src.glob(pattern)):
+                    if f.name == "report_content.json":
+                        continue  # editorial input, already baked into corpus_report.html
+                    shutil.copy2(f, audit_dst / f.name)
+                    staged["audit_files"].append(
+                        f"{run_id}/{f.name}" if multi else f.name)
+
     staged["corpus_file"] = corpus_name
-    with open(corpus_dst, encoding="utf-8") as f:
-        staged["n_docs"] = sum(1 for _ in f)
-
-    manifest_src = run_dir / "run_manifest.json"
-    if manifest_src.exists():
-        shutil.copy2(manifest_src, dataset_dir / "run_manifest.json")
-        staged["manifest_file"] = "run_manifest.json"
-
-    audit_src = run_dir / "audit"
-    if audit_src.is_dir():
-        audit_dst = dataset_dir / "audit"
-        utils.ensure_dir(audit_dst)
-        # *.jsonl too: evals/audit_dad.py writes audit/tic_candidates.jsonl and
-        # audit/reason_failures.jsonl for DAD runs — a fixed *.json/*.html
-        # pattern silently dropped both.
-        for pattern in ("*.json", "*.jsonl", "*.html"):
-            for f in sorted(audit_src.glob(pattern)):
-                if f.name == "report_content.json":
-                    continue  # editorial input, already baked into corpus_report.html
-                shutil.copy2(f, audit_dst / f.name)
-                staged["audit_files"].append(f.name)
-
     return staged
 
 
@@ -197,9 +265,12 @@ def _load_json(path: Path) -> dict | None:
         return json.load(f)
 
 
-def build_metrics_rows(dataset_dir: Path) -> list[tuple[str, str, str]]:
+def build_metrics_rows(dataset_dir: Path,
+                       run_id: str | None = None) -> list[tuple[str, str, str]]:
     """(label, value, source_filename) rows, one per known audit file that's
     present in this ONE dataset's dir AND has the fields this function expects.
+    run_id scopes the lookup to a combined publish's per-run audit subdir
+    (audit/<run_id>/ — see stage_run) instead of the single-run audit/.
 
     Every value is a measured field lifted verbatim from the file's own
     summary — no thresholds, verdicts, or causal claims added here.
@@ -216,7 +287,7 @@ def build_metrics_rows(dataset_dir: Path) -> list[tuple[str, str, str]]:
     surface in the card's "additional files" line — just without a row a
     future run has no way to reproduce.
     """
-    audit_dir = dataset_dir / "audit"
+    audit_dir = dataset_dir / "audit" / run_id if run_id else dataset_dir / "audit"
     rows: list[tuple[str, str, str]] = []
 
     d = _load_json(audit_dir / "audit_report.json")
@@ -322,6 +393,38 @@ def _dataset_section(ds: dict) -> list[str]:
     n = staged.get("n_docs")
     if n:
         lines += ["", f"{n} {PIPELINE_UNITS.get(tag, 'records')}."]
+
+    # A combined publish (several runs in one corpus — see stage_run) carries
+    # per-run manifests under manifests/ instead of one run_manifest.json.
+    # Checked on disk, not via staged["runs"], so a sibling fetched from the
+    # Hub (which has no staging metadata) renders the same way.
+    manifests_dir = dataset_dir / "manifests"
+    if manifests_dir.is_dir():
+        counts = {r["run_id"]: r["n_docs"] for r in (staged.get("runs") or [])}
+        lines += ["", "Combined from several runs; each row's `source_run` "
+                      "column names the run that generated it."]
+        lines += ["", "| run | examples | default model | per-stage models "
+                      "| backend | git commit |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        run_manifests = [_load_json(p) or {}
+                         for p in sorted(manifests_dir.glob("*.json"))]
+        for m in run_manifests:
+            rid = m.get("run_id", "unknown")
+            default_model, overrides = models_used(m, tag)
+            lines.append(
+                f"| `{rid}` | {counts.get(rid, '—')} "
+                f"| `{default_model or 'unknown'}` "
+                f"| {', '.join(f'`{x}`' for x in overrides) or '—'} "
+                f"| `{_get(m, 'config', 'backend', default='unknown')}` "
+                f"| `{m.get('git_commit', 'unknown')}` |")
+        for m in run_manifests:
+            rid = m.get("run_id", "unknown")
+            rows = build_metrics_rows(dataset_dir, run_id=rid)
+            if rows:
+                lines += ["", f"**`{rid}`** — "
+                          + "; ".join(f"{label}: {value}" for label, value, _ in rows)
+                          + f". Audit files under `{tag}/audit/{rid}/`."]
+        return lines
 
     manifest = _load_json(dataset_dir / "run_manifest.json") or {}
     if manifest:
@@ -501,6 +604,7 @@ def fetch_sibling(repo_id: str, sibling_tag: str, dest_dir: Path) -> dict | None
     wanted = [
         f for f in files
         if f in (f"{prefix}run_manifest.json", f"{prefix}{CARD_META_FILENAME}")
+        or (f.startswith(f"{prefix}manifests/") and f.endswith(".json"))
         or (f.startswith(f"{prefix}audit/") and f.endswith(".json"))
     ]
     # A transient download failure must NOT abort the publish: _create_repo has
@@ -562,7 +666,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Publish a run's final corpus + audit reports as a Hugging Face dataset."
     )
-    parser.add_argument("--input", required=True, help="Run directory (SDF or DAD)")
+    parser.add_argument("--input", required=True, nargs="+",
+                        help="Run directory (SDF or DAD). Several DAD run dirs "
+                             "publish as ONE combined corpus whose source_run "
+                             "column names each row's run; SDF takes exactly one.")
     parser.add_argument("--repo-id", required=True,
                         help="e.g. sentientfutures/animal-welfare-mid-training-datasets")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
@@ -579,7 +686,20 @@ def main() -> None:
                         help="Where to stage files (default: a temp dir)")
     args = parser.parse_args()
 
-    run_dir, corpus_name = resolve_corpus_file(args.input)
+    resolved = [resolve_corpus_file(p) for p in args.input]
+    run_dirs = [r[0] for r in resolved]
+    corpus_names = {r[1] for r in resolved}
+    if len(corpus_names) > 1:
+        raise SystemExit("All --input run dirs must belong to the same pipeline "
+                         f"(got {sorted(corpus_names)})")
+    corpus_name = corpus_names.pop()
+    if corpus_name == "sdf_corpus.jsonl" and len(run_dirs) > 1:
+        # SDF corpora are copied verbatim (no flatten step to carry a
+        # source_run column), so a concatenation would lose per-row provenance.
+        raise SystemExit("Combined publishing is DAD-only; pass one SDF run dir.")
+    if len(set(run_dirs)) != len(run_dirs):
+        raise SystemExit("Duplicate --input run dirs would double their rows "
+                         "in the combined corpus.")
     pipeline_tag = "sdf" if corpus_name == "sdf_corpus.jsonl" else "dad"
     sibling_tag = "dad" if pipeline_tag == "sdf" else "sdf"
     pretty_name = args.pretty_name or args.repo_id.rsplit("/", 1)[-1]
@@ -601,15 +721,18 @@ def main() -> None:
         staging_dir = Path(tmp) if args.staging_dir else Path(tmp) / "staged"
         # stage_run wipes the staging root, so it must run BEFORE any sibling
         # metadata is fetched into a neighbouring subdirectory.
-        staged = stage_run(run_dir, corpus_name, staging_dir, pipeline_tag)
+        staged = stage_run(run_dirs, corpus_name, staging_dir, pipeline_tag)
 
         # report_content.json is excluded from the upload (already baked into
         # corpus_report.html) but its title/subtitle are still reused for this
-        # dataset's section heading — read in-memory, never staged.
-        content = _load_json(run_dir / "audit" / "report_content.json")
+        # dataset's section heading — read in-memory, never staged. Only SDF
+        # runs produce one, and SDF publishes are single-run, so runs[0] is
+        # the only place it could live.
+        content = _load_json(run_dirs[0] / "audit" / "report_content.json")
 
-        print(f"Staged {pipeline_tag}/{corpus_name} ({staged['n_docs']} records), "
-              f"{'with' if staged['manifest_file'] else 'without'} run_manifest.json, "
+        run_names = ", ".join(r["run_id"] for r in staged["runs"])
+        print(f"Staged {pipeline_tag}/{corpus_name} ({staged['n_docs']} records "
+              f"from {len(staged['runs'])} run(s): {run_names}), "
               f"{len(staged['audit_files'])} audit file(s): {', '.join(staged['audit_files']) or '(none)'}")
 
         dataset_dir = staging_dir / pipeline_tag
@@ -667,7 +790,7 @@ def main() -> None:
         commit = _upload_folder(
             folder_path=str(staging_dir),
             repo_id=args.repo_id,
-            commit_message=f"Publish {pipeline_tag}: {run_dir.name}",
+            commit_message=f"Publish {pipeline_tag}: {run_names}",
             # Scoped to THIS pipeline — a bare "audit/*" would delete the
             # sibling's audit files on every publish.
             #
@@ -679,7 +802,14 @@ def main() -> None:
             # Safe to delete unconditionally because upload_folder drops any
             # deletion whose path is also being added, so a freshly staged
             # sidecar survives while a no-longer-produced one is cleared.
+            # run_manifest.json and manifests/* are both listed so a publish
+            # that switches layout (single-run <-> combined) clears the OTHER
+            # layout's manifest file(s) — upload_folder drops any deletion
+            # whose path is also being added, so the layout actually staged
+            # always survives its own pattern.
             delete_patterns=[f"{pipeline_tag}/audit/*",
+                             f"{pipeline_tag}/run_manifest.json",
+                             f"{pipeline_tag}/manifests/*",
                              f"{pipeline_tag}/{CARD_META_FILENAME}"],
         )
         if args.tag:
