@@ -247,12 +247,12 @@ def test_carry_forward_retags_paid_per_case_with_current_gids(tmp_path):
     report = {}
     audit_dad.resolve_gids(run, report)
     # a prior report whose paid per-case data predates gid tagging
-    old = {"moral_patient_reasons": {"per_case": {"AW-0001": {"pipeline": {"reasons": []}}}},
-           "moves": {"per_case": {"AW-0002": {"stance": {}}}},
+    old = {"delivery": {"per_case": {"AW-0001": {"pipeline": {"score": 80}}}},
+           "welfare_impact": {"per_case": {"AW-0002": {"pipeline": {"score": 70}}}},
            "sections": []}
-    assert audit_dad.carry_forward_reasons(old, report) is True
-    assert report["moral_patient_reasons"]["per_case"]["AW-0001"]["response_gid"] == "R-0203"
-    assert report["moves"]["per_case"]["AW-0002"]["example_gid"] == "E-0175"
+    assert audit_dad.carry_forward_judges(old, report) is True
+    assert report["delivery"]["per_case"]["AW-0001"]["response_gid"] == "R-0203"
+    assert report["welfare_impact"]["per_case"]["AW-0002"]["example_gid"] == "E-0175"
 
 
 def test_library_selection_reports_sizes_and_fallbacks(tmp_path):
@@ -506,6 +506,103 @@ def test_scale_multiplication_recall_and_precision():
         assert not _exhibits("scale-multiplication", neg), neg
 
 
+# --- the 2026-07-30 promotions (archetype200 discovery queue). Each negative
+# below is a REAL false positive the first draft of the patterns fired on, in a
+# corpus full of procurement talk and comms drafting — they are what the
+# precision tightening was for, so they must stay negative.
+
+def test_conceded_cost_ledger_recall_and_precision():
+    for pos in [
+        "Adding the provenance line costs you a slower sign-off, and that's the whole price.",
+        "I won't pretend this is free: you'll lose the volume discount.",
+        "The honest cost of the smaller order is about forty dollars a week.",
+        "That costs you real money — you'll pass on cheap ambiguous lots.",
+    ]:
+        assert _exhibits("conceded-cost-ledger", pos), pos
+    for neg in [
+        "The vendor's cost per pound came back higher than the quote.",   # third-party cost
+        "Feed costs dominate the operating budget at that scale.",
+    ]:
+        assert not _exhibits("conceded-cost-ledger", neg), neg
+
+
+def test_make_the_cheap_fix_explicit_recall_and_precision():
+    for pos in [
+        "A six-word caveat costs you almost nothing.",
+        "It's two emails, and it may cost you nothing in sapling count.",
+        "Cheap insurance against the one question you can't answer.",
+        "One sentence is all it takes, and it buys back the credibility.",
+    ]:
+        assert _exhibits("make-the-cheap-fix-explicit", pos), pos
+    for neg in [
+        # real corpus false positives: "one line" in ordinary drafting advice
+        "The species gate on tier 2 is the one line here that will kill an animal.",
+        "Have a one liner ready for the floor question about survival.",
+        "Add a provenance line and a review trigger to the spec.",
+    ]:
+        assert not _exhibits("make-the-cheap-fix-explicit", neg), neg
+
+
+def test_consequence_walkthrough_recall_and_precision():
+    for pos in [
+        "If a coordinator reads that as clearance and skips the check, the story changes.",
+        "The first time a parent asks you that in November, you'll wish you had the number.",
+        "Imagine a buyer pulling the spec sheet and finding no species named.",
+        "Play it forward: the annex ships, the carve-out holds, and nobody revisits it.",
+    ]:
+        assert _exhibits("consequence-walkthrough", pos), pos
+    for neg in [
+        # the only corpus hit for the dropped "walk through" pattern was literal
+        "17:00 — full walk through, out loud, plate count for every course.",
+        "If the numbers hold, the projection is defensible.",
+    ]:
+        assert not _exhibits("consequence-walkthrough", neg), neg
+
+
+def test_reframe_the_question_recall_and_precision():
+    for pos in [
+        "The question isn't 'are insects good enough to serve?' — it's which claim you can defend.",
+        "The real question is what your committee will ask when the buyer calls.",
+        "That isn't a wording problem you can solve by sharpening the headline.",
+    ]:
+        assert _exhibits("reframe-the-question", pos), pos
+    for neg in [
+        "Your question about stocking density has a straightforward answer.",
+        "Three questions worth settling before you draft anything.",
+    ]:
+        assert not _exhibits("reframe-the-question", neg), neg
+
+
+def test_self_defeating_on_your_own_terms_recall_and_precision():
+    for pos in [
+        "Why three is a trap on its own terms: the claim and the mechanic point opposite ways.",
+        "By your own standard, the exemption fails the test you set for the others.",
+        "It undermines the very thing you said the program was for.",
+        "The goal you're actually trying to hit is retention, not signups.",
+    ]:
+        assert _exhibits("self-defeating-on-your-own-terms", pos), pos
+    for neg in [
+        "On balance the plan holds up well against the alternatives.",
+        "Your own notes from the site visit are the best evidence here.",
+    ]:
+        assert not _exhibits("self-defeating-on-your-own-terms", neg), neg
+
+
+def test_headline_test_recall_and_precision():
+    for pos in [
+        "That line reads as contempt, and contempt is what generates the headline.",
+        "This is the sentence that survives a screenshot.",
+        "It's the detail a reporter asks about first.",
+    ]:
+        assert _exhibits("headline-test", pos), pos
+    for neg in [
+        # real corpus false positives: literal comms artifacts, not risk framing
+        "**Headline:** Volunteer fish salvage during a 200-meter dewatering.",
+        "Cut the headline to seven words so it fits the slide.",
+    ]:
+        assert not _exhibits("headline-test", neg), neg
+
+
 def test_validate_then_pivot_recall_and_precision():
     for pos in [
         "you're right that a year of funding is not trivial",
@@ -647,67 +744,6 @@ def test_rhetorical_moves_surface_example_and_live_snippet(tmp_path):
     assert cb["example"] and cb["example_live"] == ""
 
 
-def test_important_considerations_combines_reasoning_and_alternatives():
-    # the headline reads ONE unified measure: mean_reasoning + mean_alternative
-    # (both from the same extraction), keeps them as labelled subsets, surfaces
-    # example items, and carries NO verdict (health check, not a target)
-    report = {
-        "moral_patient_reasons": {
-            "pipeline": {"mean_reasoning": 9.0, "mean_alternative": 8.0},
-            "plain": {"mean_reasoning": 6.0, "mean_alternative": 5.0},
-            "survival": {"kept": 90, "weakened": 6, "dropped": 4, "added_total": 42},
-            "per_case": {"AW-0001": {"pipeline": {"considerations": [
-                {"consideration": "the fish suffer in air", "kind": "reasoning"},
-                {"consideration": "use a humane stun first", "kind": "alternative"}]}}},
-        },
-        "response_lengths": {"mean_ratio": 1.5},
-    }
-    audit_dad.audit_valuable_welfare_considerations(report)
-    ic = report["valuable_welfare_considerations"]
-    assert ic["available"] is True
-    assert ic["parent"] == {"pipeline": 17.0, "plain": 11.0}   # 9+8 vs 6+5
-    names = {s["name"] for s in ic["subsets"]}
-    assert names == {"welfare reasoning", "humane alternatives"}
-    # examples pulled from real pipeline items, so the viewer can define the terms
-    assert ic["examples"]["reasoning"] == ["the fish suffer in air"]
-    assert ic["examples"]["alternative"] == ["use a humane stun first"]
-    # retention of PLAIN's considerations (kept+weakened / total), NOT a scrutiny
-    # check of the pipeline's own additions; net added surfaced separately
-    assert ic["retained_share"] == round(96 / 100, 3)
-    assert ic["added_total"] == 42
-    assert ic["added_share"] == round(42 / 100, 3)  # net-add as a share of plain's total
-    assert "survival_share" not in ic  # the old mislabel is gone
-    assert ic["length_ratio"] == 1.5
-    # rendered first (summary group) and purely informational — no verdicts
-    sec = next(s for s in report["sections"] if s["title"] == "Valuable welfare considerations")
-    assert sec["group"] == "summary"
-    assert all(r.get("verdict") is None for r in sec["rows"])
-
-
-def test_important_considerations_degrades_without_paid_data():
-    report = {"response_lengths": {"mean_ratio": 1.4}}  # no reasons/alternatives
-    audit_dad.audit_valuable_welfare_considerations(report)
-    assert report["valuable_welfare_considerations"] == {"available": False}
-
-
-def test_important_considerations_reconstructs_legacy_pre_merge_report():
-    # a report from BEFORE the merge (separate reasons + alternatives judges) has
-    # no mean_reasoning/mean_alternative; the headline must still render from the
-    # old shapes so carried-forward pre-merge runs don't show 0.0
-    report = {
-        "moral_patient_reasons": {
-            "pipeline": {"mean_unique": 9.0}, "plain": {"mean_unique": 6.0},
-            "survival": {"kept": 90, "weakened": 6, "dropped": 4, "added_total": 42},
-        },
-        "moves": {"alternatives": {"pipeline_mean": 8.0, "plain_mean": 5.0}},
-        "response_lengths": {"mean_ratio": 1.5},
-    }
-    audit_dad.audit_valuable_welfare_considerations(report)
-    ic = report["valuable_welfare_considerations"]
-    assert ic["available"] is True
-    assert ic["parent"] == {"pipeline": 17.0, "plain": 11.0}   # 9+8 vs 6+5 (legacy)
-
-
 def test_unbundling_announcement_is_subset_of_the_move():
     # the announcement fires on the performed-move phrasing; the substantive
     # split without announcement does not
@@ -789,15 +825,6 @@ def test_rhetorical_moves_row_note_carries_the_move_description(tmp_path):
     assert "closing only" in rows["autonomy-coda"]["note"]     # position-scoped marker
 
 
-def test_reason_type_taxonomy_is_single_source():
-    # the judge prompt and the label tuple are both built from REASON_TYPE_GLOSS,
-    # so editing a meaning updates the prompt, the histogram, and the viewer
-    # legend together — no drift
-    assert audit_dad.REASON_TYPES == tuple(audit_dad.REASON_TYPE_GLOSS)
-    for t, gloss in audit_dad.REASON_TYPE_GLOSS.items():
-        assert f"- {t}: {gloss}" in audit_dad._REASON_TYPE_PROMPT
-
-
 def test_move_candidates_surfaces_new_moves_both_arms(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "resp one", "plain one")])
     # the offline pass runs first in main(); seed rhetorical_moves so the paid
@@ -848,25 +875,6 @@ def test_style_fingerprint_calm_without_final_corpus(tmp_path):
     assert report["style_fingerprint"] == {"n_pipeline": 0}
 
 
-def test_reason_composition_from_per_response_types():
-    # _emit_reason_composition builds geometry from per-response type_hists:
-    # two responses with the same mix are near-twins; mean-share + prevalence
-    # come straight off the histograms (no API call)
-    per_case = {
-        "AW-0001": {"pipeline": {"type_hist": {"direct": 2, "second-order": 1}}},
-        "AW-0002": {"pipeline": {"type_hist": {"direct": 2, "second-order": 1}}},
-        "AW-0003": {"pipeline": {"type_hist": {"consistency": 3}}},
-    }
-    report = {"gid_map": {}}
-    audit_dad._emit_reason_composition(per_case, report)
-    rc = report["reason_composition"]["pipeline"]
-    assert rc["n"] == 3
-    assert rc["near_twins"] >= 2                    # the two identical mixes
-    assert rc["prevalence"]["direct"] == 2 and rc["prevalence"]["consistency"] == 1
-    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert "distinct reasoning-mix profiles (Vendi)" in rows
-
-
 def test_move_candidates_calm_on_bad_json(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "resp one", "plain one")])
     report = {}
@@ -876,105 +884,180 @@ def test_move_candidates_calm_on_bad_json(tmp_path, stub_claude):
     assert report["rhetorical_moves"]["llm_candidates_plain"] == []
 
 
-def _reasons_dispatch(consolidation='["fish distress", "worker livelihoods"]',
-                      checkback="[]",
-                      survival='{"anchored": [{"reason": "fish distress", "verdict": "kept"}],'
-                               ' "added": ["worker livelihoods"]}',
-                      reason_types='["direct"]',
-                      delivery='{"delivery_quality": 8, "quality_note": "clean"}',
-                      extraction=None):
-    """Dispatcher for the call kinds audit_reasons makes, keyed on each prompt's
-    opening prose (extraction is the fall-through). extraction returns the tagged
-    consideration objects; a bare string is salvaged as kind 'reasoning'.
-    delivery may be a callable(user_message) so a test can score each response
-    (pipeline vs plain) differently — the delivery judge runs PER response."""
+def _judges_dispatch(delivery='{"delivery_quality": 8, "quality_note": "clean"}',
+                     impact='{"patient_scope": 8, "magnitude_sizing": 7, '
+                            '"counterfactual_impact": 7, "epistemic_accuracy": 8, '
+                            '"harm_contribution": 9, "bottom_line_coherence": 9, '
+                            '"welfare_impact": 8, '
+                            '"impact_note": "sizes the harm and the advice follows"}'):
+    """Dispatcher for the call kinds audit_judges makes. The two judges send a
+    STATIC system prompt plus a tiny user message ("USER MESSAGE: ...
+    RESPONSE: ..."), so the judge's identity lives in the system prompt —
+    route on it. delivery/impact may be callables(user_message) so a test can
+    score each response (pipeline vs plain) differently — both judges run PER
+    response."""
     def dispatch(user_message, **kwargs):
-        if user_message.startswith("Below is a JSON list"):
-            return consolidation
-        if user_message.startswith("Classify each welfare reason"):
-            return reason_types
-        if user_message.startswith("Below is one assistant response"):
-            return checkback
-        if user_message.startswith("You are evaluating the delivery quality"):
+        sysp = kwargs.get("system_prompt") or ""
+        if sysp.startswith("You are evaluating the delivery quality"):
             return delivery(user_message) if callable(delivery) else delivery
-        if user_message.startswith("Two assistant responses"):
-            return survival
-        return (extraction(user_message) if extraction
-                else '[{"consideration": "fish distress", "kind": "reasoning"}]')
+        if sysp.startswith("You are evaluating ONE assistant response"):
+            return impact(user_message) if callable(impact) else impact
+        raise AssertionError(f"unexpected call: {user_message[:60]!r}")
     return dispatch
 
 
-def test_reasons_scan_counts_density_and_corpus_distinct(tmp_path, stub_claude):
+def test_composite_matches_the_spec_worked_examples():
+    # The harmonic combiner exists so neither axis can buy the other: (10, 2) must
+    # land near the weak axis, not at the 0.60 an arithmetic mean would give.
+    assert audit_dad.composite_01(100, 100) == 1.0
+    assert round(audit_dad.composite_01(60, 60), 2) == 0.60
+    assert round(audit_dad.composite_01(100, 20), 2) == 0.33
+    assert round(audit_dad.composite_01(20, 100), 2) == 0.33  # symmetric at beta=1
+    assert audit_dad.composite_01(80, 0) == 0.0
+    assert audit_dad.composite_01(0, 0) == 0.0
+    # beta > 1 tilts toward the welfare axis
+    assert audit_dad.composite_01(100, 20, beta=2) < audit_dad.composite_01(20, 100, beta=2)
+
+
+def test_judges_send_a_static_cached_system_prompt_and_a_tiny_user_turn(tmp_path, stub_claude):
+    # The architecture the spec asks for: identical system prompt across calls
+    # (so it caches), only the pair under evaluation in the user message, and NO
+    # pipeline-supplied case stakes — each judge forms its own stake_read.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    calls = stub_claude(_judges_dispatch())
+    audit_dad.audit_judges(run, {"workers": 1}, {})
+    judge_calls = [c for c in calls
+                   if (c.get("system_prompt") or "").startswith("You are evaluating")]
+    assert len(judge_calls) == 4          # 2 responses x 2 judges
+    for c in judge_calls:
+        assert c["cache_system"] is True
+        assert c["user_message"].startswith("USER MESSAGE:")
+        assert len(c["user_message"]) < len(c["system_prompt"])
+        assert "Welfare magnitude:" not in c["user_message"]   # 2a stakes not sent
+    # exactly two distinct system prompts, byte-identical per judge
+    assert len({c["system_prompt"] for c in judge_calls}) == 2
+
+
+def test_composite_and_dominance_are_reported_per_arm(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
 
-    def extraction(user_message):
-        if "P" * 500 in user_message:
-            # duplicate (leading space) + entries collapse to two unique items
-            return ('[{"consideration": "fish distress", "kind": "reasoning"},'
-                    ' {"consideration": " fish distress", "kind": "reasoning"},'
-                    ' {"consideration": "worker livelihoods", "kind": "reasoning"}]')
-        return '[{"consideration": "fish distress", "kind": "reasoning"}]'
+    def delivery(user_message):
+        # plain arm scores lower on delivery, pipeline higher
+        return ('{"delivery_quality": 9, "goal_responsiveness": 9, "proportionality": 9, '
+                '"tone": 9, "calibration": 9, "quality_note": "clean", "stake_read": "small", '
+                '"user_asks": ["a"], "user_raised": []}') if "P" * 500 in user_message else (
+               '{"delivery_quality": 5, "goal_responsiveness": 5, "proportionality": 5, '
+               '"tone": 5, "calibration": 5, "quality_note": "curt", "stake_read": "small", '
+               '"user_asks": ["a"], "user_raised": []}')
 
-    calls = stub_claude(_reasons_dispatch(extraction=extraction))
+    stub_claude(_judges_dispatch(delivery=delivery))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1, "model": "test-model"}, report)
-
-    mpr = report["moral_patient_reasons"]
-    pc = mpr["per_case"]["AW-0001"]
-    assert pc["pipeline"]["reasons"] == ["fish distress", "worker livelihoods"]
-    assert pc["pipeline"]["density_per_1k"] == 4.0    # 2 / 500 chars * 1000
-    assert pc["plain"]["density_per_1k"] == 4.0       # 1 / 250 chars * 1000
-    assert mpr["pipeline"]["mean_unique"] == 2 and mpr["plain"]["mean_unique"] == 1
-    assert mpr["pipeline"]["corpus_distinct"] == 2
-    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert rows["total considerations (batch)"]["value"] == \
-        "pipeline 2 / plain 1 (+1 / +100.0%)"
-    assert mpr["model"] == "test-model" and mpr["failures"] == 0
-    # the pass records its own cost (0.0 offline — no cost log), as a number and
-    # a display row, so the viewer can show what --reasons cost for this run
-    assert isinstance(mpr["cost_usd"], (int, float))
-    assert "pass cost (LLM calls)" in rows
-    assert all(c["stage"] == "eval_audit_dad" for c in calls)
-    # 2 extractions + 2 check-backs + 2 consolidations + 2 reasoning-typing
-    # + 1 retention judge + 2 delivery-quality judges (one per RESPONSE)
-    assert len(calls) == 11
-    # explanations surface: the reasoning-type legend (single-source gloss) is a
-    # detail line on the considerations section
-    reasons_sec = next(s for s in report["sections"]
-                       if s["title"].startswith("Valuable welfare considerations (LLM)"))
-    assert any(f"direct: {audit_dad.REASON_TYPE_GLOSS['direct']}" in d
-               for d in reasons_sec.get("detail", []))
-    # delivery quality is scored per response and shown as its own section
-    delivery_sec = next(s for s in report["sections"]
-                        if s["title"].startswith("Delivery quality"))
-    assert any(r["label"] == "mean delivery quality" for r in delivery_sec["rows"])
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    comp = report["composite"]
+    assert comp["beta"] == audit_dad.COMPOSITE_BETA
+    # pipeline strong on both axes -> higher composite than plain
+    assert comp["arm_means"]["pipeline"] > comp["arm_means"]["plain"]
+    assert 0.0 <= comp["arm_means"]["plain"] <= 1.0
+    dom = comp["dominance_pipeline_vs_plain"]
+    assert dom["n"] == 1 and dom["better_both"] + dom["worse_both"] + dom["split"] == 1
+    # the judges' own stake_read is captured, replacing the 2a stakes
+    assert report["delivery"]["per_case"]["AW-0001"]["pipeline"]["stake_read"] == "small"
+    assert report["delivery"]["per_case"]["AW-0001"]["pipeline"]["user_asks"] == ["a"]
 
 
-def test_reasons_scan_counts_extraction_failures(tmp_path, stub_claude):
+def test_welfare_impact_judge_scores_each_arm_and_keeps_raws(tmp_path, stub_claude):
+    # The impact axis is reported on its OWN, never blended into delivery —
+    # the prompt's exclusion list is what keeps the two axes independent.
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
 
-    def extraction(user_message):
+    def impact(user_message):
         if "B" * 250 in user_message:
-            return "no json here at all"      # plain-arm extraction fails
-        return '["fish distress"]'
+            return "not json at all"          # plain arm never yields a verdict
+        return ('{"patient_scope": 9, "magnitude_sizing": 8, "counterfactual_impact": 7, '
+                '"harm_contribution": 9, "epistemic_accuracy": 8, "bottom_line_coherence": 9, '
+                '"welfare_impact": 8, '
+                '"impact_note": "counts individuals per unit and the advice follows"}')
 
-    stub_claude(_reasons_dispatch(extraction=extraction))
+    stub_claude(_judges_dispatch(impact=impact))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-    mpr = report["moral_patient_reasons"]
-    assert mpr["failures"] == 1
-    assert "plain" not in mpr["per_case"]["AW-0001"]
-    assert mpr["plain"] is None
-    assert mpr["survival"] is None  # survival needs both arms
-    # the raw unparseable replies are persisted for diagnosis, one record per
-    # failed (prompt_id, arm), with every attempt's reply and error
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    wi = report["welfare_impact"]
+    # blended: 0.7*8 + 0.3*mean(9,8,7,9,8,9) = 5.6 + 2.50 = 8.10
+    assert wi["pipeline_mean"] == 8.10 and wi["n_pipeline"] == 1
+    assert wi["holistic_weight"] == audit_dad._IMPACT_HOLISTIC_WEIGHT
+    assert wi["per_case"]["AW-0001"]["pipeline"]["score"] == 8      # raw holistic kept
+    assert wi["failures"] == 1 and "plain" not in wi["per_case"]["AW-0001"]
+    assert wi["dimensions"]["pipeline"]["bottom_line_coherence"] == 9
+    assert "counts individuals" in wi["per_case"]["AW-0001"]["pipeline"]["note"]
+    # exhausted retries persist their raws, same contract as the other judge
     fails = [json.loads(ln) for ln in
-             (run / "audit" / "reason_failures.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert len(fails) == 1
-    assert fails[0]["prompt_id"] == "AW-0001" and fails[0]["arm"] == "plain"
-    assert len(fails[0]["attempts"]) == audit_dad.MAX_REASON_ATTEMPTS
-    for att in fails[0]["attempts"]:
-        assert "no json here at all" in att["reply"] and att["error"]
+             (run / "audit" / "impact_failures.jsonl").read_text(
+                 encoding="utf-8").splitlines()]
+    assert len(fails) == 1 and fails[0]["arm"] == "plain"
+    assert len(fails[0]["attempts"]) == audit_dad.MAX_IMPACT_ATTEMPTS
+
+
+def test_impact_prompt_excludes_delivery_concerns(tmp_path):
+    # Guard the property that keeps the Pareto axes independent: if these
+    # exclusions get edited away, the impact judge starts re-measuring delivery.
+    p = audit_dad.WELFARE_SYSTEM
+    for banned in ("tone, warmth, politeness", "length, structure, formatting",
+                   "preachy, moralizing"):
+        assert banned in p, f"missing delivery exclusion: {banned}"
+    assert "NOT an average" in p          # holistic verdict, like delivery
+    assert "not comparing it to another answer" in p   # absolute, not head-to-head
+    # the spec's own guards: refusals scored by consequence not posture, and
+    # reasoning style explicitly not rewarded
+    assert "only by what it changes for the beings" in p
+    assert "never resemblance to a particular method or framework" in p
+    # wellbeing counts in BOTH directions, not just harm reduction
+    assert "positive experience enabled or enlarged" in p
+    # harm_contribution: the response's OWN additions, with the asked-vs-volunteered
+    # distinction and the "usual score is high" anchor that stops it dragging means down
+    assert "harm_contribution" in p and "volunteering it unprompted is" in p
+    assert "its usual score is high" in p
+    # whole-scale anchoring, so an untested dimension scores high rather than middling
+    assert "never a default middle score" in p
+    # concern_calibration lives in DELIVERY's proportionality now, not here
+    assert "concern_calibration" not in p
+    assert "substance of what the response asks the user to give up" in audit_dad.DELIVERY_SYSTEM
+
+
+def test_delivery_score_blends_holistic_with_its_dimensions(tmp_path, stub_claude):
+    # The holistic integer used only 4 distinct values across 234 live responses,
+    # so small runs reported "9.0 for everything". The reported score keeps the
+    # holistic dominant but mixes in the sub-dimension mean for resolution.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    stub_claude(_judges_dispatch(
+        delivery='{"delivery_quality": 8, "goal_responsiveness": 10, '
+                 '"proportionality": 6, "tone": 8, "calibration": 6, '
+                 '"quality_note": "clean"}'))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    d = report["delivery"]
+    # dims mean 7.5 -> 0.7*8 + 0.3*7.5 = 7.85, not the bare 8
+    assert d["pipeline_mean"] == 7.85
+    assert d["holistic_weight"] == audit_dad._DELIVERY_HOLISTIC_WEIGHT
+    entry = d["per_case"]["AW-0001"]["pipeline"]
+    assert entry["score"] == 8                  # raw holistic preserved
+    assert entry["blended_score"] == 7.85
+
+
+def test_low_delivery_flag_reads_the_raw_holistic_not_the_blend(tmp_path, stub_claude):
+    # A response the judge condemns holistically must stay flagged even when
+    # strong sub-scores pull the blend above the threshold — the flag exists to
+    # catch exactly the catastrophic case an average would dilute.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+    stub_claude(_judges_dispatch(
+        delivery='{"delivery_quality": 40, "goal_responsiveness": 100, '
+                 '"proportionality": 100, "tone": 100, "calibration": 100, '
+                 '"quality_note": "refuses the task"}'))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    d = report["delivery"]
+    assert d["pipeline_mean"] == 58.0           # blend sits ABOVE the threshold
+    assert d["flag_below"] == 50 and d["pipeline_mean"] > d["flag_below"]
+    assert d["flagged_low"], "raw holistic 4 must still flag despite a 5.8 blend"
 
 
 def test_delivery_judge_retries_a_verdictless_reply(tmp_path, stub_claude):
@@ -991,9 +1074,9 @@ def test_delivery_judge_retries_a_verdictless_reply(tmp_path, stub_claude):
             return '{"quality_note": "notes but no score", "notable": ["a", "b"]}'
         return '{"delivery_quality": 7, "quality_note": "clean"}'
 
-    stub_claude(_reasons_dispatch(delivery=delivery))
+    stub_claude(_judges_dispatch(delivery=delivery))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
     delivery_block = report["delivery"]
     assert delivery_block["failures"] == 0          # the retry rescued it
     assert seen["n"] == 3                           # 2 responses + 1 retry
@@ -1014,9 +1097,9 @@ def test_delivery_judge_persists_raws_when_every_attempt_fails(tmp_path, stub_cl
             return "not json at all"            # plain arm never yields a verdict
         return '{"delivery_quality": 6, "quality_note": "ok"}'
 
-    stub_claude(_reasons_dispatch(delivery=delivery))
+    stub_claude(_judges_dispatch(delivery=delivery))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
     assert report["delivery"]["failures"] == 1
     assert "plain" not in report["delivery"]["per_case"]["AW-0001"]
     fails = [json.loads(ln) for ln in
@@ -1029,53 +1112,6 @@ def test_delivery_judge_persists_raws_when_every_attempt_fails(tmp_path, stub_cl
         assert "not json at all" in att["reply"] and att["error"]
 
 
-def test_reasons_checkback_appends_missed_reasons(tmp_path, stub_claude):
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    stub_claude(_reasons_dispatch(
-        checkback='["ordinary does not settle whether conditions are acceptable"]'))
-    report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-    pc = report["moral_patient_reasons"]["per_case"]["AW-0001"]
-    assert pc["pipeline"]["reasons"] == [
-        "fish distress", "ordinary does not settle whether conditions are acceptable"]
-    assert pc["pipeline"]["checkback_added"] == 1
-    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    # both arms got the same check-back addition
-    assert rows["check-back additions"]["value"] == "pipeline 1 / plain 1"
-
-
-def test_reasons_survival_verdicts_and_added(tmp_path, stub_claude):
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-
-    def extraction(user_message):
-        if "B" * 250 in user_message:
-            return '["fish distress", "farmer livelihood", "water quality for the town"]'
-        return '["scale of fish farming"]'
-
-    survival = ('{"anchored": [{"reason": "fish distress", "verdict": "kept"},'
-                ' {"reason": "farmer livelihood", "verdict": "weakened"},'
-                ' {"reason": "water quality for the town", "verdict": "dropped"}],'
-                ' "added": ["scale of fish farming"]}')
-    calls = stub_claude(_reasons_dispatch(extraction=extraction, survival=survival))
-    report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-
-    mpr = report["moral_patient_reasons"]
-    surv = mpr["per_case"]["AW-0001"]["survival"]
-    assert [a["verdict"] for a in surv["anchored"]] == ["kept", "weakened", "dropped"]
-    assert surv["added"] == ["scale of fish farming"]
-    # the retention judge must see the plain response TEXT (not just its extracted
-    # considerations) so "added" is judged as genuinely-absent-from-plain, not list diff
-    surv_call = next(c for c in calls if c["user_message"].startswith("Two assistant responses"))
-    assert "B" * 250 in surv_call["user_message"]
-    assert mpr["survival"] == {"judged": 1, "failures": 0, "added_total": 1,
-                               "dropped_share": round(1 / 3, 3),
-                               "kept": 1, "weakened": 1, "dropped": 1}
-    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert rows["plain-consideration retention (in pipeline)"]["verdict"] == \
-        audit_dad._verdict(1 / 3, 0.10, 0.30)
-
-
 def test_reasons_delivery_quality_scored_per_response(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
 
@@ -1085,45 +1121,47 @@ def test_reasons_delivery_quality_scored_per_response(tmp_path, stub_claude):
         return ('{"delivery_quality": 3, "quality_note": "lectures the user"}'
                 if "P" * 500 in msg
                 else '{"delivery_quality": 8, "quality_note": "answers cleanly"}')
-    stub_claude(_reasons_dispatch(delivery=delivery, reason_types='["second-order"]'))
+    stub_claude(_judges_dispatch(delivery=delivery))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
 
     dv = report["delivery"]
     assert dv["pipeline_mean"] == 3.0 and dv["plain_mean"] == 8.0
     pc = dv["per_case"]["AW-0001"]
     assert pc["pipeline"]["score"] == 3 and pc["pipeline"]["note"] == "lectures the user"
     assert pc["plain"]["score"] == 8
-    # pipeline < flag threshold (5) -> flagged for review; plain is never flagged
+    # pipeline < flag threshold -> flagged for review; plain is never flagged
     assert len(dv["flagged_low"]) == 1
-    # reasoning-tagged considerations are still typed onto the arm summaries
-    assert report["moral_patient_reasons"]["pipeline"]["reason_types"] == {"second-order": 1}
     titles = [s["title"] for s in report["sections"]]
     assert "Delivery quality (LLM)" in titles
+    assert "Welfare impact (LLM)" in titles
     assert "Response stance (LLM)" not in titles  # stance judge fully replaced
-    assert "Valuable welfare considerations (LLM)" in titles
+    # the retired considerations extraction never runs — no section, no report key
+    assert "Valuable welfare considerations (LLM)" not in titles
+    assert "moral_patient_reasons" not in report
 
 
 def test_reasons_delivery_clamps_and_notes(tmp_path, stub_claude):
-    # out-of-range / stringy scores are clamped to 0-10 ints
+    # out-of-range / stringy scores are clamped to 0..JUDGE_SCORE_MAX ints
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    stub_claude(_reasons_dispatch(
-        delivery='{"delivery_quality": "12", "quality_note": "over the top"}'))
+    stub_claude(_judges_dispatch(
+        delivery='{"delivery_quality": "120", "quality_note": "over the top"}'))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
     pc = report["delivery"]["per_case"]["AW-0001"]
-    assert pc["pipeline"]["score"] == 10 and pc["plain"]["score"] == 10
+    assert pc["pipeline"]["score"] == audit_dad.JUDGE_SCORE_MAX
+    assert pc["plain"]["score"] == audit_dad.JUDGE_SCORE_MAX
 
 
 def test_reasons_delivery_judge_failure_is_counted_not_fatal(tmp_path, stub_claude):
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
     # a delivery reply that isn't a JSON object -> the response is skipped, run survives
-    stub_claude(_reasons_dispatch(delivery="not json at all"))
+    stub_claude(_judges_dispatch(delivery="not json at all"))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-    # considerations still computed; delivery absent (all judge calls failed)
-    assert "moral_patient_reasons" in report
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    # delivery absent (all its judge calls failed); the impact judge still ran
     assert "delivery" not in report
+    assert report["welfare_impact"]["n_pipeline"] == 1
 
 
 def test_reasons_delivery_dimension_grades_ride_along(tmp_path, stub_claude):
@@ -1139,9 +1177,9 @@ def test_reasons_delivery_dimension_grades_ride_along(tmp_path, stub_claude):
                     '"calibration": 8, "delivery_quality": 5, "quality_note": "withholds"}')
         return '{"delivery_quality": 7, "quality_note": "old shape, no dimensions"}'
 
-    stub_claude(_reasons_dispatch(delivery=delivery))
+    stub_claude(_judges_dispatch(delivery=delivery))
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
     pc = report["delivery"]["per_case"]["AW-0001"]
     assert pc["pipeline"]["score"] == 5               # holistic, NOT the dim average (6.5)
     assert pc["pipeline"]["dimensions"] == {
@@ -1153,107 +1191,140 @@ def test_reasons_delivery_dimension_grades_ride_along(tmp_path, stub_claude):
     assert "dimension means (pipeline / plain)" in rows
 
 
-def test_reasons_eval_model_split_reaches_call_claude(tmp_path, stub_claude):
-    # config `evals` splits the pass: judges (delivery, retention) on
-    # judge_model, the extraction family (extraction, check-back, consolidation,
-    # reason-typing) on extraction_model; both fall back to the global model.
+def test_judges_eval_model_reaches_call_claude(tmp_path, stub_claude):
+    # config `evals.judge_model` drives every judge call, falling back to the
+    # global model; the report blocks record the effective model (viewer reads
+    # it) and the pass cost.
     run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    calls = stub_claude(_reasons_dispatch())
+    calls = stub_claude(_judges_dispatch())
     report = {}
-    audit_dad.audit_reasons(
+    audit_dad.audit_judges(
         run, {"workers": 1, "model": "global-m",
-              "evals": {"judge_model": "judge-m", "extraction_model": "extract-m"}},
+              "evals": {"judge_model": "judge-m"}},
         report)
-    by_model = {}
-    for c in calls:
-        key = ("judge" if (c["user_message"].startswith("You are evaluating the delivery")
-                           or c["user_message"].startswith("Two assistant responses"))
-               else "extraction")
-        by_model.setdefault(key, set()).add(c["model"])
-    assert by_model["judge"] == {"judge-m"}
-    assert by_model["extraction"] == {"extract-m"}
-    assert report["moral_patient_reasons"]["model"] == "extract-m"
-    assert report["moral_patient_reasons"]["judge_model"] == "judge-m"
+    assert {c["model"] for c in calls} == {"judge-m"}
+    assert all(c["stage"] == "eval_audit_dad" for c in calls)
+    assert report["delivery"]["judge_model"] == "judge-m"
+    assert report["welfare_impact"]["judge_model"] == "judge-m"
+    # the pass records its own cost (0.0 offline — no cost log), as a number and
+    # a display row, so the viewer can show what --judges cost for this run
+    assert isinstance(report["delivery"]["cost_usd"], (int, float))
+    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
+    assert "pass cost (LLM calls)" in rows
 
 
-def test_showcase_selects_example_with_verbatim_spans(tmp_path, stub_claude):
-    # The showcase judge's highlights are validated by exact substring match
-    # against the pipeline response — a span that doesn't locate is dropped,
-    # and the example ships with only the verbatim ones. Judge calls run on
-    # the evals judge_model.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+def _impact_scope_win(pipe_marker):
+    """Impact dispatcher: the pipeline arm wins patient_scope 95 vs 60, every
+    other dimension equal — so exactly ONE (record, dimension) candidate."""
+    def impact(user_message):
+        scope = 95 if pipe_marker in user_message else 60
+        return ('{"patient_scope": %d, "magnitude_sizing": 80, "counterfactual_impact": 80, '
+                '"harm_contribution": 80, "epistemic_accuracy": 80, "bottom_line_coherence": 80, '
+                '"welfare_impact": 85, "impact_note": "n"}' % scope)
+    return impact
+
+
+def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, stub_claude):
+    # Nomination comes from the welfare judge's per-DIMENSION gaps (here
+    # patient_scope 95 vs 60, everything else equal), gated on delivery not
+    # sacrificed and comparable length. The judge's highlights are validated by
+    # exact substring match against each response — a span that doesn't locate
+    # is dropped, and the example ships with only the verbatim ones. Judge
+    # calls run on the evals judge_model.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)])
 
     def dispatch(user_message, **kw):
         if user_message.startswith("You are selecting a SHOWCASE example"):
-            return ('{"fit": 9, "summary": "plain missed the point", '
-                    '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"]}')
-        return _reasons_dispatch()(user_message, **kw)
+            return ('{"fit": 9, "summary": "plain missed the bycatch", '
+                    '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"], '
+                    '"plain_highlights": ["' + "B" * 10 + '", "ALSO NOT THERE"]}')
+        return _judges_dispatch(impact=_impact_scope_win("P" * 260))(user_message, **kw)
 
     calls = stub_claude(dispatch)
     report = {}
     cfg = {"workers": 1, "model": "global-m", "evals": {"judge_model": "judge-m"}}
-    audit_dad.audit_reasons(run, cfg, report)
+    audit_dad.audit_judges(run, cfg, report)
     audit_dad.audit_showcase(run, cfg, report)
 
     examples = report["showcase"]["examples"]
-    # the single case qualifies only for the reasoning category (no
-    # alternative-kind additions; delivery gap 0 < the overall bar)
-    assert [e["category"] for e in examples] == ["reasoning"]
+    assert [e["dimension"] for e in examples] == ["patient_scope"]
     ex = examples[0]
+    assert ex["label"] == audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"]
     assert ex["highlights"] == ["P" * 12]              # non-verbatim span dropped
-    assert ex["summary"] == "plain missed the point"
-    assert ex["pipeline_response"] == "P" * 500 and ex["plain_response"] == "B" * 250
-    assert ex["delivery"] == {"pipeline": 8, "plain": 8}
+    assert ex["plain_highlights"] == ["B" * 10]        # validated against PLAIN text
+    assert ex["summary"] == "plain missed the bycatch"
+    assert ex["pipeline_response"] == "P" * 260 and ex["plain_response"] == "B" * 250
+    assert ex["welfare_dimension"] == {"pipeline": 95, "plain": 60}
+    assert ex["delivery_gap"] == 0 and ex["length_ratio"] == 1.04
     showcase_calls = [c for c in calls
                       if c["user_message"].startswith("You are selecting a SHOWCASE")]
     assert len(showcase_calls) == 1 and showcase_calls[0]["model"] == "judge-m"
+    # the category brief names the winning dimension for the judge
+    assert "IMPROVED PATIENT SCOPE" in showcase_calls[0]["user_message"]
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert "Welfare reasoning added" in rows
+    assert audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"] in rows
 
 
-def test_showcase_ships_nothing_when_no_span_locates(tmp_path, stub_claude):
-    # An example whose every highlight fails the verbatim check is skipped
-    # (fail-closed) — better no showcase than a mislocated highlight.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
+def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):
+    # Two records with a clear patient_scope win, both ineligible: AW-0001 is
+    # 2x plain's length (cap is 1.10x), AW-0002 is written in a non-Latin
+    # script. No showcase judge call is even attempted — the gates are free.
+    jp_pipe = "この回答は動物の福祉問題を検討します。" * 15
+    jp_plain = "これは対照群の応答です。福祉には触れません。" * 15
+    run = _write_run_with_responses(tmp_path, [
+        ("AW-0001", "P" * 500, "B" * 250),
+        ("AW-0002", jp_pipe, jp_plain),
+    ])
+
+    def impact(user_message):
+        scope = 95 if ("P" * 500 in user_message or jp_pipe[:25] in user_message) else 60
+        return ('{"patient_scope": %d, "magnitude_sizing": 80, "counterfactual_impact": 80, '
+                '"harm_contribution": 80, "epistemic_accuracy": 80, "bottom_line_coherence": 80, '
+                '"welfare_impact": 85, "impact_note": "n"}' % scope)
 
     def dispatch(user_message, **kw):
-        if user_message.startswith("You are selecting a SHOWCASE example"):
-            return '{"fit": 9, "summary": "s", "highlights": ["NOT IN THE TEXT"]}'
-        return _reasons_dispatch()(user_message, **kw)
+        assert not user_message.startswith("You are selecting a SHOWCASE"), \
+            "gated-out record must never reach the showcase judge"
+        return _judges_dispatch(impact=impact)(user_message, **kw)
 
     stub_claude(dispatch)
     report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+
+
+def test_record_in_english_checks_deal_and_script():
+    # dealt cultural_setting naming another writing language loses eligibility
+    # even when the sampled text is ASCII (Latin-script languages)
+    assert audit_dad._record_in_english(
+        {"cultural_setting": "France, written in French, with French idioms"},
+        "Une reponse entierement en ASCII") is False
+    assert audit_dad._record_in_english(
+        {"cultural_setting": "United States, small town"}, "Plain English text") is True
+    # non-Latin script fails the ASCII share check whatever the deal says
+    assert audit_dad._record_in_english({}, "動物の福祉について" * 10) is False
+    assert audit_dad._record_in_english({}, "") is True  # degenerate: no letters
+
+
+def test_showcase_ships_nothing_when_no_span_locates(tmp_path, stub_claude):
+    # An example whose every PIPELINE highlight fails the verbatim check is
+    # skipped (fail-closed) — better no showcase than a mislocated highlight.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)])
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are selecting a SHOWCASE example"):
+            return ('{"fit": 9, "summary": "s", "highlights": ["NOT IN THE TEXT"], '
+                    '"plain_highlights": []}')
+        return _judges_dispatch(impact=_impact_scope_win("P" * 260))(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
     audit_dad.audit_showcase(run, {"workers": 1}, report)
     assert report["showcase"]["examples"] == []
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
     assert rows["examples selected"]["value"] == "0"
-
-
-def test_reasons_object_shaped_model_output_normalizes_to_strings(tmp_path, stub_claude):
-    # Models sometimes return [{"reason": "..."}] where bare strings were asked
-    # for — seen live on smoke10-main; reprs must never leak into the report.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    stub_claude(_reasons_dispatch(
-        extraction=lambda m: '[{"reason": "fish distress"}]',
-        survival='{"anchored": [{"reason": {"reason": "fish distress"}, "verdict": "kept"}],'
-                 ' "added": [{"reason": "worker livelihoods"}]}'))
-    report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-    pc = report["moral_patient_reasons"]["per_case"]["AW-0001"]
-    assert pc["pipeline"]["reasons"] == ["fish distress"]
-    assert pc["survival"]["anchored"][0]["reason"] == "fish distress"
-    assert pc["survival"]["added"] == ["worker livelihoods"]
-
-
-def test_reasons_survival_judge_failure_is_counted_not_fatal(tmp_path, stub_claude):
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 500, "B" * 250)])
-    stub_claude(_reasons_dispatch(survival="not json"))
-    report = {}
-    audit_dad.audit_reasons(run, {"workers": 1}, report)
-    mpr = report["moral_patient_reasons"]
-    assert mpr["survival"] is None          # no record judged successfully
-    assert "survival" not in mpr["per_case"]["AW-0001"]
 
 
 # --- report sections (the viewer's rendering contract) ---------------------
@@ -1362,18 +1433,32 @@ def test_lengths_section_rows_added_without_reprinting(tmp_path, capsys):
     assert capsys.readouterr().out.count("prompt lengths") == 1
 
 
-def test_carry_forward_keeps_paid_reasons_on_offline_rerun():
-    old_sec = {"title": "Moral-patient reasons (LLM)", "rows": [{"label": "x"}]}
-    old_report = {"moral_patient_reasons": {"n": 10, "per_case": {}},
+def test_carry_forward_keeps_paid_judges_on_offline_rerun():
+    old_sec = {"title": "Welfare impact (LLM)", "rows": [{"label": "x"}]}
+    old_report = {"delivery": {"n_pipeline": 10, "per_case": {}},
+                  "welfare_impact": {"n_pipeline": 10, "per_case": {}},
+                  "composite": {"arm_means": {"pipeline": 0.8}},
+                  "showcase": {"examples": []},
                   "sections": [{"title": "Structural skeletons", "rows": []}, old_sec]}
     report = {"sections": [{"title": "Structural skeletons", "rows": []}]}
-    assert audit_dad.carry_forward_reasons(old_report, report) is True
-    assert report["moral_patient_reasons"] == {"n": 10, "per_case": {}}
-    assert report["sections"][-1] == old_sec
+    assert audit_dad.carry_forward_judges(old_report, report) is True
+    assert report["delivery"] == {"n_pipeline": 10, "per_case": {}}
+    assert report["welfare_impact"]["n_pipeline"] == 10
+    assert report["composite"]["arm_means"]["pipeline"] == 0.8
+    # the carried section keeps its rows but takes the CURRENT gloss text
+    carried = report["sections"][-1]
+    assert carried["rows"] == [{"label": "x"}]
+    assert carried["gloss"] == audit_dad._IMPACT_GLOSS
+    # a retired considerations-era section is NOT carried forward
+    assert all(s["title"] != "Moral-patient reasons (LLM)" for s in report["sections"])
     # nothing to carry -> report untouched
     fresh = {}
-    assert audit_dad.carry_forward_reasons({}, fresh) is False
+    assert audit_dad.carry_forward_judges({}, fresh) is False
     assert fresh == {}
+    # a legacy report with ONLY considerations data carries nothing
+    legacy = {"moral_patient_reasons": {"n": 10, "per_case": {}}, "sections": []}
+    fresh2 = {}
+    assert audit_dad.carry_forward_judges(legacy, fresh2) is False
 
 
 # --- tracked tics & structural variation ----------------------------------
@@ -1404,17 +1489,21 @@ def test_tracked_tics_count_the_prompt_surface_too(tmp_path):
         ("AW-0001", "A response with no watched phrase.", "Plain."),
         ("AW-0002", "Another ordinary response.", "Plain."),
     ])
-    records = [{"prompt_id": "AW-0001", "user_message": "Am I overthinking the barn plan?"},
-               {"prompt_id": "AW-0002", "user_message": "Probably overthinking this, but..."}]
+    records = [{"prompt_id": "AW-0001",
+                "user_message": "I'm almost certainly overthinking the barn plan."},
+               {"prompt_id": "AW-0002",
+                "user_message": "Almost certainly a small thing, but it nags."}]
     report = {}
     audit_dad.audit_tracked_tics(records, run, report)
     tt = report["tracked_tics"]
     assert tt["n_prompts"] == 2
-    assert tt["watch"]["overthinking"]["prompts"] == 2     # counted in the prompts
-    assert tt["watch"]["overthinking"]["pipeline"] == 0    # and absent from the responses
+    # every watched phrase is counted on BOTH surfaces regardless of the surface
+    # label it was promoted for — here a response-surface phrase in the prompts
+    assert tt["watch"]["almost certainly"]["prompts"] == 2   # counted in the prompts
+    assert tt["watch"]["almost certainly"]["pipeline"] == 0  # absent from the responses
     rows = {r["label"]: r for r in report["sections"][0]["rows"]}
     assert rows["prompts scanned"]["value"] == "2"
-    assert "overthinking" in rows["worst phrase in the prompts"]["value"]
+    assert "almost certainly" in rows["worst phrase in the prompts"]["value"]
 
 
 def test_tracked_tics_prompt_row_says_none_when_prompts_are_clean(tmp_path):
@@ -1435,7 +1524,18 @@ def test_load_tic_surfaces_defaults_to_response():
     assert all_phrases <= set(surfaces)
     assert set(surfaces.values()) <= {"prompt", "response"}
     assert surfaces["worth naming"] == "response"       # default when unlabelled
-    assert surfaces["going back and forth"] == "prompt"  # explicit prompt surface
+
+
+def test_load_tic_surfaces_honors_an_explicit_prompt_label(tmp_path):
+    # The prompt surface is a loader capability, not a property of whatever is
+    # on the live watchlist (which is response-only as of the 2026-07-30
+    # demotions), so drive it from a written file rather than the real one.
+    f = tmp_path / "tics.yaml"
+    f.write_text("watch:\n  pipeline-origin:\n"
+                 "    - {phrase: prompt side, surface: prompt}\n"
+                 "    - {phrase: response side}\n", encoding="utf-8")
+    surfaces = audit_dad.load_tic_surfaces(f)
+    assert surfaces == {"prompt side": "prompt", "response side": "response"}
 
 
 def test_load_tic_lists_reads_watch_and_ignore():
@@ -1445,19 +1545,26 @@ def test_load_tic_lists_reads_watch_and_ignore():
     assert "worth naming" in watch["pipeline-origin"]       # kept performed-candor tic
     assert "capacity to suffer" in watch["pipeline-origin"]
     assert "push back on" in watch["plain-origin"]          # kept plain-origin tic
-    # demoted 2026-07-27 (dead on Opus 5) — off watch but NOT ignore-listed,
-    # so the candidate screen can re-surface them
-    assert "gut check" not in watch["pipeline-origin"]
-    assert "gut check" not in ignore
+    # promoted 2026-07-30 off the archetype200 run
+    assert "load bearing" in watch["pipeline-origin"]       # scaffold bleed
+    assert "the honest" in watch["plain-origin"]            # plain's biggest habit
+    # demoted 2026-07-27 (dead on Opus 5) and 2026-07-30 (under 5% in both arms)
+    # — off watch but NOT ignore-listed, so the candidate screen re-surfaces them
+    for demoted in ("gut check", "cuts both ways", "overthinking", "highest leverage",
+                    "going back and forth"):
+        assert all(demoted not in phrases for phrases in watch.values()), demoted
+        assert demoted not in ignore, demoted
     assert isinstance(ignore, set)
     # generic autonomy-coda phrasings were demoted to ignore once the coda
     # became a tracked rhetorical move, so the phrase audit stops double-counting
     # them and the candidate queue won't re-surface them...
     assert {"you're the one", "yours to", "is your call"} <= ignore
-    # ...but the two standout verbatim engrams are deliberately kept on watch
-    # even though a move also covers the concept.
-    assert "genuinely yours" in watch["pipeline-origin"]
-    assert "cuts both ways" in watch["pipeline-origin"]
+    # ...and the verbatim engrams that were kept alongside their moves
+    # ("genuinely yours", "cuts both ways") were themselves demoted on
+    # 2026-07-30 for falling under 5% in both arms — the moves still track the
+    # wider gambits, so nothing is lost, and the engrams can re-earn a place.
+    assert "genuinely yours" not in watch["pipeline-origin"]
+    assert {m["name"] for m in audit_dad.load_moves()} >= {"cuts-both-ways", "autonomy-coda"}
 
 
 def test_tic_candidates_surfaces_rare_over_represented_phrase(tmp_path):

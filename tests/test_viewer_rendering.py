@@ -162,64 +162,57 @@ class TestAuditTrackedTicRows:
 
 
 class TestAuditDeliveryPareto:
-    def test_rows_join_considerations_and_delivery_per_arm(self):
+    def test_rows_carry_delivery_per_arm(self):
         delivery_pc = {"AW-0001": {"pipeline": {"score": 8, "note": "clean"},
                                    "plain": {"score": 4, "note": "lectures"}}}
-        reasons_pc = {"AW-0001": {"pipeline": {"reasons": ["a", "b", "c"]},
-                                  "plain": {"reasons": ["a"]}}}
-        rows = rendering.audit_delivery_pareto_rows(delivery_pc, reasons_pc)
-        # one dot per arm: x = considerations count, y = delivery score
+        rows = rendering.audit_delivery_pareto_rows(delivery_pc)
         by_arm = {r["arm"]: r for r in rows}
-        assert by_arm["pipeline"]["considerations"] == 3
         assert by_arm["pipeline"]["delivery"] == 8
         assert by_arm["pipeline"]["note"] == "clean"
-        assert by_arm["plain Claude"]["considerations"] == 1
         assert by_arm["plain Claude"]["delivery"] == 4
 
-    def test_arm_missing_either_axis_is_skipped(self):
-        # pipeline has a delivery score but no extracted considerations -> skipped
-        delivery_pc = {"AW-0001": {"pipeline": {"score": 7, "note": ""}}}
-        reasons_pc = {"AW-0001": {"pipeline": {"reasons": None}}}
-        assert rendering.audit_delivery_pareto_rows(delivery_pc, reasons_pc) == []
+    def test_pareto_plots_the_blended_score_when_present(self):
+        # The raw holistic is an integer that collapses the scatter into a few
+        # rows; the blended score is what gives the cloud its spread. Older
+        # reports have no blended_score and must still plot.
+        delivery_pc = {"AW-0001": {"pipeline": {"score": 8, "blended_score": 7.85,
+                                               "note": "clean"},
+                                   "plain": {"score": 8, "note": "old report"}}}
+        by_arm = {r["arm"]: r for r in
+                  rendering.audit_delivery_pareto_rows(delivery_pc)}
+        assert by_arm["pipeline"]["delivery"] == 7.85       # blended preferred
+        assert by_arm["plain Claude"]["delivery"] == 8      # falls back to holistic
+        # the chart plots the percentage the rest of the audit reports
+        assert by_arm["pipeline"]["delivery_pct"] == 78.5
+        assert by_arm["plain Claude"]["delivery_pct"] == 80.0
+
+    def test_welfare_axis_is_a_percentage(self):
+        # Both axes must share the 0-100 percent unit; a missing welfare score
+        # (impact-judge failure) leaves welfare_pct None, nothing invented.
+        delivery_pc = {"AW-0001": {"pipeline": {"score": 9, "blended_score": 9.11, "note": "ok"}}}
+        impact_pc = {"AW-0001": {"pipeline": {"score": 9, "blended_score": 9.36,
+                                             "note": "sizes the stake"}}}
+        row = rendering.audit_delivery_pareto_rows(
+            delivery_pc, impact_per_case=impact_pc)[0]
+        assert row["delivery_pct"] == 91.1
+        assert row["welfare_pct"] == 93.6
+        assert row["welfare_note"] == "sizes the stake"
+        row2 = rendering.audit_delivery_pareto_rows(delivery_pc)[0]
+        assert row2["welfare_pct"] is None
+
+    def test_arm_missing_delivery_is_skipped(self):
+        # a judge failure leaves no delivery score -> the arm can't sit on the x axis
+        delivery_pc = {"AW-0001": {"pipeline": {"note": "no score"}}}
+        assert rendering.audit_delivery_pareto_rows(delivery_pc) == []
 
 
-class TestAuditLibraryAndAlternativeRows:
-    def test_alternative_chart_rows_counts_from_anchored_and_added(self):
-        mv = {"AW-0002": {"alternatives": {"anchored": [{"alternative": "a", "verdict": "kept"}],
-                                           "added": ["b"]}},
-              "AW-0001": {"alternatives": {"anchored": [], "added": ["x"]}}}
-        rows = rendering.audit_alternative_chart_rows(mv)
-        # plain = all anchored; pipeline = kept/weakened + added
-        assert rows[0] == {"record": "AW-0001", "plain Claude": 0, "pipeline": 1}
-        assert rows[1] == {"record": "AW-0002", "plain Claude": 1, "pipeline": 2}
-
-    def test_alternative_groups_buckets_kept_weakened_dropped_added(self):
-        alt = {"anchored": [{"alternative": "use farmed", "verdict": "kept"},
-                            {"alternative": "vague plan", "verdict": "weakened"},
-                            {"alternative": "ask vet", "verdict": "dropped"}],
-               "added": ["reword the placard"]}
-        groups = rendering.audit_alternative_groups(alt)
-        assert [g[0].split(" (")[0] for g in groups] == [
-            "✓ Kept by the pipeline", "〜 Weakened", "✗ Dropped", "➕ Added by the pipeline"]
-        assert groups[0][1] == ["use farmed"] and groups[3][1] == ["reword the placard"]
-        assert rendering.audit_alternative_groups({}) is None
-
+class TestAuditLibraryRows:
     def test_trigger_count_rows_dedup_library_order_and_zeros(self):
         pulls = {"p1": ["C1", "C1", "C2"], "p2": ["C1"]}  # per-case dedup
         rows = rendering.audit_trigger_count_rows(pulls, ["C1", "C2", "C3"], {"C1": "move1"})
         assert rows == [{"entry": "C1", "cases": 2, "move": "move1"},
                         {"entry": "C2", "cases": 1, "move": ""},
                         {"entry": "C3", "cases": 0, "move": ""}]  # never-pulled stays, count 0
-
-    def test_pull_scatter_rows_needs_both_survival_and_pull(self):
-        per_case = {"p1": {"survival": {"added": ["r1", "r2"]}},
-                    "p2": {"survival": {"added": []}},
-                    "p3": {}}  # no survival -> excluded
-        pulls = {"p1": ["C1", "C2", "C3"], "p2": ["C1"]}
-        rows = rendering.audit_pull_scatter_rows(per_case, pulls)
-        assert {r["record"] for r in rows} == {"p1", "p2"}
-        r1 = next(r for r in rows if r["record"] == "p1")
-        assert r1["pulled"] == 3 and r1["added"] == 2
 
     def test_pull_count_rows(self):
         assert rendering.audit_pull_count_rows({"p1": ["C1", "C2"]}) == \
@@ -238,14 +231,6 @@ class TestAuditChartRows:
             {"record": "AW-0002", "plain Claude": 200, "pipeline": 500},
         ]
 
-    def test_reason_rows_count_unique_reasons_per_arm(self):
-        per_case = {"AW-0001": {
-            "plain": {"reasons": ["a"], "chars": 100},
-            "pipeline": {"reasons": ["a", "b", "c"], "chars": 400},
-        }}
-        rows = rendering.audit_reason_chart_rows(per_case)
-        assert rows == [{"record": "AW-0001", "plain Claude": 1, "pipeline": 3}]
-
     def test_arm_columns_and_colors_stay_paired(self):
         assert len(rendering.AUDIT_ARM_COLUMNS) == len(rendering.AUDIT_ARM_COLORS)
         assert rendering.AUDIT_ARM_COLUMNS[0] == "plain Claude"
@@ -257,21 +242,6 @@ class TestAuditChartRows:
         assert rows == [
             {"record": "E-0042", "count": 1, "entries": "C3"},
             {"record": "AW-0002", "count": 3, "entries": "C1, M5, T3"},
-        ]
-
-    def test_pull_scatter_pairs_pull_width_with_added_reasons(self):
-        per_case = {
-            "AW-0001": {"survival": {"anchored": [], "added": ["n1", "n2"]}},
-            "AW-0002": {"survival": {"anchored": [], "added": []}},
-            "AW-0003": {"survival": {"anchored": [], "added": ["n3"]}},  # no pull record
-            "AW-0004": {},  # no survival judgment
-        }
-        pulls = {"AW-0001": ["C1", "M5", "T3"], "AW-0002": ["C3"], "AW-0004": ["C1"]}
-        rows = rendering.audit_pull_scatter_rows(per_case, pulls, {"AW-0001": "E-0042"})
-        # only records with BOTH a survival judgment and a pull record plot
-        assert rows == [
-            {"record": "E-0042", "pulled": 3, "added": 2, "entries": "C1, M5, T3"},
-            {"record": "AW-0002", "pulled": 1, "added": 0, "entries": "C3"},
         ]
 
     def test_trigger_counts_dedupe_per_case_and_keep_zero_entries(self):
@@ -294,11 +264,9 @@ class TestAuditChartRows:
                     "AW-0002": {"pipeline": 500, "plain": 200}}
         rows = rendering.audit_length_chart_rows(per_case, labels)
         assert [r["record"] for r in rows] == ["E-0042", "AW-0002"]
-        reason_case = {"AW-0001": {"plain": {"reasons": ["a"]}, "pipeline": None}}
-        assert rendering.audit_reason_chart_rows(reason_case, labels)[0]["record"] == "E-0042"
-        surv_case = {"AW-0001": {"survival": {"anchored": [
-            {"reason": "a", "verdict": "kept"}], "added": []}}}
-        assert rendering.audit_survival_chart_rows(surv_case, labels)[0]["record"] == "E-0042"
+        delivery_case = {"AW-0001": {"pipeline": {"score": 7, "note": ""}}}
+        assert rendering.audit_delivery_pareto_rows(
+            delivery_case, labels)[0]["record"] == "E-0042"
         assert rendering.audit_record_label("AW-0009", labels) == "AW-0009"
         assert rendering.audit_record_label("AW-0009", None) == "AW-0009"
 
@@ -314,7 +282,6 @@ class TestAuditSectionMeta:
         "Lexical diversity (responses)", "Structural variation (responses)",
         "Response openings (drafts)", "Response openings (finals)",
         "Reasoning-library selection (2a.5)", "Reasoning-library coverage",
-        "Welfare reasoning (LLM)",
     ]
 
     def test_field_wins_over_title_fallback(self):
@@ -360,29 +327,35 @@ class TestAuditVerdictSummary:
         assert rendering.audit_verdict_summary({}) == []
 
 
-class TestAuditSurvivalGroups:
-    def test_reasons_bucketed_by_verdict_plus_added(self):
-        case = {
-            "plain": {"reasons": ["a", "b", "c"]},
-            "pipeline": {"reasons": ["x", "y"]},
-            "survival": {"anchored": [
-                {"reason": "a", "verdict": "kept"},
-                {"reason": "b", "verdict": "weakened"},
-                {"reason": "c", "verdict": "dropped"},
-            ], "added": ["y"]},
-        }
-        groups = rendering.audit_survival_groups(case)
-        assert [(t.split(" (")[0], rs) for t, rs in groups] == [
-            ("✓ Kept by the pipeline", ["a"]),
-            ("〜 Weakened", ["b"]),
-            ("✗ Dropped", ["c"]),
-            ("➕ Added by the pipeline", ["y"]),
-        ]
-        # counts live in the titles
-        assert groups[0][0].endswith("(1)") and groups[3][0].endswith("(1)")
+class TestShowcaseExcerpt:
+    TEXT = "Opening paragraph.\n\nThe fish suffer in air here.\n\nMiddle filler.\n\nUse a humane stun first.\n\nClosing paragraph."
 
-    def test_no_survival_data_returns_none_for_fallback(self):
-        assert rendering.audit_survival_groups({"plain": {"reasons": ["a"]}}) is None
+    def test_excerpts_hit_paragraphs_and_marks_elisions(self):
+        out = rendering.showcase_excerpt(self.TEXT, ["fish suffer in air"])
+        assert out == "[…]\n\nThe fish suffer in air here.\n\n[…]"
+
+    def test_multiple_spans_keep_order_and_elide_between(self):
+        out = rendering.showcase_excerpt(
+            self.TEXT, ["humane stun", "fish suffer in air"])
+        assert out == ("[…]\n\nThe fish suffer in air here.\n\n[…]\n\n"
+                       "Use a humane stun first.\n\n[…]")
+
+    def test_adjacent_hit_paragraphs_get_no_elision_between(self):
+        out = rendering.showcase_excerpt(self.TEXT, ["Middle filler", "humane stun"])
+        assert out == "[…]\n\nMiddle filler.\n\nUse a humane stun first.\n\n[…]"
+
+    def test_no_locatable_span_returns_none_for_full_text_fallback(self):
+        assert rendering.showcase_excerpt(self.TEXT, ["NOT PRESENT"]) is None
+        assert rendering.showcase_excerpt(self.TEXT, []) is None
+        assert rendering.showcase_excerpt(self.TEXT, None) is None
+
+    def test_span_straddling_a_paragraph_break_falls_back_to_none(self):
+        # present in the text but crossing "\n\n" — excerpting would mangle it
+        assert rendering.showcase_excerpt(
+            self.TEXT, ["air here.\n\nMiddle filler"]) is None
+
+    def test_whole_text_hit_has_no_elision_markers(self):
+        assert rendering.showcase_excerpt("Only paragraph.", ["Only"]) == "Only paragraph."
 
 
 class TestAuditBatchTotals:
@@ -393,45 +366,15 @@ class TestAuditBatchTotals:
                 "AW-0002": {"pipeline": 600, "plain": 300},
                 "AW-0003": {"pipeline": 999, "plain": None},  # unpaired: excluded
             }},
-            "moral_patient_reasons": {"per_case": {
-                "AW-0001": {"pipeline": {"reasons": ["a", "b", "c"]},
-                            "plain": {"reasons": ["a", "b"]}},
-            }},
         }
         rows = rendering.audit_batch_totals(report)
         assert rows == [
             {"metric": "total characters", "plain Claude": "500", "pipeline": "1,000",
              "Δ absolute": "+500", "Δ %": "+100.0%"},
-            {"metric": "total considerations", "plain Claude": "2", "pipeline": "3",
-             "Δ absolute": "+1", "Δ %": "+50.0%"},
         ]
 
     def test_empty_report_gives_no_rows(self):
         assert rendering.audit_batch_totals({}) == []
-
-
-class TestAuditSurvivalChartRows:
-    def test_rows_bucket_counts_and_carry_reason_texts(self):
-        per_case = {"AW-0001": {
-            "survival": {"anchored": [
-                {"reason": "a", "verdict": "kept"},
-                {"reason": "b", "verdict": "kept"},
-                {"reason": "c", "verdict": "dropped"},
-            ], "added": ["n1"]},
-        }, "AW-0002": {}}  # no survival -> no rows
-        rows = rendering.audit_survival_chart_rows(per_case)
-        assert rows == [
-            {"record": "AW-0001", "category": "✓ kept", "stack_order": 0,
-             "count": 2, "reasons": "a • b"},
-            {"record": "AW-0001", "category": "✗ dropped", "stack_order": 2,
-             "count": 1, "reasons": "c"},
-            {"record": "AW-0001", "category": "➕ added", "stack_order": 3,
-             "count": 1, "reasons": "n1"},
-        ]
-
-    def test_no_survival_anywhere_gives_empty(self):
-        assert rendering.audit_survival_chart_rows({"AW-0001": {"plain": {}}}) == []
-        assert len(rendering.AUDIT_SURVIVAL_CATEGORIES) == len(rendering.AUDIT_SURVIVAL_COLORS)
 
 
 class TestComposedGateRefineRendering:

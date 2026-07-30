@@ -31,10 +31,11 @@ python dad_pipeline/run.py --config config.yaml --resume --step 3 --run-id 2026-
 
 # Evaluate outputs (latest symlink points at the most recent run).
 # DAD runs the standard evals AUTOMATICALLY at the end of every full run
-# (audit_dad --reasons + diversity.py; dad.evals.auto: false to skip) —
+# (audit_dad --judges + diversity.py; dad.evals.auto: false to skip) —
 # the commands below are for re-runs, partial runs, and older run dirs.
 # DAD: corpus-level audit — prompt- and response-side diversity checks incl.
-# opening shapes, offline/free; --reasons adds the paid LLM reason pass.
+# opening shapes, offline/free; --judges adds the paid LLM judge pass
+# (welfare impact + delivery quality + showcase).
 # (evals/score_dad_parked.py, the per-example rubric judge, is PARKED pending
 # a rubric redesign — see its docstring.)
 python evals/audit_dad.py --input outputs/dad/latest

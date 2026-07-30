@@ -239,7 +239,7 @@ def test_dad_full_run_launches_both_evals(
     assert len(record_subprocess) == 2
     audit_cmd, diversity_cmd = record_subprocess
     assert audit_cmd[1].endswith("evals/audit_dad.py")
-    assert "--reasons" in audit_cmd
+    assert "--judges" in audit_cmd
     assert str(run_dir) in audit_cmd
     assert diversity_cmd[1].endswith("evals/diversity.py")
     assert str(run_dir) in diversity_cmd
