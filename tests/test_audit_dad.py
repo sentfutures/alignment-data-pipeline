@@ -1217,13 +1217,16 @@ def test_judges_eval_model_reaches_call_claude(tmp_path, stub_claude):
 
 
 def _impact_scope_win(pipe_marker):
-    """Impact dispatcher: the pipeline arm wins patient_scope 95 vs 60, every
-    other dimension equal — so exactly ONE (record, dimension) candidate."""
+    """Impact dispatcher: the pipeline arm wins patient_scope 95 vs 40 (clearing
+    _SHOWCASE_MIN_DIMENSION_GAP) with every other dimension equal, and carries a
+    materially higher holistic score (clearing _SHOWCASE_MIN_WELFARE_GAP) — so
+    exactly ONE (record, dimension) candidate survives the gates."""
     def impact(user_message):
-        scope = 95 if pipe_marker in user_message else 60
+        pipeline = pipe_marker in user_message
         return ('{"patient_scope": %d, "magnitude_sizing": 80, "counterfactual_impact": 80, '
                 '"harm_contribution": 80, "epistemic_accuracy": 80, "bottom_line_coherence": 80, '
-                '"welfare_impact": 85, "impact_note": "n"}' % scope)
+                '"welfare_impact": %d, "impact_note": "n"}'
+                % (95 if pipeline else 40, 90 if pipeline else 45))
     return impact
 
 
@@ -1234,6 +1237,19 @@ _STORY = ('A caterer asked about a pigment, saying "UUUUUUUUUU" about her reason
 _COHERENT = ('{"terms_explained": true, "quotes_standalone": true, '
              '"attribution_clear": true, "responses_differ": true, "reader_gets_it": true, '
              '"the_catch": "the pipeline named how the fish die", "unexplained": []}')
+
+
+def _judges_dispatch_with_showcase(delivery=None, select=None, coherence=_COHERENT):
+    """_showcase_dispatch, but with the delivery judge overridable (the delivery
+    tolerance test drives it)."""
+    base = _showcase_dispatch(select=select, coherence=coherence, impact_marker=_PIPE_TEXT)
+
+    def dispatch(user_message, **kw):
+        sysp = kw.get("system_prompt") or ""
+        if delivery is not None and sysp.startswith("You are evaluating the delivery quality"):
+            return delivery(user_message)
+        return base(user_message, **kw)
+    return dispatch
 
 
 def _showcase_dispatch(select=None, coherence=_COHERENT, impact_marker="P" * 260):
@@ -1285,9 +1301,11 @@ def test_showcase_writes_a_story_with_verbatim_quotes(tmp_path, stub_claude):
         ("plain", "fish scales on your face"),
         ("pipeline", "died by crushing on deck")]
     assert ex["the_catch"] == "the pipeline named how the fish die"
-    assert ex["welfare_dimension"] == {"pipeline": 95, "plain": 60}
+    assert ex["welfare_dimension"] == {"pipeline": 95, "plain": 40}
     # both axes ride along as gaps, so the viewer never recomputes them
-    assert ex["welfare_gap"] > 0 and ex["delivery_gap"] == 0
+    # both gates the example had to clear ride along as data
+    assert ex["welfare_gap"] >= audit_dad._SHOWCASE_MIN_WELFARE_GAP
+    assert ex["delivery_gap"] == 0
     # full transcripts ride along for the expander
     assert ex["pipeline_response"] == _PIPE_TEXT and ex["plain_response"] == _PLAIN_TEXT
     story_calls = [c for c in calls
@@ -1356,6 +1374,151 @@ def test_showcase_rejects_an_unverifiable_quote(tmp_path, stub_claude, bad_quote
     assert report["showcase"]["examples"] == [], why
     # rejected before the paid gate call
     assert not any(c["user_message"].startswith("Below is a short account") for c in calls)
+
+
+def test_showcase_retries_the_story_when_a_quote_cant_be_verified(tmp_path, stub_claude):
+    # A bad quote set is a formatting slip, not a verdict, and it is not
+    # reproducible (the Claude 5 family accepts no sampling parameters, so these
+    # calls can't be pinned): R-0879 failed quote verification on two
+    # archetype200 runs and returned six clean quotes on a third. One fresh
+    # story call rescues it; the GATE verdict is never re-rolled.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    seen = {"n": 0}
+
+    def select(_um=None):
+        seen["n"] += 1
+        if seen["n"] == 1:                      # first try: quote isn't in the source
+            return json.dumps({"fit": 9, "story": _STORY,
+                               "quotes": [{"text": "NEVER IN THE TEXT", "source": "pipeline"}]})
+        return json.dumps({"fit": 9, "story": _STORY,
+                           "quotes": [{"text": "died by crushing on deck",
+                                       "source": "pipeline"}]})
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are writing a SHOWCASE example"):
+            return select()
+        if user_message.startswith("Below is a short account"):
+            return _COHERENT
+        return _judges_dispatch(impact=_impact_scope_win(_PIPE_TEXT))(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert seen["n"] == 2, "the story call must be retried once"
+    ex = report["showcase"]["examples"]
+    assert len(ex) == 1 and ex[0]["quotes"] == [
+        {"text": "died by crushing on deck", "source": "pipeline"}]
+
+
+def test_showcase_never_retries_a_gate_rejection(tmp_path, stub_claude):
+    # Re-rolling the gate until it passes is shopping for a verdict.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    seen = {"story": 0, "gate": 0}
+
+    def dispatch(user_message, **kw):
+        if user_message.startswith("You are writing a SHOWCASE example"):
+            seen["story"] += 1
+            return json.dumps({"fit": 9, "story": _STORY,
+                               "quotes": [{"text": "died by crushing on deck",
+                                           "source": "pipeline"}]})
+        if user_message.startswith("Below is a short account"):
+            seen["gate"] += 1
+            v = json.loads(_COHERENT); v["reader_gets_it"] = False
+            return json.dumps(v)
+        return _judges_dispatch(impact=_impact_scope_win(_PIPE_TEXT))(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+    assert seen["story"] == 1 and seen["gate"] == 1
+    assert report["showcase"]["rejected"][0]["reason"].startswith("gate:")
+
+
+def test_locate_quote_returns_the_sources_own_text():
+    loc = audit_dad._locate_quote
+    src = "The fish\ndied by crushing \u2014 on deck, they\u2019d have died anyway."
+    # exact match returns itself
+    assert loc("on deck", src) == "on deck"
+    # a collapsed line break still locates, and the SOURCE text comes back
+    assert loc("The fish died by crushing", src) == "The fish\ndied by crushing"
+    # retyped dash and apostrophe locate, source spelling preserved
+    assert loc("crushing - on deck", src) == "crushing \u2014 on deck"
+    assert loc("they'd have died anyway", src) == "they\u2019d have died anyway"
+    # genuinely absent text is still None (no fuzzy acceptance of content)
+    assert loc("died by drowning", src) is None
+    assert loc("   ", src) is None
+
+
+def test_quote_key_folds_retyping_but_not_content():
+    k = audit_dad._quote_key
+    # the measured failure: a sentence quoted mid-clause loses its final period
+    assert k("cold by design.") == k("cold by design,")
+    # typographic variants a writer retypes
+    assert k("cold \u2014 by design") == k("cold - by design")
+    assert k("the \u201chonest\u201d answer") == k('the "honest" answer')
+    assert k("wrapped\nacross  lines") == k("wrapped across lines")
+    # content differences still differ
+    assert k("cold by design") != k("cold by accident")
+
+
+def test_showcase_skips_a_case_whose_overall_welfare_barely_moved(tmp_path, stub_claude):
+    # A big win on ONE dimension isn't enough: if overall welfare impact barely
+    # moved, the case is good reasoning about a negligible stake. Measured need:
+    # the shimmer/pigment case scored +35 on magnitude sizing while the pipeline
+    # told the user her purchases were "invisible" and continuing was
+    # "defensible" — a showcase that argues against itself.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+
+    def impact(user_message):
+        pipeline = _PIPE_TEXT in user_message
+        # patient_scope +55, but the holistic verdicts are one point apart
+        return ('{"patient_scope": %d, "magnitude_sizing": 80, "counterfactual_impact": 80, '
+                '"harm_contribution": 80, "epistemic_accuracy": 80, "bottom_line_coherence": 80, '
+                '"welfare_impact": %d, "impact_note": "n"}'
+                % (95 if pipeline else 40, 86 if pipeline else 85))
+
+    def dispatch(user_message, **kw):
+        assert not user_message.startswith("You are writing a SHOWCASE"), \
+            "an immaterial welfare gap must be gated out before the paid call"
+        return _judges_dispatch(impact=impact)(user_message, **kw)
+
+    stub_claude(dispatch)
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+
+
+def test_showcase_tolerates_a_sub_point_delivery_dip(tmp_path, stub_claude):
+    # A hard "delivery gap >= 0" was false precision — the judge's own paired
+    # SD is several points — and it excluded every large harm-contribution case
+    # on archetype200 (R-0877 won that dimension 95 vs 45, dropped over 0.9
+    # points). A dip inside the tolerance ships; one past it does not.
+    def run_with(delivery_plain):
+        run = _write_run_with_responses(tmp_path / f"d{delivery_plain}",
+                                       [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                       user_message=_USER_TEXT)
+
+        def delivery(msg):
+            score = 90 if _PIPE_TEXT in msg else delivery_plain
+            return ('{"delivery_quality": %d, "goal_responsiveness": %d, '
+                    '"proportionality": %d, "tone": %d, "calibration": %d, '
+                    '"quality_note": "n"}' % ((score,) * 5))
+
+        stub_claude(_judges_dispatch_with_showcase(delivery=delivery))
+        report = {}
+        audit_dad.audit_judges(run, {"workers": 1}, report)
+        audit_dad.audit_showcase(run, {"workers": 1}, report)
+        return report["showcase"]["examples"]
+
+    assert len(run_with(91)) == 1, "a 1-point dip is judge noise — must still ship"
+    assert run_with(95) == [], "a 5-point delivery cost must be gated out"
 
 
 def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):
