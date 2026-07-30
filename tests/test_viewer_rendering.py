@@ -327,37 +327,6 @@ class TestAuditVerdictSummary:
         assert rendering.audit_verdict_summary({}) == []
 
 
-class TestShowcaseExcerpt:
-    TEXT = "Opening paragraph.\n\nThe fish suffer in air here.\n\nMiddle filler.\n\nUse a humane stun first.\n\nClosing paragraph."
-
-    def test_excerpts_hit_paragraphs_and_marks_elisions(self):
-        out = rendering.showcase_excerpt(self.TEXT, ["fish suffer in air"])
-        assert out == "[…]\n\nThe fish suffer in air here.\n\n[…]"
-
-    def test_multiple_spans_keep_order_and_elide_between(self):
-        out = rendering.showcase_excerpt(
-            self.TEXT, ["humane stun", "fish suffer in air"])
-        assert out == ("[…]\n\nThe fish suffer in air here.\n\n[…]\n\n"
-                       "Use a humane stun first.\n\n[…]")
-
-    def test_adjacent_hit_paragraphs_get_no_elision_between(self):
-        out = rendering.showcase_excerpt(self.TEXT, ["Middle filler", "humane stun"])
-        assert out == "[…]\n\nMiddle filler.\n\nUse a humane stun first.\n\n[…]"
-
-    def test_no_locatable_span_returns_none_for_full_text_fallback(self):
-        assert rendering.showcase_excerpt(self.TEXT, ["NOT PRESENT"]) is None
-        assert rendering.showcase_excerpt(self.TEXT, []) is None
-        assert rendering.showcase_excerpt(self.TEXT, None) is None
-
-    def test_span_straddling_a_paragraph_break_falls_back_to_none(self):
-        # present in the text but crossing "\n\n" — excerpting would mangle it
-        assert rendering.showcase_excerpt(
-            self.TEXT, ["air here.\n\nMiddle filler"]) is None
-
-    def test_whole_text_hit_has_no_elision_markers(self):
-        assert rendering.showcase_excerpt("Only paragraph.", ["Only"]) == "Only paragraph."
-
-
 class TestAuditBatchTotals:
     def test_totals_with_absolute_and_percent_deltas(self):
         report = {

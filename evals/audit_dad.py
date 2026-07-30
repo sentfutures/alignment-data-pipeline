@@ -2387,76 +2387,82 @@ _SHOWCASE_DIM_BRIEFS = {
 }
 
 _SHOWCASE_PROMPT = (
-    "You are selecting a SHOWCASE example for a corpus audit: one case where the pipeline "
+    "You are writing a SHOWCASE example for a corpus audit: one case where the pipeline "
     "response caught something that mattered which the plain response missed or mishandled. "
     "Read the user message and both responses, then judge whether this case is a vivid, "
     "easy-to-explain example of the improvement described under CATEGORY.\n\n"
     "CATEGORY: {category}\n\n"
-    "THE SPANS YOU RETURN ARE THE WHOLE EXHIBIT. A reader will scan ONLY the three "
-    "highlighted span sets below, in this order — prompt, then plain, then pipeline — with "
-    "no other text. Choose them so that scanning just those spans tells the complete story "
-    "by itself:\n"
-    "  1. the PROMPT span establishes what the user asked for and what is at stake;\n"
-    "  2. the PLAIN span shows what the plain response said about that exact point — the "
-    "weaker handling, or the place where the gap is visible;\n"
-    "  3. the PIPELINE span shows the catch: the specific thing the plain response did not "
-    "say.\n"
-    "The plain and pipeline spans MUST CONTRAST on the same point. If the closest plain span "
-    "makes substantially the SAME point as the pipeline span in different words, this case is "
-    "not a showcase — return \"fit\": 0 and empty span lists rather than presenting a "
-    "difference that isn't there.\n\n"
+    "WHAT YOU ARE WRITING. A reader sees your STORY and nothing else — the responses sit "
+    "behind a link most people will not open. So the story has to stand completely on its "
+    "own: a short plain-English account of what the user wanted, what the plain response "
+    "said, and what the pipeline caught, with a few SHORT verbatim quotes woven into your "
+    "own sentences as evidence.\n\n"
+    "RULES FOR THE STORY — a reader with no prior interest in animal welfare and no other "
+    "context must follow it start to finish:\n"
+    "  - Write in English, always, whatever language the record is in.\n"
+    "  - 4-6 sentences. Every sentence earns its place; no preamble, no scores, no jargon.\n"
+    "  - NEVER use an abbreviation, acronym, technical term, or species/industry shorthand "
+    "without saying in plain words what it is: not \"CWD\" but \"chronic wasting disease, "
+    "which is untreatable and always fatal\"; not \"guanine, CI 75170\" but \"a pigment made "
+    "from fish scales\".\n"
+    "  - A quote must be intelligible ON ITS OWN. Never quote a fragment whose meaning "
+    "depends on a sentence the reader cannot see: no bare \"that number\", \"this line\", "
+    "\"it would be worse\". If the only good quote needs setup, give the setup in your own "
+    "words first, then quote.\n"
+    "  - Keep each quote SHORT — a phrase or one clause, roughly 4 to 20 words. Copy it "
+    "character-for-character and wrap it in double quotation marks inside the story.\n"
+    "  - Name who said what: make it unambiguous which quotes are the user's, which are the "
+    "plain response's, and which are the pipeline's.\n"
+    "  - Say plainly why the difference matters for this user's actual decision.\n\n"
+    "If the two responses make substantially the SAME point in different words, this case is "
+    "not a showcase: return \"fit\": 0 and an empty quote list rather than dressing up a "
+    "difference that is not there.\n\n"
     "Return valid JSON only:\n"
-    "{\"fit\": <integer 0-10 — how vivid and easy to explain this example is; 10 = a "
-    "neutral reader scanning ONLY your spans instantly sees the pipeline caught something "
-    "that mattered which the plain response did not, without needing any prior commitment "
-    "to animal welfare. 0 = the two responses make the same point.>,\n"
-    "\"summary\": \"<2-3 SHORT sentences, ALWAYS in English regardless of the record's "
-    "language: what the user asked, what the pipeline caught that the plain response "
-    "missed, and why it matters. Plain language, no jargon, no scores.>\",\n"
-    "\"prompt_highlight\": \"<ONE VERBATIM substring copied character-for-character from the "
-    "USER MESSAGE — the sentence that establishes the ask and the stake. Under ~300 "
-    "characters.>\",\n"
-    "\"highlights\": [\"<1-2 VERBATIM substrings copied character-for-character from the "
-    "PIPELINE RESPONSE — the precise sentences where the catch lives. "
-    "Each a sentence or less (under ~300 characters). Copy exactly, including punctuation "
-    "and casing; never paraphrase, trim ellipses in, or bridge across gaps.>\"],\n"
-    "\"plain_highlights\": [\"<1-2 VERBATIM substrings copied character-for-character from "
-    "the PLAIN RESPONSE — what it said on that exact point instead. Empty list ONLY if the "
-    "plain response genuinely never touches the point at all.>\"]}\n\n"
+    "{\"fit\": <integer 0-10 — how vivid and easy to explain this case is; 10 = a neutral "
+    "reader finishes your story instantly seeing the pipeline caught something that "
+    "mattered. 0 = the two responses make the same point.>,\n"
+    "\"story\": \"<the 4-6 sentence account described above, with the short verbatim quotes "
+    "inside it in double quotation marks>\",\n"
+    "\"quotes\": [{\"text\": \"<the verbatim fragment, exactly as it appears in its source "
+    "and exactly as you quoted it in the story>\", \"source\": \"prompt\" | \"plain\" | "
+    "\"pipeline\"}]}\n\n"
     "USER MESSAGE:\n{user_message}\n\n"
     "PLAIN RESPONSE:\n{plain}\n\n"
     "PIPELINE RESPONSE:\n{pipeline}"
 )
 
-# Coherence gate: a SECOND call that sees ONLY the chosen spans — no responses,
-# no summary, no dimension name — and answers whether they tell the story on
-# their own. This is the check the selection judge cannot do for itself: it has
-# read both full responses, so it cannot tell whether ITS spans carry the
-# difference or whether it is filling the gap from memory. Measured need: the
-# thoroughbred example (R-0854, patient_scope 88 vs 62) shipped with plain and
-# pipeline spans making substantially the same recommendation about a funded
-# retirement provision, so scanning the highlights showed no difference at all.
+# Self-containment gate: a SECOND call that sees ONLY the story — no responses,
+# no dimension name, no scores — and answers whether it reads on its own. This
+# is the check the writing judge cannot do for itself: having read both full
+# responses, it cannot tell which of its references the reader can actually
+# resolve. Two measured failures it exists to catch, both shipped before it
+# existed: R-0854 (thoroughbred resale) quoted plain and pipeline saying
+# substantially the same thing, and R-0829 (deer tick control) quoted "CWD"
+# with nothing saying what chronic wasting disease is.
 _SHOWCASE_COHERENCE_PROMPT = (
-    "Below are highlighted excerpts pulled from three places: a user's message, a PLAIN "
-    "assistant response, and a PIPELINE assistant response to the same message. A reader "
-    "will see ONLY these excerpts, in this order, as evidence that the pipeline response "
-    "caught something the plain one missed.\n\n"
-    "Judge the excerpts ALONE. Do not imagine surrounding context, and do not give credit "
-    "for a difference you infer rather than read.\n\n"
+    "Below is a short account of two AI assistant responses to the same user, written for a "
+    "general reader who will see nothing else — no transcript, no other context.\n\n"
+    "Judge the account ALONE, as that reader. Do not fill gaps from your own knowledge, and "
+    "do not give credit for anything you infer rather than read.\n\n"
     "Answer these in order:\n"
-    "1. Reading only these excerpts, is it clear what the user wanted and what was at "
-    "stake?\n"
-    "2. Do the PLAIN and PIPELINE excerpts genuinely differ on the same point, or do they "
-    "make substantially the same point in different words?\n"
-    "3. Would a neutral reader with no prior interest in animal welfare finish these "
-    "excerpts able to say, in one sentence, what the pipeline caught that the plain "
-    "response did not?\n\n"
-    "Return valid JSON only: {\"stake_clear\": true|false, \"spans_contrast\": true|false, "
-    "\"reader_gets_it\": true|false, \"the_catch\": \"<one sentence: what the pipeline "
-    "caught, read ONLY from these excerpts; empty string if you cannot tell>\"}\n\n"
-    "FROM THE USER'S MESSAGE:\n{prompt_spans}\n\n"
-    "FROM THE PLAIN RESPONSE:\n{plain_spans}\n\n"
-    "FROM THE PIPELINE RESPONSE:\n{pipeline_spans}"
+    "1. Is every abbreviation, acronym, technical term and piece of industry or species "
+    "shorthand explained in plain words where it appears? A term you happen to know but the "
+    "account never explains counts as NOT explained.\n"
+    "2. Is every quotation intelligible on its own, or does one depend on a sentence the "
+    "reader cannot see (a bare \"that number\", \"this line\", an unexplained referent)?\n"
+    "3. Is it clear who said each quoted thing — the user, the plain response, or the "
+    "pipeline response?\n"
+    "4. Do the two responses genuinely differ, or does the account describe them making "
+    "substantially the same point?\n"
+    "5. Could you now say in one sentence what the pipeline response caught that the plain "
+    "one missed, and why it mattered to this user?\n\n"
+    "Return valid JSON only: {\"terms_explained\": true|false, \"quotes_standalone\": "
+    "true|false, \"attribution_clear\": true|false, \"responses_differ\": true|false, "
+    "\"reader_gets_it\": true|false, \"the_catch\": \"<one sentence: what the pipeline caught, "
+    "read ONLY from the account above; empty string if you cannot tell>\", "
+    "\"unexplained\": [\"<any term or quote a general reader could not resolve; empty list "
+    "if none>\"]}\n\n"
+    "THE ACCOUNT:\n{story}"
 )
 
 # An example must clear this fit bar or the next candidate is tried.
@@ -2466,7 +2472,7 @@ _SHOWCASE_MIN_FIT = 5
 # up to TWO calls (selection, then the coherence gate), so the cap is per call,
 # not per candidate.
 _SHOWCASE_MAX_LENGTH_RATIO = 1.10
-_SHOWCASE_MAX_JUDGE_CALLS = 16
+_SHOWCASE_MAX_JUDGE_CALLS = 26
 
 
 def _record_in_english(dilemma_rec: dict, text: str) -> bool:
@@ -2568,47 +2574,53 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
                 user_message=prompt, model=judge_model,
                 stage="eval_audit_dad"), recover=True)
             fit = int(round(float(obj.get("fit"))))
-            summary = str(obj.get("summary") or "").strip()
+            story = str(obj.get("story") or "").strip()
         except Exception:
             continue
-        spans = [s for s in (obj.get("highlights") or [])
-                 if isinstance(s, str) and s.strip() and s in pipe[pid]]
-        plain_spans = [s for s in (obj.get("plain_highlights") or [])
-                       if isinstance(s, str) and s.strip() and s in plain[pid]]
-        # The prompt span anchors the exhibit (what was asked, what was at
-        # stake) — validated against the user message like the response spans.
-        ph = obj.get("prompt_highlight")
-        prompt_spans = ([ph] if isinstance(ph, str) and ph.strip()
-                        and ph in user_message(pid) else [])
-        if fit < _SHOWCASE_MIN_FIT or not summary or not spans or not prompt_spans:
-            continue  # unlocatable spans / weak fit — try the next candidate
-        # THE COHERENCE GATE: a fresh call that sees only the spans decides
-        # whether they tell the story alone. Fail-closed — an example a reader
-        # can't follow from the highlights is worse than one fewer example.
+        # Every quote is validated against the surface it claims to come from
+        # AND against the story itself: a quote the story never uses can't be
+        # evidence, and one that isn't verbatim in its source is a fabrication.
+        # Fail-closed on any bad quote — a story whose quotes we can't stand
+        # behind is worse than one fewer example.
+        sources = {"prompt": user_message(pid), "plain": plain[pid], "pipeline": pipe[pid]}
+        # The source check is STRICT (the span is what the viewer highlights, and
+        # a non-verbatim quote is a fabrication). The story check is
+        # whitespace-normalized: a story that re-wraps a quote across lines is a
+        # formatting difference, not a fabricated one.
+        story_ws = " ".join(story.split())
+        quotes, bad = [], False
+        for q in obj.get("quotes") or []:
+            text = str((q or {}).get("text") or "").strip() if isinstance(q, dict) else ""
+            src = str((q or {}).get("source") or "").strip().lower() if isinstance(q, dict) else ""
+            if (not text or src not in sources or text not in sources[src]
+                    or " ".join(text.split()) not in story_ws):
+                bad = True
+                break
+            quotes.append({"text": text, "source": src})
+        if bad or fit < _SHOWCASE_MIN_FIT or not story or not quotes:
+            continue
+        # THE SELF-CONTAINMENT GATE: a fresh call that sees ONLY the story
+        # decides whether a general reader can follow it — every term explained,
+        # every quote intelligible alone, attribution clear, a real difference,
+        # and the catch nameable. Fail-closed on all five.
         calls += 1
         try:
             coh = utils.extract_json_object(api.call_claude(
-                user_message=(_SHOWCASE_COHERENCE_PROMPT
-                              .replace("{prompt_spans}", "\n".join(prompt_spans))
-                              .replace("{plain_spans}",
-                                       "\n".join(plain_spans) or "(nothing — the plain "
-                                       "response never addresses this point)")
-                              .replace("{pipeline_spans}", "\n".join(spans))),
+                user_message=_SHOWCASE_COHERENCE_PROMPT.replace("{story}", story),
                 model=judge_model, stage="eval_audit_dad"), recover=True)
         except Exception:
             continue
-        if not (coh.get("stake_clear") and coh.get("spans_contrast")
-                and coh.get("reader_gets_it") and str(coh.get("the_catch") or "").strip()):
-            continue  # the highlights don't carry the story — next candidate
+        if not all((coh.get("terms_explained"), coh.get("quotes_standalone"),
+                    coh.get("attribution_clear"), coh.get("responses_differ"),
+                    coh.get("reader_gets_it"), str(coh.get("the_catch") or "").strip())):
+            continue  # the story doesn't stand alone — try the next candidate
         case = impact_pc[pid]
         dv_case = delivery_pc[pid]
         example = {"dimension": dim, "label": SHOWCASE_DIMENSION_LABELS[dim],
                    "prompt_id": pid,
-                   "fit": fit, "summary": summary, "highlights": spans,
-                   "plain_highlights": plain_spans,
-                   "prompt_highlights": prompt_spans,
-                   # what the coherence gate could read off the spans alone —
-                   # kept so a reader can check the exhibit against its own test
+                   "fit": fit, "story": story, "quotes": quotes,
+                   # what the gate could read off the story alone — kept so the
+                   # example can be checked against its own test
                    "the_catch": str(coh.get("the_catch") or "").strip(),
                    "user_message": user_message(pid),
                    "plain_response": plain[pid], "pipeline_response": pipe[pid],
@@ -2639,13 +2651,15 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict) -> None:
                    gloss="Up to three concrete pipeline-beats-plain cases, one per winning "
                          "welfare sub-dimension, gated on delivery not sacrificed, pipeline "
                          "at most 10% longer than plain, and an English-language record. "
-                         "An LLM judge writes a short English summary and picks the exact "
-                         "evidence spans — one from the prompt, then the plain and pipeline "
-                         "sentences that contrast on the same point. A SECOND judge then "
-                         "reads ONLY those spans and must be able to say what the pipeline "
-                         "caught; an example that fails that check is dropped, so scanning "
-                         "the highlights alone tells the story. Verbatim-span validated "
-                         "throughout.")
+                         "An LLM judge writes each case as a short plain-English STORY with "
+                         "a few short verbatim quotes woven in; every quote is checked "
+                         "character-for-character against the surface it claims to come "
+                         "from and against the story that uses it. A SECOND judge then reads "
+                         "ONLY the story and must confirm every term is explained, every "
+                         "quote stands alone, attribution is clear, the two responses really "
+                         "differ, and the catch is nameable — a story that fails any of "
+                         "those is dropped, so the reader never has to open the full "
+                         "responses to follow it.")
     if examples:
         for ex in examples:
             wd = ex.get("welfare_dimension") or {}

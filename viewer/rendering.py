@@ -452,31 +452,6 @@ def audit_trigger_count_rows(pulls: dict, library_ids: list[str],
             for eid in library_ids]
 
 
-def showcase_excerpt(text: str, spans: list) -> str | None:
-    """Excerpt of a response for the showcase side-by-side: the paragraphs
-    containing any verbatim evidence span, in order, with "[…]" marking every
-    elided stretch. None when no span locates inside a single paragraph — the
-    caller then shows the full text, because an excerpt that misses its own
-    evidence is worse than length. Pure so it stays testable."""
-    spans = [s for s in spans or [] if isinstance(s, str) and s and s in text]
-    if not spans:
-        return None
-    paras = text.split("\n\n")
-    hits = [i for i, p in enumerate(paras) if any(s in p for s in spans)]
-    if not hits:
-        return None  # a span straddles a paragraph break — excerpting would mangle it
-    parts: list[str] = ["[…]"] if hits[0] > 0 else []
-    prev = None
-    for i in hits:
-        if prev is not None and i > prev + 1:
-            parts.append("[…]")
-        parts.append(paras[i])
-        prev = i
-    if hits[-1] < len(paras) - 1:
-        parts.append("[…]")
-    return "\n\n".join(parts)
-
-
 def list_templates(run_dir: Path, git_commit: str | None, pipeline: str) -> list[Template]:
     """Every template file relevant to a run (for the run-detail Prompts tab)."""
     names = []

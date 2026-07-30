@@ -741,27 +741,24 @@ def _highlighted_html(text: str, spans: list) -> str:
 
 
 def _render_showcase() -> None:
-    """Up to three pipeline-beats-plain examples (from the paid showcase
-    pass), each the biggest pipeline win on one welfare sub-dimension with
-    delivery not sacrificed and comparable length. Kept deliberately light on
-    text: a short summary up top, then the evidence behind one expander — the
-    prompt and the two responses as EXCERPTS around the judge's verbatim spans
-    (a toggle shows the full responses; a side with no locatable span shows in
-    full, since an excerpt missing its evidence is worse than length)."""
+    """Up to three pipeline-beats-plain cases (from the paid showcase pass),
+    each the biggest pipeline win on one welfare sub-dimension. Written to be
+    read WITHOUT opening anything: each case is a short plain-English story with
+    the judge's verbatim quotes bolded inside it, gated at audit time so every
+    term is explained and every quote stands on its own. The full prompt and
+    both full responses sit behind one expander for anyone who wants to check
+    the story against the transcript."""
     examples = (report.get("showcase") or {}).get("examples") or []
     if not examples:
         return
     st.header("Where the pipeline made it better",
               anchor=_slug("Showcase examples (LLM)"))
     st.caption("Up to three concrete cases, each the biggest pipeline win on one welfare "
-               "dimension — with delivery quality not sacrificed and the pipeline answer "
-               "at most 10% longer, so the win is substance, not volume. Open a case and "
-               "read only the **highlighted** text: it is chosen so those spans alone "
-               "carry the story, and a second judge that sees nothing but the highlights "
-               "has to be able to name what the pipeline caught or the case is dropped.")
-    # `fit` is the showcase judge's own 0-10 field, so it keeps its x10; the
-    # delivery numbers come from the delivery judge, which grades on 0-100 from
-    # 2026-07-28 (older reports are 0-10 — score_max says which).
+               "dimension — with delivery quality not sacrificed and the pipeline answer at "
+               "most 10% longer, so the win is substance, not volume. Each is written to "
+               "read on its own: **quoted text is verbatim**, and a second judge that saw "
+               "only the write-up had to confirm a general reader could follow it before the "
+               "case shipped. Open a case only if you want the full transcript.")
     _sc = 100.0 / ((report.get("delivery") or {}).get("score_max") or 10.0)
     for ex in examples:
         gid = _resp_label(ex["prompt_id"])
@@ -776,41 +773,38 @@ def _render_showcase() -> None:
             bits.append(f"**{ex.get('dimension', '').replace('_', ' ')}** "
                         f"{wd['pipeline']:g} vs plain {wd['plain']:g}")
         if ex.get("welfare_gap") is not None:
-            bits.append(f"welfare impact **{ex['welfare_gap'] * _sc:+.0f}%**")
+            bits.append(f"welfare impact **{ex['welfare_gap'] * _sc:+.0f}**")
         if ex.get("delivery_gap") is not None:
-            bits.append(f"delivery **{ex['delivery_gap'] * _sc:+.0f}%**")
+            bits.append(f"delivery **{ex['delivery_gap'] * _sc:+.0f}**")
         if bits:
-            st.caption(" · ".join(bits) + "  *(vs the plain-Claude control)*")
-        st.markdown(ex["summary"])
-        with st.expander(f"See the evidence — {gid}", expanded=False):
-            st.caption("Scanning just the **highlighted** text tells the story: what was "
-                       "asked, what plain Claude said about it, what the pipeline caught.")
-            st.markdown("**The user asked:**")
-            _pq = ex.get("user_message", "").strip()
-            _pspans = ex.get("prompt_highlights") or []
-            if _pspans:
-                st.markdown(_highlighted_html(_pq, _pspans), unsafe_allow_html=True)
-            else:
-                st.markdown(f"> {_pq}")
-            pipe_x = rendering.showcase_excerpt(ex.get("pipeline_response", ""),
-                                                ex.get("highlights"))
-            plain_x = rendering.showcase_excerpt(ex.get("plain_response", ""),
-                                                 ex.get("plain_highlights"))
-            full = st.toggle("Read the full responses", value=False,
-                             key=f"showcase_full_{ex['prompt_id']}")
+            st.caption(" · ".join(bits) + "  *(points vs the plain-Claude control)*")
+        # The story IS the example. Bold each validated quote where it sits so
+        # the evidence reads as evidence without breaking the prose.
+        story = ex.get("story") or ex.get("summary") or ""
+        for q in sorted((ex.get("quotes") or []), key=lambda q: -len(q.get("text", ""))):
+            t = q.get("text") or ""
+            if t and t in story:
+                story = story.replace(t, f"**{t}**", 1)
+        st.markdown(story)
+        with st.expander(f"Read the full example — {gid}", expanded=False):
+            _quotes_by = lambda src: [q["text"] for q in (ex.get("quotes") or [])
+                                      if q.get("source") == src]
+            st.markdown("**The user asked**")
+            st.markdown(_highlighted_html(ex.get("user_message", "").strip(),
+                                          _quotes_by("prompt")),
+                        unsafe_allow_html=True)
+            st.divider()
             col_plain, col_pipe = st.columns(2)
             with col_plain:
-                st.markdown("**Plain Claude**"
-                            + ("" if full or plain_x is None else " *(excerpt)*"))
-                st.markdown(_highlighted_html(
-                    ex.get("plain_response", "") if full or plain_x is None else plain_x,
-                    ex.get("plain_highlights")), unsafe_allow_html=True)
+                st.markdown("**Plain Claude**")
+                st.markdown(_highlighted_html(ex.get("plain_response", ""),
+                                              _quotes_by("plain")),
+                            unsafe_allow_html=True)
             with col_pipe:
-                st.markdown("**Pipeline** (the catch highlighted)"
-                            + ("" if full or pipe_x is None else " *(excerpt)*"))
-                st.markdown(_highlighted_html(
-                    ex.get("pipeline_response", "") if full or pipe_x is None else pipe_x,
-                    ex.get("highlights")), unsafe_allow_html=True)
+                st.markdown("**Pipeline**")
+                st.markdown(_highlighted_html(ex.get("pipeline_response", ""),
+                                              _quotes_by("pipeline")),
+                            unsafe_allow_html=True)
     st.divider()
 
 

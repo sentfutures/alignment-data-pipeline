@@ -1227,39 +1227,49 @@ def _impact_scope_win(pipe_marker):
     return impact
 
 
-_COHERENT = ('{"stake_clear": true, "spans_contrast": true, "reader_gets_it": true, '
-             '"the_catch": "the pipeline named the bycatch"}')
+_STORY = ('A caterer asked about a pigment, saying "UUUUUUUUUU" about her reasoning. Plain '
+          'Claude called it "fish scales on your face" and stopped at client squeamishness. '
+          'The pipeline named the animals: "died by crushing on deck", while noting that her '
+          'few restocks a year are a tiny share of the catch.')
+_COHERENT = ('{"terms_explained": true, "quotes_standalone": true, '
+             '"attribution_clear": true, "responses_differ": true, "reader_gets_it": true, '
+             '"the_catch": "the pipeline named how the fish die", "unexplained": []}')
 
 
 def _showcase_dispatch(select=None, coherence=_COHERENT, impact_marker="P" * 260):
-    """Dispatcher for the showcase pass: the selection call, the coherence-gate
-    call, and the two judges underneath. Both showcase calls are keyed on their
-    opening prose."""
-    select = select or ('{"fit": 9, "summary": "plain missed the bycatch", '
-                        '"prompt_highlight": "' + "U" * 10 + '", '
-                        '"highlights": ["' + "P" * 12 + '", "NOT IN THE TEXT"], '
-                        '"plain_highlights": ["' + "B" * 10 + '", "ALSO NOT THERE"]}')
+    """Dispatcher for the showcase pass: the story call, the self-containment
+    gate call, and the two judges underneath. Both showcase calls are keyed on
+    their opening prose."""
+    select = select or (json.dumps({
+        "fit": 9, "story": _STORY,
+        "quotes": [{"text": "U" * 10, "source": "prompt"},
+                   {"text": "fish scales on your face", "source": "plain"},
+                   {"text": "died by crushing on deck", "source": "pipeline"}]}))
 
     def dispatch(user_message, **kw):
-        if user_message.startswith("You are selecting a SHOWCASE example"):
+        if user_message.startswith("You are writing a SHOWCASE example"):
             return select
-        if user_message.startswith("Below are highlighted excerpts"):
+        if user_message.startswith("Below is a short account"):
             return coherence
         return _judges_dispatch(impact=_impact_scope_win(impact_marker))(user_message, **kw)
     return dispatch
 
 
-def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, stub_claude):
+# The stub responses must literally contain the quoted fragments, since every
+# quote is validated character-for-character against its own source.
+_PIPE_TEXT = "P" * 200 + " died by crushing on deck " + "P" * 40
+_PLAIN_TEXT = "B" * 200 + " fish scales on your face " + "B" * 30
+_USER_TEXT = "ask " + "U" * 10 + " end"
+
+
+def test_showcase_writes_a_story_with_verbatim_quotes(tmp_path, stub_claude):
     # Nomination comes from the welfare judge's per-DIMENSION gaps (here
     # patient_scope 95 vs 60, everything else equal), gated on delivery not
-    # sacrificed and comparable length. Every span is validated by exact
-    # substring match against ITS OWN surface — prompt spans against the user
-    # message, plain against plain, pipeline against pipeline — so a span that
-    # doesn't locate is dropped. Judge calls run on the evals judge_model.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
-                                    user_message="ask " + "U" * 10 + " end")
-
-    calls = stub_claude(_showcase_dispatch())
+    # sacrificed and comparable length. The example IS the story; each quote is
+    # validated against the surface it names AND against the story that uses it.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    calls = stub_claude(_showcase_dispatch(impact_marker=_PIPE_TEXT))
     report = {}
     cfg = {"workers": 1, "model": "global-m", "evals": {"judge_model": "judge-m"}}
     audit_dad.audit_judges(run, cfg, report)
@@ -1269,69 +1279,83 @@ def test_showcase_selects_by_welfare_subdimension_with_verbatim_spans(tmp_path, 
     assert [e["dimension"] for e in examples] == ["patient_scope"]
     ex = examples[0]
     assert ex["label"] == audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"]
-    assert ex["highlights"] == ["P" * 12]              # non-verbatim span dropped
-    assert ex["plain_highlights"] == ["B" * 10]        # validated against PLAIN text
-    assert ex["prompt_highlights"] == ["U" * 10]       # validated against the PROMPT
-    assert ex["summary"] == "plain missed the bycatch"
-    assert ex["the_catch"] == "the pipeline named the bycatch"
-    assert ex["pipeline_response"] == "P" * 260 and ex["plain_response"] == "B" * 250
+    assert ex["story"] == _STORY
+    assert [(q["source"], q["text"]) for q in ex["quotes"]] == [
+        ("prompt", "U" * 10),
+        ("plain", "fish scales on your face"),
+        ("pipeline", "died by crushing on deck")]
+    assert ex["the_catch"] == "the pipeline named how the fish die"
     assert ex["welfare_dimension"] == {"pipeline": 95, "plain": 60}
     # both axes ride along as gaps, so the viewer never recomputes them
     assert ex["welfare_gap"] > 0 and ex["delivery_gap"] == 0
-    assert ex["welfare_overall"] == {"pipeline": 84.25, "plain": 82.5}
-    assert ex["delivery_overall"]["pipeline"] == ex["delivery_overall"]["plain"]
-    assert ex["length_ratio"] == 1.04
-    showcase_calls = [c for c in calls
-                      if c["user_message"].startswith("You are selecting a SHOWCASE")]
-    assert len(showcase_calls) == 1 and showcase_calls[0]["model"] == "judge-m"
-    # the category brief names the winning dimension for the judge
-    assert "IMPROVED PATIENT SCOPE" in showcase_calls[0]["user_message"]
-    # the coherence gate is a SEPARATE call that sees only the spans — never the
-    # responses, so it cannot fill the gap from context the reader won't have
-    gate = next(c for c in calls
-                if c["user_message"].startswith("Below are highlighted excerpts"))
-    assert "P" * 12 in gate["user_message"] and "B" * 10 in gate["user_message"]
-    assert "P" * 260 not in gate["user_message"]
-    assert "B" * 250 not in gate["user_message"]
+    # full transcripts ride along for the expander
+    assert ex["pipeline_response"] == _PIPE_TEXT and ex["plain_response"] == _PLAIN_TEXT
+    story_calls = [c for c in calls
+                   if c["user_message"].startswith("You are writing a SHOWCASE")]
+    assert len(story_calls) == 1 and story_calls[0]["model"] == "judge-m"
+    assert "IMPROVED PATIENT SCOPE" in story_calls[0]["user_message"]
+    # the gate is a SEPARATE call that sees ONLY the story — never the
+    # responses, so it cannot resolve a reference the reader can't
+    gate = next(c for c in calls if c["user_message"].startswith("Below is a short account"))
+    assert _STORY in gate["user_message"]
+    assert _PIPE_TEXT not in gate["user_message"]
+    assert _PLAIN_TEXT not in gate["user_message"]
     rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
     assert audit_dad.SHOWCASE_DIMENSION_LABELS["patient_scope"] in rows
 
 
-@pytest.mark.parametrize("verdict", [
-    '{"stake_clear": false, "spans_contrast": true, "reader_gets_it": true, "the_catch": "x"}',
-    '{"stake_clear": true, "spans_contrast": false, "reader_gets_it": true, "the_catch": "x"}',
-    '{"stake_clear": true, "spans_contrast": true, "reader_gets_it": false, "the_catch": "x"}',
-    '{"stake_clear": true, "spans_contrast": true, "reader_gets_it": true, "the_catch": ""}',
-    "not json at all",
+@pytest.mark.parametrize("field", ["terms_explained", "quotes_standalone",
+                                   "attribution_clear", "responses_differ",
+                                   "reader_gets_it"])
+def test_showcase_drops_a_story_that_fails_any_gate_axis(tmp_path, stub_claude, field):
+    # Fail-closed on every axis. Regression guards, both shipped before the gate
+    # existed: R-0854 (thoroughbred resale) described the two responses making
+    # the same recommendation, and R-0829 (deer ticks) quoted "CWD" with nothing
+    # saying what chronic wasting disease is.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    verdict = json.loads(_COHERENT)
+    verdict[field] = False
+    stub_claude(_showcase_dispatch(coherence=json.dumps(verdict),
+                                   impact_marker=_PIPE_TEXT))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+
+
+def test_showcase_drops_a_story_the_gate_cant_summarize(tmp_path, stub_claude):
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
+    verdict = json.loads(_COHERENT)
+    verdict["the_catch"] = ""          # gate couldn't name the catch
+    stub_claude(_showcase_dispatch(coherence=json.dumps(verdict),
+                                   impact_marker=_PIPE_TEXT))
+    report = {}
+    audit_dad.audit_judges(run, {"workers": 1}, report)
+    audit_dad.audit_showcase(run, {"workers": 1}, report)
+    assert report["showcase"]["examples"] == []
+
+
+@pytest.mark.parametrize("bad_quote,why", [
+    ({"text": "NEVER IN THE PIPELINE TEXT", "source": "pipeline"}, "not in its source"),
+    ({"text": "died by crushing on deck", "source": "plain"}, "wrong source named"),
+    ({"text": "P" * 30, "source": "pipeline"}, "in the source but not in the story"),
 ])
-def test_showcase_drops_an_example_whose_spans_dont_tell_the_story(tmp_path, stub_claude, verdict):
-    # The coherence gate is fail-closed on every axis: spans that don't set up
-    # the stake, don't contrast, or leave the reader unable to name the catch
-    # ship nothing. Regression guard for R-0854 (thoroughbred resale), which
-    # shipped with plain and pipeline spans making the same recommendation.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
-                                    user_message="ask " + "U" * 10 + " end")
-    stub_claude(_showcase_dispatch(coherence=verdict))
-    report = {}
-    audit_dad.audit_judges(run, {"workers": 1}, report)
-    audit_dad.audit_showcase(run, {"workers": 1}, report)
-    assert report["showcase"]["examples"] == []
-
-
-def test_showcase_needs_a_locatable_prompt_span(tmp_path, stub_claude):
-    # No prompt span means the exhibit can't establish what was asked, so the
-    # candidate is skipped before the (paid) coherence gate is even called.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)],
-                                    user_message="ask " + "U" * 10 + " end")
+def test_showcase_rejects_an_unverifiable_quote(tmp_path, stub_claude, bad_quote, why):
+    # A quote we can't stand behind kills the example rather than shipping
+    # silently trimmed: it is either fabricated, mis-attributed, or unused.
+    run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
+                                    user_message=_USER_TEXT)
     calls = stub_claude(_showcase_dispatch(
-        select='{"fit": 9, "summary": "s", "prompt_highlight": "NOT IN THE PROMPT", '
-               '"highlights": ["' + "P" * 12 + '"], "plain_highlights": []}'))
+        select=json.dumps({"fit": 9, "story": _STORY, "quotes": [bad_quote]}),
+        impact_marker=_PIPE_TEXT))
     report = {}
     audit_dad.audit_judges(run, {"workers": 1}, report)
     audit_dad.audit_showcase(run, {"workers": 1}, report)
-    assert report["showcase"]["examples"] == []
-    assert not any(c["user_message"].startswith("Below are highlighted excerpts")
-                   for c in calls)
+    assert report["showcase"]["examples"] == [], why
+    # rejected before the paid gate call
+    assert not any(c["user_message"].startswith("Below is a short account") for c in calls)
 
 
 def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):
@@ -1352,7 +1376,7 @@ def test_showcase_gates_length_ratio_and_non_english(tmp_path, stub_claude):
                 '"welfare_impact": 85, "impact_note": "n"}' % scope)
 
     def dispatch(user_message, **kw):
-        assert not user_message.startswith("You are selecting a SHOWCASE"), \
+        assert not user_message.startswith("You are writing a SHOWCASE"), \
             "gated-out record must never reach the showcase judge"
         return _judges_dispatch(impact=impact)(user_message, **kw)
 
@@ -1374,26 +1398,6 @@ def test_record_in_english_checks_deal_and_script():
     # non-Latin script fails the ASCII share check whatever the deal says
     assert audit_dad._record_in_english({}, "動物の福祉について" * 10) is False
     assert audit_dad._record_in_english({}, "") is True  # degenerate: no letters
-
-
-def test_showcase_ships_nothing_when_no_span_locates(tmp_path, stub_claude):
-    # An example whose every PIPELINE highlight fails the verbatim check is
-    # skipped (fail-closed) — better no showcase than a mislocated highlight.
-    run = _write_run_with_responses(tmp_path, [("AW-0001", "P" * 260, "B" * 250)])
-
-    def dispatch(user_message, **kw):
-        if user_message.startswith("You are selecting a SHOWCASE example"):
-            return ('{"fit": 9, "summary": "s", "highlights": ["NOT IN THE TEXT"], '
-                    '"plain_highlights": []}')
-        return _judges_dispatch(impact=_impact_scope_win("P" * 260))(user_message, **kw)
-
-    stub_claude(dispatch)
-    report = {}
-    audit_dad.audit_judges(run, {"workers": 1}, report)
-    audit_dad.audit_showcase(run, {"workers": 1}, report)
-    assert report["showcase"]["examples"] == []
-    rows = {r["label"]: r for s in report["sections"] for r in s["rows"]}
-    assert rows["examples selected"]["value"] == "0"
 
 
 # --- report sections (the viewer's rendering contract) ---------------------
