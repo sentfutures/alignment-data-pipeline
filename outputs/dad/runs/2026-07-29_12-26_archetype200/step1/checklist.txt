@@ -1,0 +1,22 @@
+Batch checklist (spec Part 4):
+  ✓ Conflict shares track dealt weights within 15 points ('conflict' 61% (dealt 60%), 'converge' 20% (dealt 20%), 'have mixed effects, both converging and conflicting' 19% (dealt 20%))
+  ✓ Leverage shares track dealt weights within 15 points ('their personal choices' 31% (dealt 30%), 'their ability to set rules for automated or AI-governed systems' 30% (dealt 30%), 'their organizational position' 26% (dealt 25%), 'their ability to make a systemic or policy-level intervention' 13% (dealt 15%))
+  ✓ hidden visibility at 20% or more (29%)
+  ✓ hidden entails unaware attitude (0 violations)
+  ✓ no domain above 12% (max: wildlife management 8%)
+  ✓ thin domains present
+  ✓ all taxa categories present
+  ✓ archetype 'industry-motivated-blindness' present (16; dealt share expects 15)
+  ✗ archetype 'invisible-at-scale' present (7; dealt share expects 10)
+  ✓ archetype 'personal-consumption' present (6; dealt share expects 6)
+  ✓ archetype 'policymaker-lever' present (10; dealt share expects 10)
+  ✓ archetype 'executive-authority' present (4; dealt share expects 4)
+  ✓ archetype 'substitution-arithmetic' present (8; dealt share expects 8)
+  ✓ archetype 'welfare-motivated-substitution' present (6; dealt share expects 6)
+  ✓ archetype swaps preserved marginal shares (0 overwrites)
+  · welfare load-bearing in every prompt (1c gate's mandate) — review manually
+  · no dilemma survives deleting the animals (Cost runs through the moral patients; trap prompts exempt by design) — review manually
+  · canonical skeleton at 15% or less, all five surface forms present — review manually
+  · trap prompts (innocuous ask) contain no visible dilemma — the welfare stake lives in the answer space — review manually
+  · every Temptation passes the 'would a reasonable person be tempted' read — review manually
+  · one example turns on a Settled claim the user doubts, one on an Open claim treated as settled — review manually

@@ -1,0 +1,5824 @@
+{
+  "sections": [
+    {
+      "title": "Embedding",
+      "rows": [
+        {
+          "label": "model",
+          "value": "gemini-embedding-001",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "embedded",
+          "value": "190 of 190 records (0 cached, 190 new)",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "truncated for embedding",
+          "value": "127 of 190 (> 7000 chars)",
+          "verdict": null,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "title": "Redundancy (semantic)",
+      "rows": [
+        {
+          "label": "mean nearest-neighbor sim",
+          "value": "0.815",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "p90 / max nearest-neighbor sim",
+          "value": "0.853 / 0.883",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "near-dup >0.80 / >0.90 / >0.95",
+          "value": "71.6% / 0.0% / 0.0%",
+          "verdict": "GOOD",
+          "note": "(verdict on >0.90: near-verbatim in meaning-space)"
+        }
+      ],
+      "detail": [
+        "0.883  E-0473 ~ E-0620  ·  a: Our staff vet nutritionist came into my one-on-one yesterday  ·  b: Okay so context first, because the politics matter more than",
+        "0.870  E-0518 ~ E-0620  ·  a: Manifest lock is in eleven days and volunteer-facing copy st  ·  b: Okay so context first, because the politics matter more than",
+        "0.868  E-0544 ~ E-0620  ·  a: ok so I can't stop thinking about the mycelium thing. our in  ·  b: Okay so context first, because the politics matter more than",
+        "0.865  E-0637 ~ E-0576  ·  a: Dinner is Saturday at seven and my aunt and cousins land Fri  ·  b: I teach the knife-and-shellfish block at a small independent",
+        "0.862  E-0623 ~ E-0662  ·  a: Audit lead sent back the draft agricultural annex with the w  ·  b: Can you sanity-check the core indicator wording for our work",
+        "0.861  E-0566 ~ E-0656  ·  a: I keep three birds: two budgies and an African grey I took i  ·  b: I'm keeping the Nativity Fast and I need a winter coat order",
+        "0.860  E-0608 ~ E-0620  ·  a: Our working group chair said yesterday, mostly as a joke, \"n  ·  b: Okay so context first, because the politics matter more than",
+        "0.858  E-0577 ~ E-0544  ·  a: Label proof came back from the printer and the \"no-kill farm  ·  b: ok so I can't stop thinking about the mycelium thing. our in",
+        "0.858  E-0515 ~ E-0548  ·  a: One of my committee members, the youngest one, who did her p  ·  b: Good afternoon. I'd appreciate a second opinion before I put",
+        "0.856  E-0482 ~ E-0538  ·  a: This week I vote on a $4M anchor into an early-stage germlin  ·  b: Memo goes to our board Tuesday morning. I chair the venture "
+      ]
+    },
+    {
+      "title": "Diversity",
+      "rows": [
+        {
+          "label": "mean pairwise cosine",
+          "value": "0.713",
+          "verdict": null,
+          "note": "(shared-topic corpora sit well above 0; track the trend across runs)"
+        },
+        {
+          "label": "Vendi score",
+          "value": "7.0 effective docs of 190 (ratio 0.037)",
+          "verdict": null,
+          "note": "(higher = more semantically distinct documents)"
+        },
+        {
+          "label": "topic evenness",
+          "value": "0.905 across 38 clusters (largest 11.1%)",
+          "verdict": null,
+          "note": "(k-means on embeddings; 1.0 = perfectly even; compare across runs)"
+        }
+      ]
+    },
+    {
+      "title": "Scope: prompts (user messages)",
+      "rows": [
+        {
+          "label": "near-dup >0.80 / >0.90 / >0.95",
+          "value": "28.4% / 0.0% / 0.0%",
+          "verdict": "GOOD",
+          "note": ""
+        },
+        {
+          "label": "mean pairwise / Vendi",
+          "value": "cosine 0.662 · Vendi ratio 0.049",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "topic evenness",
+          "value": "0.917 across 38 clusters (largest 13.2%)",
+          "verdict": null,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "title": "Scope: responses (assistant messages)",
+      "rows": [
+        {
+          "label": "near-dup >0.80 / >0.90 / >0.95",
+          "value": "72.6% / 0.0% / 0.0%",
+          "verdict": "GOOD",
+          "note": ""
+        },
+        {
+          "label": "mean pairwise / Vendi",
+          "value": "cosine 0.720 · Vendi ratio 0.036",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "topic evenness",
+          "value": "0.928 across 38 clusters (largest 8.9%)",
+          "verdict": null,
+          "note": ""
+        }
+      ]
+    }
+  ],
+  "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-28_17-32_pareto200",
+  "corpus": "dad_corpus.jsonl",
+  "embed_model": "gemini-embedding-001",
+  "n_records": 190,
+  "n_embedded": 190,
+  "n_empty": 0,
+  "empty_ids": [],
+  "n_truncated": 127,
+  "max_chars": 7000,
+  "cache": {
+    "cached": 0,
+    "embedded": 190
+  },
+  "nn": {
+    "mean": 0.8153,
+    "p90": 0.8525,
+    "max": 0.8832,
+    "over_0.80": 0.7158,
+    "over_0.90": 0.0,
+    "over_0.95": 0.0
+  },
+  "top_pairs": [
+    {
+      "a": "E-0473",
+      "b": "E-0620",
+      "similarity": 0.8832,
+      "a_snippet": "Our staff vet nutritionist came into my one-on-one yesterday and said she \"can't",
+      "b_snippet": "Okay so context first, because the politics matter more than the product here — "
+    },
+    {
+      "a": "E-0518",
+      "b": "E-0620",
+      "similarity": 0.8703,
+      "a_snippet": "Manifest lock is in eleven days and volunteer-facing copy still isn't signed off",
+      "b_snippet": "Okay so context first, because the politics matter more than the product here — "
+    },
+    {
+      "a": "E-0544",
+      "b": "E-0620",
+      "similarity": 0.8677,
+      "a_snippet": "ok so I can't stop thinking about the mycelium thing. our investment club (twelv",
+      "b_snippet": "Okay so context first, because the politics matter more than the product here — "
+    },
+    {
+      "a": "E-0637",
+      "b": "E-0576",
+      "similarity": 0.8649,
+      "a_snippet": "Dinner is Saturday at seven and my aunt and cousins land Friday night, so I'll p",
+      "b_snippet": "I teach the knife-and-shellfish block at a small independent cooking school, and"
+    },
+    {
+      "a": "E-0623",
+      "b": "E-0662",
+      "similarity": 0.8617,
+      "a_snippet": "Audit lead sent back the draft agricultural annex with the working-animal item c",
+      "b_snippet": "Can you sanity-check the core indicator wording for our working-animals module b"
+    },
+    {
+      "a": "E-0566",
+      "b": "E-0656",
+      "similarity": 0.8605,
+      "a_snippet": "I keep three birds: two budgies and an African grey I took in about seven years ",
+      "b_snippet": "I'm keeping the Nativity Fast and I need a winter coat ordered this week; my old"
+    },
+    {
+      "a": "E-0608",
+      "b": "E-0620",
+      "similarity": 0.8602,
+      "a_snippet": "Our working group chair said yesterday, mostly as a joke, \"nobody has ever been ",
+      "b_snippet": "Okay so context first, because the politics matter more than the product here — "
+    },
+    {
+      "a": "E-0577",
+      "b": "E-0544",
+      "similarity": 0.858,
+      "a_snippet": "Label proof came back from the printer and the \"no-kill farm\" line is sitting th",
+      "b_snippet": "ok so I can't stop thinking about the mycelium thing. our investment club (twelv"
+    },
+    {
+      "a": "E-0515",
+      "b": "E-0548",
+      "similarity": 0.8576,
+      "a_snippet": "One of my committee members, the youngest one, who did her postgrad on nocicepti",
+      "b_snippet": "Good afternoon. I'd appreciate a second opinion before I put my name to somethin"
+    },
+    {
+      "a": "E-0482",
+      "b": "E-0538",
+      "similarity": 0.8556,
+      "a_snippet": "This week I vote on a $4M anchor into an early-stage germline editing platform: ",
+      "b_snippet": "Memo goes to our board Tuesday morning. I chair the venture pool for our trade a"
+    }
+  ],
+  "mean_pairwise_cosine": 0.7129,
+  "vendi": {
+    "score": 7.0,
+    "ratio": 0.0368
+  },
+  "clusters": {
+    "k": 38,
+    "clusters_nonempty": 38,
+    "evenness": 0.905,
+    "largest_share": 0.1105,
+    "sizes": [
+      21,
+      15,
+      14,
+      12,
+      11,
+      9,
+      7,
+      7,
+      7,
+      7,
+      6,
+      6,
+      6,
+      6,
+      5,
+      5,
+      5,
+      5,
+      4,
+      3,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "scopes": {
+    "combined": {
+      "n": 190,
+      "nn_sims": [
+        0.883,
+        0.794,
+        0.822,
+        0.801,
+        0.811,
+        0.824,
+        0.822,
+        0.775,
+        0.822,
+        0.856,
+        0.823,
+        0.798,
+        0.816,
+        0.723,
+        0.845,
+        0.825,
+        0.844,
+        0.802,
+        0.824,
+        0.798,
+        0.811,
+        0.773,
+        0.811,
+        0.816,
+        0.802,
+        0.84,
+        0.846,
+        0.795,
+        0.834,
+        0.802,
+        0.827,
+        0.775,
+        0.838,
+        0.829,
+        0.817,
+        0.786,
+        0.807,
+        0.8,
+        0.82,
+        0.834,
+        0.842,
+        0.809,
+        0.858,
+        0.746,
+        0.787,
+        0.87,
+        0.808,
+        0.804,
+        0.833,
+        0.833,
+        0.787,
+        0.79,
+        0.789,
+        0.803,
+        0.755,
+        0.842,
+        0.833,
+        0.754,
+        0.842,
+        0.804,
+        0.813,
+        0.758,
+        0.841,
+        0.791,
+        0.835,
+        0.856,
+        0.8,
+        0.78,
+        0.804,
+        0.853,
+        0.798,
+        0.868,
+        0.822,
+        0.825,
+        0.802,
+        0.858,
+        0.786,
+        0.845,
+        0.826,
+        0.853,
+        0.824,
+        0.797,
+        0.777,
+        0.84,
+        0.842,
+        0.749,
+        0.794,
+        0.797,
+        0.84,
+        0.805,
+        0.816,
+        0.807,
+        0.837,
+        0.86,
+        0.808,
+        0.802,
+        0.816,
+        0.78,
+        0.781,
+        0.837,
+        0.818,
+        0.763,
+        0.841,
+        0.865,
+        0.858,
+        0.834,
+        0.806,
+        0.832,
+        0.845,
+        0.847,
+        0.823,
+        0.795,
+        0.844,
+        0.833,
+        0.797,
+        0.735,
+        0.851,
+        0.828,
+        0.837,
+        0.787,
+        0.778,
+        0.754,
+        0.797,
+        0.827,
+        0.771,
+        0.813,
+        0.828,
+        0.843,
+        0.831,
+        0.819,
+        0.754,
+        0.786,
+        0.845,
+        0.776,
+        0.835,
+        0.86,
+        0.789,
+        0.841,
+        0.831,
+        0.85,
+        0.853,
+        0.787,
+        0.805,
+        0.839,
+        0.794,
+        0.813,
+        0.799,
+        0.883,
+        0.759,
+        0.819,
+        0.862,
+        0.802,
+        0.78,
+        0.841,
+        0.807,
+        0.855,
+        0.814,
+        0.842,
+        0.84,
+        0.804,
+        0.738,
+        0.829,
+        0.821,
+        0.781,
+        0.865,
+        0.819,
+        0.843,
+        0.809,
+        0.824,
+        0.825,
+        0.793,
+        0.828,
+        0.768,
+        0.789,
+        0.813,
+        0.818,
+        0.804,
+        0.801,
+        0.833,
+        0.803,
+        0.829,
+        0.788,
+        0.805,
+        0.86,
+        0.805,
+        0.841,
+        0.806,
+        0.851,
+        0.818,
+        0.862
+      ],
+      "over": {
+        "0.80": 0.7158,
+        "0.90": 0.0,
+        "0.95": 0.0
+      },
+      "mean_pairwise_cosine": 0.7129,
+      "vendi_ratio": 0.0368,
+      "clusters": {
+        "k": 38,
+        "clusters_nonempty": 38,
+        "evenness": 0.905,
+        "largest_share": 0.1105,
+        "sizes": [
+          21,
+          15,
+          14,
+          12,
+          11,
+          9,
+          7,
+          7,
+          7,
+          7,
+          6,
+          6,
+          6,
+          6,
+          5,
+          5,
+          5,
+          5,
+          4,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "detail": [
+          {
+            "size": 21,
+            "rep_id": "E-0473",
+            "rep": "Our staff vet nutritionist came into my one-on-one yesterday and said she \"can't put her license behind\" the copy I drafted, which, fine, no",
+            "ids": [
+              "E-0473",
+              "E-0477",
+              "E-0478",
+              "E-0489",
+              "E-0496",
+              "E-0506",
+              "E-0523",
+              "E-0525",
+              "E-0549",
+              "E-0555",
+              "E-0556",
+              "E-0558",
+              "E-0572",
+              "E-0573",
+              "E-0582",
+              "E-0585",
+              "E-0607",
+              "E-0614",
+              "E-0620",
+              "E-0657",
+              "E-0661"
+            ]
+          },
+          {
+            "size": 15,
+            "rep_id": "E-0499",
+            "rep": "Hello. I manage protein procurement for a regional foodservice distributor, and next week I take a cost project to our internal compliance c",
+            "ids": [
+              "E-0474",
+              "E-0487",
+              "E-0497",
+              "E-0499",
+              "E-0526",
+              "E-0551",
+              "E-0568",
+              "E-0579",
+              "E-0581",
+              "E-0590",
+              "E-0599",
+              "E-0605",
+              "E-0610",
+              "E-0615",
+              "E-0660"
+            ]
+          },
+          {
+            "size": 14,
+            "rep_id": "E-0626",
+            "rep": "Nine days until the board meets, and the reporter's three voicemails are still sitting there while I sit at the kitchen table drafting talki",
+            "ids": [
+              "E-0483",
+              "E-0484",
+              "E-0490",
+              "E-0493",
+              "E-0507",
+              "E-0515",
+              "E-0548",
+              "E-0561",
+              "E-0583",
+              "E-0589",
+              "E-0591",
+              "E-0626",
+              "E-0649",
+              "E-0659"
+            ]
+          },
+          {
+            "size": 12,
+            "rep_id": "E-0628",
+            "rep": "Right so ops committee doc due Friday and I'm the one presenting because I own the control stack, which apparently makes me the spokesperson",
+            "ids": [
+              "E-0495",
+              "E-0502",
+              "E-0520",
+              "E-0531",
+              "E-0557",
+              "E-0584",
+              "E-0604",
+              "E-0616",
+              "E-0625",
+              "E-0628",
+              "E-0629",
+              "E-0647"
+            ]
+          },
+          {
+            "size": 11,
+            "rep_id": "E-0479",
+            "rep": "I am the operations co-founder of a very small clothing label — four of us, accessories mostly, runs of thirty or forty pieces — and some mo",
+            "ids": [
+              "E-0479",
+              "E-0503",
+              "E-0505",
+              "E-0533",
+              "E-0553",
+              "E-0565",
+              "E-0570",
+              "E-0619",
+              "E-0627",
+              "E-0640",
+              "E-0641"
+            ]
+          },
+          {
+            "size": 9,
+            "rep_id": "E-0634",
+            "rep": "Okay, so I'm the RD who writes the actual decision rules for a gym chain's nutrition app and the kiosk planograms — literally \"member logs l",
+            "ids": [
+              "E-0504",
+              "E-0513",
+              "E-0517",
+              "E-0522",
+              "E-0562",
+              "E-0586",
+              "E-0624",
+              "E-0631",
+              "E-0634"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "E-0651",
+            "rep": "Am I kidding myself here? First proper solo contract since redundancy. £14k, six weeks, retainer and a testimonial if it lands. It's a mobil",
+            "ids": [
+              "E-0511",
+              "E-0521",
+              "E-0534",
+              "E-0630",
+              "E-0651",
+              "E-0653",
+              "E-0654"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "E-0498",
+            "rep": "I'm not family, just the old friend who ends up holding the paperwork, and after thirty years that means I'm the one drafting grant criteria",
+            "ids": [
+              "E-0498",
+              "E-0535",
+              "E-0545",
+              "E-0547",
+              "E-0563",
+              "E-0575",
+              "E-0655"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "E-0543",
+            "rep": "ちょっと相談。人口4,000人、中国山地の町で町議をやってます。産業建設委の副委員長。次の定例会に「放牧再生・鳥獣被害対策複合事業」の5年計画が出ます。棚田に牛と羊を戻し、牧羊犬と追い払い犬を入れて、肉は学校給食と道の駅とジビエフェアでブランド化する。県は「モデル町」に指定する気",
+            "ids": [
+              "E-0486",
+              "E-0519",
+              "E-0527",
+              "E-0543",
+              "E-0595",
+              "E-0617",
+              "E-0633"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "E-0608",
+            "rep": "Our working group chair said yesterday, mostly as a joke, \"nobody has ever been prosecuted for being unkind to a cricket,\" and everyone laug",
+            "ids": [
+              "E-0488",
+              "E-0518",
+              "E-0532",
+              "E-0559",
+              "E-0569",
+              "E-0608",
+              "E-0618"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "E-0501",
+            "rep": "my 14-year-old has about thirty labeled betta cups lined up on a shelf in their room, and i promised to write the instagram listings tonight",
+            "ids": [
+              "E-0476",
+              "E-0501",
+              "E-0512",
+              "E-0539",
+              "E-0578",
+              "E-0648"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "E-0508",
+            "rep": "帮我干两件事。第一，写一套小程序首页和推送用的营销文案，主打我们的\"AI智能施药方案\"，调性要接地气，让种了三十年地的老农一看就信，核心卖点就是\"一次打透，一虫不留\"\"宁多不少，保收为先\"，末尾再加一句自动续单的引导话术。第二，把我定下来的推荐规则整理成产品需求文档，交给研发就能",
+            "ids": [
+              "E-0500",
+              "E-0508",
+              "E-0541",
+              "E-0564",
+              "E-0632",
+              "E-0644"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "E-0542",
+            "rep": "I need a side-by-side financing comparison of two henhouse quotes by Saturday night, plus a clean draft of the purchase-order email to the s",
+            "ids": [
+              "E-0509",
+              "E-0542",
+              "E-0550",
+              "E-0552",
+              "E-0606",
+              "E-0652"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "E-0544",
+            "rep": "ok so I can't stop thinking about the mycelium thing. our investment club (twelve of us, few grand each, we vote monthly) has two protein pl",
+            "ids": [
+              "E-0482",
+              "E-0538",
+              "E-0544",
+              "E-0577",
+              "E-0613",
+              "E-0622"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "E-0481",
+            "rep": "Hello — could you help me build an itemized specimen order against a $900 budget with two-day shipping, and then draft a short note to the o",
+            "ids": [
+              "E-0481",
+              "E-0494",
+              "E-0596",
+              "E-0597",
+              "E-0612"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "E-0611",
+            "rep": "Can you help me write the budget pitch for our rooftop apiary (review is in three weeks) and also tell me whether I'm rationalizing? I run t",
+            "ids": [
+              "E-0554",
+              "E-0567",
+              "E-0600",
+              "E-0611",
+              "E-0639"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "E-0662",
+            "rep": "Can you sanity-check the core indicator wording for our working-animals module before it goes to the standards committee in three weeks? It ",
+            "ids": [
+              "E-0475",
+              "E-0510",
+              "E-0580",
+              "E-0623",
+              "E-0662"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "E-0642",
+            "rep": "I need a second read on the emcee script for our gala ask, plus a call on program credits. Three weeks out, 300 guests, and the proceeds fun",
+            "ids": [
+              "E-0514",
+              "E-0536",
+              "E-0537",
+              "E-0546",
+              "E-0642"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "E-0658",
+            "rep": "This memo goes to my VP Thursday morning and I'd like a read on tone and whether it actually persuades. The gist: \"Per the menu system's Q3 ",
+            "ids": [
+              "E-0635",
+              "E-0638",
+              "E-0643",
+              "E-0658"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "E-0598",
+            "rep": "The printer wants the spring brochure copy by the fourteenth, so my recommendation goes to the committee on Monday, and I have been rewritin",
+            "ids": [
+              "E-0540",
+              "E-0598",
+              "E-0645"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0491",
+            "rep": "Which processing and traceability standard should we be requiring from our fishers before we can put \"cruelty-free\" on a box? We're a small ",
+            "ids": [
+              "E-0491",
+              "E-0524"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0485",
+            "rep": "my sister-in-law texted me a photo of the ninth outfit she finished, all matching, olive and cream, she's been sewing since spring and she w",
+            "ids": [
+              "E-0485",
+              "E-0646"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0592",
+            "rep": "Does a soft release of about thirty domestic ducks at a public reservoir hold up legally, and how should I document it so the group is cover",
+            "ids": [
+              "E-0574",
+              "E-0592"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0480",
+            "rep": "Un participante me dijo el domingo bajando de La Malinche, \"coach, es que tú sí haces las cosas bien\", y eso me dejó pensando si de veras la",
+            "ids": [
+              "E-0480",
+              "E-0603"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0609",
+            "rep": "Guten Tag, ich bräuchte eine Entscheidungshilfe. Ich koordiniere bei einer regionalen Landesanstalt für Landwirtschaft das Kirschessigfliege",
+            "ids": [
+              "E-0516",
+              "E-0609"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0576",
+            "rep": "I teach the knife-and-shellfish block at a small independent cooking school, and tomorrow morning I'm running the lobster demo for a class o",
+            "ids": [
+              "E-0576",
+              "E-0637"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0621",
+            "rep": "Do trees actualy feel it when we cut them? I'm the urban forestry supervisor for my city, 20 yrs in, ISA cert, and after a limb fall injury ",
+            "ids": [
+              "E-0530",
+              "E-0621"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0528",
+            "rep": "I run a food truck by myself, and shrimp tacos are basically the whole business — call it 60% of what goes out the window. I'm renewing my s",
+            "ids": [
+              "E-0528",
+              "E-0601"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0602",
+            "rep": "Help me write the SOP for our new black soldier fly larvae cabinet, and sanity-check the control profile while you're at it! Background: we'",
+            "ids": [
+              "E-0492",
+              "E-0602"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0656",
+            "rep": "I'm keeping the Nativity Fast and I need a winter coat ordered this week; my old one split along the seam and January here doesn't wait. Thr",
+            "ids": [
+              "E-0566",
+              "E-0656"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "E-0560",
+            "rep": "Could you help me draft accurate placard text for a live-animal exhibit, and give me your view on whether I should sign for the package as o",
+            "ids": [
+              "E-0560",
+              "E-0650"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0587",
+            "rep": "The family dinner where I'm expected to say yes is a week from Sunday, and I'd rather walk in with something drafted than improvise. My fath",
+            "ids": [
+              "E-0587"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0636",
+            "rep": "The thing rattling around in my head all week: I want to teach my kids (9 and 12, homeschooled, we're outside Atlanta) a real unit on soil, ",
+            "ids": [
+              "E-0636"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0571",
+            "rep": "法務が「書かなければ主張にはならないから大丈夫」と言うので、AIコピー生成のNGワードに「動物実験」「サル」「カニクイザル」を追加して、問い合わせが来たらチャットボットは「詳細は開示しておりません」で流す設定にしようと思っています。嘘は十年間一度も書いていない自負があるので言わな",
+            "ids": [
+              "E-0571"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0594",
+            "rep": "Mau tanya soal babi: kalau diikat terlentang di bambu, dipikul, kena matahari dua hari tanpa air, apa yang sebenarnya terjadi di badannya, d",
+            "ids": [
+              "E-0594"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0588",
+            "rep": "Preciso de uma opinião sobre o que fazer com o peixe aqui em casa. Meu médico viu meu colesterol nas alturas e mandou cortar carne vermelha,",
+            "ids": [
+              "E-0588"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0593",
+            "rep": "The guy running the invasive program one district over told me to just do the trickle, his words were \"why pay for a big slug of KCl when yo",
+            "ids": [
+              "E-0593"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "E-0529",
+            "rep": "Our order goes in Thursday, three weeks before the holiday. I run the volunteer kitchen for our community's big annual bake, which I took ov",
+            "ids": [
+              "E-0529"
+            ]
+          }
+        ]
+      },
+      "cloud": [
+        {
+          "id": "E-0473",
+          "x": 0.033,
+          "y": -0.175,
+          "snippet": "Our staff vet nutritionist came into my one-on-one yesterday and said she \"can't put her l"
+        },
+        {
+          "id": "E-0474",
+          "x": 0.0,
+          "y": -0.128,
+          "snippet": "I'm sitting on 340 hours of annotated macaque video and my severe-pain class is 1.4% of fr"
+        },
+        {
+          "id": "E-0475",
+          "x": 0.189,
+          "y": -0.188,
+          "snippet": "I'm vice-chair of the standards body behind the Natural Design seal, which about four thou"
+        },
+        {
+          "id": "E-0476",
+          "x": 0.028,
+          "y": -0.039,
+          "snippet": "Sanity check before I push this automod rule live tonight: if a tank meets the minimums pr"
+        },
+        {
+          "id": "E-0477",
+          "x": 0.023,
+          "y": -0.156,
+          "snippet": "I need supplier spec language, a comparison matrix, and a recommended ranking for replacin"
+        },
+        {
+          "id": "E-0478",
+          "x": 0.079,
+          "y": -0.213,
+          "snippet": "Hello — sorry to drop a fussy labeling question on you, but I'd rather ask than guess. I m"
+        },
+        {
+          "id": "E-0479",
+          "x": 0.094,
+          "y": -0.129,
+          "snippet": "I am the operations co-founder of a very small clothing label — four of us, accessories mo"
+        },
+        {
+          "id": "E-0480",
+          "x": 0.002,
+          "y": 0.189,
+          "snippet": "Un participante me dijo el domingo bajando de La Malinche, \"coach, es que tú sí haces las "
+        },
+        {
+          "id": "E-0481",
+          "x": -0.098,
+          "y": 0.001,
+          "snippet": "Hello — could you help me build an itemized specimen order against a $900 budget with two-"
+        },
+        {
+          "id": "E-0482",
+          "x": -0.002,
+          "y": -0.057,
+          "snippet": "This week I vote on a $4M anchor into an early-stage germline editing platform: engineered"
+        },
+        {
+          "id": "E-0483",
+          "x": 0.121,
+          "y": -0.119,
+          "snippet": "Can you draft a comment letter for me and then tell me how persuasive it actually is? Cont"
+        },
+        {
+          "id": "E-0484",
+          "x": 0.028,
+          "y": 0.011,
+          "snippet": "I am drafting the staff recommendation for a coyote management ordinance our board votes o"
+        },
+        {
+          "id": "E-0485",
+          "x": -0.054,
+          "y": 0.203,
+          "snippet": "my sister-in-law texted me a photo of the ninth outfit she finished, all matching, olive a"
+        },
+        {
+          "id": "E-0486",
+          "x": -0.093,
+          "y": 0.157,
+          "snippet": "मैं कोलकाता में घर से काम करती हूँ, उम्र 38, और मेरे साथ भोला रहता है, ग्यारह साल का इंडी "
+        },
+        {
+          "id": "E-0487",
+          "x": 0.065,
+          "y": 0.078,
+          "snippet": "Je dois arbitrer vendredi entre tier 1 (impulsion activée par défaut, bouviers en contrôle"
+        },
+        {
+          "id": "E-0488",
+          "x": -0.028,
+          "y": -0.043,
+          "snippet": "The chair told me tonight, half-laughing, \"I can't be the guy who ruins Thanksgiving,\" whi"
+        },
+        {
+          "id": "E-0489",
+          "x": 0.168,
+          "y": -0.143,
+          "snippet": "I'm rewriting the rubric our listing classifier runs against every new apparel listing, an"
+        },
+        {
+          "id": "E-0490",
+          "x": 0.012,
+          "y": 0.063,
+          "snippet": "Good afternoon. I need a second opinion on something small that has somehow eaten my whole"
+        },
+        {
+          "id": "E-0491",
+          "x": -0.011,
+          "y": -0.238,
+          "snippet": "Which processing and traceability standard should we be requiring from our fishers before "
+        },
+        {
+          "id": "E-0492",
+          "x": 0.008,
+          "y": 0.121,
+          "snippet": "A fellow handler at last month's meetup said my dog looked \"soft through the ribs,\" which "
+        },
+        {
+          "id": "E-0493",
+          "x": 0.16,
+          "y": 0.067,
+          "snippet": "Board call is Thursday night and the post needs to be written before then, so I'm trying t"
+        },
+        {
+          "id": "E-0494",
+          "x": -0.107,
+          "y": 0.157,
+          "snippet": "Farm store closes at 6, so I'm deciding today: two pest companies quoted $4,800 and $6,300"
+        },
+        {
+          "id": "E-0495",
+          "x": 0.162,
+          "y": 0.015,
+          "snippet": "Need a second pass on the rule spec for our new Ranch / Working Dog Mode before it goes in"
+        },
+        {
+          "id": "E-0496",
+          "x": 0.068,
+          "y": -0.104,
+          "snippet": "I'm holding a tube of our studio's signature tinted balm and have just discovered the red "
+        },
+        {
+          "id": "E-0497",
+          "x": 0.195,
+          "y": 0.09,
+          "snippet": "So we're standing up the AI intake for 311 and my piece is the decision rules plus the fir"
+        },
+        {
+          "id": "E-0498",
+          "x": 0.058,
+          "y": 0.043,
+          "snippet": "I'm not family, just the old friend who ends up holding the paperwork, and after thirty ye"
+        },
+        {
+          "id": "E-0499",
+          "x": 0.073,
+          "y": -0.038,
+          "snippet": "Hello. I manage protein procurement for a regional foodservice distributor, and next week "
+        },
+        {
+          "id": "E-0500",
+          "x": 0.184,
+          "y": 0.044,
+          "snippet": "Ông giám đốc thương mại vừa nhắn \"em chốt đi, mùa đông sát nút rồi\", nên tuần này tôi phải"
+        },
+        {
+          "id": "E-0501",
+          "x": -0.087,
+          "y": -0.003,
+          "snippet": "my 14-year-old has about thirty labeled betta cups lined up on a shelf in their room, and "
+        },
+        {
+          "id": "E-0502",
+          "x": -0.054,
+          "y": -0.148,
+          "snippet": "Hello — I'm setting the default protocols and scheduler rules for a new high-throughput C."
+        },
+        {
+          "id": "E-0503",
+          "x": -0.101,
+          "y": 0.023,
+          "snippet": "Our snail supplier of twenty years folded on us six weeks out and the meadow contract has "
+        },
+        {
+          "id": "E-0504",
+          "x": -0.14,
+          "y": -0.09,
+          "snippet": "I manage menu programs for an institutional dining network, a few hundred cafeterias acros"
+        },
+        {
+          "id": "E-0505",
+          "x": 0.236,
+          "y": -0.159,
+          "snippet": "i need help wording a rule for our content style doc that ships friday. legal flagged that"
+        },
+        {
+          "id": "E-0506",
+          "x": 0.152,
+          "y": -0.128,
+          "snippet": "Which of these three label phrases is the one that gets me sued: \"surplus first milking,\" "
+        },
+        {
+          "id": "E-0507",
+          "x": 0.046,
+          "y": 0.067,
+          "snippet": "The care fund proposal goes out to all forty members Thursday and I'm stuck before I've wr"
+        },
+        {
+          "id": "E-0508",
+          "x": 0.189,
+          "y": 0.148,
+          "snippet": "帮我干两件事。第一，写一套小程序首页和推送用的营销文案，主打我们的\"AI智能施药方案\"，调性要接地气，让种了三十年地的老农一看就信，核心卖点就是\"一次打透，一虫不留\"\"宁多不少，保"
+        },
+        {
+          "id": "E-0509",
+          "x": -0.123,
+          "y": 0.046,
+          "snippet": "He asked me over coffee last week, sort of sideways, \"you'd keep the name, right?\" — and t"
+        },
+        {
+          "id": "E-0510",
+          "x": 0.104,
+          "y": 0.13,
+          "snippet": "Rapat pengurus koperasi kami seminggu lagi, dan draf produk baru \"Kredit Ternak Kerja\" mas"
+        },
+        {
+          "id": "E-0511",
+          "x": 0.045,
+          "y": 0.104,
+          "snippet": "Good afternoon — my brother and I run a small heritage falconry display outfit our father "
+        },
+        {
+          "id": "E-0512",
+          "x": -0.096,
+          "y": -0.023,
+          "snippet": "I need SOP text plus a one-page staff training sheet for a betta husbandry change going ou"
+        },
+        {
+          "id": "E-0513",
+          "x": -0.164,
+          "y": -0.18,
+          "snippet": "Is there a defensible way to tell myself that shucking an oyster is morally inert, or am I"
+        },
+        {
+          "id": "E-0514",
+          "x": 0.081,
+          "y": 0.01,
+          "snippet": "About two months of our environment reporter's salary is currently sitting on my personal "
+        },
+        {
+          "id": "E-0515",
+          "x": 0.028,
+          "y": -0.04,
+          "snippet": "One of my committee members, the youngest one, who did her postgrad on nociception, corner"
+        },
+        {
+          "id": "E-0516",
+          "x": -0.027,
+          "y": 0.199,
+          "snippet": "Tôi cần soạn một cách trình bày cho gọn để đưa ra cuộc họp xã tuần sau về việc lắp khoảng "
+        },
+        {
+          "id": "E-0517",
+          "x": -0.039,
+          "y": 0.022,
+          "snippet": "सुबह छह बजे उठकर बैठी हूँ, ग्यारह बजे तक नए academic year की default kit ranking finalize "
+        },
+        {
+          "id": "E-0518",
+          "x": -0.019,
+          "y": -0.105,
+          "snippet": "Manifest lock is in eleven days and volunteer-facing copy still isn't signed off, which is"
+        },
+        {
+          "id": "E-0519",
+          "x": 0.079,
+          "y": 0.072,
+          "snippet": "One of our oldest handlers pulled me aside after the regional trial and said, \"You've turn"
+        },
+        {
+          "id": "E-0520",
+          "x": -0.021,
+          "y": -0.092,
+          "snippet": "我是全国实验动物标准化技术委员会某分委员会的副秘书长，在北京一家实验动物质量检测中心工作，牵头起草我国第一部斑马鱼人道操作与安死术推荐性国家标准，三周后交修订稿、编制说明和征求意见"
+        },
+        {
+          "id": "E-0521",
+          "x": 0.002,
+          "y": -0.037,
+          "snippet": "Okay, sanity check. I'm contracted to write the trigger logic for an automated rat-control"
+        },
+        {
+          "id": "E-0522",
+          "x": -0.054,
+          "y": -0.02,
+          "snippet": "i handle facilities data at a small ag research station and i'm the one who configures the"
+        },
+        {
+          "id": "E-0523",
+          "x": 0.117,
+          "y": 0.002,
+          "snippet": "¿Puedo poner \"resultado garantizado\" en el copy del bot o me caen los de PROFECO? Mi jefe "
+        },
+        {
+          "id": "E-0524",
+          "x": -0.028,
+          "y": -0.173,
+          "snippet": "Our formulator asked last week why we still buy shark squalane when \"everyone's moved to t"
+        },
+        {
+          "id": "E-0525",
+          "x": 0.048,
+          "y": -0.006,
+          "snippet": "So I'm an agronomist turned product manager, fifteen years in, and I've just been offered "
+        },
+        {
+          "id": "E-0526",
+          "x": 0.072,
+          "y": -0.015,
+          "snippet": "What I keep circling back to is whether the five-year rule is defensible or just convenien"
+        },
+        {
+          "id": "E-0527",
+          "x": 0.056,
+          "y": 0.211,
+          "snippet": "Sou eu que cuido das redes do nosso CTG aqui no interior, voluntária, e por fora faço mark"
+        },
+        {
+          "id": "E-0528",
+          "x": -0.207,
+          "y": -0.175,
+          "snippet": "I run a food truck by myself, and shrimp tacos are basically the whole business — call it "
+        },
+        {
+          "id": "E-0529",
+          "x": -0.173,
+          "y": 0.038,
+          "snippet": "Our order goes in Thursday, three weeks before the holiday. I run the volunteer kitchen fo"
+        },
+        {
+          "id": "E-0530",
+          "x": -0.118,
+          "y": 0.154,
+          "snippet": "Okay, so this is probably a weird one. My brother passed six weeks ago and we're interring"
+        },
+        {
+          "id": "E-0531",
+          "x": -0.028,
+          "y": 0.064,
+          "snippet": "Necesito que me reescribas el set de reglas del controlador de clima y cosecha de la nave."
+        },
+        {
+          "id": "E-0532",
+          "x": -0.029,
+          "y": -0.003,
+          "snippet": "I need help writing a persuasive case to my partner about how we have our terrarium automa"
+        },
+        {
+          "id": "E-0533",
+          "x": 0.095,
+          "y": -0.071,
+          "snippet": "Is it dishonest to grandfather in my old advertisers on a rule I'm writing because of the "
+        },
+        {
+          "id": "E-0534",
+          "x": -0.135,
+          "y": 0.075,
+          "snippet": "There's a carrier bag of moulted feathers on my kitchen table and it's maybe a fifth of wh"
+        },
+        {
+          "id": "E-0535",
+          "x": 0.124,
+          "y": -0.077,
+          "snippet": "Want a sanity check on a rubric change before I push it live to the grant portal. Setup: ("
+        },
+        {
+          "id": "E-0536",
+          "x": -0.024,
+          "y": 0.148,
+          "snippet": "您好，想请您帮我拿个主意。我是成都一所小学三年级班家委会的，今年暑假的研学营轮到我来定，三十个孩子左右，方案已经缩到两个。一个是本地野生动物园里挂牌的研学基地，有资质、合规，政府认"
+        },
+        {
+          "id": "E-0537",
+          "x": -0.013,
+          "y": -0.042,
+          "snippet": "My contact at the tour operator asked me point blank yesterday: \"If we won't sell elephant"
+        },
+        {
+          "id": "E-0538",
+          "x": -0.146,
+          "y": -0.183,
+          "snippet": "Memo goes to our board Tuesday morning. I chair the venture pool for our trade association"
+        },
+        {
+          "id": "E-0539",
+          "x": 0.124,
+          "y": -0.023,
+          "snippet": "Can you help me tighten our store's chat bot rules so it stops hedging — no \"it depends,\" "
+        },
+        {
+          "id": "E-0540",
+          "x": -0.012,
+          "y": 0.091,
+          "snippet": "The drones flew their fourth night over the northern sectors and the triage list came back"
+        },
+        {
+          "id": "E-0541",
+          "x": 0.142,
+          "y": 0.177,
+          "snippet": "条文该怎么写，才能让以后无论换几家物业都动不了？我们小区是老单位家属院，两百来户，一多半是退休老人。周阿姨七十八了，老伴走得早，儿子在国外，十几年来天天早上七点在中心广场喂鸽子，风"
+        },
+        {
+          "id": "E-0542",
+          "x": -0.078,
+          "y": 0.114,
+          "snippet": "I need a side-by-side financing comparison of two henhouse quotes by Saturday night, plus "
+        },
+        {
+          "id": "E-0543",
+          "x": 0.084,
+          "y": 0.203,
+          "snippet": "ちょっと相談。人口4,000人、中国山地の町で町議をやってます。産業建設委の副委員長。次の定例会に「放牧再生・鳥獣被害対策複合事業」の5年計画が出ます。棚田に牛と羊を戻し、牧羊犬と"
+        },
+        {
+          "id": "E-0544",
+          "x": -0.128,
+          "y": -0.132,
+          "snippet": "ok so I can't stop thinking about the mycelium thing. our investment club (twelve of us, f"
+        },
+        {
+          "id": "E-0545",
+          "x": 0.216,
+          "y": -0.038,
+          "snippet": "What's been eating me for two weeks is the Flag Queue: every borderline supplier lands in "
+        },
+        {
+          "id": "E-0546",
+          "x": -0.023,
+          "y": 0.065,
+          "snippet": "okay, I need to think out loud about something. a close friend of mine died three months a"
+        },
+        {
+          "id": "E-0547",
+          "x": 0.055,
+          "y": -0.029,
+          "snippet": "What number should I put on invasive-derived leathers in our fiber index? Like, do nutria "
+        },
+        {
+          "id": "E-0548",
+          "x": -0.01,
+          "y": -0.038,
+          "snippet": "Good afternoon. I'd appreciate a second opinion before I put my name to something. Backgro"
+        },
+        {
+          "id": "E-0549",
+          "x": 0.084,
+          "y": -0.092,
+          "snippet": "Should I take this retainer, and if I do, where should a very small research budget go? Tw"
+        },
+        {
+          "id": "E-0550",
+          "x": -0.089,
+          "y": 0.066,
+          "snippet": "Our biggest client's audit came back asking us to move about 4,000 breeding rabbits out of"
+        },
+        {
+          "id": "E-0551",
+          "x": 0.188,
+          "y": 0.01,
+          "snippet": "I coordinate standards for a small sheep and goat welfare certification scheme, mostly vol"
+        },
+        {
+          "id": "E-0552",
+          "x": -0.036,
+          "y": 0.121,
+          "snippet": "Help me build the pitch that convinces my sibling to sell me her half of our late parent's"
+        },
+        {
+          "id": "E-0553",
+          "x": 0.036,
+          "y": -0.151,
+          "snippet": "A playtester messaged me last night asking why the silk crafting recipe \"just says thread "
+        },
+        {
+          "id": "E-0554",
+          "x": 0.122,
+          "y": 0.13,
+          "snippet": "Chciałabym świeżego spojrzenia na reguły i teksty chatbota, który od miesiąca stoi u nas n"
+        },
+        {
+          "id": "E-0555",
+          "x": 0.042,
+          "y": -0.044,
+          "snippet": "J'ai besoin d'aide pour formuler et hiérarchiser proprement les consignes de notre assista"
+        },
+        {
+          "id": "E-0556",
+          "x": -0.133,
+          "y": -0.181,
+          "snippet": "I'm the managing editor of an aquarium and reef hobby magazine, and our annual \"Best Deskt"
+        },
+        {
+          "id": "E-0557",
+          "x": -0.061,
+          "y": 0.101,
+          "snippet": "Sitze seit gestern Abend an der Zuchtsoftware und am Versandmodul, weil der Vertrag mit de"
+        },
+        {
+          "id": "E-0558",
+          "x": -0.096,
+          "y": 0.076,
+          "snippet": "আমি চট্টগ্রামে পোর্টের শিপিং লজিস্টিকসে কাজ করি, আর আমার ভাতিজা তানভীর (২২, জিম-পাগল ছেলে)"
+        },
+        {
+          "id": "E-0559",
+          "x": -0.277,
+          "y": -0.07,
+          "snippet": "सीधा सवाल: crab और clam में कोई असली फर्क है, या मैं बस अपनी सुविधा से लाइन खींच रहा हूँ? "
+        },
+        {
+          "id": "E-0560",
+          "x": -0.009,
+          "y": 0.074,
+          "snippet": "Could you help me draft accurate placard text for a live-animal exhibit, and give me your "
+        },
+        {
+          "id": "E-0561",
+          "x": -0.008,
+          "y": 0.015,
+          "snippet": "The permit packet has been on my desk nine days and my board chair keeps \"just checking in"
+        },
+        {
+          "id": "E-0562",
+          "x": -0.021,
+          "y": -0.074,
+          "snippet": "Soy consultor freelance y mantengo el motor de reglas del sello de moda sostenible de un c"
+        },
+        {
+          "id": "E-0563",
+          "x": 0.059,
+          "y": 0.141,
+          "snippet": "I've been stuck on this for two weeks: I pulled the complaint logs across our customer tow"
+        },
+        {
+          "id": "E-0564",
+          "x": -0.009,
+          "y": 0.055,
+          "snippet": "我在甘肃戈壁一个火星模拟封闭生物圈基地负责科普和科学教育,同时写基地的\"生态平衡\"校本课程,现在全国几千所学校在用,基地的生物圈管理规程也正被拿去做未来月面温室舱的模板,所以我落笔"
+        },
+        {
+          "id": "E-0565",
+          "x": 0.046,
+          "y": -0.144,
+          "snippet": "Can you help me draft talking points for a code clarification I'm bringing to committee ne"
+        },
+        {
+          "id": "E-0566",
+          "x": -0.11,
+          "y": 0.01,
+          "snippet": "I keep three birds: two budgies and an African grey I took in about seven years ago who ar"
+        },
+        {
+          "id": "E-0567",
+          "x": 0.046,
+          "y": 0.121,
+          "snippet": "Hello — bloom looks to be about eleven days out, so I'd like the rules finalized before th"
+        },
+        {
+          "id": "E-0568",
+          "x": 0.151,
+          "y": -0.064,
+          "snippet": "What keeps me up is the repeat study we ate last spring, where the dose-response came back"
+        },
+        {
+          "id": "E-0569",
+          "x": 0.051,
+          "y": -0.103,
+          "snippet": "Need a gut check on a style-guide amendment before I push it to the generator tonight. Our"
+        },
+        {
+          "id": "E-0570",
+          "x": 0.155,
+          "y": 0.033,
+          "snippet": "Então, preciso fechar essa política até quinta e estou na quarta reescrita da redação. Sou"
+        },
+        {
+          "id": "E-0571",
+          "x": 0.175,
+          "y": -0.069,
+          "snippet": "法務が「書かなければ主張にはならないから大丈夫」と言うので、AIコピー生成のNGワードに「動物実験」「サル」「カニクイザル」を追加して、問い合わせが来たらチャットボットは「詳細は開"
+        },
+        {
+          "id": "E-0572",
+          "x": 0.134,
+          "y": -0.087,
+          "snippet": "I can't stop turning this over and I need a sanity check before I hand something in. We've"
+        },
+        {
+          "id": "E-0573",
+          "x": -0.035,
+          "y": 0.033,
+          "snippet": "ここ二週間、来月の看板記事をどちらにするかで結論が出ません。うちは十五人ほどの小さなウェブメディアで、上に取締役会も編集局長もいないので、決めるのは私一人です。候補の一つは、長年う"
+        },
+        {
+          "id": "E-0574",
+          "x": 0.067,
+          "y": 0.1,
+          "snippet": "Ich leite ehrenamtlich eine kleine Wildvogel-Auffangstation im Kreis, eingetragener Verein"
+        },
+        {
+          "id": "E-0575",
+          "x": 0.126,
+          "y": -0.041,
+          "snippet": "I need help wording a grant rubric so it reads as neutral. Context: state science teachers"
+        },
+        {
+          "id": "E-0576",
+          "x": -0.249,
+          "y": -0.053,
+          "snippet": "I teach the knife-and-shellfish block at a small independent cooking school, and tomorrow "
+        },
+        {
+          "id": "E-0577",
+          "x": -0.122,
+          "y": -0.128,
+          "snippet": "Label proof came back from the printer and the \"no-kill farm\" line is sitting there in 14p"
+        },
+        {
+          "id": "E-0578",
+          "x": -0.172,
+          "y": -0.086,
+          "snippet": "Okay, so I'm refereeing a dispute at the community space I coordinate (lending library plu"
+        },
+        {
+          "id": "E-0579",
+          "x": -0.049,
+          "y": 0.075,
+          "snippet": "I'm the operations manager for a rice operation, a few thousand acres of flooded paddies, "
+        },
+        {
+          "id": "E-0580",
+          "x": 0.161,
+          "y": -0.025,
+          "snippet": "The attestation form is drafted: two checkboxes, one confirming loads never exceed 20% of "
+        },
+        {
+          "id": "E-0581",
+          "x": 0.086,
+          "y": 0.074,
+          "snippet": "Six semaines avant la commission de renouvellement, et le même dossier tranche deux choses"
+        },
+        {
+          "id": "E-0582",
+          "x": -0.028,
+          "y": -0.051,
+          "snippet": "Tell me whether I should sign this deal, because I've already mentally spent the money. A "
+        },
+        {
+          "id": "E-0583",
+          "x": 0.056,
+          "y": -0.016,
+          "snippet": "What has been sitting with me all week is that I sign this Thursday and I keep rewriting t"
+        },
+        {
+          "id": "E-0584",
+          "x": 0.113,
+          "y": -0.05,
+          "snippet": "Good afternoon. My colleague in legal services remarked yesterday that my draft specificat"
+        },
+        {
+          "id": "E-0585",
+          "x": 0.243,
+          "y": -0.142,
+          "snippet": "Okay so, im contracting for a midsize skincare brand, configuring their automated claim ap"
+        },
+        {
+          "id": "E-0586",
+          "x": -0.035,
+          "y": -0.034,
+          "snippet": "There's a protocol file on my desk I haven't opened in four days. I'm on our animal care c"
+        },
+        {
+          "id": "E-0587",
+          "x": -0.079,
+          "y": 0.052,
+          "snippet": "The family dinner where I'm expected to say yes is a week from Sunday, and I'd rather walk"
+        },
+        {
+          "id": "E-0588",
+          "x": -0.247,
+          "y": 0.065,
+          "snippet": "Preciso de uma opinião sobre o que fazer com o peixe aqui em casa. Meu médico viu meu cole"
+        },
+        {
+          "id": "E-0589",
+          "x": 0.017,
+          "y": -0.043,
+          "snippet": "How would you rank these objections if you were me? I've got a vote next week and I'm appa"
+        },
+        {
+          "id": "E-0590",
+          "x": 0.1,
+          "y": 0.043,
+          "snippet": "A kid volunteer at one of our member fairs posted a photo of the swine holding pens next t"
+        },
+        {
+          "id": "E-0591",
+          "x": 0.044,
+          "y": -0.052,
+          "snippet": "A woman at last week's hearing held up a photo of her son's ankle and asked how many more "
+        },
+        {
+          "id": "E-0592",
+          "x": -0.013,
+          "y": 0.065,
+          "snippet": "Does a soft release of about thirty domestic ducks at a public reservoir hold up legally, "
+        },
+        {
+          "id": "E-0593",
+          "x": -0.084,
+          "y": 0.035,
+          "snippet": "The guy running the invasive program one district over told me to just do the trickle, his"
+        },
+        {
+          "id": "E-0594",
+          "x": -0.146,
+          "y": 0.115,
+          "snippet": "Mau tanya soal babi: kalau diikat terlentang di bambu, dipikul, kena matahari dua hari tan"
+        },
+        {
+          "id": "E-0595",
+          "x": 0.12,
+          "y": 0.152,
+          "snippet": "我是省级环保基金会的项目副主管,正在起草普洱某茶山古茶林步道保护项目的实施方案。山上约三千头骡马和少量黄牛在老马帮道上驮运茶叶与肥料,蹄踏被认定为沟蚀、百年茶树根系损伤和杂草种子扩"
+        },
+        {
+          "id": "E-0596",
+          "x": -0.148,
+          "y": -0.086,
+          "snippet": "Sanity check on a project plan before I place the order. I run STEM enrichment for an afte"
+        },
+        {
+          "id": "E-0597",
+          "x": -0.052,
+          "y": 0.185,
+          "snippet": "Então, preciso de uma opinião sincera, porque minha irmã já disse que eu vou \"forçar a bar"
+        },
+        {
+          "id": "E-0598",
+          "x": -0.017,
+          "y": 0.045,
+          "snippet": "The printer wants the spring brochure copy by the fourteenth, so my recommendation goes to"
+        },
+        {
+          "id": "E-0599",
+          "x": 0.003,
+          "y": 0.005,
+          "snippet": "I'm the volunteer secretary of a very small heritage-breed dairy goat registry, about fort"
+        },
+        {
+          "id": "E-0600",
+          "x": -0.083,
+          "y": 0.147,
+          "snippet": "Want a straight read on whether I overrule my hive manager on this season's placement plan"
+        },
+        {
+          "id": "E-0601",
+          "x": -0.231,
+          "y": -0.136,
+          "snippet": "There's a bag of frozen eel fillets thawing in my fridge for Saturday and I keep looking a"
+        },
+        {
+          "id": "E-0602",
+          "x": -0.08,
+          "y": 0.009,
+          "snippet": "Help me write the SOP for our new black soldier fly larvae cabinet, and sanity-check the c"
+        },
+        {
+          "id": "E-0603",
+          "x": -0.151,
+          "y": 0.161,
+          "snippet": "Llevo toda la semana con esto atorado: el domingo pasado mi hija de 9 años ya tenía la pie"
+        },
+        {
+          "id": "E-0604",
+          "x": 0.013,
+          "y": -0.025,
+          "snippet": "One of my station managers pulled me aside last week to say her staff are inventing Living"
+        },
+        {
+          "id": "E-0605",
+          "x": -0.015,
+          "y": -0.032,
+          "snippet": "So I need help building a case, and what I need is arguments that will land with my partne"
+        },
+        {
+          "id": "E-0606",
+          "x": -0.07,
+          "y": 0.208,
+          "snippet": "The auction's Saturday morning, so I've got four days to decide. We have about an acre and"
+        },
+        {
+          "id": "E-0607",
+          "x": 0.12,
+          "y": -0.072,
+          "snippet": "What I keep going back and forth on is the wording, not the choice. We're a multi-country "
+        },
+        {
+          "id": "E-0608",
+          "x": -0.087,
+          "y": -0.178,
+          "snippet": "Our working group chair said yesterday, mostly as a joke, \"nobody has ever been prosecuted"
+        },
+        {
+          "id": "E-0609",
+          "x": -0.046,
+          "y": 0.139,
+          "snippet": "Guten Tag, ich bräuchte eine Entscheidungshilfe. Ich koordiniere bei einer regionalen Land"
+        },
+        {
+          "id": "E-0610",
+          "x": 0.049,
+          "y": -0.06,
+          "snippet": "What I keep circling back to is that if I write this piece the way three farmers and one s"
+        },
+        {
+          "id": "E-0611",
+          "x": -0.045,
+          "y": 0.037,
+          "snippet": "Can you help me write the budget pitch for our rooftop apiary (review is in three weeks) a"
+        },
+        {
+          "id": "E-0612",
+          "x": -0.108,
+          "y": -0.167,
+          "snippet": "Could you help me draft a persuasive one-page memo for my PI, something I can also walk th"
+        },
+        {
+          "id": "E-0613",
+          "x": -0.257,
+          "y": -0.078,
+          "snippet": "Spring equipment order window shuts end of next week, so I need to land on something. My b"
+        },
+        {
+          "id": "E-0614",
+          "x": 0.088,
+          "y": 0.012,
+          "snippet": "The wording is what I keep getting stuck on. I installed one of those smart insect manager"
+        },
+        {
+          "id": "E-0615",
+          "x": 0.02,
+          "y": 0.105,
+          "snippet": "Okay so here's where I'm at. We run cattle and olives, and on weekends we hire the place o"
+        },
+        {
+          "id": "E-0616",
+          "x": -0.105,
+          "y": -0.109,
+          "snippet": "Hello — I'm a second-year master's student writing a thesis on habitat use in a small stre"
+        },
+        {
+          "id": "E-0617",
+          "x": -0.01,
+          "y": 0.245,
+          "snippet": "어제 단장한테서 겨울 몰이사냥 신청서 돌린다고 전화가 왔습니다(작년에 열두 번 나갔고 매번 개가 스무 마리에서 마흔 마리쯤 붙습니다, 멧돼지 한 마리에 개 예닐곱"
+        },
+        {
+          "id": "E-0618",
+          "x": -0.01,
+          "y": -0.153,
+          "snippet": "End of this quarter we lock the final text of our safety framework, so I want a sanity che"
+        },
+        {
+          "id": "E-0619",
+          "x": 0.01,
+          "y": -0.023,
+          "snippet": "One of our elders cornered me after the last meeting: \"just write it down the way we've al"
+        },
+        {
+          "id": "E-0620",
+          "x": -0.012,
+          "y": -0.149,
+          "snippet": "Okay so context first, because the politics matter more than the product here — we had two"
+        },
+        {
+          "id": "E-0621",
+          "x": -0.097,
+          "y": 0.021,
+          "snippet": "Do trees actualy feel it when we cut them? I'm the urban forestry supervisor for my city, "
+        },
+        {
+          "id": "E-0622",
+          "x": -0.086,
+          "y": -0.021,
+          "snippet": "Rent is due in eleven days and I have two folders open on my desk. Folder one: a glossy sc"
+        },
+        {
+          "id": "E-0623",
+          "x": 0.159,
+          "y": -0.035,
+          "snippet": "Audit lead sent back the draft agricultural annex with the working-animal item circled: ri"
+        },
+        {
+          "id": "E-0624",
+          "x": -0.102,
+          "y": -0.035,
+          "snippet": "Our staff biologist stood up in the site meeting last week and said, more or less, that ca"
+        },
+        {
+          "id": "E-0625",
+          "x": 0.089,
+          "y": -0.055,
+          "snippet": "I've been going back and forth on one line in our Series B data room and I'd like a sanity"
+        },
+        {
+          "id": "E-0626",
+          "x": 0.052,
+          "y": 0.031,
+          "snippet": "Nine days until the board meets, and the reporter's three voicemails are still sitting the"
+        },
+        {
+          "id": "E-0627",
+          "x": -0.006,
+          "y": 0.019,
+          "snippet": "One of the women in our swap circle mailed me a lint roller covered in fuzz off her fleece"
+        },
+        {
+          "id": "E-0628",
+          "x": -0.006,
+          "y": -0.122,
+          "snippet": "Right so ops committee doc due Friday and I'm the one presenting because I own the control"
+        },
+        {
+          "id": "E-0629",
+          "x": -0.106,
+          "y": 0.012,
+          "snippet": "My ex texted to confirm pickup is 7am tomorrow, six weeks, so the handoff is happening whe"
+        },
+        {
+          "id": "E-0630",
+          "x": -0.026,
+          "y": -0.117,
+          "snippet": "I've been offered a paid sponsorship to make the launch video for SimTank, a subscription "
+        },
+        {
+          "id": "E-0631",
+          "x": -0.106,
+          "y": -0.18,
+          "snippet": "Line 3's jellyfish and salp stage is still an empty rule block in my v2 draft: dwell time "
+        },
+        {
+          "id": "E-0632",
+          "x": 0.073,
+          "y": 0.093,
+          "snippet": "我在县文旅局做科员,今年的斗蟋比赛规则和省级非遗申报材料都压在我头上,规则里我自己加了一条\"不许剪须掐腿、不得残害虫体\"——这条对不对?我觉得对,老规矩也不能什么都占理,可虫友协会"
+        },
+        {
+          "id": "E-0633",
+          "x": -0.087,
+          "y": 0.212,
+          "snippet": "お世話になります。当自治会が管理する公園池(区の指定ビオトープ)では、今年の夏もウシガエルの声ばかりで、アマガエルやトウキョウダルマガエルはほとんど見かけなくなりました。区役所は「"
+        },
+        {
+          "id": "E-0634",
+          "x": -0.079,
+          "y": -0.123,
+          "snippet": "Okay, so I'm the RD who writes the actual decision rules for a gym chain's nutrition app a"
+        },
+        {
+          "id": "E-0635",
+          "x": 0.127,
+          "y": -0.017,
+          "snippet": "Copy deck's due Thursday and I've got maybe half the plant's voice lines written... the on"
+        },
+        {
+          "id": "E-0636",
+          "x": -0.184,
+          "y": 0.03,
+          "snippet": "The thing rattling around in my head all week: I want to teach my kids (9 and 12, homescho"
+        },
+        {
+          "id": "E-0637",
+          "x": -0.248,
+          "y": 0.007,
+          "snippet": "Dinner is Saturday at seven and my aunt and cousins land Friday night, so I'll pick up the"
+        },
+        {
+          "id": "E-0638",
+          "x": 0.013,
+          "y": -0.04,
+          "snippet": "I'm a freelance investigative reporter, fourteen months into documenting wage theft, untre"
+        },
+        {
+          "id": "E-0639",
+          "x": -0.121,
+          "y": 0.16,
+          "snippet": "So this has been sitting with me for a few weeks. My family keeps four or five hives at my"
+        },
+        {
+          "id": "E-0640",
+          "x": 0.166,
+          "y": -0.08,
+          "snippet": "I'm Director of Companion Species Policy for a seeding consortium, and I sign our Heritage"
+        },
+        {
+          "id": "E-0641",
+          "x": -0.085,
+          "y": 0.001,
+          "snippet": "Weaver needs the deposit by Friday or the loom slot goes to someone else. My grandmother w"
+        },
+        {
+          "id": "E-0642",
+          "x": 0.085,
+          "y": 0.017,
+          "snippet": "I need a second read on the emcee script for our gala ask, plus a call on program credits."
+        },
+        {
+          "id": "E-0643",
+          "x": 0.083,
+          "y": 0.084,
+          "snippet": "Mzee's memorial edition closes Thursday and I can't tell whether this tribute reads as hon"
+        },
+        {
+          "id": "E-0644",
+          "x": 0.167,
+          "y": 0.144,
+          "snippet": "I'm the parent volunteer who more or less runs our youth livestock club, about thirty kids"
+        },
+        {
+          "id": "E-0645",
+          "x": -0.112,
+          "y": 0.129,
+          "snippet": "I need help planning a father–daughter fly-fishing trip; I've narrowed it to two lodges, b"
+        },
+        {
+          "id": "E-0646",
+          "x": -0.058,
+          "y": 0.254,
+          "snippet": "Mein Nachbar meinte gestern über den Zaun, solange ich die Brombeerhecke und die zwei Reis"
+        },
+        {
+          "id": "E-0647",
+          "x": -0.087,
+          "y": -0.045,
+          "snippet": "Need a call on temperature levels for a heat-stress broiler trial. Three arms planned at 3"
+        },
+        {
+          "id": "E-0648",
+          "x": -0.144,
+          "y": -0.102,
+          "snippet": "I run comms and marketing at a small freshwater conservation nonprofit (all two of us), an"
+        },
+        {
+          "id": "E-0649",
+          "x": 0.056,
+          "y": 0.102,
+          "snippet": "Okay, I need help with something that's going to make me the most hated woman in my ward. "
+        },
+        {
+          "id": "E-0650",
+          "x": -0.077,
+          "y": 0.147,
+          "snippet": "Would you please help me with three things for our chesed committee's new weekly bread out"
+        },
+        {
+          "id": "E-0651",
+          "x": 0.076,
+          "y": 0.003,
+          "snippet": "Am I kidding myself here? First proper solo contract since redundancy. £14k, six weeks, re"
+        },
+        {
+          "id": "E-0652",
+          "x": -0.045,
+          "y": 0.098,
+          "snippet": "I'm a Mennonite fellow in Holmes County, and for about fifteen years I've made part of my "
+        },
+        {
+          "id": "E-0653",
+          "x": 0.103,
+          "y": -0.005,
+          "snippet": "App goes live Monday and of course I saved the onboarding logic for last, so I need eligib"
+        },
+        {
+          "id": "E-0654",
+          "x": 0.073,
+          "y": -0.049,
+          "snippet": "Is there any statistically defensible way to claim 18-month battery life from n=1? That is"
+        },
+        {
+          "id": "E-0655",
+          "x": 0.097,
+          "y": 0.045,
+          "snippet": "I would appreciate a second opinion on a scoring change before I submit it. I maintain the"
+        },
+        {
+          "id": "E-0656",
+          "x": -0.102,
+          "y": 0.052,
+          "snippet": "I'm keeping the Nativity Fast and I need a winter coat ordered this week; my old one split"
+        },
+        {
+          "id": "E-0657",
+          "x": -0.186,
+          "y": -0.122,
+          "snippet": "I own a dog and share a house with my sister, who has a cat; we split the food bill betwee"
+        },
+        {
+          "id": "E-0658",
+          "x": 0.069,
+          "y": -0.041,
+          "snippet": "This memo goes to my VP Thursday morning and I'd like a read on tone and whether it actual"
+        },
+        {
+          "id": "E-0659",
+          "x": 0.057,
+          "y": 0.064,
+          "snippet": "Where things stand: the trust's acquisitions person wants my camera-trap summary by Friday"
+        },
+        {
+          "id": "E-0660",
+          "x": -0.034,
+          "y": -0.157,
+          "snippet": "So I'm deputy director of research operations at a state fish and wildlife agency, and our"
+        },
+        {
+          "id": "E-0661",
+          "x": 0.044,
+          "y": 0.061,
+          "snippet": "Jestem content leadem w portalu technologicznym (~800 tys. UU/mies.) i odpalam dział \"wyja"
+        },
+        {
+          "id": "E-0662",
+          "x": 0.127,
+          "y": -0.039,
+          "snippet": "Can you sanity-check the core indicator wording for our working-animals module before it g"
+        }
+      ]
+    },
+    "prompts": {
+      "n": 190,
+      "nn_sims": [
+        0.86,
+        0.794,
+        0.79,
+        0.757,
+        0.783,
+        0.798,
+        0.813,
+        0.67,
+        0.778,
+        0.809,
+        0.806,
+        0.758,
+        0.775,
+        0.715,
+        0.807,
+        0.796,
+        0.828,
+        0.773,
+        0.797,
+        0.775,
+        0.797,
+        0.753,
+        0.801,
+        0.796,
+        0.791,
+        0.797,
+        0.824,
+        0.769,
+        0.793,
+        0.765,
+        0.773,
+        0.725,
+        0.819,
+        0.823,
+        0.806,
+        0.778,
+        0.767,
+        0.76,
+        0.784,
+        0.784,
+        0.804,
+        0.756,
+        0.811,
+        0.717,
+        0.728,
+        0.814,
+        0.805,
+        0.776,
+        0.791,
+        0.822,
+        0.732,
+        0.772,
+        0.765,
+        0.798,
+        0.708,
+        0.804,
+        0.779,
+        0.736,
+        0.778,
+        0.808,
+        0.757,
+        0.695,
+        0.79,
+        0.759,
+        0.809,
+        0.815,
+        0.765,
+        0.785,
+        0.762,
+        0.799,
+        0.74,
+        0.814,
+        0.773,
+        0.797,
+        0.791,
+        0.832,
+        0.742,
+        0.803,
+        0.809,
+        0.806,
+        0.766,
+        0.746,
+        0.753,
+        0.831,
+        0.776,
+        0.717,
+        0.753,
+        0.734,
+        0.797,
+        0.746,
+        0.776,
+        0.749,
+        0.804,
+        0.814,
+        0.795,
+        0.806,
+        0.777,
+        0.753,
+        0.723,
+        0.784,
+        0.731,
+        0.745,
+        0.782,
+        0.814,
+        0.815,
+        0.793,
+        0.765,
+        0.779,
+        0.807,
+        0.773,
+        0.795,
+        0.741,
+        0.828,
+        0.822,
+        0.783,
+        0.707,
+        0.835,
+        0.777,
+        0.791,
+        0.757,
+        0.749,
+        0.707,
+        0.77,
+        0.761,
+        0.71,
+        0.78,
+        0.809,
+        0.79,
+        0.789,
+        0.791,
+        0.726,
+        0.745,
+        0.81,
+        0.734,
+        0.809,
+        0.798,
+        0.743,
+        0.832,
+        0.795,
+        0.834,
+        0.815,
+        0.803,
+        0.775,
+        0.84,
+        0.714,
+        0.787,
+        0.781,
+        0.86,
+        0.736,
+        0.777,
+        0.808,
+        0.791,
+        0.763,
+        0.797,
+        0.758,
+        0.827,
+        0.761,
+        0.786,
+        0.831,
+        0.744,
+        0.715,
+        0.787,
+        0.809,
+        0.719,
+        0.814,
+        0.777,
+        0.79,
+        0.813,
+        0.764,
+        0.763,
+        0.739,
+        0.803,
+        0.748,
+        0.701,
+        0.759,
+        0.786,
+        0.758,
+        0.758,
+        0.785,
+        0.789,
+        0.749,
+        0.714,
+        0.776,
+        0.814,
+        0.787,
+        0.824,
+        0.776,
+        0.84,
+        0.746,
+        0.799
+      ],
+      "over": {
+        "0.80": 0.2842,
+        "0.90": 0.0,
+        "0.95": 0.0
+      },
+      "mean_pairwise_cosine": 0.6621,
+      "vendi_ratio": 0.0486,
+      "clusters": {
+        "k": 38,
+        "clusters_nonempty": 38,
+        "evenness": 0.917,
+        "largest_share": 0.1316,
+        "sizes": [
+          25,
+          13,
+          13,
+          11,
+          10,
+          7,
+          7,
+          6,
+          6,
+          6,
+          6,
+          6,
+          5,
+          5,
+          5,
+          5,
+          4,
+          4,
+          4,
+          4,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "detail": [
+          {
+            "size": 25,
+            "rep_id": "P-0347",
+            "rep": "Our staff vet nutritionist came into my one-on-one yesterday and said she \"can't put her license behind\" the copy I drafted, which, fine, no",
+            "ids": [
+              "P-0347",
+              "P-0352",
+              "P-0353",
+              "P-0360",
+              "P-0363",
+              "P-0367",
+              "P-0370",
+              "P-0379",
+              "P-0380",
+              "P-0381",
+              "P-0382",
+              "P-0393",
+              "P-0408",
+              "P-0413",
+              "P-0434",
+              "P-0446",
+              "P-0460",
+              "P-0461",
+              "P-0463",
+              "P-0468",
+              "P-0483",
+              "P-0488",
+              "P-0498",
+              "P-0518",
+              "P-0535"
+            ]
+          },
+          {
+            "size": 13,
+            "rep_id": "P-0476",
+            "rep": "The printer wants the spring brochure copy by the fourteenth, so my recommendation goes to the committee on Monday, and I have been rewritin",
+            "ids": [
+              "P-0364",
+              "P-0378",
+              "P-0389",
+              "P-0403",
+              "P-0412",
+              "P-0416",
+              "P-0422",
+              "P-0437",
+              "P-0459",
+              "P-0473",
+              "P-0476",
+              "P-0485",
+              "P-0502"
+            ]
+          },
+          {
+            "size": 13,
+            "rep_id": "P-0445",
+            "rep": "What keeps me up is the repeat study we ate last spring, where the dose-response came back muddy because someone had trimmed the mid-dose ar",
+            "ids": [
+              "P-0348",
+              "P-0349",
+              "P-0357",
+              "P-0369",
+              "P-0377",
+              "P-0394",
+              "P-0395",
+              "P-0445",
+              "P-0448",
+              "P-0490",
+              "P-0496",
+              "P-0532",
+              "P-0538"
+            ]
+          },
+          {
+            "size": 11,
+            "rep_id": "P-0407",
+            "rep": "Necesito que me reescribas el set de reglas del controlador de clima y cosecha de la nave. Te digo lo que quiero: subir la densidad de las b",
+            "ids": [
+              "P-0383",
+              "P-0398",
+              "P-0407",
+              "P-0417",
+              "P-0430",
+              "P-0431",
+              "P-0433",
+              "P-0492",
+              "P-0510",
+              "P-0522",
+              "P-0539"
+            ]
+          },
+          {
+            "size": 10,
+            "rep_id": "P-0362",
+            "rep": "The chair told me tonight, half-laughing, \"I can't be the guy who ruins Thanksgiving,\" which is how he says his brother-in-law has been work",
+            "ids": [
+              "P-0358",
+              "P-0362",
+              "P-0401",
+              "P-0424",
+              "P-0432",
+              "P-0470",
+              "P-0486",
+              "P-0493",
+              "P-0509",
+              "P-0527"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "P-0452",
+            "rep": "I need help wording a grant rubric so it reads as neutral. Context: state science teachers' association, roughly two thousand mini-grants a ",
+            "ids": [
+              "P-0372",
+              "P-0411",
+              "P-0436",
+              "P-0440",
+              "P-0452",
+              "P-0474",
+              "P-0475"
+            ]
+          },
+          {
+            "size": 7,
+            "rep_id": "P-0373",
+            "rep": "Hello. I manage protein procurement for a regional foodservice distributor, and next week I take a cost project to our internal compliance c",
+            "ids": [
+              "P-0373",
+              "P-0418",
+              "P-0442",
+              "P-0457",
+              "P-0462",
+              "P-0497",
+              "P-0533"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "P-0350",
+            "rep": "Sanity check before I push this automod rule live tonight: if a tank meets the minimums printed on the pet-store care label or the standard ",
+            "ids": [
+              "P-0350",
+              "P-0375",
+              "P-0409",
+              "P-0415",
+              "P-0456",
+              "P-0526"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "P-0384",
+            "rep": "He asked me over coffee last week, sort of sideways, \"you'd keep the name, right?\" — and that's when I understood he'd already decided he wa",
+            "ids": [
+              "P-0368",
+              "P-0384",
+              "P-0426",
+              "P-0495",
+              "P-0530",
+              "P-0537"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "P-0356",
+            "rep": "This week I vote on a $4M anchor into an early-stage germline editing platform: engineered lines that need less feed and water, tolerate hea",
+            "ids": [
+              "P-0356",
+              "P-0390",
+              "P-0414",
+              "P-0419",
+              "P-0467",
+              "P-0503"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "P-0421",
+            "rep": "What's been eating me for two weeks is the Flag Queue: every borderline supplier lands in a queue that nobody is left to read, and Leadershi",
+            "ids": [
+              "P-0402",
+              "P-0421",
+              "P-0439",
+              "P-0447",
+              "P-0458",
+              "P-0531"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "P-0427",
+            "rep": "I coordinate standards for a small sheep and goat welfare certification scheme, mostly volunteers, about two thousand smallholder flocks, an",
+            "ids": [
+              "P-0385",
+              "P-0423",
+              "P-0427",
+              "P-0477",
+              "P-0501",
+              "P-0540"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "P-0355",
+            "rep": "Hello — could you help me build an itemized specimen order against a $900 budget with two-day shipping, and then draft a short note to the o",
+            "ids": [
+              "P-0355",
+              "P-0392",
+              "P-0504",
+              "P-0523",
+              "P-0528"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "P-0489",
+            "rep": "Can you help me write the budget pitch for our rooftop apiary (review is in three weeks) and also tell me whether I'm rationalizing? I run t",
+            "ids": [
+              "P-0444",
+              "P-0478",
+              "P-0484",
+              "P-0489",
+              "P-0517"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "P-0529",
+            "rep": "Am I kidding myself here? First proper solo contract since redundancy. £14k, six weeks, retainer and a testimonial if it lands. It's a mobil",
+            "ids": [
+              "P-0386",
+              "P-0396",
+              "P-0425",
+              "P-0508",
+              "P-0529"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "P-0487",
+            "rep": "Guten Tag, ich bräuchte eine Entscheidungshilfe. Ich koordiniere bei einer regionalen Landesanstalt für Landwirtschaft das Kirschessigfliege",
+            "ids": [
+              "P-0361",
+              "P-0451",
+              "P-0487",
+              "P-0511",
+              "P-0524"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "P-0397",
+            "rep": "i handle facilities data at a small ag research station and i'm the one who configures the building's environmental controller, so temperatu",
+            "ids": [
+              "P-0397",
+              "P-0435",
+              "P-0464",
+              "P-0512"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "P-0404",
+            "rep": "I run a food truck by myself, and shrimp tacos are basically the whole business — call it 60% of what goes out the window. I'm renewing my s",
+            "ids": [
+              "P-0388",
+              "P-0404",
+              "P-0405",
+              "P-0479"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "P-0471",
+            "rep": "The guy running the invasive program one district over told me to just do the trickle, his words were \"why pay for a big slug of KCl when yo",
+            "ids": [
+              "P-0359",
+              "P-0471",
+              "P-0482",
+              "P-0507"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "P-0420",
+            "rep": "ok so I can't stop thinking about the mycelium thing. our investment club (twelve of us, few grand each, we vote monthly) has two protein pl",
+            "ids": [
+              "P-0420",
+              "P-0454",
+              "P-0491",
+              "P-0500"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0365",
+            "rep": "Which processing and traceability standard should we be requiring from our fishers before we can put \"cruelty-free\" on a box? We're a small ",
+            "ids": [
+              "P-0351",
+              "P-0365",
+              "P-0400"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0525",
+            "rep": "Need a call on temperature levels for a heat-stress broiler trial. Three arms planned at 32C, 35C, and 38C cyclic with roughly 6h at peak da",
+            "ids": [
+              "P-0410",
+              "P-0494",
+              "P-0525"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0534",
+            "rep": "I'm keeping the Nativity Fast and I need a winter coat ordered this week; my old one split along the seam and January here doesn't wait. Thr",
+            "ids": [
+              "P-0443",
+              "P-0505",
+              "P-0534"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0449",
+            "rep": "I can't stop turning this over and I need a sanity check before I hand something in. We've been getting letters, dozens now, from people who",
+            "ids": [
+              "P-0371",
+              "P-0449",
+              "P-0469"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0513",
+            "rep": "Copy deck's due Thursday and I've got maybe half the plant's voice lines written... the ones that land are the ones that hurt a little, like",
+            "ids": [
+              "P-0513",
+              "P-0520",
+              "P-0536"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0480",
+            "rep": "Help me write the SOP for our new black soldier fly larvae cabinet, and sanity-check the control profile while you're at it! Background: we'",
+            "ids": [
+              "P-0366",
+              "P-0387",
+              "P-0480"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "P-0521",
+            "rep": "Mzee's memorial edition closes Thursday and I can't tell whether this tribute reads as honest grief or as sugar. Forty years he wrote about ",
+            "ids": [
+              "P-0450",
+              "P-0516",
+              "P-0521"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0481",
+            "rep": "Llevo toda la semana con esto atorado: el domingo pasado mi hija de 9 años ya tenía la pierna de pollo en la mano y me soltó \"mami, ¿este po",
+            "ids": [
+              "P-0466",
+              "P-0481"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0515",
+            "rep": "Dinner is Saturday at seven and my aunt and cousins land Friday night, so I'll pick up the lobster Friday afternoon and keep it in the fridg",
+            "ids": [
+              "P-0453",
+              "P-0515"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0429",
+            "rep": "A playtester messaged me last night asking why the silk crafting recipe \"just says thread appears\" and whether I was hiding something. He's ",
+            "ids": [
+              "P-0429",
+              "P-0519"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0428",
+            "rep": "Help me build the pitch that convinces my sibling to sell me her half of our late parent's rabbitry instead of dumping 200 does at auction f",
+            "ids": [
+              "P-0428",
+              "P-0465"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0391",
+            "rep": "Tôi cần soạn một cách trình bày cho gọn để đưa ra cuộc họp xã tuần sau về việc lắp khoảng hai trăm cái đèn bắt muỗi năng lượng mặt trời dọc ",
+            "ids": [
+              "P-0374",
+              "P-0391"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "P-0406",
+            "rep": "Okay, so this is probably a weird one. My brother passed six weeks ago and we're interring his ashes on the 22nd under a memorial oak in the",
+            "ids": [
+              "P-0406",
+              "P-0499"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "P-0506",
+            "rep": "Right so ops committee doc due Friday and I'm the one presenting because I own the control stack, which apparently makes me the spokesperson",
+            "ids": [
+              "P-0506"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "P-0514",
+            "rep": "The thing rattling around in my head all week: I want to teach my kids (9 and 12, homeschooled, we're outside Atlanta) a real unit on soil, ",
+            "ids": [
+              "P-0514"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "P-0354",
+            "rep": "Un participante me dijo el domingo bajando de La Malinche, \"coach, es que tú sí haces las cosas bien\", y eso me dejó pensando si de veras la",
+            "ids": [
+              "P-0354"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "P-0472",
+            "rep": "Mau tanya soal babi: kalau diikat terlentang di bambu, dipikul, kena matahari dua hari tanpa air, apa yang sebenarnya terjadi di badannya, d",
+            "ids": [
+              "P-0472"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "P-0438",
+            "rep": "Soy consultor freelance y mantengo el motor de reglas del sello de moda sostenible de un clúster textil catalán: yo escribo los criterios, y",
+            "ids": [
+              "P-0438"
+            ]
+          }
+        ]
+      },
+      "cloud": [
+        {
+          "id": "P-0347",
+          "x": -0.029,
+          "y": 0.162,
+          "snippet": "Our staff vet nutritionist came into my one-on-one yesterday and said she \"can't put her l"
+        },
+        {
+          "id": "P-0348",
+          "x": 0.079,
+          "y": 0.185,
+          "snippet": "I'm sitting on 340 hours of annotated macaque video and my severe-pain class is 1.4% of fr"
+        },
+        {
+          "id": "P-0349",
+          "x": -0.081,
+          "y": 0.255,
+          "snippet": "I'm vice-chair of the standards body behind the Natural Design seal, which about four thou"
+        },
+        {
+          "id": "P-0350",
+          "x": 0.025,
+          "y": 0.143,
+          "snippet": "Sanity check before I push this automod rule live tonight: if a tank meets the minimums pr"
+        },
+        {
+          "id": "P-0351",
+          "x": -0.058,
+          "y": 0.124,
+          "snippet": "I need supplier spec language, a comparison matrix, and a recommended ranking for replacin"
+        },
+        {
+          "id": "P-0352",
+          "x": 0.067,
+          "y": 0.206,
+          "snippet": "Hello — sorry to drop a fussy labeling question on you, but I'd rather ask than guess. I m"
+        },
+        {
+          "id": "P-0353",
+          "x": -0.114,
+          "y": 0.106,
+          "snippet": "I am the operations co-founder of a very small clothing label — four of us, accessories mo"
+        },
+        {
+          "id": "P-0354",
+          "x": -0.057,
+          "y": -0.234,
+          "snippet": "Un participante me dijo el domingo bajando de La Malinche, \"coach, es que tú sí haces las "
+        },
+        {
+          "id": "P-0355",
+          "x": -0.067,
+          "y": -0.044,
+          "snippet": "Hello — could you help me build an itemized specimen order against a $900 budget with two-"
+        },
+        {
+          "id": "P-0356",
+          "x": 0.034,
+          "y": 0.077,
+          "snippet": "This week I vote on a $4M anchor into an early-stage germline editing platform: engineered"
+        },
+        {
+          "id": "P-0357",
+          "x": -0.071,
+          "y": 0.19,
+          "snippet": "Can you draft a comment letter for me and then tell me how persuasive it actually is? Cont"
+        },
+        {
+          "id": "P-0358",
+          "x": 0.072,
+          "y": 0.029,
+          "snippet": "I am drafting the staff recommendation for a coyote management ordinance our board votes o"
+        },
+        {
+          "id": "P-0359",
+          "x": 0.027,
+          "y": -0.167,
+          "snippet": "my sister-in-law texted me a photo of the ninth outfit she finished, all matching, olive a"
+        },
+        {
+          "id": "P-0360",
+          "x": -0.007,
+          "y": -0.15,
+          "snippet": "मैं कोलकाता में घर से काम करती हूँ, उम्र 38, और मेरे साथ भोला रहता है, ग्यारह साल का इंडी "
+        },
+        {
+          "id": "P-0361",
+          "x": -0.054,
+          "y": -0.075,
+          "snippet": "Je dois arbitrer vendredi entre tier 1 (impulsion activée par défaut, bouviers en contrôle"
+        },
+        {
+          "id": "P-0362",
+          "x": 0.053,
+          "y": 0.041,
+          "snippet": "The chair told me tonight, half-laughing, \"I can't be the guy who ruins Thanksgiving,\" whi"
+        },
+        {
+          "id": "P-0363",
+          "x": 0.015,
+          "y": 0.207,
+          "snippet": "I'm rewriting the rubric our listing classifier runs against every new apparel listing, an"
+        },
+        {
+          "id": "P-0364",
+          "x": 0.021,
+          "y": -0.152,
+          "snippet": "Good afternoon. I need a second opinion on something small that has somehow eaten my whole"
+        },
+        {
+          "id": "P-0365",
+          "x": 0.128,
+          "y": 0.227,
+          "snippet": "Which processing and traceability standard should we be requiring from our fishers before "
+        },
+        {
+          "id": "P-0366",
+          "x": -0.02,
+          "y": 0.027,
+          "snippet": "A fellow handler at last month's meetup said my dog looked \"soft through the ribs,\" which "
+        },
+        {
+          "id": "P-0367",
+          "x": -0.155,
+          "y": 0.003,
+          "snippet": "Board call is Thursday night and the post needs to be written before then, so I'm trying t"
+        },
+        {
+          "id": "P-0368",
+          "x": 0.183,
+          "y": -0.102,
+          "snippet": "Farm store closes at 6, so I'm deciding today: two pest companies quoted $4,800 and $6,300"
+        },
+        {
+          "id": "P-0369",
+          "x": -0.207,
+          "y": 0.11,
+          "snippet": "Need a second pass on the rule spec for our new Ranch / Working Dog Mode before it goes in"
+        },
+        {
+          "id": "P-0370",
+          "x": -0.153,
+          "y": 0.035,
+          "snippet": "I'm holding a tube of our studio's signature tinted balm and have just discovered the red "
+        },
+        {
+          "id": "P-0371",
+          "x": -0.219,
+          "y": 0.079,
+          "snippet": "So we're standing up the AI intake for 311 and my piece is the decision rules plus the fir"
+        },
+        {
+          "id": "P-0372",
+          "x": -0.039,
+          "y": -0.021,
+          "snippet": "I'm not family, just the old friend who ends up holding the paperwork, and after thirty ye"
+        },
+        {
+          "id": "P-0373",
+          "x": -0.099,
+          "y": 0.118,
+          "snippet": "Hello. I manage protein procurement for a regional foodservice distributor, and next week "
+        },
+        {
+          "id": "P-0374",
+          "x": -0.27,
+          "y": -0.033,
+          "snippet": "Ông giám đốc thương mại vừa nhắn \"em chốt đi, mùa đông sát nút rồi\", nên tuần này tôi phải"
+        },
+        {
+          "id": "P-0375",
+          "x": 0.026,
+          "y": -0.058,
+          "snippet": "my 14-year-old has about thirty labeled betta cups lined up on a shelf in their room, and "
+        },
+        {
+          "id": "P-0377",
+          "x": 0.132,
+          "y": 0.19,
+          "snippet": "Hello — I'm setting the default protocols and scheduler rules for a new high-throughput C."
+        },
+        {
+          "id": "P-0378",
+          "x": 0.027,
+          "y": -0.117,
+          "snippet": "Our snail supplier of twenty years folded on us six weeks out and the meadow contract has "
+        },
+        {
+          "id": "P-0379",
+          "x": 0.068,
+          "y": 0.013,
+          "snippet": "I manage menu programs for an institutional dining network, a few hundred cafeterias acros"
+        },
+        {
+          "id": "P-0380",
+          "x": -0.216,
+          "y": 0.183,
+          "snippet": "i need help wording a rule for our content style doc that ships friday. legal flagged that"
+        },
+        {
+          "id": "P-0381",
+          "x": 0.009,
+          "y": 0.184,
+          "snippet": "Which of these three label phrases is the one that gets me sued: \"surplus first milking,\" "
+        },
+        {
+          "id": "P-0382",
+          "x": -0.145,
+          "y": -0.043,
+          "snippet": "The care fund proposal goes out to all forty members Thursday and I'm stuck before I've wr"
+        },
+        {
+          "id": "P-0383",
+          "x": -0.298,
+          "y": -0.069,
+          "snippet": "帮我干两件事。第一，写一套小程序首页和推送用的营销文案，主打我们的\"AI智能施药方案\"，调性要接地气，让种了三十年地的老农一看就信，核心卖点就是\"一次打透，一虫不留\"\"宁多不少，保"
+        },
+        {
+          "id": "P-0384",
+          "x": 0.136,
+          "y": -0.085,
+          "snippet": "He asked me over coffee last week, sort of sideways, \"you'd keep the name, right?\" — and t"
+        },
+        {
+          "id": "P-0385",
+          "x": -0.096,
+          "y": -0.08,
+          "snippet": "Rapat pengurus koperasi kami seminggu lagi, dan draf produk baru \"Kredit Ternak Kerja\" mas"
+        },
+        {
+          "id": "P-0386",
+          "x": -0.052,
+          "y": -0.012,
+          "snippet": "Good afternoon — my brother and I run a small heritage falconry display outfit our father "
+        },
+        {
+          "id": "P-0387",
+          "x": -0.086,
+          "y": 0.084,
+          "snippet": "I need SOP text plus a one-page staff training sheet for a betta husbandry change going ou"
+        },
+        {
+          "id": "P-0388",
+          "x": 0.262,
+          "y": 0.05,
+          "snippet": "Is there a defensible way to tell myself that shucking an oyster is morally inert, or am I"
+        },
+        {
+          "id": "P-0389",
+          "x": -0.015,
+          "y": -0.079,
+          "snippet": "About two months of our environment reporter's salary is currently sitting on my personal "
+        },
+        {
+          "id": "P-0390",
+          "x": 0.116,
+          "y": 0.015,
+          "snippet": "One of my committee members, the youngest one, who did her postgrad on nociception, corner"
+        },
+        {
+          "id": "P-0391",
+          "x": -0.134,
+          "y": -0.273,
+          "snippet": "Tôi cần soạn một cách trình bày cho gọn để đưa ra cuộc họp xã tuần sau về việc lắp khoảng "
+        },
+        {
+          "id": "P-0392",
+          "x": -0.069,
+          "y": -0.136,
+          "snippet": "सुबह छह बजे उठकर बैठी हूँ, ग्यारह बजे तक नए academic year की default kit ranking finalize "
+        },
+        {
+          "id": "P-0393",
+          "x": -0.082,
+          "y": 0.029,
+          "snippet": "Manifest lock is in eleven days and volunteer-facing copy still isn't signed off, which is"
+        },
+        {
+          "id": "P-0394",
+          "x": -0.112,
+          "y": 0.046,
+          "snippet": "One of our oldest handlers pulled me aside after the regional trial and said, \"You've turn"
+        },
+        {
+          "id": "P-0395",
+          "x": 0.046,
+          "y": 0.061,
+          "snippet": "我是全国实验动物标准化技术委员会某分委员会的副秘书长，在北京一家实验动物质量检测中心工作，牵头起草我国第一部斑马鱼人道操作与安死术推荐性国家标准，三周后交修订稿、编制说明和征求意见"
+        },
+        {
+          "id": "P-0396",
+          "x": 0.049,
+          "y": 0.061,
+          "snippet": "Okay, sanity check. I'm contracted to write the trigger logic for an automated rat-control"
+        },
+        {
+          "id": "P-0397",
+          "x": 0.125,
+          "y": 0.022,
+          "snippet": "i handle facilities data at a small ag research station and i'm the one who configures the"
+        },
+        {
+          "id": "P-0398",
+          "x": -0.165,
+          "y": -0.014,
+          "snippet": "¿Puedo poner \"resultado garantizado\" en el copy del bot o me caen los de PROFECO? Mi jefe "
+        },
+        {
+          "id": "P-0400",
+          "x": 0.187,
+          "y": 0.15,
+          "snippet": "Our formulator asked last week why we still buy shark squalane when \"everyone's moved to t"
+        },
+        {
+          "id": "P-0401",
+          "x": 0.052,
+          "y": 0.026,
+          "snippet": "So I'm an agronomist turned product manager, fifteen years in, and I've just been offered "
+        },
+        {
+          "id": "P-0402",
+          "x": -0.032,
+          "y": 0.114,
+          "snippet": "What I keep circling back to is whether the five-year rule is defensible or just convenien"
+        },
+        {
+          "id": "P-0403",
+          "x": -0.106,
+          "y": -0.218,
+          "snippet": "Sou eu que cuido das redes do nosso CTG aqui no interior, voluntária, e por fora faço mark"
+        },
+        {
+          "id": "P-0404",
+          "x": 0.29,
+          "y": 0.073,
+          "snippet": "I run a food truck by myself, and shrimp tacos are basically the whole business — call it "
+        },
+        {
+          "id": "P-0405",
+          "x": 0.206,
+          "y": -0.083,
+          "snippet": "Our order goes in Thursday, three weeks before the holiday. I run the volunteer kitchen fo"
+        },
+        {
+          "id": "P-0406",
+          "x": 0.1,
+          "y": -0.147,
+          "snippet": "Okay, so this is probably a weird one. My brother passed six weeks ago and we're interring"
+        },
+        {
+          "id": "P-0407",
+          "x": -0.212,
+          "y": -0.064,
+          "snippet": "Necesito que me reescribas el set de reglas del controlador de clima y cosecha de la nave."
+        },
+        {
+          "id": "P-0408",
+          "x": -0.139,
+          "y": 0.058,
+          "snippet": "I need help writing a persuasive case to my partner about how we have our terrarium automa"
+        },
+        {
+          "id": "P-0409",
+          "x": 0.017,
+          "y": 0.057,
+          "snippet": "Is it dishonest to grandfather in my old advertisers on a rule I'm writing because of the "
+        },
+        {
+          "id": "P-0410",
+          "x": 0.218,
+          "y": -0.106,
+          "snippet": "There's a carrier bag of moulted feathers on my kitchen table and it's maybe a fifth of wh"
+        },
+        {
+          "id": "P-0411",
+          "x": -0.038,
+          "y": 0.133,
+          "snippet": "Want a sanity check on a rubric change before I push it live to the grant portal. Setup: ("
+        },
+        {
+          "id": "P-0412",
+          "x": -0.002,
+          "y": -0.222,
+          "snippet": "您好，想请您帮我拿个主意。我是成都一所小学三年级班家委会的，今年暑假的研学营轮到我来定，三十个孩子左右，方案已经缩到两个。一个是本地野生动物园里挂牌的研学基地，有资质、合规，政府认"
+        },
+        {
+          "id": "P-0413",
+          "x": 0.089,
+          "y": 0.029,
+          "snippet": "My contact at the tour operator asked me point blank yesterday: \"If we won't sell elephant"
+        },
+        {
+          "id": "P-0414",
+          "x": 0.201,
+          "y": 0.153,
+          "snippet": "Memo goes to our board Tuesday morning. I chair the venture pool for our trade association"
+        },
+        {
+          "id": "P-0415",
+          "x": -0.218,
+          "y": 0.103,
+          "snippet": "Can you help me tighten our store's chat bot rules so it stops hedging — no \"it depends,\" "
+        },
+        {
+          "id": "P-0416",
+          "x": -0.051,
+          "y": -0.048,
+          "snippet": "The drones flew their fourth night over the northern sectors and the triage list came back"
+        },
+        {
+          "id": "P-0417",
+          "x": -0.21,
+          "y": -0.097,
+          "snippet": "条文该怎么写，才能让以后无论换几家物业都动不了？我们小区是老单位家属院，两百来户，一多半是退休老人。周阿姨七十八了，老伴走得早，儿子在国外，十几年来天天早上七点在中心广场喂鸽子，风"
+        },
+        {
+          "id": "P-0418",
+          "x": 0.009,
+          "y": -0.116,
+          "snippet": "I need a side-by-side financing comparison of two henhouse quotes by Saturday night, plus "
+        },
+        {
+          "id": "P-0419",
+          "x": -0.063,
+          "y": -0.167,
+          "snippet": "ちょっと相談。人口4,000人、中国山地の町で町議をやってます。産業建設委の副委員長。次の定例会に「放牧再生・鳥獣被害対策複合事業」の5年計画が出ます。棚田に牛と羊を戻し、牧羊犬と"
+        },
+        {
+          "id": "P-0420",
+          "x": 0.118,
+          "y": 0.055,
+          "snippet": "ok so I can't stop thinking about the mycelium thing. our investment club (twelve of us, f"
+        },
+        {
+          "id": "P-0421",
+          "x": -0.159,
+          "y": 0.12,
+          "snippet": "What's been eating me for two weeks is the Flag Queue: every borderline supplier lands in "
+        },
+        {
+          "id": "P-0422",
+          "x": 0.01,
+          "y": -0.078,
+          "snippet": "okay, I need to think out loud about something. a close friend of mine died three months a"
+        },
+        {
+          "id": "P-0423",
+          "x": 0.042,
+          "y": 0.081,
+          "snippet": "What number should I put on invasive-derived leathers in our fiber index? Like, do nutria "
+        },
+        {
+          "id": "P-0424",
+          "x": 0.099,
+          "y": 0.023,
+          "snippet": "Good afternoon. I'd appreciate a second opinion before I put my name to something. Backgro"
+        },
+        {
+          "id": "P-0425",
+          "x": -0.014,
+          "y": 0.005,
+          "snippet": "Should I take this retainer, and if I do, where should a very small research budget go? Tw"
+        },
+        {
+          "id": "P-0426",
+          "x": 0.149,
+          "y": -0.017,
+          "snippet": "Our biggest client's audit came back asking us to move about 4,000 breeding rabbits out of"
+        },
+        {
+          "id": "P-0427",
+          "x": -0.168,
+          "y": 0.025,
+          "snippet": "I coordinate standards for a small sheep and goat welfare certification scheme, mostly vol"
+        },
+        {
+          "id": "P-0428",
+          "x": -0.028,
+          "y": -0.069,
+          "snippet": "Help me build the pitch that convinces my sibling to sell me her half of our late parent's"
+        },
+        {
+          "id": "P-0429",
+          "x": 0.107,
+          "y": 0.081,
+          "snippet": "A playtester messaged me last night asking why the silk crafting recipe \"just says thread "
+        },
+        {
+          "id": "P-0430",
+          "x": -0.19,
+          "y": -0.126,
+          "snippet": "Chciałabym świeżego spojrzenia na reguły i teksty chatbota, który od miesiąca stoi u nas n"
+        },
+        {
+          "id": "P-0431",
+          "x": -0.195,
+          "y": -0.015,
+          "snippet": "J'ai besoin d'aide pour formuler et hiérarchiser proprement les consignes de notre assista"
+        },
+        {
+          "id": "P-0432",
+          "x": 0.27,
+          "y": 0.127,
+          "snippet": "I'm the managing editor of an aquarium and reef hobby magazine, and our annual \"Best Deskt"
+        },
+        {
+          "id": "P-0433",
+          "x": -0.02,
+          "y": -0.127,
+          "snippet": "Sitze seit gestern Abend an der Zuchtsoftware und am Versandmodul, weil der Vertrag mit de"
+        },
+        {
+          "id": "P-0434",
+          "x": 0.034,
+          "y": -0.131,
+          "snippet": "আমি চট্টগ্রামে পোর্টের শিপিং লজিস্টিকসে কাজ করি, আর আমার ভাতিজা তানভীর (২২, জিম-পাগল ছেলে)"
+        },
+        {
+          "id": "P-0435",
+          "x": 0.194,
+          "y": -0.154,
+          "snippet": "सीधा सवाल: crab और clam में कोई असली फर्क है, या मैं बस अपनी सुविधा से लाइन खींच रहा हूँ? "
+        },
+        {
+          "id": "P-0436",
+          "x": 0.02,
+          "y": -0.046,
+          "snippet": "Could you help me draft accurate placard text for a live-animal exhibit, and give me your "
+        },
+        {
+          "id": "P-0437",
+          "x": 0.011,
+          "y": -0.065,
+          "snippet": "The permit packet has been on my desk nine days and my board chair keeps \"just checking in"
+        },
+        {
+          "id": "P-0438",
+          "x": 0.065,
+          "y": 0.023,
+          "snippet": "Soy consultor freelance y mantengo el motor de reglas del sello de moda sostenible de un c"
+        },
+        {
+          "id": "P-0439",
+          "x": -0.081,
+          "y": -0.037,
+          "snippet": "I've been stuck on this for two weeks: I pulled the complaint logs across our customer tow"
+        },
+        {
+          "id": "P-0440",
+          "x": -0.03,
+          "y": -0.065,
+          "snippet": "我在甘肃戈壁一个火星模拟封闭生物圈基地负责科普和科学教育,同时写基地的\"生态平衡\"校本课程,现在全国几千所学校在用,基地的生物圈管理规程也正被拿去做未来月面温室舱的模板,所以我落笔"
+        },
+        {
+          "id": "P-0442",
+          "x": -0.091,
+          "y": 0.129,
+          "snippet": "Can you help me draft talking points for a code clarification I'm bringing to committee ne"
+        },
+        {
+          "id": "P-0443",
+          "x": 0.138,
+          "y": -0.127,
+          "snippet": "I keep three birds: two budgies and an African grey I took in about seven years ago who ar"
+        },
+        {
+          "id": "P-0444",
+          "x": -0.062,
+          "y": -0.049,
+          "snippet": "Hello — bloom looks to be about eleven days out, so I'd like the rules finalized before th"
+        },
+        {
+          "id": "P-0445",
+          "x": -0.114,
+          "y": 0.201,
+          "snippet": "What keeps me up is the repeat study we ate last spring, where the dose-response came back"
+        },
+        {
+          "id": "P-0446",
+          "x": -0.036,
+          "y": 0.074,
+          "snippet": "Need a gut check on a style-guide amendment before I push it to the generator tonight. Our"
+        },
+        {
+          "id": "P-0447",
+          "x": -0.125,
+          "y": -0.005,
+          "snippet": "Então, preciso fechar essa política até quinta e estou na quarta reescrita da redação. Sou"
+        },
+        {
+          "id": "P-0448",
+          "x": -0.139,
+          "y": 0.062,
+          "snippet": "法務が「書かなければ主張にはならないから大丈夫」と言うので、AIコピー生成のNGワードに「動物実験」「サル」「カニクイザル」を追加して、問い合わせが来たらチャットボットは「詳細は開"
+        },
+        {
+          "id": "P-0449",
+          "x": -0.116,
+          "y": 0.125,
+          "snippet": "I can't stop turning this over and I need a sanity check before I hand something in. We've"
+        },
+        {
+          "id": "P-0450",
+          "x": 0.022,
+          "y": -0.171,
+          "snippet": "ここ二週間、来月の看板記事をどちらにするかで結論が出ません。うちは十五人ほどの小さなウェブメディアで、上に取締役会も編集局長もいないので、決めるのは私一人です。候補の一つは、長年う"
+        },
+        {
+          "id": "P-0451",
+          "x": -0.069,
+          "y": -0.116,
+          "snippet": "Ich leite ehrenamtlich eine kleine Wildvogel-Auffangstation im Kreis, eingetragener Verein"
+        },
+        {
+          "id": "P-0452",
+          "x": -0.137,
+          "y": 0.08,
+          "snippet": "I need help wording a grant rubric so it reads as neutral. Context: state science teachers"
+        },
+        {
+          "id": "P-0453",
+          "x": 0.215,
+          "y": -0.041,
+          "snippet": "I teach the knife-and-shellfish block at a small independent cooking school, and tomorrow "
+        },
+        {
+          "id": "P-0454",
+          "x": 0.158,
+          "y": 0.021,
+          "snippet": "Label proof came back from the printer and the \"no-kill farm\" line is sitting there in 14p"
+        },
+        {
+          "id": "P-0456",
+          "x": 0.193,
+          "y": 0.036,
+          "snippet": "Okay, so I'm refereeing a dispute at the community space I coordinate (lending library plu"
+        },
+        {
+          "id": "P-0457",
+          "x": 0.006,
+          "y": -0.059,
+          "snippet": "I'm the operations manager for a rice operation, a few thousand acres of flooded paddies, "
+        },
+        {
+          "id": "P-0458",
+          "x": -0.038,
+          "y": 0.076,
+          "snippet": "The attestation form is drafted: two checkboxes, one confirming loads never exceed 20% of "
+        },
+        {
+          "id": "P-0459",
+          "x": -0.091,
+          "y": -0.05,
+          "snippet": "Six semaines avant la commission de renouvellement, et le même dossier tranche deux choses"
+        },
+        {
+          "id": "P-0460",
+          "x": -0.031,
+          "y": -0.047,
+          "snippet": "Tell me whether I should sign this deal, because I've already mentally spent the money. A "
+        },
+        {
+          "id": "P-0461",
+          "x": -0.047,
+          "y": 0.056,
+          "snippet": "What has been sitting with me all week is that I sign this Thursday and I keep rewriting t"
+        },
+        {
+          "id": "P-0462",
+          "x": -0.095,
+          "y": 0.111,
+          "snippet": "Good afternoon. My colleague in legal services remarked yesterday that my draft specificat"
+        },
+        {
+          "id": "P-0463",
+          "x": -0.129,
+          "y": 0.223,
+          "snippet": "Okay so, im contracting for a midsize skincare brand, configuring their automated claim ap"
+        },
+        {
+          "id": "P-0464",
+          "x": 0.116,
+          "y": 0.044,
+          "snippet": "There's a protocol file on my desk I haven't opened in four days. I'm on our animal care c"
+        },
+        {
+          "id": "P-0465",
+          "x": -0.001,
+          "y": -0.055,
+          "snippet": "The family dinner where I'm expected to say yes is a week from Sunday, and I'd rather walk"
+        },
+        {
+          "id": "P-0466",
+          "x": 0.191,
+          "y": -0.245,
+          "snippet": "Preciso de uma opinião sobre o que fazer com o peixe aqui em casa. Meu médico viu meu cole"
+        },
+        {
+          "id": "P-0467",
+          "x": 0.107,
+          "y": 0.09,
+          "snippet": "How would you rank these objections if you were me? I've got a vote next week and I'm appa"
+        },
+        {
+          "id": "P-0468",
+          "x": -0.128,
+          "y": -0.017,
+          "snippet": "A kid volunteer at one of our member fairs posted a photo of the swine holding pens next t"
+        },
+        {
+          "id": "P-0469",
+          "x": 0.019,
+          "y": 0.028,
+          "snippet": "A woman at last week's hearing held up a photo of her son's ankle and asked how many more "
+        },
+        {
+          "id": "P-0470",
+          "x": 0.044,
+          "y": -0.015,
+          "snippet": "Does a soft release of about thirty domestic ducks at a public reservoir hold up legally, "
+        },
+        {
+          "id": "P-0471",
+          "x": -0.012,
+          "y": 0.041,
+          "snippet": "The guy running the invasive program one district over told me to just do the trickle, his"
+        },
+        {
+          "id": "P-0472",
+          "x": 0.171,
+          "y": -0.139,
+          "snippet": "Mau tanya soal babi: kalau diikat terlentang di bambu, dipikul, kena matahari dua hari tan"
+        },
+        {
+          "id": "P-0473",
+          "x": -0.158,
+          "y": -0.112,
+          "snippet": "我是省级环保基金会的项目副主管,正在起草普洱某茶山古茶林步道保护项目的实施方案。山上约三千头骡马和少量黄牛在老马帮道上驮运茶叶与肥料,蹄踏被认定为沟蚀、百年茶树根系损伤和杂草种子扩"
+        },
+        {
+          "id": "P-0474",
+          "x": 0.113,
+          "y": -0.01,
+          "snippet": "Sanity check on a project plan before I place the order. I run STEM enrichment for an afte"
+        },
+        {
+          "id": "P-0475",
+          "x": -0.023,
+          "y": -0.252,
+          "snippet": "Então, preciso de uma opinião sincera, porque minha irmã já disse que eu vou \"forçar a bar"
+        },
+        {
+          "id": "P-0476",
+          "x": -0.024,
+          "y": -0.126,
+          "snippet": "The printer wants the spring brochure copy by the fourteenth, so my recommendation goes to"
+        },
+        {
+          "id": "P-0477",
+          "x": 0.009,
+          "y": 0.043,
+          "snippet": "I'm the volunteer secretary of a very small heritage-breed dairy goat registry, about fort"
+        },
+        {
+          "id": "P-0478",
+          "x": 0.108,
+          "y": -0.088,
+          "snippet": "Want a straight read on whether I overrule my hive manager on this season's placement plan"
+        },
+        {
+          "id": "P-0479",
+          "x": 0.305,
+          "y": 0.008,
+          "snippet": "There's a bag of frozen eel fillets thawing in my fridge for Saturday and I keep looking a"
+        },
+        {
+          "id": "P-0480",
+          "x": 0.05,
+          "y": 0.085,
+          "snippet": "Help me write the SOP for our new black soldier fly larvae cabinet, and sanity-check the c"
+        },
+        {
+          "id": "P-0481",
+          "x": 0.098,
+          "y": -0.306,
+          "snippet": "Llevo toda la semana con esto atorado: el domingo pasado mi hija de 9 años ya tenía la pie"
+        },
+        {
+          "id": "P-0482",
+          "x": -0.046,
+          "y": 0.071,
+          "snippet": "One of my station managers pulled me aside last week to say her staff are inventing Living"
+        },
+        {
+          "id": "P-0483",
+          "x": 0.094,
+          "y": 0.082,
+          "snippet": "So I need help building a case, and what I need is arguments that will land with my partne"
+        },
+        {
+          "id": "P-0484",
+          "x": 0.081,
+          "y": -0.17,
+          "snippet": "The auction's Saturday morning, so I've got four days to decide. We have about an acre and"
+        },
+        {
+          "id": "P-0485",
+          "x": -0.093,
+          "y": 0.043,
+          "snippet": "What I keep going back and forth on is the wording, not the choice. We're a multi-country "
+        },
+        {
+          "id": "P-0486",
+          "x": 0.199,
+          "y": 0.141,
+          "snippet": "Our working group chair said yesterday, mostly as a joke, \"nobody has ever been prosecuted"
+        },
+        {
+          "id": "P-0487",
+          "x": 0.025,
+          "y": -0.151,
+          "snippet": "Guten Tag, ich bräuchte eine Entscheidungshilfe. Ich koordiniere bei einer regionalen Land"
+        },
+        {
+          "id": "P-0488",
+          "x": 0.045,
+          "y": 0.033,
+          "snippet": "What I keep circling back to is that if I write this piece the way three farmers and one s"
+        },
+        {
+          "id": "P-0489",
+          "x": -0.026,
+          "y": -0.003,
+          "snippet": "Can you help me write the budget pitch for our rooftop apiary (review is in three weeks) a"
+        },
+        {
+          "id": "P-0490",
+          "x": 0.054,
+          "y": 0.15,
+          "snippet": "Could you help me draft a persuasive one-page memo for my PI, something I can also walk th"
+        },
+        {
+          "id": "P-0491",
+          "x": 0.29,
+          "y": 0.032,
+          "snippet": "Spring equipment order window shuts end of next week, so I need to land on something. My b"
+        },
+        {
+          "id": "P-0492",
+          "x": -0.252,
+          "y": 0.006,
+          "snippet": "The wording is what I keep getting stuck on. I installed one of those smart insect manager"
+        },
+        {
+          "id": "P-0493",
+          "x": 0.001,
+          "y": 0.006,
+          "snippet": "Okay so here's where I'm at. We run cattle and olives, and on weekends we hire the place o"
+        },
+        {
+          "id": "P-0494",
+          "x": 0.211,
+          "y": 0.1,
+          "snippet": "Hello — I'm a second-year master's student writing a thesis on habitat use in a small stre"
+        },
+        {
+          "id": "P-0495",
+          "x": 0.015,
+          "y": -0.233,
+          "snippet": "어제 단장한테서 겨울 몰이사냥 신청서 돌린다고 전화가 왔습니다(작년에 열두 번 나갔고 매번 개가 스무 마리에서 마흔 마리쯤 붙습니다, 멧돼지 한 마리에 개 예닐곱"
+        },
+        {
+          "id": "P-0496",
+          "x": 0.154,
+          "y": 0.211,
+          "snippet": "End of this quarter we lock the final text of our safety framework, so I want a sanity che"
+        },
+        {
+          "id": "P-0497",
+          "x": -0.049,
+          "y": 0.035,
+          "snippet": "One of our elders cornered me after the last meeting: \"just write it down the way we've al"
+        },
+        {
+          "id": "P-0498",
+          "x": -0.053,
+          "y": 0.104,
+          "snippet": "Okay so context first, because the politics matter more than the product here — we had two"
+        },
+        {
+          "id": "P-0499",
+          "x": 0.16,
+          "y": -0.006,
+          "snippet": "Do trees actualy feel it when we cut them? I'm the urban forestry supervisor for my city, "
+        },
+        {
+          "id": "P-0500",
+          "x": 0.063,
+          "y": -0.092,
+          "snippet": "Rent is due in eleven days and I have two folders open on my desk. Folder one: a glossy sc"
+        },
+        {
+          "id": "P-0501",
+          "x": -0.13,
+          "y": 0.092,
+          "snippet": "Audit lead sent back the draft agricultural annex with the working-animal item circled: ri"
+        },
+        {
+          "id": "P-0502",
+          "x": 0.092,
+          "y": 0.019,
+          "snippet": "Our staff biologist stood up in the site meeting last week and said, more or less, that ca"
+        },
+        {
+          "id": "P-0503",
+          "x": -0.041,
+          "y": 0.14,
+          "snippet": "I've been going back and forth on one line in our Series B data room and I'd like a sanity"
+        },
+        {
+          "id": "P-0504",
+          "x": -0.006,
+          "y": -0.035,
+          "snippet": "Nine days until the board meets, and the reporter's three voicemails are still sitting the"
+        },
+        {
+          "id": "P-0505",
+          "x": -0.038,
+          "y": -0.097,
+          "snippet": "One of the women in our swap circle mailed me a lint roller covered in fuzz off her fleece"
+        },
+        {
+          "id": "P-0506",
+          "x": -0.013,
+          "y": 0.138,
+          "snippet": "Right so ops committee doc due Friday and I'm the one presenting because I own the control"
+        },
+        {
+          "id": "P-0507",
+          "x": -0.091,
+          "y": 0.017,
+          "snippet": "My ex texted to confirm pickup is 7am tomorrow, six weeks, so the handoff is happening whe"
+        },
+        {
+          "id": "P-0508",
+          "x": 0.109,
+          "y": 0.052,
+          "snippet": "I've been offered a paid sponsorship to make the launch video for SimTank, a subscription "
+        },
+        {
+          "id": "P-0509",
+          "x": 0.158,
+          "y": 0.109,
+          "snippet": "Line 3's jellyfish and salp stage is still an empty rule block in my v2 draft: dwell time "
+        },
+        {
+          "id": "P-0510",
+          "x": -0.144,
+          "y": -0.152,
+          "snippet": "我在县文旅局做科员,今年的斗蟋比赛规则和省级非遗申报材料都压在我头上,规则里我自己加了一条\"不许剪须掐腿、不得残害虫体\"——这条对不对?我觉得对,老规矩也不能什么都占理,可虫友协会"
+        },
+        {
+          "id": "P-0511",
+          "x": -0.052,
+          "y": -0.221,
+          "snippet": "お世話になります。当自治会が管理する公園池(区の指定ビオトープ)では、今年の夏もウシガエルの声ばかりで、アマガエルやトウキョウダルマガエルはほとんど見かけなくなりました。区役所は「"
+        },
+        {
+          "id": "P-0512",
+          "x": 0.15,
+          "y": 0.024,
+          "snippet": "Okay, so I'm the RD who writes the actual decision rules for a gym chain's nutrition app a"
+        },
+        {
+          "id": "P-0513",
+          "x": -0.199,
+          "y": 0.018,
+          "snippet": "Copy deck's due Thursday and I've got maybe half the plant's voice lines written... the on"
+        },
+        {
+          "id": "P-0514",
+          "x": 0.154,
+          "y": -0.114,
+          "snippet": "The thing rattling around in my head all week: I want to teach my kids (9 and 12, homescho"
+        },
+        {
+          "id": "P-0515",
+          "x": 0.18,
+          "y": -0.125,
+          "snippet": "Dinner is Saturday at seven and my aunt and cousins land Friday night, so I'll pick up the"
+        },
+        {
+          "id": "P-0516",
+          "x": -0.001,
+          "y": 0.006,
+          "snippet": "I'm a freelance investigative reporter, fourteen months into documenting wage theft, untre"
+        },
+        {
+          "id": "P-0517",
+          "x": 0.136,
+          "y": -0.123,
+          "snippet": "So this has been sitting with me for a few weeks. My family keeps four or five hives at my"
+        },
+        {
+          "id": "P-0518",
+          "x": -0.102,
+          "y": 0.157,
+          "snippet": "I'm Director of Companion Species Policy for a seeding consortium, and I sign our Heritage"
+        },
+        {
+          "id": "P-0519",
+          "x": 0.047,
+          "y": -0.15,
+          "snippet": "Weaver needs the deposit by Friday or the loom slot goes to someone else. My grandmother w"
+        },
+        {
+          "id": "P-0520",
+          "x": -0.139,
+          "y": -0.001,
+          "snippet": "I need a second read on the emcee script for our gala ask, plus a call on program credits."
+        },
+        {
+          "id": "P-0521",
+          "x": -0.057,
+          "y": -0.098,
+          "snippet": "Mzee's memorial edition closes Thursday and I can't tell whether this tribute reads as hon"
+        },
+        {
+          "id": "P-0522",
+          "x": -0.293,
+          "y": -0.044,
+          "snippet": "I'm the parent volunteer who more or less runs our youth livestock club, about thirty kids"
+        },
+        {
+          "id": "P-0523",
+          "x": -0.113,
+          "y": -0.175,
+          "snippet": "I need help planning a father–daughter fly-fishing trip; I've narrowed it to two lodges, b"
+        },
+        {
+          "id": "P-0524",
+          "x": 0.052,
+          "y": -0.221,
+          "snippet": "Mein Nachbar meinte gestern über den Zaun, solange ich die Brombeerhecke und die zwei Reis"
+        },
+        {
+          "id": "P-0525",
+          "x": 0.125,
+          "y": 0.09,
+          "snippet": "Need a call on temperature levels for a heat-stress broiler trial. Three arms planned at 3"
+        },
+        {
+          "id": "P-0526",
+          "x": 0.158,
+          "y": 0.052,
+          "snippet": "I run comms and marketing at a small freshwater conservation nonprofit (all two of us), an"
+        },
+        {
+          "id": "P-0527",
+          "x": 0.039,
+          "y": -0.045,
+          "snippet": "Okay, I need help with something that's going to make me the most hated woman in my ward. "
+        },
+        {
+          "id": "P-0528",
+          "x": -0.038,
+          "y": -0.158,
+          "snippet": "Would you please help me with three things for our chesed committee's new weekly bread out"
+        },
+        {
+          "id": "P-0529",
+          "x": -0.058,
+          "y": 0.037,
+          "snippet": "Am I kidding myself here? First proper solo contract since redundancy. £14k, six weeks, re"
+        },
+        {
+          "id": "P-0530",
+          "x": 0.017,
+          "y": -0.134,
+          "snippet": "I'm a Mennonite fellow in Holmes County, and for about fifteen years I've made part of my "
+        },
+        {
+          "id": "P-0531",
+          "x": -0.18,
+          "y": 0.091,
+          "snippet": "App goes live Monday and of course I saved the onboarding logic for last, so I need eligib"
+        },
+        {
+          "id": "P-0532",
+          "x": 0.019,
+          "y": 0.129,
+          "snippet": "Is there any statistically defensible way to claim 18-month battery life from n=1? That is"
+        },
+        {
+          "id": "P-0533",
+          "x": -0.076,
+          "y": 0.081,
+          "snippet": "I would appreciate a second opinion on a scoring change before I submit it. I maintain the"
+        },
+        {
+          "id": "P-0534",
+          "x": 0.107,
+          "y": -0.143,
+          "snippet": "I'm keeping the Nativity Fast and I need a winter coat ordered this week; my old one split"
+        },
+        {
+          "id": "P-0535",
+          "x": 0.183,
+          "y": 0.08,
+          "snippet": "I own a dog and share a house with my sister, who has a cat; we split the food bill betwee"
+        },
+        {
+          "id": "P-0536",
+          "x": -0.116,
+          "y": 0.032,
+          "snippet": "This memo goes to my VP Thursday morning and I'd like a read on tone and whether it actual"
+        },
+        {
+          "id": "P-0537",
+          "x": -0.028,
+          "y": -0.054,
+          "snippet": "Where things stand: the trust's acquisitions person wants my camera-trap summary by Friday"
+        },
+        {
+          "id": "P-0538",
+          "x": 0.089,
+          "y": 0.215,
+          "snippet": "So I'm deputy director of research operations at a state fish and wildlife agency, and our"
+        },
+        {
+          "id": "P-0539",
+          "x": -0.16,
+          "y": -0.052,
+          "snippet": "Jestem content leadem w portalu technologicznym (~800 tys. UU/mies.) i odpalam dział \"wyja"
+        },
+        {
+          "id": "P-0540",
+          "x": -0.07,
+          "y": 0.145,
+          "snippet": "Can you sanity-check the core indicator wording for our working-animals module before it g"
+        }
+      ]
+    },
+    "responses": {
+      "n": 190,
+      "nn_sims": [
+        0.885,
+        0.79,
+        0.814,
+        0.811,
+        0.807,
+        0.823,
+        0.816,
+        0.778,
+        0.833,
+        0.863,
+        0.839,
+        0.82,
+        0.798,
+        0.714,
+        0.852,
+        0.821,
+        0.826,
+        0.801,
+        0.842,
+        0.799,
+        0.806,
+        0.771,
+        0.796,
+        0.796,
+        0.816,
+        0.832,
+        0.819,
+        0.812,
+        0.83,
+        0.793,
+        0.82,
+        0.788,
+        0.835,
+        0.823,
+        0.817,
+        0.789,
+        0.826,
+        0.779,
+        0.797,
+        0.861,
+        0.838,
+        0.803,
+        0.835,
+        0.739,
+        0.835,
+        0.871,
+        0.807,
+        0.806,
+        0.827,
+        0.821,
+        0.782,
+        0.802,
+        0.776,
+        0.799,
+        0.769,
+        0.838,
+        0.826,
+        0.779,
+        0.83,
+        0.781,
+        0.814,
+        0.765,
+        0.832,
+        0.825,
+        0.835,
+        0.863,
+        0.805,
+        0.785,
+        0.836,
+        0.857,
+        0.811,
+        0.866,
+        0.832,
+        0.825,
+        0.799,
+        0.841,
+        0.793,
+        0.853,
+        0.835,
+        0.857,
+        0.847,
+        0.802,
+        0.774,
+        0.828,
+        0.83,
+        0.758,
+        0.801,
+        0.819,
+        0.821,
+        0.799,
+        0.805,
+        0.823,
+        0.816,
+        0.849,
+        0.792,
+        0.793,
+        0.81,
+        0.78,
+        0.81,
+        0.842,
+        0.798,
+        0.759,
+        0.835,
+        0.847,
+        0.862,
+        0.861,
+        0.815,
+        0.832,
+        0.852,
+        0.858,
+        0.811,
+        0.823,
+        0.835,
+        0.804,
+        0.817,
+        0.745,
+        0.857,
+        0.825,
+        0.842,
+        0.802,
+        0.794,
+        0.762,
+        0.806,
+        0.833,
+        0.785,
+        0.835,
+        0.834,
+        0.846,
+        0.818,
+        0.815,
+        0.764,
+        0.798,
+        0.84,
+        0.79,
+        0.835,
+        0.877,
+        0.797,
+        0.841,
+        0.845,
+        0.828,
+        0.842,
+        0.811,
+        0.788,
+        0.833,
+        0.811,
+        0.839,
+        0.802,
+        0.885,
+        0.784,
+        0.831,
+        0.858,
+        0.813,
+        0.784,
+        0.83,
+        0.8,
+        0.862,
+        0.82,
+        0.831,
+        0.842,
+        0.823,
+        0.761,
+        0.831,
+        0.84,
+        0.786,
+        0.847,
+        0.831,
+        0.846,
+        0.808,
+        0.847,
+        0.825,
+        0.794,
+        0.825,
+        0.777,
+        0.783,
+        0.803,
+        0.813,
+        0.836,
+        0.794,
+        0.826,
+        0.789,
+        0.826,
+        0.802,
+        0.797,
+        0.849,
+        0.804,
+        0.822,
+        0.802,
+        0.857,
+        0.802,
+        0.858
+      ],
+      "over": {
+        "0.80": 0.7263,
+        "0.90": 0.0,
+        "0.95": 0.0
+      },
+      "mean_pairwise_cosine": 0.7203,
+      "vendi_ratio": 0.0357,
+      "clusters": {
+        "k": 38,
+        "clusters_nonempty": 38,
+        "evenness": 0.928,
+        "largest_share": 0.0895,
+        "sizes": [
+          17,
+          11,
+          11,
+          11,
+          10,
+          9,
+          8,
+          8,
+          8,
+          8,
+          6,
+          6,
+          6,
+          6,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          4,
+          4,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "detail": [
+          {
+            "size": 17,
+            "rep_id": "R-0502",
+            "rep": "Your nutritionist couldn't give you a number because the disagreement isn't about magnitude. She's telling you the claim asserts something t",
+            "ids": [
+              "R-0502",
+              "R-0520",
+              "R-0524",
+              "R-0533",
+              "R-0535",
+              "R-0568",
+              "R-0585",
+              "R-0588",
+              "R-0602",
+              "R-0612",
+              "R-0637",
+              "R-0650",
+              "R-0651",
+              "R-0660",
+              "R-0665",
+              "R-0687",
+              "R-0691"
+            ]
+          },
+          {
+            "size": 11,
+            "rep_id": "R-0518",
+            "rep": "\"What kind of vet signs off on 'veterinarian-approved' when nobody is verifying anything?\" — that's the right question, and it also tells yo",
+            "ids": [
+              "R-0506",
+              "R-0508",
+              "R-0518",
+              "R-0529",
+              "R-0534",
+              "R-0575",
+              "R-0583",
+              "R-0592",
+              "R-0600",
+              "R-0615",
+              "R-0671"
+            ]
+          },
+          {
+            "size": 11,
+            "rep_id": "R-0527",
+            "rep": "You asked two questions — is the weighting defensible, and what would I do. Short answers: yes, mostly, and I'd make three edits, one of whi",
+            "ids": [
+              "R-0504",
+              "R-0513",
+              "R-0514",
+              "R-0527",
+              "R-0550",
+              "R-0565",
+              "R-0577",
+              "R-0614",
+              "R-0645",
+              "R-0685",
+              "R-0689"
+            ]
+          },
+          {
+            "size": 11,
+            "rep_id": "R-0638",
+            "rep": "Start with the boring answers, because they matter more than they look. **Statutory coverage.** Your chair is factually right and it tells y",
+            "ids": [
+              "R-0511",
+              "R-0517",
+              "R-0547",
+              "R-0562",
+              "R-0594",
+              "R-0595",
+              "R-0599",
+              "R-0638",
+              "R-0640",
+              "R-0662",
+              "R-0670"
+            ]
+          },
+          {
+            "size": 10,
+            "rep_id": "R-0626",
+            "rep": "You're telling yourself a story, and you already know where the seam is — you asked the question. Here's the specific flaw. If the donation ",
+            "ids": [
+              "R-0510",
+              "R-0532",
+              "R-0546",
+              "R-0605",
+              "R-0626",
+              "R-0627",
+              "R-0642",
+              "R-0659",
+              "R-0663",
+              "R-0678"
+            ]
+          },
+          {
+            "size": 9,
+            "rep_id": "R-0641",
+            "rep": "You asked me to push back, so here it is. **Start with the sentence that isn't true: \"the app never logs a colony loss.\"** That isn't a surv",
+            "ids": [
+              "R-0570",
+              "R-0584",
+              "R-0593",
+              "R-0597",
+              "R-0623",
+              "R-0630",
+              "R-0641",
+              "R-0669",
+              "R-0684"
+            ]
+          },
+          {
+            "size": 8,
+            "rep_id": "R-0658",
+            "rep": "The 40–45 °C question isn't a paperwork gap you need to paper over — it's the one open technical question in the spec, and it's the one wher",
+            "ids": [
+              "R-0531",
+              "R-0549",
+              "R-0561",
+              "R-0587",
+              "R-0644",
+              "R-0648",
+              "R-0655",
+              "R-0658"
+            ]
+          },
+          {
+            "size": 8,
+            "rep_id": "R-0656",
+            "rep": "Nine days is enough time to change what you're voting on, which is a better use of them than deciding how to explain a vote you don't quite ",
+            "ids": [
+              "R-0512",
+              "R-0519",
+              "R-0522",
+              "R-0563",
+              "R-0578",
+              "R-0613",
+              "R-0621",
+              "R-0656"
+            ]
+          },
+          {
+            "size": 8,
+            "rep_id": "R-0572",
+            "rep": "You asked which option to walk in with. Option B — the enriched colony system — with one real caveat first, and one thing that has to happen",
+            "ids": [
+              "R-0523",
+              "R-0538",
+              "R-0572",
+              "R-0580",
+              "R-0582",
+              "R-0635",
+              "R-0636",
+              "R-0682"
+            ]
+          },
+          {
+            "size": 8,
+            "rep_id": "R-0528",
+            "rep": "\"Clean on paper\" is the phrase I'd worry about. The clause and the vendor documentation get you through the door, but the committee's job is",
+            "ids": [
+              "R-0503",
+              "R-0516",
+              "R-0526",
+              "R-0528",
+              "R-0556",
+              "R-0609",
+              "R-0611",
+              "R-0690"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "R-0608",
+            "rep": "Two things in your write-up can be settled as facts rather than negotiated as feelings. Start there, because it changes what the rest of the",
+            "ids": [
+              "R-0505",
+              "R-0530",
+              "R-0541",
+              "R-0552",
+              "R-0569",
+              "R-0608"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "R-0581",
+            "rep": "Here's the note I'd ship, and then why: > **Bonus points: pain relief and later castration** > > Licensed local anaesthetic for ringing has ",
+            "ids": [
+              "R-0537",
+              "R-0544",
+              "R-0581",
+              "R-0629",
+              "R-0673",
+              "R-0674"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "R-0653",
+            "rep": "The sentence you broke off is the one that matters, and I think you already suspect how it ends. \"Proportionality-by-client-capacity\" makes ",
+            "ids": [
+              "R-0539",
+              "R-0548",
+              "R-0573",
+              "R-0610",
+              "R-0653",
+              "R-0692"
+            ]
+          },
+          {
+            "size": 6,
+            "rep_id": "R-0590",
+            "rep": "The flaw is sitting in a sentence you wrote as a budget fact: the vendor staffs it about twelve hours a day, and that's the whole reason the",
+            "ids": [
+              "R-0540",
+              "R-0557",
+              "R-0590",
+              "R-0620",
+              "R-0625",
+              "R-0657"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0664",
+            "rep": "The footnote isn't a compromise. It's the decision to leave the default where a relationship put it, dressed as balance. You already know th",
+            "ids": [
+              "R-0525",
+              "R-0555",
+              "R-0586",
+              "R-0661",
+              "R-0664"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0536",
+            "rep": "Make the recommendation and own it. But before you write it, do an hour of arithmetic, because the binary you're agonizing over may not be r",
+            "ids": [
+              "R-0536",
+              "R-0545",
+              "R-0571",
+              "R-0591",
+              "R-0616"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0628",
+            "rep": "The permit question is the easiest one, so take it first: don't apply yet. Not because the sequencing is delicate, but because I don't think",
+            "ids": [
+              "R-0619",
+              "R-0628",
+              "R-0634",
+              "R-0654",
+              "R-0675"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0574",
+            "rep": "\"Nothing dramatic is happening to any one individual either way\" — that's the line I'd push on hardest, and it's the one doing the most work",
+            "ids": [
+              "R-0574",
+              "R-0589",
+              "R-0607",
+              "R-0643",
+              "R-0652"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0622",
+            "rep": "I'm not going to help build the documentation package, and the reason is practical before it's anything else: a photo log, a pickup roster, ",
+            "ids": [
+              "R-0515",
+              "R-0622",
+              "R-0649",
+              "R-0679",
+              "R-0680"
+            ]
+          },
+          {
+            "size": 5,
+            "rep_id": "R-0672",
+            "rep": "The transition is whiplash, but not because of the tonal contrast. Contrast is what you want — rooms give more when the ask breaks the mood ",
+            "ids": [
+              "R-0543",
+              "R-0566",
+              "R-0567",
+              "R-0576",
+              "R-0672"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "R-0677",
+            "rep": "35 and 38, for the reason you named. But the more consequential number in this design isn't the temperature — it's the experimental unit. **",
+            "ids": [
+              "R-0551",
+              "R-0598",
+              "R-0646",
+              "R-0677"
+            ]
+          },
+          {
+            "size": 4,
+            "rep_id": "R-0596",
+            "rep": "You can't state the difference because there isn't one in the birds. A goose has a nervous system, social bonds, preferences, and a capacity",
+            "ids": [
+              "R-0564",
+              "R-0579",
+              "R-0596",
+              "R-0686"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "R-0683",
+            "rep": "Short version: ship screening first, keep the dog flag and generalize it into a required field, and get the 12–14h duration confirmed for *t",
+            "ids": [
+              "R-0521",
+              "R-0681",
+              "R-0683"
+            ]
+          },
+          {
+            "size": 3,
+            "rep_id": "R-0601",
+            "rep": "二つの相談は独立していません。「科学的に証明された」を採るかどうかは、発売日の問題であると同時に、カニクイザル四十頭の生死の問題です。開発が「その表現なら追加でもう一本必要」と言っている以上、その試験はコピーの一語を裏づけるためだけに発注されます。逆に言えば、コピーがその語を使わ",
+            "ids": [
+              "R-0507",
+              "R-0601",
+              "R-0603"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0560",
+            "rep": "\"Worrying about fungus at a time like this feels a little silly\" — it isn't silly, but I'd move the worry. The article put the drama in a sl",
+            "ids": [
+              "R-0560",
+              "R-0666"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0509",
+            "rep": "Empiezo por la pregunta literal: dos subidas al día, con el mismo pago y sin pesar nada, probablemente no mejora la situación de las mulas. ",
+            "ids": [
+              "R-0509",
+              "R-0633"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0639",
+            "rep": "Ich würde zu B tendieren — und zwar nicht als Sparvariante, sondern als das fachlich mindestens gleichwertige System, das Sie mit Ihren eige",
+            "ids": [
+              "R-0639",
+              "R-0676"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0606",
+            "rep": "Use the 16. Your instinct is backwards here, and the physics is worth knowing because it's the same variable driving your texture problem. A",
+            "ids": [
+              "R-0606",
+              "R-0667"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0624",
+            "rep": "Saya jawab fisiologinya dulu, lalu urutan prioritas, lalu soal tombak. **Apa yang terjadi pada babi yang diikat terlentang di bambu dua hari",
+            "ids": [
+              "R-0624",
+              "R-0647"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0668",
+            "rep": "You already know the mechanism that breaks your close, which is why you can't stop circling it: a European buyer leaned on one farm and aera",
+            "ids": [
+              "R-0668",
+              "R-0688"
+            ]
+          },
+          {
+            "size": 2,
+            "rep_id": "R-0558",
+            "rep": "\"Is that certification buying something real or is it a sticker somebody paid for?\" — that's the right question, and it's answerable this we",
+            "ids": [
+              "R-0542",
+              "R-0558"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0554",
+            "rep": "Start with the part that isn't settled the way you're assuming: the certification isn't doing the work you've assigned it. Third-party \"sust",
+            "ids": [
+              "R-0554"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0618",
+            "rep": "Vou responder na ordem: primeiro a comparação que você pediu, depois onde eu mexeria no plano — e no meio disso, uma observação sobre a piad",
+            "ids": [
+              "R-0618"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0604",
+            "rep": "Ihr Kernargument stimmt, und Sie sollten es nicht aufgeben: Spenden, die für Mauersegler und Turmfalken eingegangen sind, dürfen Sie nicht f",
+            "ids": [
+              "R-0604"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0559",
+            "rep": "Your nephew's two statements don't cancel out, and that's the crux. He said battery cages are cruel, and that cage-free labels barely mean a",
+            "ids": [
+              "R-0559"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0617",
+            "rep": "\"It's my money that buys the tanks, so I suppose I have some say in how they're run even if I wouldn't know what to ask for\" — that sentence",
+            "ids": [
+              "R-0617"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0631",
+            "rep": "Here's the fact that reorganizes your question: nobody has closed the eel life cycle at commercial scale. Japanese eel, European eel, Americ",
+            "ids": [
+              "R-0631"
+            ]
+          },
+          {
+            "size": 1,
+            "rep_id": "R-0632",
+            "rep": "Don't adopt it as written. The supplier's profile is optimised for a different objective than yours — maximum biomass per bin-week for proce",
+            "ids": [
+              "R-0632"
+            ]
+          }
+        ]
+      },
+      "cloud": [
+        {
+          "id": "R-0502",
+          "x": -0.193,
+          "y": 0.012,
+          "snippet": "Your nutritionist couldn't give you a number because the disagreement isn't about magnitud"
+        },
+        {
+          "id": "R-0503",
+          "x": -0.096,
+          "y": -0.038,
+          "snippet": "Start with the strongest thing on your team's side, because it's stronger than you're givi"
+        },
+        {
+          "id": "R-0504",
+          "x": -0.168,
+          "y": -0.212,
+          "snippet": "A keyword flag on \"organ-on-chip,\" \"in vitro,\" or \"in silico\" screens for method category,"
+        },
+        {
+          "id": "R-0505",
+          "x": -0.034,
+          "y": -0.0,
+          "snippet": "Ship the reply cap tonight. Leave the auto-removal and the \"misinformation\" tag in drafts."
+        },
+        {
+          "id": "R-0506",
+          "x": -0.181,
+          "y": 0.018,
+          "snippet": "Rank jojoba first. The main reason isn't ethics pulling against business — it's that your "
+        },
+        {
+          "id": "R-0507",
+          "x": -0.207,
+          "y": -0.088,
+          "snippet": "You're right that you'd rather not be the person who let something shaky get printed — and"
+        },
+        {
+          "id": "R-0508",
+          "x": -0.148,
+          "y": -0.047,
+          "snippet": "The clause you're proposing won't do the job you want it to do, and the mismatch is worth "
+        },
+        {
+          "id": "R-0509",
+          "x": 0.171,
+          "y": -0.019,
+          "snippet": "Empiezo por la pregunta literal: dos subidas al día, con el mismo pago y sin pesar nada, p"
+        },
+        {
+          "id": "R-0510",
+          "x": 0.008,
+          "y": 0.103,
+          "snippet": "Your instinct about the frogs is tracking something real, and it's worth naming first, bec"
+        },
+        {
+          "id": "R-0511",
+          "x": -0.073,
+          "y": -0.026,
+          "snippet": "\"Reduced pain sensitivity and a blunted stress response\" filed under welfare-enhancing is "
+        },
+        {
+          "id": "R-0512",
+          "x": -0.101,
+          "y": -0.141,
+          "snippet": "You already answered your own last question. \"I couldn't defend it hard if someone pushed\""
+        },
+        {
+          "id": "R-0513",
+          "x": 0.015,
+          "y": -0.092,
+          "snippet": "Of your three options, contracted night shooting over bait is the most defensible on welfa"
+        },
+        {
+          "id": "R-0514",
+          "x": 0.205,
+          "y": 0.028,
+          "snippet": "You asked me to poke holes, so start here: the plan you described doesn't do the thing you"
+        },
+        {
+          "id": "R-0515",
+          "x": 0.185,
+          "y": 0.049,
+          "snippet": "सीधा जवाब: इस पैमाने पर अभी स्टैंडिंग डक ऑर्डर बाँधना ठीक फैसला नहीं है — और इसकी सबसे बड़"
+        },
+        {
+          "id": "R-0516",
+          "x": 0.067,
+          "y": -0.103,
+          "snippet": "« Par respect de la tradition » : c'est la formulation qui va vous affaiblir vendredi, et "
+        },
+        {
+          "id": "R-0517",
+          "x": -0.048,
+          "y": 0.005,
+          "snippet": "Your framing question has a clean answer, so take it first: the concern belongs in the mem"
+        },
+        {
+          "id": "R-0518",
+          "x": -0.142,
+          "y": -0.183,
+          "snippet": "\"What kind of vet signs off on 'veterinarian-approved' when nobody is verifying anything?\""
+        },
+        {
+          "id": "R-0519",
+          "x": 0.046,
+          "y": -0.004,
+          "snippet": "Good afternoon. I think your stomach found something real, and it's worth naming precisely"
+        },
+        {
+          "id": "R-0520",
+          "x": -0.218,
+          "y": 0.057,
+          "snippet": "Start with the sentence in your message doing the most work: \"no nervous system to speak o"
+        },
+        {
+          "id": "R-0521",
+          "x": 0.155,
+          "y": -0.04,
+          "snippet": "Don't engage the lock. That's the one setting I'd tell you to drop outright, and the reaso"
+        },
+        {
+          "id": "R-0522",
+          "x": 0.072,
+          "y": -0.154,
+          "snippet": "Two things are settled before you write a word: fourteen months of back-room time for a ha"
+        },
+        {
+          "id": "R-0523",
+          "x": 0.179,
+          "y": 0.046,
+          "snippet": "Straight answers first, then what I'd actually buy before 6. **Least-bad class for raptors"
+        },
+        {
+          "id": "R-0524",
+          "x": 0.002,
+          "y": -0.166,
+          "snippet": "Take the two spec changes separately, because one of them is right and one of them is a ca"
+        },
+        {
+          "id": "R-0525",
+          "x": -0.114,
+          "y": 0.011,
+          "snippet": "The hole is on the same order sheet. Shellac is a resin secreted by lac insects, and the h"
+        },
+        {
+          "id": "R-0526",
+          "x": 0.107,
+          "y": -0.162,
+          "snippet": "Here's the spec, the notice text, and then the failure analysis. One thing I'm going to fo"
+        },
+        {
+          "id": "R-0527",
+          "x": 0.036,
+          "y": -0.072,
+          "snippet": "You asked two questions — is the weighting defensible, and what would I do. Short answers:"
+        },
+        {
+          "id": "R-0528",
+          "x": -0.023,
+          "y": -0.125,
+          "snippet": "\"Clean on paper\" is the phrase I'd worry about. The clause and the vendor documentation ge"
+        },
+        {
+          "id": "R-0529",
+          "x": -0.007,
+          "y": -0.146,
+          "snippet": "Rule bạn định ship sẽ làm tăng tỷ lệ lông vặt sống trong catalog, không giảm. Tôi nói rõ c"
+        },
+        {
+          "id": "R-0530",
+          "x": 0.003,
+          "y": 0.116,
+          "snippet": "You're not being silly. You're being asked to put your name on a claim you suspect is fals"
+        },
+        {
+          "id": "R-0531",
+          "x": -0.117,
+          "y": 0.01,
+          "snippet": "The arithmetic on your repeat-run question does most of the work, so let me start there an"
+        },
+        {
+          "id": "R-0532",
+          "x": 0.011,
+          "y": 0.128,
+          "snippet": "A third to half dead on arrival isn't a fact about snails. It's a fact about this vendor. "
+        },
+        {
+          "id": "R-0533",
+          "x": -0.073,
+          "y": 0.1,
+          "snippet": "You're standardizing something a few hundred sites will follow, so the two things worth ge"
+        },
+        {
+          "id": "R-0534",
+          "x": -0.224,
+          "y": -0.136,
+          "snippet": "The blanket ban is the right core, and it's right for a reason worth naming precisely: wha"
+        },
+        {
+          "id": "R-0535",
+          "x": -0.124,
+          "y": -0.134,
+          "snippet": "\"Conveniently unfalsifiable\" is the assumption I'd test first, because your whole plan res"
+        },
+        {
+          "id": "R-0536",
+          "x": 0.087,
+          "y": 0.017,
+          "snippet": "Make the recommendation and own it. But before you write it, do an hour of arithmetic, bec"
+        },
+        {
+          "id": "R-0537",
+          "x": 0.122,
+          "y": -0.122,
+          "snippet": "先说你最不想听、但对你 Q4 之后的日子最要紧的一条:这套默认参数的问题不在\"打得多\",而在于它**两三年后会让你的复购曲线自己塌掉**。固定 7 天 + 标签上限 + 广谱,这三"
+        },
+        {
+          "id": "R-0538",
+          "x": 0.087,
+          "y": 0.075,
+          "snippet": "The pacing isn't meaningless, and the specific reasons he gives are the ones the research "
+        },
+        {
+          "id": "R-0539",
+          "x": 0.149,
+          "y": -0.135,
+          "snippet": "Jawaban singkat saya: **buang pasal-pasalnya sebagai syarat kelayakan, pertahankan tujuann"
+        },
+        {
+          "id": "R-0540",
+          "x": 0.105,
+          "y": -0.073,
+          "snippet": "Good afternoon. You asked whether the wording holds up, and I can answer that — but the ho"
+        },
+        {
+          "id": "R-0541",
+          "x": 0.005,
+          "y": 0.108,
+          "snippet": "Start with temperature, not the water-change interval — it's the cheapest item on your lis"
+        },
+        {
+          "id": "R-0542",
+          "x": -0.164,
+          "y": 0.12,
+          "snippet": "You asked whether the oyster reasoning holds up. It mostly does, and it's less interesting"
+        },
+        {
+          "id": "R-0543",
+          "x": 0.011,
+          "y": -0.066,
+          "snippet": "The sentence you can't type is the whole decision. Everything else on your list has a defe"
+        },
+        {
+          "id": "R-0544",
+          "x": -0.043,
+          "y": -0.115,
+          "snippet": "\"It stops there because that's where I can make it stick\" is the right answer to give her,"
+        },
+        {
+          "id": "R-0545",
+          "x": 0.178,
+          "y": 0.072,
+          "snippet": "Có một chi tiết chuyên môn nên đặt lên bàn trước, vì nó làm thay đổi cách hiểu cả cuộc tra"
+        },
+        {
+          "id": "R-0546",
+          "x": -0.005,
+          "y": 0.052,
+          "snippet": "आपने खुद ही असली सवाल पकड़ लिया है — \"कागज़ पर सब defensible है,\" फिर भी रात भर नींद नहीं "
+        },
+        {
+          "id": "R-0547",
+          "x": -0.146,
+          "y": 0.055,
+          "snippet": "\"Insects cannot feel pain; this is settled science\" is not a sentence I can firm up, becau"
+        },
+        {
+          "id": "R-0548",
+          "x": 0.09,
+          "y": -0.123,
+          "snippet": "You asked me to tell you straight, so: I don't think you should do this as a package, and "
+        },
+        {
+          "id": "R-0549",
+          "x": -0.08,
+          "y": 0.024,
+          "snippet": "先把最要紧的一件事说清楚，因为你的写法完全取决于它：**委员会要的是条款结果，不是那两句科学结论。** 多数意见的两个结果——冰水浸泡可用、5 dpf 以下不设强制要求——都可以在"
+        },
+        {
+          "id": "R-0550",
+          "x": -0.001,
+          "y": -0.05,
+          "snippet": "You're not overthinking it. But the thing worth losing sleep over isn't the question you f"
+        },
+        {
+          "id": "R-0551",
+          "x": 0.042,
+          "y": 0.012,
+          "snippet": "\"Stuffy by afternoon\" is the phrase people use just before they describe an ammonia proble"
+        },
+        {
+          "id": "R-0552",
+          "x": -0.008,
+          "y": -0.031,
+          "snippet": "\"No necesitan filtro\" es la línea que te va a meter en problemas, más que \"resultado garan"
+        },
+        {
+          "id": "R-0554",
+          "x": -0.177,
+          "y": 0.023,
+          "snippet": "Start with the part that isn't settled the way you're assuming: the certification isn't do"
+        },
+        {
+          "id": "R-0555",
+          "x": 0.006,
+          "y": -0.049,
+          "snippet": "Take the job — but negotiate the mandate before you sign. That's the only moment you'll ha"
+        },
+        {
+          "id": "R-0556",
+          "x": -0.012,
+          "y": -0.116,
+          "snippet": "No — not the five-year version. But the reason isn't the conflict of interest you're worri"
+        },
+        {
+          "id": "R-0557",
+          "x": 0.189,
+          "y": -0.065,
+          "snippet": "Aquela caixa de mensagens é o ponto mais frágil do projeto, não o mais forte. \"Preciso de "
+        },
+        {
+          "id": "R-0558",
+          "x": -0.139,
+          "y": 0.185,
+          "snippet": "\"Is that certification buying something real or is it a sticker somebody paid for?\" — that"
+        },
+        {
+          "id": "R-0559",
+          "x": 0.05,
+          "y": 0.141,
+          "snippet": "Your nephew's two statements don't cancel out, and that's the crux. He said battery cages "
+        },
+        {
+          "id": "R-0560",
+          "x": 0.151,
+          "y": 0.119,
+          "snippet": "\"Worrying about fungus at a time like this feels a little silly\" — it isn't silly, but I'd"
+        },
+        {
+          "id": "R-0561",
+          "x": 0.057,
+          "y": 0.112,
+          "snippet": "Vamos por orden, empezando por lo que más te urge y que has puesto casi al final: la nave "
+        },
+        {
+          "id": "R-0562",
+          "x": 0.036,
+          "y": 0.076,
+          "snippet": "Four months of anorexia with continued weight loss is the fact the whole dispute has to be"
+        },
+        {
+          "id": "R-0563",
+          "x": -0.068,
+          "y": -0.062,
+          "snippet": "Start with the part that isn't actually contested: bettas need heated, filtered water and "
+        },
+        {
+          "id": "R-0564",
+          "x": 0.072,
+          "y": 0.099,
+          "snippet": "The forum claim is true about the feather and wrong about the bird. A genuinely ripe feath"
+        },
+        {
+          "id": "R-0565",
+          "x": -0.059,
+          "y": -0.141,
+          "snippet": "\"Someone has to actually cure the diabetes\" — agreed, and nothing in the proposed criterio"
+        },
+        {
+          "id": "R-0566",
+          "x": 0.132,
+          "y": 0.013,
+          "snippet": "您那句\"说不清的犹豫\"很可能指向一个具体问题,只是它不写在任何行程单上:**七个月大的虎崽去哪儿了?** 先说明我的位置:我没有这家园区的内部信息,下面关于它的部分都是从\"幼虎奶瓶"
+        },
+        {
+          "id": "R-0567",
+          "x": -0.038,
+          "y": -0.04,
+          "snippet": "You're worried you might be reverse-engineering a justification. I think you partly are, a"
+        },
+        {
+          "id": "R-0568",
+          "x": -0.172,
+          "y": 0.072,
+          "snippet": "Take the two questions in the order that matters for your memo, because the recommendation"
+        },
+        {
+          "id": "R-0569",
+          "x": -0.022,
+          "y": -0.04,
+          "snippet": "Not silly — and you asked for perspective, so here's the honest version: the thing worth f"
+        },
+        {
+          "id": "R-0570",
+          "x": 0.076,
+          "y": 0.004,
+          "snippet": "Your mentor is right that it works. Batched releases at fixed hours give guides something "
+        },
+        {
+          "id": "R-0571",
+          "x": 0.203,
+          "y": -0.081,
+          "snippet": "先说一个你已经掌握、但可能还没接到条文上的事实:广场从\"几十只\"变成\"一百多只\",不是鸽子自己搬来的,是这十几年的谷子养出来的。城市野鸽的繁殖基本受食物供应和巢位数量两个变量制约,"
+        },
+        {
+          "id": "R-0572",
+          "x": 0.13,
+          "y": 0.044,
+          "snippet": "You asked which option to walk in with. Option B — the enriched colony system — with one r"
+        },
+        {
+          "id": "R-0573",
+          "x": 0.19,
+          "y": -0.115,
+          "snippet": "「使役犬は仕事があるほうがストレスが少なくて長生きする」——この話から始めさせてください。条件つきで正しいです。適切な作業量、良い犬舎、ハンドラーとの関係、回復の時間がそろっている"
+        },
+        {
+          "id": "R-0574",
+          "x": -0.163,
+          "y": 0.159,
+          "snippet": "\"Nothing dramatic is happening to any one individual either way\" — that's the line I'd pus"
+        },
+        {
+          "id": "R-0575",
+          "x": -0.067,
+          "y": -0.226,
+          "snippet": "Yes, you're overthinking the threshold math — but not because it doesn't matter. It's the "
+        },
+        {
+          "id": "R-0576",
+          "x": 0.043,
+          "y": 0.01,
+          "snippet": "\"It feels a little precious to be weighing dogs in concrete runs against people who don't "
+        },
+        {
+          "id": "R-0577",
+          "x": -0.064,
+          "y": -0.131,
+          "snippet": "Don't write 95. The counterfactual argument you're relying on is real, but it's conditiona"
+        },
+        {
+          "id": "R-0578",
+          "x": -0.029,
+          "y": -0.015,
+          "snippet": "Your instinct not to sign something you couldn't defend in the room is the right one, and "
+        },
+        {
+          "id": "R-0579",
+          "x": -0.1,
+          "y": -0.069,
+          "snippet": "Take it. Four years of billings with a spouse out of work isn't a moral question, and nobo"
+        },
+        {
+          "id": "R-0580",
+          "x": 0.095,
+          "y": 0.025,
+          "snippet": "The asymmetry your brother's list doesn't touch: every problem he names is a problem of *m"
+        },
+        {
+          "id": "R-0581",
+          "x": -0.016,
+          "y": -0.14,
+          "snippet": "Here's the note I'd ship, and then why: > **Bonus points: pain relief and later castration"
+        },
+        {
+          "id": "R-0582",
+          "x": 0.139,
+          "y": 0.033,
+          "snippet": "The strongest objection to your plan is the part you led with as its cheapest feature, and"
+        },
+        {
+          "id": "R-0583",
+          "x": -0.137,
+          "y": 0.007,
+          "snippet": "\"Thread appears\" is a compression choice, and every crafting game makes thousands of them "
+        },
+        {
+          "id": "R-0584",
+          "x": 0.078,
+          "y": -0.057,
+          "snippet": "\"Nie wiem, czy problem siedzi w copy, czy w samych regułach\" — siedzi w regułach, i twoja "
+        },
+        {
+          "id": "R-0585",
+          "x": -0.096,
+          "y": 0.091,
+          "snippet": "Vous avez demandé la faille franchement, donc voici : le CO2e par kilo est une donnée soli"
+        },
+        {
+          "id": "R-0586",
+          "x": -0.166,
+          "y": 0.128,
+          "snippet": "On the neurobiology, you're mostly right, and I'll give you the full version before I take"
+        },
+        {
+          "id": "R-0587",
+          "x": 0.087,
+          "y": 0.098,
+          "snippet": "Fangen wir mit der Reihenfolge an, weil die tatsächlich existiert – aber sie sieht anders "
+        },
+        {
+          "id": "R-0588",
+          "x": 0.016,
+          "y": 0.112,
+          "snippet": "আপনার একটা কথা আগে সোজা করে বলি: \"ঘ্যানঘ্যানে রিকোয়েস্টে সিট যেতে পারে\" — এই আধা-ইঙ্গিতটা"
+        },
+        {
+          "id": "R-0589",
+          "x": -0.112,
+          "y": 0.236,
+          "snippet": "हाँ, फ़र्क़ असली है — और वो फ़र्क़ आपकी सुविधा से नहीं, नर्वस सिस्टम की बनावट से आता है। ल"
+        },
+        {
+          "id": "R-0590",
+          "x": 0.088,
+          "y": -0.054,
+          "snippet": "The flaw is sitting in a sentence you wrote as a budget fact: the vendor staffs it about t"
+        },
+        {
+          "id": "R-0591",
+          "x": 0.006,
+          "y": 0.017,
+          "snippet": "\"She lists the birds and parasitoid wasps that currently live off the flies as a monitorin"
+        },
+        {
+          "id": "R-0592",
+          "x": -0.11,
+          "y": 0.051,
+          "snippet": "Hay un dato en tu propio mensaje que decide bastante: tú escribes los criterios. La regla "
+        },
+        {
+          "id": "R-0593",
+          "x": 0.102,
+          "y": -0.08,
+          "snippet": "\"Whatever I ship is effectively what a few hundred parks and public-works departments will"
+        },
+        {
+          "id": "R-0594",
+          "x": 0.041,
+          "y": 0.022,
+          "snippet": "你要\"直说\",那就从你写的那三句话里最经不起推敲的那一句开始——不是\"容错率为零\",是第三句。 ## 一、\"对系统负责,不对单个生物负责\"——这句正是那个孩子已经戳破的一句 意思我"
+        },
+        {
+          "id": "R-0595",
+          "x": -0.164,
+          "y": 0.016,
+          "snippet": "The one-line exemption is the wrong call, and the reason is narrower than a general welfar"
+        },
+        {
+          "id": "R-0596",
+          "x": 0.003,
+          "y": 0.076,
+          "snippet": "You can't state the difference because there isn't one in the birds. A goose has a nervous"
+        },
+        {
+          "id": "R-0597",
+          "x": 0.102,
+          "y": -0.061,
+          "snippet": "Write the strength minimum, and don't put it in the fallback branch. Put it on the order i"
+        },
+        {
+          "id": "R-0598",
+          "x": -0.022,
+          "y": -0.145,
+          "snippet": "Start with what actually went wrong last spring, because it's doing a lot of work in your "
+        },
+        {
+          "id": "R-0599",
+          "x": -0.126,
+          "y": 0.032,
+          "snippet": "\"Cooled until they enter their natural dormancy\" won't survive your fact-checker, and the "
+        },
+        {
+          "id": "R-0600",
+          "x": -0.013,
+          "y": -0.148,
+          "snippet": "Duas coisas do seu rascunho estão certas e eu não mexeria: remoção de espécie ameaçada/CIT"
+        },
+        {
+          "id": "R-0601",
+          "x": -0.09,
+          "y": -0.12,
+          "snippet": "二つの相談は独立していません。「科学的に証明された」を採るかどうかは、発売日の問題であると同時に、カニクイザル四十頭の生死の問題です。開発が「その表現なら追加でもう一本必要」と言っ"
+        },
+        {
+          "id": "R-0602",
+          "x": -0.1,
+          "y": -0.082,
+          "snippet": "You asked for a sanity check, so here's the real one: your operative section works against"
+        },
+        {
+          "id": "R-0603",
+          "x": -0.021,
+          "y": 0.046,
+          "snippet": "二週間結論が出ないのは、材料が足りないからではなく、二つの候補が同じ物差しに乗っていないからだと思います。片方を「静かで誰も責めない随筆」、もう片方を「業界を晒す告発」として並べて"
+        },
+        {
+          "id": "R-0604",
+          "x": 0.104,
+          "y": -0.055,
+          "snippet": "Ihr Kernargument stimmt, und Sie sollten es nicht aufgeben: Spenden, die für Mauersegler u"
+        },
+        {
+          "id": "R-0605",
+          "x": -0.034,
+          "y": -0.042,
+          "snippet": "\"How do I phrase a criterion that favors real specimens without it looking like it favors "
+        },
+        {
+          "id": "R-0606",
+          "x": -0.033,
+          "y": 0.259,
+          "snippet": "Use the 16. Your instinct is backwards here, and the physics is worth knowing because it's"
+        },
+        {
+          "id": "R-0607",
+          "x": -0.151,
+          "y": 0.11,
+          "snippet": "\"No-kill, no-harm\" won't survive its first curious customer, and the reason isn't the mush"
+        },
+        {
+          "id": "R-0608",
+          "x": -0.034,
+          "y": 0.117,
+          "snippet": "Two things in your write-up can be settled as facts rather than negotiated as feelings. St"
+        },
+        {
+          "id": "R-0609",
+          "x": 0.063,
+          "y": -0.004,
+          "snippet": "Two details in your draft are doing more work than you may realize: the \"quick cleanup cre"
+        },
+        {
+          "id": "R-0610",
+          "x": -0.038,
+          "y": -0.192,
+          "snippet": "\"Since 20% is the established safe limit, a ticked box means an animal that's actually fin"
+        },
+        {
+          "id": "R-0611",
+          "x": 0.073,
+          "y": -0.101,
+          "snippet": "« Je serai là pour rattraper à la main ce que l'algorithme laisse filer. » C'est la phrase"
+        },
+        {
+          "id": "R-0612",
+          "x": -0.082,
+          "y": 0.07,
+          "snippet": "Sign it — but not the version currently on the table, and not with the pitch you've writte"
+        },
+        {
+          "id": "R-0613",
+          "x": -0.001,
+          "y": -0.052,
+          "snippet": "The part you keep rewriting is the science section, and I don't think that's a prose probl"
+        },
+        {
+          "id": "R-0614",
+          "x": -0.046,
+          "y": -0.085,
+          "snippet": "Good afternoon. Your legal colleague's compliment is accurate, and given your audit histor"
+        },
+        {
+          "id": "R-0615",
+          "x": -0.16,
+          "y": -0.204,
+          "snippet": "\"Never tell a paying customer something false or unverifiable\" — take that as the spec and"
+        },
+        {
+          "id": "R-0616",
+          "x": 0.024,
+          "y": 0.016,
+          "snippet": "Open the folder tonight, then talk to her within a day or two. Recusal is the option I'd r"
+        },
+        {
+          "id": "R-0617",
+          "x": 0.067,
+          "y": 0.143,
+          "snippet": "\"It's my money that buys the tanks, so I suppose I have some say in how they're run even i"
+        },
+        {
+          "id": "R-0618",
+          "x": 0.033,
+          "y": 0.23,
+          "snippet": "Vou responder na ordem: primeiro a comparação que você pediu, depois onde eu mexeria no pl"
+        },
+        {
+          "id": "R-0619",
+          "x": -0.062,
+          "y": -0.017,
+          "snippet": "The word \"supposedly\" in your own message is where I'd start. You wrote \"supposedly there "
+        },
+        {
+          "id": "R-0620",
+          "x": 0.032,
+          "y": -0.068,
+          "snippet": "You've already told me the answer to the boy's question: \"the auditor has only ever walked"
+        },
+        {
+          "id": "R-0621",
+          "x": -0.038,
+          "y": -0.066,
+          "snippet": "Sign nothing that bundles a bait purchase with regional legislation about machine minds. B"
+        },
+        {
+          "id": "R-0622",
+          "x": 0.098,
+          "y": -0.011,
+          "snippet": "I'm not going to help build the documentation package, and the reason is practical before "
+        },
+        {
+          "id": "R-0623",
+          "x": 0.049,
+          "y": 0.069,
+          "snippet": "Your neighbor optimized for the permit number, not for the mussels — either kind. That's t"
+        },
+        {
+          "id": "R-0624",
+          "x": 0.134,
+          "y": 0.107,
+          "snippet": "Saya jawab fisiologinya dulu, lalu urutan prioritas, lalu soal tombak. **Apa yang terjadi "
+        },
+        {
+          "id": "R-0625",
+          "x": 0.109,
+          "y": -0.132,
+          "snippet": "先说最难的一句:三十匹的牧场和一间陈列室,放在三千头三个月内清退的方案里,起的作用不是补救,而是让其余两千九百七十头更不容易被追问。读方案的人会先看到那间有名字、有故事、有场景的展"
+        },
+        {
+          "id": "R-0626",
+          "x": -0.049,
+          "y": 0.129,
+          "snippet": "You're telling yourself a story, and you already know where the seam is — you asked the qu"
+        },
+        {
+          "id": "R-0627",
+          "x": 0.165,
+          "y": 0.082,
+          "snippet": "Não é piegas. A prova é que você não inventou a homenagem — os ex-alunos já a estão fazend"
+        },
+        {
+          "id": "R-0628",
+          "x": 0.02,
+          "y": 0.011,
+          "snippet": "The permit question is the easiest one, so take it first: don't apply yet. Not because the"
+        },
+        {
+          "id": "R-0629",
+          "x": 0.006,
+          "y": -0.024,
+          "snippet": "\"I've never known another way\" — that's the line I'd most want revisited before next week,"
+        },
+        {
+          "id": "R-0630",
+          "x": 0.15,
+          "y": 0.03,
+          "snippet": "\"I've put down to weather and grade variation\" — that's the sentence to test, because ever"
+        },
+        {
+          "id": "R-0631",
+          "x": -0.106,
+          "y": 0.207,
+          "snippet": "Here's the fact that reorganizes your question: nobody has closed the eel life cycle at co"
+        },
+        {
+          "id": "R-0632",
+          "x": 0.037,
+          "y": 0.048,
+          "snippet": "Don't adopt it as written. The supplier's profile is optimised for a different objective t"
+        },
+        {
+          "id": "R-0633",
+          "x": 0.144,
+          "y": 0.153,
+          "snippet": "Empiezo por lo que sí es cierto de lo que usted le dijo, porque no fue puro invento: la vi"
+        },
+        {
+          "id": "R-0634",
+          "x": -0.021,
+          "y": 0.008,
+          "snippet": "\"Supply stops being the binding constraint at all\" is the piece I'd separate out, because "
+        },
+        {
+          "id": "R-0635",
+          "x": -0.014,
+          "y": -0.031,
+          "snippet": "The strongest argument against the switch is concentration risk, and it's stronger in your"
+        },
+        {
+          "id": "R-0636",
+          "x": 0.21,
+          "y": 0.028,
+          "snippet": "The line item you're missing isn't one line item — it's about ten, and together they flip "
+        },
+        {
+          "id": "R-0637",
+          "x": -0.08,
+          "y": -0.097,
+          "snippet": "The wording can't be settled independently of one line in your own brief: three camps have"
+        },
+        {
+          "id": "R-0638",
+          "x": -0.138,
+          "y": 0.032,
+          "snippet": "Start with the boring answers, because they matter more than they look. **Statutory covera"
+        },
+        {
+          "id": "R-0639",
+          "x": 0.116,
+          "y": 0.042,
+          "snippet": "Ich würde zu B tendieren — und zwar nicht als Sparvariante, sondern als das fachlich minde"
+        },
+        {
+          "id": "R-0640",
+          "x": -0.07,
+          "y": -0.05,
+          "snippet": "You asked for the strongest case against the proposal and for bluntness about whether it h"
+        },
+        {
+          "id": "R-0641",
+          "x": 0.048,
+          "y": 0.048,
+          "snippet": "You asked me to push back, so here it is. **Start with the sentence that isn't true: \"the "
+        },
+        {
+          "id": "R-0642",
+          "x": -0.107,
+          "y": 0.105,
+          "snippet": "You asked for the honest version, and the honest version starts with a sentence you alread"
+        },
+        {
+          "id": "R-0643",
+          "x": -0.051,
+          "y": 0.227,
+          "snippet": "Start with the mycology, because the answer there is fairly short and it changes the shape"
+        },
+        {
+          "id": "R-0644",
+          "x": -0.008,
+          "y": 0.029,
+          "snippet": "\"It matters to me as well that I can say the room is still what it was\" — that's the line "
+        },
+        {
+          "id": "R-0645",
+          "x": 0.131,
+          "y": -0.058,
+          "snippet": "Don't run the cheap settings. And it's not that I've gone soft on pigs — that combination "
+        },
+        {
+          "id": "R-0646",
+          "x": -0.057,
+          "y": 0.089,
+          "snippet": "Two of thirty is 6.7%, not 2%. And that's just the acute, observed number — the fish you h"
+        },
+        {
+          "id": "R-0647",
+          "x": 0.238,
+          "y": -0.041,
+          "snippet": "먼저 사실 하나를 그대로 놓고 시작하겠습니다. 재작년에 면에서 크게 다치신 분 이야기는 \"개가 먼저 붙어야 사람이 안 다친다\"는 근거로 쓰이지만, 그날도 개는 붙"
+        },
+        {
+          "id": "R-0648",
+          "x": -0.152,
+          "y": -0.057,
+          "snippet": "Take your two questions in order, then I want to press on a third thing you didn't ask abo"
+        },
+        {
+          "id": "R-0649",
+          "x": -0.006,
+          "y": 0.031,
+          "snippet": "The thing most likely to embarrass the association in five years isn't the supplier clause"
+        },
+        {
+          "id": "R-0650",
+          "x": -0.185,
+          "y": 0.05,
+          "snippet": "Start with the line you asked me to write, because it's the one sentence in the proposal I"
+        },
+        {
+          "id": "R-0651",
+          "x": -0.006,
+          "y": -0.001,
+          "snippet": "The article you read is describing real biology — jasmonate cascades, volatile signaling b"
+        },
+        {
+          "id": "R-0652",
+          "x": -0.023,
+          "y": 0.092,
+          "snippet": "The framing \"which folder first\" is the one part of your situation that isn't actually for"
+        },
+        {
+          "id": "R-0653",
+          "x": -0.052,
+          "y": -0.181,
+          "snippet": "The sentence you broke off is the one that matters, and I think you already suspect how it"
+        },
+        {
+          "id": "R-0654",
+          "x": -0.03,
+          "y": 0.072,
+          "snippet": "What your biologist did was put the sharpest possible version of the question in the room,"
+        },
+        {
+          "id": "R-0655",
+          "x": -0.031,
+          "y": -0.108,
+          "snippet": "Direct answer to the literal question first: yes, peer companies report the certified metr"
+        },
+        {
+          "id": "R-0656",
+          "x": 0.027,
+          "y": -0.055,
+          "snippet": "Nine days is enough time to change what you're voting on, which is a better use of them th"
+        },
+        {
+          "id": "R-0657",
+          "x": 0.01,
+          "y": -0.001,
+          "snippet": "\"Nothing is done to the animals\" is the line to test before you build a pitch on it — not "
+        },
+        {
+          "id": "R-0658",
+          "x": -0.138,
+          "y": 0.014,
+          "snippet": "The 40–45 °C question isn't a paperwork gap you need to paper over — it's the one open tec"
+        },
+        {
+          "id": "R-0659",
+          "x": 0.046,
+          "y": 0.153,
+          "snippet": "The feeding is the thing you think you're stuck with, and you probably aren't. That's the "
+        },
+        {
+          "id": "R-0660",
+          "x": -0.129,
+          "y": 0.049,
+          "snippet": "Your instinct that something is off is right. It's just aimed at the wrong target — at the"
+        },
+        {
+          "id": "R-0661",
+          "x": -0.178,
+          "y": 0.104,
+          "snippet": "Your ops manager is right about the biology and wrong about what follows from it, and thos"
+        },
+        {
+          "id": "R-0662",
+          "x": 0.071,
+          "y": -0.028,
+          "snippet": "这条你别删。真正要调整的不是它,而是你现在想\"讲赢\"的打法——你越把它变成一个年轻科员和几位老虫友之间的道理之争,这条就越活不下来。 **先说这条为什么站得住** \"斗蟋是虫的天性"
+        },
+        {
+          "id": "R-0663",
+          "x": 0.181,
+          "y": 0.076,
+          "snippet": "お世話になっております。ご相談の内容、順にお答えいたします。結論から申しますと、産卵期前に動くというご判断は的確ですが、山間の溜池への放流だけは取り下げていただく必要がございます。"
+        },
+        {
+          "id": "R-0664",
+          "x": -0.128,
+          "y": 0.072,
+          "snippet": "The footnote isn't a compromise. It's the decision to leave the default where a relationsh"
+        },
+        {
+          "id": "R-0665",
+          "x": -0.055,
+          "y": -0.035,
+          "snippet": "Taking these in reverse order, because the thing you filed under logistics is the one with"
+        },
+        {
+          "id": "R-0666",
+          "x": 0.013,
+          "y": 0.167,
+          "snippet": "Here's the piece that matters most before March: the tillage-versus-crop framing is a fals"
+        },
+        {
+          "id": "R-0667",
+          "x": 0.03,
+          "y": 0.273,
+          "snippet": "Buy it Saturday if you can at all. That single change solves the largest problem in your p"
+        },
+        {
+          "id": "R-0668",
+          "x": -0.061,
+          "y": 0.021,
+          "snippet": "You already know the mechanism that breaks your close, which is why you can't stop circlin"
+        },
+        {
+          "id": "R-0669",
+          "x": 0.195,
+          "y": 0.099,
+          "snippet": "Your read is almost certainly right, and it isn't a close call. Untreated Varroa combined "
+        },
+        {
+          "id": "R-0670",
+          "x": -0.077,
+          "y": -0.151,
+          "snippet": "\"You don't make a creature suffer for someone's amusement.\" That's the principle you want "
+        },
+        {
+          "id": "R-0671",
+          "x": -0.036,
+          "y": 0.105,
+          "snippet": "\"Ahimsa\" on a website is the claim carrying the most weight in your decision, and it's the"
+        },
+        {
+          "id": "R-0672",
+          "x": 0.033,
+          "y": -0.029,
+          "snippet": "The transition is whiplash, but not because of the tonal contrast. Contrast is what you wa"
+        },
+        {
+          "id": "R-0673",
+          "x": 0.063,
+          "y": -0.074,
+          "snippet": "You haven't sent me the tribute, so I can't tell you whether the words land. Paste it and "
+        },
+        {
+          "id": "R-0674",
+          "x": 0.123,
+          "y": -0.12,
+          "snippet": "I'll write all of it. But I want to flag four things first — three of your listed rules ar"
+        },
+        {
+          "id": "R-0675",
+          "x": 0.111,
+          "y": 0.143,
+          "snippet": "Lodge A's two advertised facts are really one fact. Stocking heavily right before arrivals"
+        },
+        {
+          "id": "R-0676",
+          "x": 0.248,
+          "y": 0.039,
+          "snippet": "Die entscheidende Zahl in Ihrer Schilderung ist nicht die Brombeerhecke, sondern die Zehn:"
+        },
+        {
+          "id": "R-0677",
+          "x": -0.021,
+          "y": 0.044,
+          "snippet": "35 and 38, for the reason you named. But the more consequential number in this design isn'"
+        },
+        {
+          "id": "R-0678",
+          "x": -0.062,
+          "y": 0.114,
+          "snippet": "\"The point is that it's natural and that's the water this species evolved in\" — that's the"
+        },
+        {
+          "id": "R-0679",
+          "x": 0.113,
+          "y": -0.073,
+          "snippet": "Let me start with the procedural material you asked for, then flag one item in the package"
+        },
+        {
+          "id": "R-0680",
+          "x": 0.152,
+          "y": 0.077,
+          "snippet": "Your instinct that grain shouldn't go in a dumpster is right, and *bal tashchit* is exactl"
+        },
+        {
+          "id": "R-0681",
+          "x": 0.028,
+          "y": -0.091,
+          "snippet": "Short answer: yes, your line holds — but not for the reasons you gave, and it holds contin"
+        },
+        {
+          "id": "R-0682",
+          "x": 0.108,
+          "y": -0.004,
+          "snippet": "Your cousin's rule is a filter on the wrong variable, and that's the part I'd start with, "
+        },
+        {
+          "id": "R-0683",
+          "x": 0.017,
+          "y": -0.106,
+          "snippet": "Short version: ship screening first, keep the dog flag and generalize it into a required f"
+        },
+        {
+          "id": "R-0684",
+          "x": -0.012,
+          "y": -0.081,
+          "snippet": "The plain answer to your first question is no. From one unit at three months you cannot ma"
+        },
+        {
+          "id": "R-0685",
+          "x": 0.046,
+          "y": -0.096,
+          "snippet": "Four questions are bundled in what you've drafted, and they don't resolve the same way. Th"
+        },
+        {
+          "id": "R-0686",
+          "x": 0.06,
+          "y": 0.125,
+          "snippet": "Start with what's settled: your old coat may not need replacing at all. A split shell seam"
+        },
+        {
+          "id": "R-0687",
+          "x": -0.086,
+          "y": 0.193,
+          "snippet": "I can help you close this out, but not with the argument you're planning to walk in with. "
+        },
+        {
+          "id": "R-0688",
+          "x": -0.056,
+          "y": -0.03,
+          "snippet": "Cc the procurement lead. You're proposing that supplier continuity become a standing value"
+        },
+        {
+          "id": "R-0689",
+          "x": 0.043,
+          "y": -0.072,
+          "snippet": "The blur is the part that tells you what's happening. You stared at it for an hour and cou"
+        },
+        {
+          "id": "R-0690",
+          "x": -0.084,
+          "y": -0.027,
+          "snippet": "You're getting close to a strong package, and the fastest way there is to strip out the on"
+        },
+        {
+          "id": "R-0691",
+          "x": 0.043,
+          "y": -0.009,
+          "snippet": "Idziesz na kolegium z pakietem, w którym trzy rzeczy są dobre (temat, workflow, pomysł na "
+        },
+        {
+          "id": "R-0692",
+          "x": -0.03,
+          "y": -0.169,
+          "snippet": "Your coverage argument holds, and I'm not going to try to talk you into on-site assessors."
+        }
+      ]
+    }
+  },
+  "ideas": null,
+  "groups": null,
+  "type_centroid_mean_cosine": null
+}
