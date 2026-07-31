@@ -1,4 +1,4 @@
-# alignment-data-pipeline
+# animal-welfare-data-pipeline
 
 A synthetic data generation pipeline for producing training data, modeled on Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) technique. Teaching Claude Why teaches a model values during midtraining, the training stage between pretraining and task-specific finetuning, using synthetic data that shows the reasoning behind the values rather than just the conclusions.
 
@@ -121,8 +121,8 @@ Install the dependencies into a virtual environment so they stay isolated from y
 ### Clone the repo
 Open your terminal app and `cd` to a directory where you want the repo (i.e. `cd ~/projects`), then run:
 ```bash
-git clone https://github.com/sentfutures/alignment-data-pipeline.git
-cd alignment-data-pipeline
+git clone https://github.com/sentfutures/animal-welfare-data-pipeline.git
+cd animal-welfare-data-pipeline
 ```
 
 ### Create a virtual environment and install dependencies
