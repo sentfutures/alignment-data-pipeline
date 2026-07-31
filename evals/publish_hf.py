@@ -111,18 +111,26 @@ def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     )
 
 
-def flatten_dad_corpus(src: Path, dst: Path, source_run: str,
-                       append: bool = False) -> int:
+def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
     """Write the published form of a DAD corpus: one flat record per example
-    (example_gid, user_prompt, assistant_response, source_run) instead of the
-    training format's messages array, so the Hub viewer shows one readable
-    column per field with no role/content nesting. source_run names the run
-    that generated the row — with several runs concatenated into one published
-    corpus (append=True for every run after the first) it is the only per-row
-    provenance. The run's own final/dad_corpus.jsonl keeps the SFT chat shape
-    — only the staged copy is flattened. A record without a user+assistant
-    string pair aborts the publish rather than uploading a mangled row.
-    Returns the number of records written.
+    (example_gid, user_prompt, assistant_response) instead of the training
+    format's messages array, so the Hub viewer shows one readable column per
+    field with no role/content nesting.
+
+    Deliberately carries NO per-row run column, even when several runs are
+    concatenated into one published corpus (append=True for every run after
+    the first). Row-to-run attribution comes from the repo instead:
+    example_gid is globally unique and content-keyed via the git-tracked
+    dad/id_registry.json, so `git grep <gid> -- outputs/dad/runs` resolves any
+    published row to exactly one committed run dir. The card's per-run table
+    records which runs went into a combined corpus. A repeated run_id string
+    on every row bought nothing that trace doesn't already give, and it
+    dominated the viewer's first screen.
+
+    The run's own final/dad_corpus.jsonl keeps the SFT chat shape — only the
+    staged copy is flattened. A record without a user+assistant string pair
+    aborts the publish rather than uploading a mangled row. Returns the number
+    of records written.
     """
     n = 0
     with open(src, encoding="utf-8") as fin, \
@@ -145,7 +153,6 @@ def flatten_dad_corpus(src: Path, dst: Path, source_run: str,
                 )
             fout.write(json.dumps({
                 "example_gid": record.get("example_gid"),
-                "source_run": source_run,
                 "user_prompt": by_role["user"],
                 "assistant_response": by_role["assistant"],
             }, ensure_ascii=False) + "\n")
@@ -163,10 +170,11 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
     With ONE run dir the layout is the original single-run shape
     (run_manifest.json + audit/*). With several (DAD only — enforced in
-    main()), the flattened corpora are concatenated into one jsonl whose
-    source_run column carries per-row provenance, and the per-run files move
-    under run-scoped paths so they can't collide: manifests/<run_id>.json and
-    audit/<run_id>/*.
+    main()), the flattened corpora are concatenated into one jsonl and the
+    per-run files move under run-scoped paths so they can't collide:
+    manifests/<run_id>.json and audit/<run_id>/*. Those per-run manifests,
+    plus the card table built from them, are the combined corpus's provenance
+    record — the rows themselves carry no run column (see flatten_dad_corpus).
     """
     # Refuse a --staging-dir that equals or contains any run dir, OR either of
     # the two specific subtrees this function reads from (final/, audit/):
@@ -211,8 +219,7 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
         corpus_src = run_dir / "final" / corpus_name
         if corpus_name == "dad_corpus.jsonl":
-            n = flatten_dad_corpus(corpus_src, corpus_dst, source_run=run_id,
-                                   append=(i > 0))
+            n = flatten_dad_corpus(corpus_src, corpus_dst, append=(i > 0))
         else:
             shutil.copy2(corpus_src, corpus_dst)
             with open(corpus_dst, encoding="utf-8") as f:
@@ -379,6 +386,31 @@ def models_used(manifest: dict, pipeline_tag: str) -> tuple[str | None, list[str
     return default, overrides
 
 
+def code_state(manifest: dict) -> str:
+    """Whether the run's working tree was clean at generation time.
+
+    The git commit alone overstates what it pins down. shared.utils records
+    git_dirty/git_dirty_files precisely because runs are typically generated
+    with uncommitted changes on top of the recorded SHA — every DAD run
+    published so far was dirty, several with pipeline code and prompt templates
+    among the modified files. So the commit is the nearest committed ancestor
+    of the generating code, not the generating code itself, and a card that
+    prints a bare SHA implies a reproducibility it doesn't have. The counts are
+    already uploaded per run in manifests/<run_id>.json — this only surfaces
+    them for a human reader.
+
+    A manifest predating the fields renders "unknown" rather than "clean":
+    absent evidence is not evidence of a clean tree.
+    """
+    dirty = manifest.get("git_dirty")
+    if dirty is None:
+        return "unknown"
+    if not dirty:
+        return "clean"
+    n = len(manifest.get("git_dirty_files") or [])
+    return f"dirty ({n} uncommitted file{'s' if n != 1 else ''})" if n else "dirty"
+
+
 def _dataset_section(ds: dict) -> list[str]:
     """The card's prose block for ONE dataset: heading, count, provenance,
     measured metrics, and pointers to its audit files."""
@@ -405,9 +437,12 @@ def _dataset_section(ds: dict) -> list[str]:
     unmerged = content.get("unmerged") or {}
     if unmerged:
         lines += ["", "> **Unmerged code warning.**"]
-        # Named per run, not collapsed: source_run lets a reader trace any row
-        # back to its run, so the warning has to be traceable the same way or
-        # it can't tell them WHICH rows came from unreviewed code.
+        # Named per run, not collapsed. A reader CAN trace any row back to its
+        # run — example_gid resolves to exactly one committed run dir in the
+        # repo (see flatten_dad_corpus) — so naming the runs is what makes that
+        # trace tell them WHICH rows came from unreviewed code. Collapsed into
+        # one verdict, the warning would name no run and the trace would have
+        # nothing to resolve against.
         for run in unmerged.get("runs") or []:
             run_id = run.get("run_id") or "unknown run"
             branch = run.get("branch") or "unknown"
@@ -430,11 +465,12 @@ def _dataset_section(ds: dict) -> list[str]:
     manifests_dir = dataset_dir / "manifests"
     if manifests_dir.is_dir():
         counts = {r["run_id"]: r["n_docs"] for r in (staged.get("runs") or [])}
-        lines += ["", "Combined from several runs; each row's `source_run` "
-                      "column names the run that generated it."]
+        lines += ["", "Combined from several runs. The rows carry no run "
+                      "column; this table is the provenance record for what "
+                      "went into the corpus."]
         lines += ["", "| run | examples | default model | per-stage models "
-                      "| backend | git commit |",
-                  "| --- | --- | --- | --- | --- | --- |"]
+                      "| backend | git commit | code state |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
         run_manifests = [_load_json(p) or {}
                          for p in sorted(manifests_dir.glob("*.json"))]
         for m in run_manifests:
@@ -445,7 +481,8 @@ def _dataset_section(ds: dict) -> list[str]:
                 f"| `{default_model or 'unknown'}` "
                 f"| {', '.join(f'`{x}`' for x in overrides) or '—'} "
                 f"| `{_get(m, 'config', 'backend', default='unknown')}` "
-                f"| `{m.get('git_commit', 'unknown')}` |")
+                f"| `{m.get('git_commit', 'unknown')}` "
+                f"| {code_state(m)} |")
         for m in run_manifests:
             rid = m.get("run_id", "unknown")
             rows = build_metrics_rows(dataset_dir, run_id=rid)
@@ -463,6 +500,7 @@ def _dataset_section(ds: dict) -> list[str]:
             f"- **run_id**: `{manifest.get('run_id', 'unknown')}`",
             f"- **label**: `{manifest.get('label', 'unknown')}`",
             f"- **git commit**: `{manifest.get('git_commit', 'unknown')}`",
+            f"- **code state**: {code_state(manifest)}",
             f"- **default model**: `{default_model or 'unknown'}`",
         ]
         if overrides:
@@ -717,10 +755,12 @@ def check_merged(run_dirs: list[Path], *, dry_run: bool,
          "runs": [{"run_id", "branch", "commit"}, ...]}
 
     Every input run is checked separately, and the stamp NAMES each unverified
-    one. A combined corpus is only as merged as its least-merged run, and its
-    source_run column exists precisely so a row can be traced to the run — and
-    therefore the code — that produced it. Collapsing that into one verdict
-    would discard the property the combined format was built to preserve.
+    one. A combined corpus is only as merged as its least-merged run, and a row
+    can be traced to the run — and therefore the code — that produced it, via
+    the repo lookup example_gid supports (see flatten_dad_corpus). Naming each
+    run is what connects that trace to a merge verdict; collapsing them into
+    one would leave a reader able to identify a row's run but not whether that
+    run's code was reviewed.
 
     Deliberately a warning-plus-confirmation rather than a refusal. The HF write
     token lives on contributors' laptops, so a hard block wouldn't prevent an
@@ -840,8 +880,9 @@ def main() -> None:
     )
     parser.add_argument("--input", required=True, nargs="+",
                         help="Run directory (SDF or DAD). Several DAD run dirs "
-                             "publish as ONE combined corpus whose source_run "
-                             "column names each row's run; SDF takes exactly one.")
+                             "publish as ONE combined corpus, with each run "
+                             "named in the card's provenance table; SDF takes "
+                             "exactly one.")
     parser.add_argument("--repo-id", required=True,
                         help="e.g. sentientfutures/animal-welfare-mid-training-datasets")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
@@ -871,8 +912,10 @@ def main() -> None:
                          f"(got {sorted(corpus_names)})")
     corpus_name = corpus_names.pop()
     if corpus_name == "sdf_corpus.jsonl" and len(run_dirs) > 1:
-        # SDF corpora are copied verbatim (no flatten step to carry a
-        # source_run column), so a concatenation would lose per-row provenance.
+        # SDF corpora are copied verbatim rather than rewritten record by
+        # record, and SDF has no cross-run stable id (doc_id is per-run), so a
+        # concatenation would leave rows no way to be traced back to a run —
+        # not even through the repo, the way DAD's example_gid allows.
         raise SystemExit("Combined publishing is DAD-only; pass one SDF run dir.")
     if len(set(run_dirs)) != len(run_dirs):
         raise SystemExit("Duplicate --input run dirs would double their rows "

@@ -313,12 +313,20 @@ class TestFlattenDadCorpus:
         records = [json.loads(line) for line in lines]
         assert len(records) == 2
         for i, rec in enumerate(records):
-            assert set(rec) == {"example_gid", "source_run",
-                                "user_prompt", "assistant_response"}
+            assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
             assert rec["example_gid"] == f"E-{i:04d}"
-            assert rec["source_run"] == MANIFEST["run_id"]
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
+
+    def test_published_rows_carry_no_run_column(self, tmp_path):
+        """Row-to-run attribution is the repo's job (git grep on the globally
+        unique example_gid), not a repeated run_id on every row."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "source_run" not in raw
+        assert MANIFEST["run_id"] not in raw
 
     def test_local_training_corpus_is_left_untouched(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
@@ -362,11 +370,18 @@ class TestFlattenDadCorpus:
         assert "鶏の福祉について" in raw
 
 
-def _dad_manifest(run_id, backend="api"):
-    return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
-            "git_commit": "abc1234", "model": "claude-sonnet-5",
-            "config": {"backend": backend,
-                       "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+def _dad_manifest(run_id, backend="api", dirty=None, dirty_files=None):
+    """A DAD run manifest. dirty=None omits the git_dirty fields entirely (a
+    manifest predating them); pass dirty=True/False to set them, shaped as
+    shared.utils records them."""
+    m = {"run_id": run_id, "label": run_id.split("_", 2)[-1],
+         "git_commit": "abc1234", "model": "claude-sonnet-5",
+         "config": {"backend": backend,
+                    "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+    if dirty is not None:
+        m["git_dirty"] = dirty
+        m["git_dirty_files"] = list(dirty_files or [])
+    return m
 
 
 class TestCombinedPublish:
@@ -383,7 +398,12 @@ class TestCombinedPublish:
             manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
         return [run_a, run_b], corpus_name
 
-    def test_corpora_concatenate_with_per_row_source_run(self, tmp_path):
+    def test_corpora_concatenate_in_input_order(self, tmp_path):
+        """Every run's rows land in the combined corpus, in --input order. The
+        rows carry no run column — example_gid is what identifies them, and
+        _two_runs gives both runs the same gids on purpose (each run dir is
+        built independently, exactly as separate real runs would be) so the
+        assertion can't accidentally lean on distinct ids."""
         run_dirs, corpus_name = self._two_runs(tmp_path)
         staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
 
@@ -391,9 +411,32 @@ class TestCombinedPublish:
         assert [r["n_docs"] for r in staged["runs"]] == [2, 3]
         records = [json.loads(line) for line in
                    (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()]
-        assert [r["source_run"] for r in records] == (
-            ["2026-07-28_17-32_pareto200"] * 2
-            + ["2026-07-29_23-58_archetype1000"] * 3)
+        assert len(records) == 5
+        assert "source_run" not in records[0]
+        # run_a contributed 2 rows, then run_b's 3 — docs=2 and docs=3 make the
+        # user_prompt sequence restart, which is what pins the concatenation order.
+        assert [r["user_prompt"] for r in records] == [
+            "user prompt 0", "user prompt 1",
+            "user prompt 0", "user prompt 1", "user prompt 2"]
+
+    def test_per_run_table_reports_each_run_s_code_state(self, tmp_path):
+        """Mixed states must be named per run, not collapsed — a combined
+        corpus is only as reproducible as its least-reproducible run."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200",
+                                   dirty=True, dirty_files=["config.yaml"]))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000", dirty=False))
+        staged, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+
+        assert "| code state |" in card
+        assert "| `abc1234` | dirty (1 uncommitted file) |" in card
+        assert "| `abc1234` | clean |" in card
 
     def test_manifests_and_audits_are_run_scoped(self, tmp_path):
         """Several runs in one dataset dir must not collide on filenames:
@@ -416,7 +459,8 @@ class TestCombinedPublish:
         card = _one_card(dataset_dir, staged)
 
         assert "5 chat examples." in card
-        assert "`source_run`" in card
+        assert "this table is the provenance record" in card
+        assert "`source_run`" not in card
         assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
         assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
         # per-run metrics line only for the run that has an audit
@@ -617,6 +661,52 @@ class TestBuildCard:
         card = _one_card(dataset_dir, staged)
         assert "- **default model**: `claude-sonnet-5`" in card
         assert "- **per-stage models**: `claude-opus-5`" in card
+
+    def test_card_reports_dirty_tree_alongside_the_commit(self, tmp_path):
+        """A bare SHA implies the run is reproducible from that commit. It
+        isn't when the tree was dirty, so the card says so next to it."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", audit_files=[], include_html=False,
+            manifest=_dad_manifest(
+                "2026-07-29_23-58_archetype1000", dirty=True,
+                dirty_files=["dad_pipeline/run.py", "prompts/dad/step1d_refine.txt"]))
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+        assert "- **git commit**: `abc1234`" in card
+        assert "- **code state**: dirty (2 uncommitted files)" in card
+
+    def test_card_reports_unknown_code_state_for_older_manifests(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)  # MANIFEST has no git_dirty
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert "- **code state**: unknown" in _one_card(dataset_dir, staged)
+
+
+class TestCodeState:
+    """The commit alone overstates reproducibility: every DAD run published so
+    far ran with uncommitted changes, several touching pipeline code and prompt
+    templates."""
+
+    def test_dirty_reports_the_file_count(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True,
+             "git_dirty_files": ["dad_pipeline/run.py", "config.yaml"]}
+        ) == "dirty (2 uncommitted files)"
+
+    def test_one_dirty_file_is_singular(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True, "git_dirty_files": ["config.yaml"]}
+        ) == "dirty (1 uncommitted file)"
+
+    def test_dirty_without_a_file_list_still_reports_dirty(self):
+        assert publish_hf.code_state({"git_dirty": True}) == "dirty"
+
+    def test_clean_tree(self):
+        assert publish_hf.code_state(
+            {"git_dirty": False, "git_dirty_files": []}) == "clean"
+
+    def test_missing_fields_are_unknown_not_clean(self):
+        """A manifest predating the fields must not be advertised as clean."""
+        assert publish_hf.code_state({"git_commit": "abc1234"}) == "unknown"
 
 
 class TestModelsUsed:
@@ -1444,9 +1534,10 @@ class TestUnmergedGuard:
         self, tmp_path, monkeypatch, stub_hf
     ):
         """The point of per-run stamping: a combined corpus is only as merged as
-        its least-merged run, and source_run lets a reader trace a row to its
-        run — so the warning must say WHICH runs, not just that some run failed.
-        The merged run must not be smeared with the others' warning."""
+        its least-merged run, and a reader can trace a row to its run through
+        the repo (example_gid) — so the warning must say WHICH runs, or that
+        trace can't tell them whether a given row's code was reviewed. The
+        merged run must not be smeared with the others' warning."""
         runs = self._dad_runs(
             tmp_path,
             ("2026-07-01_10-00_merged", "aaaaaaa", "main"),
