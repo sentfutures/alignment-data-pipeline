@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import api, utils, constitution_loader
-from dad_pipeline.id_registry import IdRegistry, example_fingerprint, registry_path
+from dad_pipeline.id_registry import IdRegistry, example_fingerprint, prompt_key, registry_path
 
 
 def run(
@@ -53,7 +53,7 @@ def run(
     def rewrite_response(resp: dict) -> dict:
         """API call + parsing only — all writes and checkpoint marks stay on
         the main thread, in input order (the parallel_map contract)."""
-        print(f"  Rewriting response for {resp['prompt_id']}...")
+        print(f"  Rewriting response for {prompt_key(resp)}...")
         system_prompt, user_prompt = utils.load_split_prompt(
             prompts_dir / "step3_rewrite.txt",
             principles_block=principles_block,
@@ -70,7 +70,7 @@ def run(
         # doubled budget before deferring, so long-form cases aren't silently
         # re-skipped on every resume.
         if stop_reason == "max_tokens":
-            print(f"    {resp['prompt_id']}: rewrite hit the 4000-token cap — retrying at 8000.")
+            print(f"    {prompt_key(resp)}: rewrite hit the 4000-token cap — retrying at 8000.")
             rewritten, stop_reason = api.call_claude(
                 user_message=user_prompt, system_prompt=system_prompt,
                 max_tokens=8000, return_stop_reason=True,
@@ -92,9 +92,9 @@ def run(
             why = ("truncated at max_tokens (even at 8000)" if stop_reason == "max_tokens"
                    else "transcript echo (reply wrapped in USER:/ASSISTANT: replay)"
                    if rewritten else "empty")
-            print(f"    Skipping {resp['prompt_id']}: rewrite {why} — not written, will retry on resume.")
+            print(f"    Skipping {prompt_key(resp)}: rewrite {why} — not written, will retry on resume.")
             utils.append_jsonl(
-                {"response_id": rid, "prompt_id": resp["prompt_id"], "reason": why},
+                {"response_id": rid, "prompt_gid": prompt_key(resp), "reason": why},
                 output_dir / "rewrite_failures.jsonl",
             )
             continue
@@ -108,7 +108,7 @@ def run(
                 "example", example_fingerprint(resp["user_message"], rewritten)),
             "response_id": rid,
             "response_gid": resp.get("response_gid"),
-            "prompt_id": resp["prompt_id"],
+            "prompt_gid": prompt_key(resp),
             "sample_index": resp.get("sample_index", 0),
             "tensions": resp.get("tensions", []),
             "entry_ids": resp.get("entry_ids", []),

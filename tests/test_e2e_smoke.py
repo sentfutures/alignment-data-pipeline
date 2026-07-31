@@ -5,6 +5,7 @@ PIPELINE_OUTPUT_ROOT redirects all run output into tmp_path so the repo's real
 outputs/ tree (and its `latest` symlinks) is never touched.
 """
 
+import hashlib
 import json
 
 import pytest
@@ -92,7 +93,7 @@ def _dad_dispatch(user_message, **kw):
     # (every template splits into system + user halves) — and it must carry
     # the finished (gate-passed, 1d-refined) prompt verbatim.
     if not (kw.get("system_prompt") or ""):
-        assert user_message == "Refined user message."
+        assert user_message.startswith("Refined user message")
         return "Plain baseline answer."
     # Every DAD template splits into a system + user prompt, so the role
     # markers live in system_prompt while the payload stays in the user
@@ -105,7 +106,10 @@ def _dad_dispatch(user_message, **kw):
     if "gate for dilemma prompts" in blob:  # step 1c: pass/fail quality gate
         return json.dumps({"pass": True, "failures": []})
     if "rewrite a fictional user input" in blob:  # step 1d: refine rewrite
-        return "n\n<revised_user_prompt>Refined user message.</revised_user_prompt>"
+        # vary the rewrite per scenario: identical wording would collapse two
+        # records onto one content-keyed prompt_gid (step 1 guards and redrafts)
+        tag = hashlib.md5(blob.encode()).hexdigest()[:6]
+        return f"n\n<revised_user_prompt>Refined user message {tag}.</revised_user_prompt>"
     if "build the full map of the case" in blob:  # step 2a
         return json.dumps({"patients": "p", "goal": "g", "levers": "l", "cost": "c",
                            "magnitude": "m", "upside": "u", "replaceability": "cf"})
@@ -147,7 +151,7 @@ def test_dad_pipeline_end_to_end_offline(tiny_config_file, outputs_root, stub_cl
         assert [m["role"] for m in record["messages"]] == ["user", "assistant"]
         # composed 1c/1d: the gate judged the draft, the refine rewrote it —
         # the corpus carries the rewrite
-        assert record["messages"][0]["content"] == "Refined user message."
+        assert record["messages"][0]["content"].startswith("Refined user message")
         assert record["messages"][1]["content"] == "Rewritten careful answer."
     # the baseline rode along: one record per prompt, never in the corpus,
     # and each one reached its 2b call as the advisory first take

@@ -192,8 +192,8 @@ def audit_length_truncation(records: list[dict], report: dict) -> None:
 
 def audit_markdown(records: list[dict], report: dict) -> None:
     """Markdown gloss is a strong synthetic tell in prose meant to look scraped —
-    the head-to-head with the CAML corpus showed an explicit ban drives bullets
-    to 0% and bold to single digits, while an unbanned corpus hit 52% bold."""
+    with an explicit ban in the prompts, bullets drop to 0% and bold to single
+    digits; a comparison corpus generated without the ban hit 52% bold."""
     n = len(records)
     counts = {label: sum(bool(rx.search(r.get("content") or "")) for r in records)
               for label, rx in _MD_CLASSES.items()}

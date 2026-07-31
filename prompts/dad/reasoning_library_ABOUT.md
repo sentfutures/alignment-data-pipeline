@@ -1,10 +1,8 @@
 # About the Animal Ethics Reasoning Library
 
-> **Human reference only — not injected into any prompt.** This file is documentation to help a person understand the library. The pipeline never reads it: step 2b loads the entries directly from `reasoning_library.csv` and embeds them in the response prompt (`prompts/dad/step2_respond.txt`). Edit the CSV to change what the model sees; edit this file to change what a human reads.
->
-> **Non-normative, and about shape not contents.** This document describes how the library is *structured*, not which entries it currently holds. For the actual entries — their number, their ids, and their exact text — read `reasoning_library.csv`; it is the single source of truth. Where this document and the CSV or templates disagree, the CSV/templates win; do not cite this document as a requirement in code review.
+> **Human reference only — not injected into any prompt.** This file is documentation to help a person understand the library. The pipeline never reads it: the loader (`dad_pipeline/reasoning_library.py`) reads the entries from `reasoning_library.csv`. Edit the CSV to change what the model sees; edit this file to change what a human reads. This document describes how the library is *structured*, not which entries it currently holds — for the actual entries, their number, ids, and exact text, the CSV is the single source of truth.
 
-The library is a set of reusable, two-sided reasoning patterns for animal-ethics dilemmas that the response generator reasons from. The generator scopes a case, selects the entries that fit, and reasons from them; when none fits, it reasons from first principles to the same standard. Entries are added and revised as the design iterates, so treat every example below as illustrative rather than a complete or current list.
+The library is a set of reusable, two-sided reasoning patterns for animal-ethics dilemmas that the response generator reasons from. Step 2 uses it in two stages: a dedicated retrieval call per case (2a.5, `prompts/dad/step2_select.txt`) reads the entries' trigger conditions and selects the ones that fit, and the response call (2b, `prompts/dad/step2_respond.txt`) receives only those selected rows in its case notes and reasons from them — falling back to the whole library when a selection is unusable. When no entry fits a case, the generator reasons from first principles to the same standard. Entries are added and revised as the library evolves, so treat every example below as illustrative rather than a complete or current list.
 
 ## The ID scheme
 

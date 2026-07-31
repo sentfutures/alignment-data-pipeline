@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import api, utils
-from dad_pipeline.id_registry import IdRegistry, registry_path, response_fingerprint
+from dad_pipeline.id_registry import IdRegistry, prompt_key, registry_path, response_fingerprint
 
 
 # Token budget for the plain arm, and the doubled budget it escalates to on a
@@ -41,18 +41,18 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
 
     existing = utils.load_jsonl(output_path)
     results = list(existing)
-    done = {r["prompt_id"] for r in existing}
+    done = {prompt_key(r) for r in existing}
 
     pending = [d for d in dilemmas
-               if d["prompt_id"] not in done
-               and not checkpoint.is_done(d["prompt_id"])]
+               if prompt_key(d) not in done
+               and not checkpoint.is_done(prompt_key(d))]
 
     model = (config["dad"].get("baseline") or {}).get("model")
 
     def baseline_call(d: dict) -> dict:
         """API call only — all writes and checkpoint marks stay on the main
         thread, in input order (the parallel_map contract)."""
-        pid = d["prompt_id"]
+        pid = prompt_key(d)
         print(f"  Baseline response for {pid}...")
         response, stop_reason = api.call_claude(
             user_message=d["user_message"], system_prompt="",
@@ -78,7 +78,7 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
     workers = int(config.get("workers", 1))
     for out in utils.parallel_map(baseline_call, pending, workers):
         d, response, stop_reason = out["dilemma"], out["response"], out["stop_reason"]
-        pid = d["prompt_id"]
+        pid = prompt_key(d)
         # A truncated or empty reply is not a usable comparison arm. Skip
         # without checkpointing so --resume retries it (fail-soft: a baseline
         # failure never stops the run — it only costs the comparison).
@@ -88,7 +88,7 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
             print(f"    Skipping {pid}: baseline {why} — not written, will retry on resume.")
             continue
         record = {
-            "prompt_id": pid,
+            "prompt_gid": pid,
             "plain_gid": registry.gid("plain", response_fingerprint(response)),
             "user_message": d["user_message"],
             "baseline_response": response,

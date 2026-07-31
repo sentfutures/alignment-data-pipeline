@@ -61,6 +61,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import embeddings, utils
+from dad_pipeline.id_registry import prompt_key, prompt_keys
 
 # ---------------------------------------------------------------- verdicts
 # (same conventions as evals/audit_sdf.py)
@@ -150,17 +151,17 @@ def scope_id(rec: dict, scope: str, fallback: str, prompt_gids: dict) -> str:
 
 
 def dad_prompt_gids(run_dir: Path) -> dict:
-    """record_id -> prompt gid (P-), joined final→step3 (record_id→prompt_id)
-    →step1 (prompt_id→prompt_gid); {} for non-DAD runs or missing stages. The
+    """record_id -> prompt gid (P-), joined final→step3→step1 via each record's
+    prompt key (prompt_gid, legacy prompt_id); {} for non-DAD runs or missing stages. The
     final corpus carries example_gid/response_gid but not the prompt gid, so the
     prompts-scope cloud needs this two-hop lookup to label dots P- not E-."""
     try:
-        pid_by_rec = {r["record_id"]: r["prompt_id"]
+        pid_by_rec = {r["record_id"]: prompt_key(r)
                       for r in utils.load_jsonl(run_dir / "step3" / "rewrites.jsonl")
-                      if r.get("record_id") and r.get("prompt_id")}
-        pgid_by_pid = {d["prompt_id"]: d["prompt_gid"]
+                      if r.get("record_id") and prompt_key(r)}
+        pgid_by_pid = {k: d["prompt_gid"]
                        for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")
-                       if d.get("prompt_id") and d.get("prompt_gid")}
+                       if d.get("prompt_gid") for k in prompt_keys(d)}
     except (OSError, KeyError):
         return {}
     return {rec: pgid_by_pid[pid] for rec, pid in pid_by_rec.items() if pid in pgid_by_pid}
@@ -277,11 +278,11 @@ def vendi_score(X: np.ndarray) -> float:
 
 def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
                     iters: int = 60, return_labels: bool = False):
-    """Topic evenness, the CaML-report analog: k-means over the (unit) doc
+    """Topic evenness: k-means over the (unit) doc
     embeddings, then the normalized entropy of cluster sizes (1.0 = topics
     perfectly even) and the largest cluster's share. Plain numpy k-means++
     (cosine via normalized centroids) — no new dependency; deterministic via
-    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k).
+    seed. k defaults to n/5 capped at 50.
     return_labels=True returns (stats, labels) so callers can say WHAT is in
     each cluster; the default stays the bare stats dict."""
     n = len(X)
@@ -350,7 +351,7 @@ def pca_coords(X: np.ndarray) -> np.ndarray:
     return (U[:, :2] * S[:2]).astype(float)
 
 
-# Idea-level diversity (CaML-report analog): each record is reduced to a
+# Idea-level diversity: each record is reduced to a
 # one-line scenario summary; summaries are embedded and near neighbours
 # counted. Catches the same idea re-skinned across registers/settings, which
 # document-level embeddings miss.
@@ -647,7 +648,7 @@ def main() -> None:
 
     # Per-scope distributions (prompts / responses / combined), stored with the
     # raw nearest-neighbour sims and sorted cluster sizes so the viewer can
-    # draw the CaML-style chart rows (NN histogram · topic-spread bars · cloud).
+    # draw the diversity chart rows (NN histogram · topic-spread bars · cloud).
     # Chat corpora get all three scopes; document corpora just the combined one.
     def _scope_block(s_ids: list, s_texts: list, S: np.ndarray) -> dict:
         s_sims, _ = nearest_neighbors(S)

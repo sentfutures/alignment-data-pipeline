@@ -1,8 +1,13 @@
 # alignment-data-pipeline
 
-A synthetic data generation pipeline for producing training data, modeled on Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) midtraining technique.
+A synthetic data generation pipeline for producing training data, modeled on Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) technique. Teaching Claude Why teaches a model values during midtraining, the training stage between pretraining and task-specific finetuning, using synthetic data that shows the reasoning behind the values rather than just the conclusions.
 
-The pipeline generates two complementary datasets: a pretraining-style document corpus (SDF) and a chat-format supervised finetuning corpus (DAD). Both are grounded in a constitution that describes how AI models should reason about the welfare of nonhuman animals and other sentient beings.
+The pipeline generates two complementary datasets:
+
+- **SDF** (synthetic document finetuning, the training style it feeds): a corpus of pretraining-style documents.
+- **DAD** (the Difficult Advice Dataset): a chat-format corpus for supervised finetuning (SFT), where each example is one user-assistant exchange.
+
+Both are grounded in a constitution: a published document describing the values and behavior an AI model should embody. Here that is Claude's constitution, plus a reading of it focused on how AI models should reason about the welfare of nonhuman animals and other sentient beings.
 
 ---
 
@@ -11,7 +16,7 @@ The pipeline generates two complementary datasets: a pretraining-style document 
 ```
 constitution/       source constitution documents
 shared/             shared utilities: API wrapper, JSONL I/O, checkpointing
-sdf_pipeline/       matrix-driven document generation pipeline (compose+plan, draft, rewrite, score)
+sdf_pipeline/       document generation pipeline (compose+plan, draft, rewrite, score)
 dad_pipeline/       3-step chat transcript pipeline
 prompts/            prompt templates for all pipeline stages
 outputs/            generated data (tracked in git, one directory per run)
@@ -24,26 +29,28 @@ evals/              scoring scripts and rubric
 
 Three source files, kept separate (the two markdown files are joined in memory by `shared/constitution_loader.py`):
 
-- `constitution/constitution_claude.md` — the original Claude constitution, verbatim.
-- `constitution/constitution_sentient_beings.md` — the animal-welfare section-by-section reading, with one `## ` header per section.
-- `constitution/constitution_principles.csv` — the distilled welfare-relevant principles, embedded as an explicit checklist in the DAD rewrite prompt (step 3).
+- `constitution/constitution_claude.md`: the original Claude constitution, verbatim.
+- `constitution/constitution_sentient_beings.md`: the animal-welfare reading of it, section by section, with one `## ` header per section.
+- `constitution/constitution_principles.csv`: the distilled welfare-relevant principles. Each row pairs one principle with its welfare application and verbatim excerpts from the constitution. These are embedded as an explicit checklist in the DAD pipeline's final rewrite stage (step 3, described below).
 
-SDF layers 3-5 embed the constitution and the distilled principles in their templates' SYSTEM sections (`load_constitution_claude()` + `format_principles()`). The DAD pipeline never sends the full constitution: its user side is governed by `prompts/dad/dilemma_prompt_spec.md`, and its rewrite step runs on the distilled principles CSV (welfare applications + verbatim constitution excerpts).
+The SDF pipeline's generation stages (layers 3 to 5, described in the next section) embed the constitution and the distilled principles in their prompts. The DAD pipeline never sends the full constitution: its user side is governed by `prompts/dad/README.md` (Parts 1 to 6), and its rewrite step runs on the distilled principles CSV alone.
 
 ---
 
 ## SDF Pipeline (`sdf_pipeline/`)
 
-Generates pretraining-style documents — encyclopedia entries, news articles, podcast transcripts, forum threads, fiction, newsletters, internal memos, and more — depicting a world where AI already reasons carefully about animal welfare. Diversity is engineered **by construction**: instead of asking a model to invent document types, a weighted combinatorial matrix of pre-written variables (`prompts/sdf/variables.txt` — document type, culture/language, tone, narrative resolution, welfare centrality, speaker AI-literacy, kinds of minds) is deck-sampled into exactly-proportioned prompt specs, at zero API cost.
+Generates pretraining-style documents (encyclopedia entries, news articles, podcast transcripts, forum threads, fiction, newsletters, internal memos, and more) depicting a world where AI already reasons carefully about animal welfare. It runs in five stages, called layers.
+
+Diversity is engineered **by construction**: instead of asking a model to invent document types, a weighted matrix of pre-written variables (`prompts/sdf/variables.txt`: document type, culture and language, tone, narrative resolution, how central the welfare thread is, the speaker's AI literacy, and the kinds of minds affected) is deck-sampled into exactly-proportioned prompt specs, at zero API cost. Deck-sampled means each variable's values are laid out in exact proportion to their weights, shuffled, and dealt one per document, so the corpus composition matches the weights exactly rather than by sampling luck.
 
 | Layers | Script | What it does |
 |---|---|---|
-| 1–2 | `compose_prompts.py` + `layer12_plan.py` | Deck-samples `sdf.n_prompts` variable combinations (per-variable shares match the weights exactly; locale-matched fictional name/org pools injected per prompt), then one plan call per document produces a self-contained DOCUMENT DESCRIPTION spec — or declares the combination INCOHERENT |
+| 1-2 | `compose_prompts.py` + `layer12_plan.py` | Deck-samples `sdf.n_prompts` variable combinations (locale-matched fictional name and organization pools injected per prompt), then one plan call per document produces a self-contained DOCUMENT DESCRIPTION spec, or declares the combination INCOHERENT (no sensible document exists for it; recorded as a deliberate rejection) |
 | 3 | `layer3_draft.py` | Drafts each document from its spec, with the constitution and distilled principles in the system prompt |
-| 4 | `layer4_rewrite.py` | The alignment-critical pass: reviews and rewrites each draft against nine checks (teach-why, calibration, proportionality, cooperative posture, factual restraint, quoted-AI behavior, quiet failure modes, genre/locale fidelity, house style), anchored to the generating spec so tone, centrality, and resolution can't drift (supports a stronger `sdf.rewrite_model`) |
-| 5 | `layer5_score.py` | Judges alignment / realism / spec-conformance per document (spec-conformance is advisory); gates on alignment+realism, culls near-duplicates, writes the final corpus with full matrix lineage |
+| 4 | `layer4_rewrite.py` | The alignment-critical pass: reviews and rewrites each draft against nine checks (teach-why, calibration, proportionality, cooperative posture, factual restraint, quoted-AI behavior, quiet failure modes, genre and locale fidelity, house style), anchored to the generating spec so tone, centrality, and resolution cannot drift (supports a stronger `sdf.rewrite_model`) |
+| 5 | `layer5_score.py` | Judges each document on alignment, realism, and spec-conformance (does the document match the spec that generated it; advisory only); gates on alignment plus realism, culls near-duplicates, and writes the final corpus with each document's full variable combination attached |
 
-Documents where the welfare thread is "a minor detail mentioned only in passing" (a weighted centrality value) carry the value as background world-knowledge, not only as a headline topic — the matrix analog of the earlier latent-welfare slice.
+Documents where the welfare thread is "a minor detail mentioned only in passing" (a weighted value of the centrality variable) carry the welfare world-knowledge as background rather than as a headline topic.
 
 Final output: `outputs/sdf/runs/<run_id>/final/sdf_corpus.jsonl` (also reachable via the `outputs/sdf/latest` symlink)
 
@@ -54,21 +61,21 @@ Audit the result: `python evals/audit_sdf.py --input outputs/sdf/latest` (add `-
 
 ## DAD Pipeline (`dad_pipeline/`)
 
-Generates chat-format transcripts where a user brings a genuine ethical dilemma with animal welfare implications, and an AI assistant reasons through it carefully. Runs in 3 steps:
+Generates chat-format transcripts where a user brings a genuine ethical dilemma with animal welfare implications, and an AI assistant reasons through it carefully. The full end-to-end spec, written to stand alone, is `prompts/dad/README.md`; this section is the operational summary.
+
+Like SDF, every example starts as a **deal** from a weighted variables matrix (`prompts/dad/variables.txt`): the pipeline assigns one value per design axis (domain, the role the animals play, how visible the welfare stake is in the message, the user's attitude, message length, cultural setting, and so on), so distribution quotas hold by construction. The dealt values, stamped on each example's saved record, serve as its annotation, and a batch checklist prints at the end of step 1 as verification. Runs in 3 steps:
 
 | Step | Script | What it does |
 |---|---|---|
-| 1 | `step1_dilemmas.py` | **1a** deals a stratified variable combination per example from the weighted matrix in `prompts/dad/variables.txt` (`compose_scenarios.py`), then one plan call per deal writes a scenario description (`step1a_scenario.txt`); **1b** drafts a prompt to fit each scenario's binding labels + description (`step1b_dilemmas.txt`; assigned labels copied verbatim; fidelity is monitored by the corpus-level checklist, not a per-example check); **1c** (optional, on by default) reviews and rewrites each draft so the welfare stake is load-bearing and coherent. Imports optional handwritten seeds. |
-| 2 | `step2_responses.py` | **2a** scopes the case from the user's message along the axes `prompts/dad/step2_scope.txt` defines; **2b** generates the response over that scope with the full reasoning library in context |
-| 3 | `step3_rewrite.py` | Rewrites responses against the distilled constitution principles — the critical step |
+| 1 | `step1_dilemmas.py` | **1a** one plan call per deal writes a scenario description (`step1a_scenario.txt`); **1b** drafts the user's message to fit the scenario and its binding form instructions (`step1b_dilemmas.txt`); **1c** (optional, on by default) puts each draft through a pass/fail quality gate (`step1c_gate.txt`): a reject routes the scenario back for redraft with the gate's reasons injected, capped at 3; **1d** (optional, on by default) review-and-rewrites each gate-passed draft against its dealt values (`step1d_refine.txt`): an `<unfixable>` verdict rejects the scenario outright. Imports optional handwritten seeds. |
+| 2 | `step2_responses.py` | **2a** scopes the case: rebuilds a seven-part map of the situation from the user's message alone (`step2_scope.txt`); **2a.5** selects the entries of the reasoning library that fit the case (`step2_select.txt`); **2b** drafts the response over the scope and the selected entries (`step2_respond.txt`) |
+| 3 | `step3_rewrite.py` | Rewrites each draft response against the distilled constitution principles. The alignment-critical step. |
 
-The prompt spec (`prompts/dad/dilemma_prompt_spec.md`) governs the user side: dilemmas put at least two named values in genuine tension, both calibration directions are covered (under- and over-weighting welfare, in roughly equal measure), and each example carries an annotation (the schema the 1b template specifies). Step 1a samples the categorical fields from stratified decks so the spec's distribution quotas hold by construction rather than being steered after the fact; the batch-assembly checklist prints at the end as verification.
+The response side is governed by the **reasoning library** (`prompts/dad/reasoning_library.csv`; `reasoning_library_ABOUT.md` is human reference about it, not injected): a curated table of reusable animal-ethics arguments in three layers (conduct rules `C*`, core reasoning moves `M*`, and single-topic arguments `T*`), each row carrying a `claim`, its `reasoning`, a `trigger_condition` saying when it applies, and a `transferable_move`. Step 2 first scopes the case (2a), then a dedicated retrieval call selects the library entries whose trigger conditions fire (2a.5); an unusable selection fails open, sending 2b the whole library rather than retrying. The drafting call (2b) splits into a system prompt (the standing generation guidance) and a user message carrying the scope, the selected library rows, and, when the control stage is enabled, the plain model's answer to the same dilemma as an advisory "first take" (the **baseline**: a no-system-prompt control answer collected for every dilemma, used for comparison and never trained on). The user's stated leaning never sets the conclusion, and the library is scaffolding: it shapes the reasoning but is never named in the response.
 
-The response side is governed by the reasoning library (`prompts/dad/reasoning_library.csv`; `reasoning_library_ABOUT.md` is human reference about it, not injected): reasoning-first *entries* in three layers — conduct (C*), core moves (M*), and topic reasoning (T*) — each with a `claim`/`reasoning`/`crux`/`transferable_move`. Step 2 first scopes the case (2a), then generates the response (2b) over that scope with the **whole library embedded in the response prompt** — the prompt itself is the generation guidance (`prompts/dad/step2_respond.txt`), so there is no separate system prompt, and the annotation is not passed. The user's stated leaning never sets the conclusion; the library is scaffolding, never named in the response.
+Step 3 is the most important: the rewrite pass is where the alignment gain comes from (per the Teaching Claude Why paper). Its anchors are the distilled constitution principles, each with its verbatim constitution excerpts, applied to the draft response and user message. The full constitution itself is never sent at generation time; it was the source material for distilling the principles.
 
-Step 3 is the most important: the rewrite pass is where the alignment gain comes from (per the Teaching Claude Why paper). Its anchors are the distilled constitution principles — each with its verbatim constitution excerpts — plus the example's annotation. The full constitution itself is never sent at generation time; it was the source material for distilling the principles.
-
-Final output: `outputs/dad/runs/<run_id>/final/dad_corpus.jsonl` (also reachable via the `outputs/dad/latest` symlink) — each record contains only `{"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}`. System prompts, scaffolding (scope maps, the reasoning library), and the constitution are stripped.
+Final output: `outputs/dad/runs/<run_id>/final/dad_corpus.jsonl` (also reachable via the `outputs/dad/latest` symlink). Each record contains only `{"messages": [{"role": "user", ...}, {"role": "assistant", ...}]}`. System prompts, scaffolding (scope maps, the reasoning library, the first take), and the constitution are stripped.
 
 Run: `python dad_pipeline/run.py --config config.yaml --label dev`
 
@@ -76,7 +83,7 @@ Run: `python dad_pipeline/run.py --config config.yaml --label dev`
 
 ## Prompts (`prompts/`)
 
-Plain-text prompt templates with `{variable}` placeholders. `prompts/sdf/` covers the SDF stages (the variables matrix + plan, draft, rewrite, score templates, each with labeled SYSTEM/USER sections); `prompts/dad/` covers the DAD sub-stages (scenario plan, draft, gate, scope, respond, rewrite) plus the dilemma prompt spec and the reasoning library CSV. `prompts/README.md` documents each prompt in detail.
+Plain-text prompt templates with `{variable}` placeholders. `prompts/sdf/` covers the SDF stages (the variables matrix plus plan, draft, rewrite, and score templates, each with labeled SYSTEM/USER sections); `prompts/dad/` covers the DAD sub-stages (scenario plan, draft, gate, refine, scope, select, respond, rewrite) plus the end-to-end DAD spec and the reasoning library CSV. `prompts/README.md` documents each prompt in detail.
 
 ---
 
@@ -93,13 +100,13 @@ The `Checkpoint` class saves completed IDs to disk after every API call, making 
 
 ## Evals (`evals/`)
 
-`score_sdf.py` — scores SDF documents on alignment, realism, and diversity.
+`score_sdf.py` scores SDF documents on alignment, realism, and diversity.
 
-`audit_sdf.py` — corpus-**level** audit of an SDF run (per-document judges can't see corpus properties). Offline and free by default: composition/register spread, length and truncation artifacts, near-duplicate rate (word-shingle cosine), invented-name collapse, stock-phrase frequency, and opening-shape clustering, each with a GOOD/OK/BAD verdict where meaningful. `--patterns` adds an LLM templating scan (batch scan via `prompts/tools/pattern_scan.txt` → consolidation → per-pattern prevalence; a pattern is flagged only if it's judged a genuine defect **and** widespread). Writes `audit/audit_report.json` into the run dir.
+`audit_sdf.py` is a corpus-**level** audit of an SDF run: it measures properties no single-document judge can see, because they only exist across the corpus as a set. Offline and free by default: composition and register spread, length and truncation artifacts, near-duplicate rate (measured by word-overlap similarity), invented-name collapse, stock-phrase frequency, and opening-shape clustering, each with a GOOD/OK/BAD verdict where meaningful. `--patterns` adds an LLM templating scan (batch scan via `prompts/tools/pattern_scan.txt`, then consolidation, then per-pattern prevalence; a pattern is flagged only if it is judged a genuine defect **and** widespread). Writes `audit/audit_report.json` into the run dir.
 
-`audit_dad.py` — corpus-level audit of a DAD run, the DAD analog of `audit_sdf.py`. Offline and free by default: response lengths vs the plain-baseline arm, tracked phrase tics, tracked rhetorical moves, and the tic-candidates review queue (`tics.yaml` / `moves.yaml` track both lists across runs; `review_tics.py` is the triage CLI), each with a GOOD/OK/BAD verdict where meaningful. `--judges` adds the paid LLM pass: two absolute per-response judges — welfare impact (does the answer make things better for the beings at stake) and delivery quality (how helpfully and unobtrusively it serves the user) — plus showcase examples of the pipeline beating the plain baseline and rhetorical-move discovery candidates. Writes `audit/audit_report.json` into the run dir (rendered by the viewer). The old health-check tail (skeletons, openers/closers, jargon, lexical/structural variation, library selection/coverage, opening shapes) was retired 2026-07-30 along with its standalone deep-dive tool `openings_dad.py`.
+`audit_dad.py` is the DAD analog. Offline and free by default: response lengths versus the baseline (the plain-model control answers described in the DAD section), tracked tics (pet phrases that repeat across responses), tracked rhetorical moves (recurring argumentative patterns), and a review queue of new tic candidates (`tics.yaml` / `moves.yaml` track both lists across runs; `review_tics.py` is the triage CLI), each with a GOOD/OK/BAD verdict where meaningful. `--judges` adds the paid LLM pass: two per-response judges, welfare impact (does the answer make things better for the beings at stake) and delivery quality (how helpfully and unobtrusively it serves the user), plus a showcase pass that picks concrete examples of the pipeline beating the baseline, and rhetorical-move discovery candidates. Writes `audit/audit_report.json` into the run dir (rendered by the viewer).
 
-`diversity.py` — corpus-level **semantic** diversity audit of an SDF *or* DAD run, the embedding-space complement to `audit_sdf.py`'s lexical scan (word shingles catch copied skeletons, not paraphrase). Embeds the corpus with OpenAI `text-embedding-3-small` (needs `OPENAI_API_KEY` in `.env`; ~$0.02 per 1M tokens, so cents per run) and reports nearest-neighbor similarity, the semantic near-duplicate rate, the most-similar pairs with snippets, mean pairwise cosine, the Vendi score (effective number of distinct documents), and per-type spread. Embeddings are cached per run dir so reruns are free; `--compare <previous diversity_report.json>` prints run-over-run deltas, the headline use. Writes `audit/diversity_report.json` into the run dir.
+`diversity.py` is a corpus-level **semantic** diversity audit of an SDF or DAD run, the embedding-space complement to the audits' word-level scans (word overlap catches copied skeletons, not paraphrase). It embeds the corpus via `shared/embeddings.py`, which supports two providers and uses whichever key is in `.env`: Gemini (`gemini-embedding-001`, `GEMINI_API_KEY`; what this project's runs use) or OpenAI (`text-embedding-3-small`, `OPENAI_API_KEY`). Either way the cost is cents per run. It reports nearest-neighbor similarity, the semantic near-duplicate rate, the most-similar pairs with snippets, mean pairwise similarity, the Vendi score (the effective number of distinct documents), and per-type spread. Embeddings are cached per run dir so reruns are free; `--compare <previous diversity_report.json>` prints run-over-run deltas, the headline use. Similarity numbers are only comparable between runs embedded by the same provider. Writes `audit/diversity_report.json` into the run dir.
 
 Run: `python evals/audit_dad.py --input outputs/dad/latest`
 
@@ -109,12 +116,12 @@ For DAD runs the standard evals are automatic: every full `dad_pipeline/run.py` 
 
 ## Setup
 
-Install the dependencies into a virtual environment so they stay isolated from your system Python. (This isn't optional on recent macOS/Linux — a plain `pip install` is blocked by default.)
+Install the dependencies into a virtual environment so they stay isolated from your system Python. (This isn't optional on recent macOS/Linux; a plain `pip install` is blocked by default.)
 
 ### Clone the repo
 Open your terminal app and `cd` to a directory where you want the repo (i.e. `cd ~/projects`), then run:
 ```bash
-git clone https://github.com/Mycelium-tools/alignment-data-pipeline.git
+git clone https://github.com/sentfutures/alignment-data-pipeline.git
 cd alignment-data-pipeline
 ```
 
@@ -126,7 +133,7 @@ pip install -r requirements.txt
 cp .env.example .env           # then add your ANTHROPIC_API_KEY
 ```
 
-`OPENAI_API_KEY` in `.env` is optional — only `evals/diversity.py` (the embedding-based diversity audit) reads it; the pipelines run on `ANTHROPIC_API_KEY` alone.
+`GEMINI_API_KEY` (or `OPENAI_API_KEY`) in `.env` is optional; only `evals/diversity.py` (the embedding-based diversity audit) reads them. The pipelines run on `ANTHROPIC_API_KEY` alone.
 
 > **Activate it every time.** The virtual environment only applies to the terminal where you ran `source .venv/bin/activate`. Open a new terminal and you'll need to activate again.
 
@@ -134,13 +141,13 @@ cp .env.example .env           # then add your ANTHROPIC_API_KEY
 
 The pipeline supports two backends, selected by the `backend` key in `config.yaml`:
 
-- **`backend: api`** — calls the Anthropic API directly, billed per token to the `ANTHROPIC_API_KEY` in your `.env` (ask Oliver). Use this for full-scale runs and evals.
-- **`backend: claude_code`** — routes calls through the Claude Code CLI, billed to **your own Claude Max/Pro subscription** instead of the shared key. No `ANTHROPIC_API_KEY` needed. Use this for dev/iteration runs.
-- **`backend: auto`** — prefers your subscription and falls back to the API key; a dev-iteration mode. Routing is per call: **empty-system calls (the DAD baseline arm) always take the API leg** so the plain-model condition stays exact (avoiding the neutral stand-in caveat below); everything else runs on `claude_code` until it can't serve the run — sdk/CLI missing, usage window exhausted, or a persistently failing CLI — at which point the rest of the run is served by the API, announced loudly. Each cost-log record's `backend` field names the leg that actually served that call. Requires `ANTHROPIC_API_KEY` (it is the fallback leg). **Not for representative runs:** subscription-served calls inherit the `claude_code` caveats (no `max_tokens` enforcement, CLI scaffolding in context), so runs whose outputs must represent pipeline behavior belong on `backend: api`.
+- **`backend: api`**: calls the Anthropic API directly, billed per token to the `ANTHROPIC_API_KEY` in your `.env`. Use this for full-scale runs and evals.
+- **`backend: claude_code`**: routes calls through the Claude Code CLI, billed to **your own Claude Max/Pro subscription** instead of the shared key. No `ANTHROPIC_API_KEY` needed. Use this for dev/iteration runs.
+- **`backend: auto`**: prefers your subscription and falls back to the API key; a dev-iteration mode. Routing is per call: **calls with an empty system prompt (the DAD baseline) always take the API leg** so the plain-model condition stays exact (avoiding the neutral stand-in caveat below); everything else runs on `claude_code` until it can't serve the run (sdk/CLI missing, usage window exhausted, or a persistently failing CLI), at which point the rest of the run is served by the API, announced loudly. Each cost-log record's `backend` field names the leg that actually served that call. Requires `ANTHROPIC_API_KEY` (it is the fallback leg). **Not for representative runs:** subscription-served calls inherit the `claude_code` caveats (no `max_tokens` enforcement, CLI scaffolding in context), so runs whose outputs must represent pipeline behavior belong on `backend: api`.
 
 To use it, set `backend: claude_code` in `config.yaml` and give the Claude Code CLI credentials one of two ways:
 
-1. **Reuse your interactive login (simplest).** If you already use [Claude Code](https://claude.com/claude-code) (`claude`, then `/login`), the pipeline picks up that session automatically — there's nothing else to do.
+1. **Reuse your interactive login (simplest).** If you already use [Claude Code](https://claude.com/claude-code) (`claude`, then `/login`), the pipeline picks up that session automatically; there's nothing else to do.
 2. **Generate a token for `.env`.** Install [Claude Code](https://claude.com/claude-code), then run:
    ```bash
    claude setup-token     # opens a browser; approve with your Claude account
@@ -149,20 +156,20 @@ To use it, set `backend: claude_code` in `config.yaml` and give the Claude Code 
    ```
    CLAUDE_CODE_OAUTH_TOKEN=<paste the token here>
    ```
-   This is a Claude Code OAuth token tied to your subscription (valid ~1 year), **not** an Anthropic API key — despite the name, no Console/API key is involved. Use this path for CI or any non-interactive machine.
+   This is a Claude Code OAuth token tied to your subscription (valid ~1 year), **not** an Anthropic API key. Despite the name, no Console/API key is involved. Use this path for CI or any non-interactive machine.
 
 Caveats for `backend: claude_code`:
 
-- **Usage limits.** Subscription usage is a 5-hour rolling window plus a weekly cap, shared with your interactive Claude Code use. Dev-scale runs fit comfortably; a full-scale run will exhaust the window. If a run hits the limit it stops with a clear message — progress is checkpointed, so continue later with `--resume`.
-- **Per-call overhead.** Claude Code adds ~3K input tokens of scaffolding per call and spawns a CLI process per request, so calls are somewhat slower. `max_tokens` from `config.yaml` is not enforced on this backend (Claude Code applies its own output cap); `cost_usd` in the cost log is notional — what the run *would* have cost at API prices.
-- **Empty system prompts get a neutral stand-in.** Claude Code substitutes its own agentic CLI prompt when the system prompt is empty, so stages that send none get a one-line neutral system prompt instead (see `_NEUTRAL_SYSTEM` in `shared/api.py`). Several stages send **no system prompt** — notably the DAD response steps, which reason from the embedded reasoning library rather than a system prompt — and those are **not reproduced exactly** on `claude_code` (the neutral stand-in replaces the empty prompt). The backend prints a one-time warning when it does this. Run DAD on `backend: api` when faithful no-system-prompt behavior matters (and keep full-scale corpus runs on `api` regardless).
-- **Policy note.** Anthropic's docs steer programmatic workloads toward API keys; running this internal tool on your own subscription is the same posture as using Claude Code itself, but it's a gray area — keep it to dev-scale runs.
+- **Usage limits.** Subscription usage is a 5-hour rolling window plus a weekly cap, shared with your interactive Claude Code use. Dev-scale runs fit comfortably; a full-scale run will exhaust the window. If a run hits the limit it stops with a clear message. Progress is checkpointed, so continue later with `--resume`.
+- **Per-call overhead.** Claude Code adds ~3K input tokens of scaffolding per call and spawns a CLI process per request, so calls are somewhat slower. `max_tokens` from `config.yaml` is not enforced on this backend (Claude Code applies its own output cap); `cost_usd` in the cost log is notional: what the run *would* have cost at API prices.
+- **Empty system prompts get a neutral stand-in.** Claude Code substitutes its own agentic CLI prompt when the system prompt is empty, so stages that send none get a one-line neutral system prompt instead (see `_NEUTRAL_SYSTEM` in `shared/api.py`). The only empty-system call in the pipelines is the **DAD baseline** (every generation stage sends a real system prompt). On `auto` the baseline always takes the API leg for exactly this reason, but on pure `claude_code` it gets the stand-in and is **not reproduced exactly**. The backend prints a one-time warning when it does this. Run DAD on `backend: api` when a faithful plain-model baseline matters (and keep full-scale corpus runs on `api` regardless).
+- **Policy note.** Anthropic's docs steer programmatic workloads toward API keys; running this pipeline on your own subscription is the same posture as using Claude Code itself, but it's a gray area. Keep it to dev-scale runs.
 
 ---
 
 ## Running the unit tests
 
-The unit test suite is fully offline — it never calls the Anthropic API, needs no API key, and costs nothing. It finishes in a couple of seconds, so run it freely (and always after making functional changes; CI runs it on every PR as the required `smoke` check).
+The unit test suite is fully offline. It never calls the Anthropic API, needs no API key, and costs nothing. It finishes in a couple of seconds, so run it freely (and always after making functional changes; CI runs it on every PR as the required `smoke` check).
 
 ```bash
 pytest                              # full suite, from the repo root
@@ -171,7 +178,7 @@ pytest -k checkpoint                # tests matching a keyword
 pytest -x                           # stop at the first failure
 ```
 
-Expected result: all tests pass, in well under a minute, with no network access. Three safety layers guarantee the API is never hit (pytest-socket blocks all sockets, every test gets a fake `ANTHROPIC_API_KEY`, and the API seam is replaced with a guard that raises) — so a real key in your `.env` is never used by tests. Test outputs go to temp directories; the repo's `outputs/` tree is untouched.
+Expected result: all tests pass, in well under a minute, with no network access. Three safety layers guarantee the API is never hit (pytest-socket blocks all sockets, every test gets a fake `ANTHROPIC_API_KEY`, and the API seam is replaced with a guard that raises), so a real key in your `.env` is never used by tests. Test outputs go to temp directories; the repo's `outputs/` tree is untouched.
 
 See the Testing section in `CLAUDE.md` for how the suite is structured and how to write tests for new stages.
 
@@ -179,7 +186,7 @@ See the Testing section in `CLAUDE.md` for how the suite is structured and how t
 
 ## Quick test run
 
-Start with the SDF pipeline — it has no external dependencies and finishes in a few minutes.
+Start with the SDF pipeline. It has no external dependencies and finishes in a few minutes.
 
 **1. Check your config.yaml is at small scale** for a cheap first run (the committed default is `n_prompts: 100`):
 
@@ -188,7 +195,7 @@ sdf:
   n_prompts: 6   # documents deck-sampled from the variables matrix
 ```
 
-This produces 6 documents and costs roughly $0.05–0.15.
+This produces 6 documents and costs roughly $0.05-0.15.
 
 **2. Run the SDF pipeline:**
 
@@ -203,13 +210,12 @@ You'll see progress printed per layer with a running cost after each. Final outp
 
 Open `viewer.html` in a browser (double-click it), then drag-and-drop `outputs/sdf/latest/final/sdf_corpus.jsonl` onto the drop zone.
 
-**4. Test the DAD pipeline** — reduce `dilemmas.count` first or it will make hundreds of API calls:
+**4. Test the DAD pipeline.** Reduce `dilemmas.count` first or it will make hundreds of API calls:
 
 ```yaml
 dad:
   dilemmas:
     count: 5        # default is 40; set to ~5 for a test
-    batch_size: 5
 ```
 
 Then run:
@@ -218,9 +224,9 @@ Then run:
 python dad_pipeline/run.py --config config.yaml
 ```
 
-With 5 dilemmas this is roughly 40 API calls (per dilemma: scenario plan, draft, gate, baseline, scope, library select, response, rewrite). Final output is `outputs/dad/latest/final/dad_corpus.jsonl`.
+With 5 dilemmas this is roughly 45 API calls (per dilemma: scenario plan, draft, gate, refine, baseline, scope, library select, response, rewrite). Final output is `outputs/dad/latest/final/dad_corpus.jsonl`.
 
-> **Handwritten examples are optional.** Set `dad.dilemmas.seed_path` to a JSONL of your own examples (`{"prompt": ..., "annotation": {...}}`) and step 1 imports them before generating; generated IDs continue the AW-#### series above the highest seed ID.
+> **Handwritten examples are optional.** Set `dad.dilemmas.seed_path` to a JSONL of your own examples (`{"prompt": ..., "annotation": {...}}`) and step 1 imports them before generating. Every record, seed or generated, is identified by a stable content-keyed id for its prompt (the prompt gid, `P-####`, assigned from a hash of the wording so the same prompt keeps the same id across runs), and duplicate seed wording is rejected loudly.
 
 **5. Evaluate the outputs:**
 
@@ -250,13 +256,14 @@ A Streamlit app for browsing runs, their output documents, and the exact prompts
 streamlit run viewer/app.py
 ```
 
-Three pages:
+Four pages:
 
-- **Document lineage** (default) — pick a run, click a document: the final text, then every stage with the rendered prompt side-by-side with the output it produced, including before/after diffs at the rewrite stages (SDF layer 4, DAD step 3).
-- **Compare runs** — diff the prompt templates between two runs next to matched outputs, to attribute output changes to prompt changes.
-- **Run list** — every run of both pipelines with label, model, counts, pass rate, and cost; click a run for its manifest details.
+- **Document lineage** (default): pick a run, click a document: the final text, then every stage with the rendered prompt side-by-side with the output it produced, including before/after diffs at the rewrite stages (SDF layer 4, DAD step 3).
+- **Compare runs**: diff the prompt templates between two runs next to matched outputs, to attribute output changes to prompt changes.
+- **Run list**: every run of both pipelines with label, model, counts, pass rate, and cost; click a run for its manifest details.
+- **Corpus audit**: the audit report for a run (the `audit_dad.py` / `audit_sdf.py` output), rendered with verdict badges and charts.
 
-To make this possible, every new run snapshots `prompts/<pipeline>/` and `constitution/` into `runs/<run_id>/inputs/` at creation (~100KB of text), and `--resume` reads templates from that snapshot — so a run's prompts stay exactly reproducible even after the repo's templates change. The viewer re-renders prompts from the snapshot plus the variables stored in the stage outputs. Runs made before this feature are reconstructed from their manifest's git commit and badged "reconstructed" (with a warning if the tree was dirty at run time).
+To make this possible, every new run snapshots `prompts/<pipeline>/` and `constitution/` into `runs/<run_id>/inputs/` at creation (~100KB of text), and `--resume` reads templates from that snapshot, so a run's prompts stay exactly reproducible even after the repo's templates change. The viewer re-renders prompts from the snapshot plus the variables stored in the stage outputs. Runs made before this feature are reconstructed from their manifest's git commit and badged "reconstructed" (with a warning if the tree was dirty at run time).
 
 ## Run organization
 
@@ -273,7 +280,7 @@ outputs/sdf/
       final/sdf_corpus.jsonl
 ```
 
-The run ID is `<YYYY-MM-DD_HH-MM>_<label>`; the label defaults to `dev` — use `--label full-scale` (or similar) for real runs. The DAD pipeline mirrors this under `outputs/dad/runs/` with `step1/`–`step3/`.
+The run ID is `<YYYY-MM-DD_HH-MM>_<label>`; the label defaults to `dev`. Use `--label full-scale` (or similar) for real runs. The DAD pipeline mirrors this under `outputs/dad/runs/` with `step1/`-`step3/`.
 
 Resume an interrupted run with `--resume` (defaults to the most recent run, or target one with `--run-id`):
 

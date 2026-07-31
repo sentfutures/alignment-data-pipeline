@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import api, utils
 from dad_pipeline import reasoning_library
-from dad_pipeline.id_registry import IdRegistry, registry_path, response_fingerprint
+from dad_pipeline.id_registry import IdRegistry, prompt_key, registry_path, response_fingerprint
 
 MAX_SCOPE_ATTEMPTS = 3
 
@@ -56,7 +56,7 @@ MAX_SCOPE_ATTEMPTS = 3
 # viewer re-render reproduce the same draw. Opener variety must come from
 # code-level sampling, not from asking the model to vary: at temperature 1 the
 # scope + library context converges every reply onto the same few openers.
-# Same mechanism as SDF's STRUCTURE_HINTS (adapted from the CAML notebook),
+# Same mechanism as SDF's STRUCTURE_HINTS,
 # which fixed templated openings on the document side.
 OPENING_HINTS = [
     "open on the concrete detail carrying the most weight",
@@ -210,7 +210,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
     # (reference notes — concrete moves may be adopted, framing may not).
     # Advisory means degradable: with the baseline stage disabled or a record
     # missing, the slot renders empty and 2b simply drafts unaided.
-    first_take_by_pid = {b["prompt_id"]: b.get("baseline_response", "")
+    first_take_by_pid = {prompt_key(b): b.get("baseline_response", "")
                          for b in (baselines or [])}
     # 2a.5 evaluates the lightweight trigger index in its own call; 2b gets
     # only the rows that fired. Each step-2 template splits into a system half
@@ -231,13 +231,13 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
     # Drop unusable scopes on load so a resumed run re-derives them instead of
     # reusing a checkpointed parse failure (pre-fix runs persisted {} scopes).
     scopes = {
-        r["prompt_id"]: r
+        prompt_key(r): r
         for r in utils.load_jsonl(scopes_path)
         if _valid_scope(r.get("scope"))
     }
     existing = utils.load_jsonl(output_path)
     results = list(existing)
-    done_keys = {(r["prompt_id"], r.get("sample_index", 0)) for r in existing}
+    done_keys = {(prompt_key(r), r.get("sample_index", 0)) for r in existing}
 
     # One work item per dilemma with anything left to do: derive an up-front
     # to-do (scope needed? which samples missing?) so completed work never
@@ -247,11 +247,11 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
     # prompt is spent, skipped on resume, and the run ships fewer examples
     # (mirroring 1b draft rejects and 1a INCOHERENT).
     scope_rejects_path = output_dir / "scope_rejects.jsonl"
-    scope_rejected = {r["prompt_id"] for r in utils.load_jsonl(scope_rejects_path)}
+    scope_rejected = {prompt_key(r) for r in utils.load_jsonl(scope_rejects_path)}
 
     pending = []
     for d in dilemmas:
-        pid = d["prompt_id"]
+        pid = prompt_key(d)
         if pid in scope_rejected:
             continue
         need_scope = pid not in scopes
@@ -267,7 +267,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
         main thread, in input order (the parallel_map contract); failure-log
         records are returned for the main thread to persist."""
         d, need_scope, missing_samples = item
-        pid = d["prompt_id"]
+        pid = prompt_key(d)
         out = {"dilemma": d, "scope_record": None, "scope_failed": False,
                "scope_failures": [], "select_failure": None,
                "responses": [], "skips": []}
@@ -332,9 +332,9 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                         # Keep the raw — it cost a call, and a discarded raw is
                         # an undiagnosable failure (same policy as every stage).
                         ids, fallback, source = list(library_ids), True, "full_library"
-                        out["select_failure"] = {"prompt_id": pid, "raw": raw_sel}
+                        out["select_failure"] = {"prompt_gid": pid, "raw": raw_sel}
                     out["scope_record"] = {
-                        "prompt_id": pid, "scope": parsed, "entry_ids": ids,
+                        "prompt_gid": pid, "scope": parsed, "entry_ids": ids,
                         "selection_fallback": fallback, "selection_source": source,
                         "triggered_entries": reasoning_library.get_entries(library, ids),
                     }
@@ -358,7 +358,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                     # in-budget retries first — a stochastic refusal clears).
                     refused = True
                     attempts_allowed = MAX_SCOPE_ATTEMPTS + 1
-                out["scope_failures"].append({"prompt_id": pid, "attempt": attempt,
+                out["scope_failures"].append({"prompt_gid": pid, "attempt": attempt,
                                               "raw": raw, "stop_reason": stop_reason,
                                               "model": model})
                 empty = " (empty output — likely refusal or content filter)" if not raw.strip() else ""
@@ -414,7 +414,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
             out["responses"].append({
                 "response_id": str(uuid.uuid4()),
                 "response_gid": None,  # assigned on the main thread (registry)
-                "prompt_id": pid,
+                "prompt_gid": pid,
                 "sample_index": sample_index,
                 "user_message": d["user_message"],
                 "scenario_cards": d.get("scenario_cards") or d.get("annotation") or {},
@@ -430,7 +430,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
 
     workers = int(config.get("workers", 1))
     for out in utils.parallel_map(process_dilemma, pending, workers):
-        pid = out["dilemma"]["prompt_id"]
+        pid = prompt_key(out["dilemma"])
         for failure in out["scope_failures"]:
             utils.append_jsonl(failure, output_dir / "scope_failures.jsonl")
         if out["select_failure"] is not None:
@@ -446,7 +446,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
                          if out["scope_failures"] else None)
             all_empty = bool(out["scope_failures"]) and all(
                 not (f.get("raw") or "").strip() for f in out["scope_failures"])
-            utils.append_jsonl({"prompt_id": pid,
+            utils.append_jsonl({"prompt_gid": pid,
                                 "attempts": MAX_SCOPE_ATTEMPTS,
                                 "reason": "scope unusable",
                                 "last_stop_reason": last_stop,
@@ -469,9 +469,9 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
             record["response_gid"] = registry.gid(
                 "response", response_fingerprint(record["assistant_response"]))
             results.append(record)
-            done_keys.add((record["prompt_id"], record["sample_index"]))
+            done_keys.add((prompt_key(record), record["sample_index"]))
             utils.append_jsonl(record, output_path)
-            checkpoint.mark_done(f"{record['prompt_id']}_s{record['sample_index']}")
+            checkpoint.mark_done(f"{prompt_key(record)}_s{record['sample_index']}")
         if out["responses"]:
             registry.save()
 

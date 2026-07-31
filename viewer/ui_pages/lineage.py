@@ -69,7 +69,7 @@ if run.pipeline == "dad" and not finals:
         st.info("No responses generated yet — showing the step-1 dilemma prompts.")
         options, labels = [], {}
         for d in dilemmas:
-            pid = d.get("prompt_id")
+            pid = loader._pkey(d)
             options.append(pid)
             labels[pid] = _goal_label(dealt_cards(d), d.get("user_message"))
         selected_id = _pick_document(options, labels, "prompt")
@@ -124,10 +124,10 @@ else:
         # isn't on the final/rewrite record, so join it from step 1.
         keep = lambda audit: True
         suffix = None
-        sort_key = lambda rec: str(audits.get(rec.get("record_id"), {}).get("prompt_id", ""))
-        pgid_by_pid = {d.get("prompt_id"): d.get("prompt_gid")
+        sort_key = lambda rec: loader._pkey(audits.get(rec.get("record_id"), {}))
+        pgid_by_pid = {k: d.get("prompt_gid")
                        for d in loader.load_stage(run.run_dir, "dad", "step1_dilemmas")
-                       if d.get("prompt_id")}
+                       for k in loader._pkeys(d)}
         st.caption("Dropdown labels: *example E- · prompt P- · response R- — goal* "
                    "(these stable ids match the corpus audit).")
 
@@ -143,7 +143,7 @@ else:
         else:
             goal = _goal_label(dealt_cards(audit), user_msg)
             ids = [rec.get("example_gid") or audit.get("example_gid"),
-                   pgid_by_pid.get(audit.get("prompt_id")),
+                   pgid_by_pid.get(loader._pkey(audit)),
                    rec.get("response_gid") or audit.get("response_gid")]
             prefix = " · ".join(x for x in ids if x)
             labels[rec["record_id"]] = f"{prefix} · {goal}" if prefix else goal
@@ -247,7 +247,7 @@ else:
         # Stable global ids as the headline — the finished artifact's identity
         # (example / prompt / response). The upstream ids (S-#### scenario,
         # C-#### control) live on their stage expanders below, as do the
-        # per-run AW-####/S-### ids; classification tag small underneath.
+        # per-run scenario ids; classification tag small underneath.
         annotation = dealt_cards(dilemma) or dealt_cards(audit)
         head = []
         if audit.get("example_gid"):
@@ -257,7 +257,7 @@ else:
         if audit.get("response_gid"):
             head.append(f"response {audit['response_gid']}")
         st.subheader("  ·  ".join(head)
-                     or str(dilemma.get("prompt_id") or audit.get("prompt_id") or selected_id))
+                     or (loader._pkey(dilemma) or loader._pkey(audit) or str(selected_id)))
         if lin.get("format") == "v2":
             taxa = dilemma.get("taxa_subcategory") or annotation.get("taxa_category")
             lev = annotation.get("leverage")
@@ -291,10 +291,10 @@ else:
                 # Ids linking each stage's expander to the cost-log rows of the
                 # API call(s) that produced it (item_id, logged since 2026-07).
                 scenario_id = dilemma.get("scenario_id")
-                pid = dilemma.get("prompt_id") or audit.get("prompt_id")
+                pid = loader._pkey(dilemma) or loader._pkey(audit)
                 resp = lin.get("response") or {}
-                resp_item = (f"{resp['prompt_id']}_s{resp.get('sample_index', 0)}"
-                             if resp.get("prompt_id") else None)
+                resp_item = (f"{loader._pkey(resp)}_s{resp.get('sample_index', 0)}"
+                             if loader._pkey(resp) else None)
 
                 # Step 1a — scenario deal + plan (a billed call since 2026-07).
                 # Pre-plan runs (no scenario_description) were pure sampling.

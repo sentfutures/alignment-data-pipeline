@@ -250,10 +250,10 @@ if run.pipeline == "dad":
 # finished example by E-#### — not the per-run prompt id. Loaded once from
 # the run's rewrites. (Hoisted above the headline: the Pareto scatter up
 # there labels by gid too.)
-_gids_by_pid = ({r.get("prompt_id"): {"response": r.get("response_gid"),
+_gids_by_pid = ({loader._pkey(r): {"response": r.get("response_gid"),
                                       "example": r.get("example_gid")}
                  for r in loader.load_stage(run.run_dir, "dad", "step3_rewrites")
-                 if r.get("prompt_id")} if run.pipeline == "dad" else {})
+                 if loader._pkey(r)} if run.pipeline == "dad" else {})
 
 
 def _label_responses(rows: list[dict], key: str = "record") -> list[dict]:
@@ -502,7 +502,7 @@ if "delivery" not in report:
 
 # Run cost + cost-by-stage: an operational metric, not the dataset's usefulness
 # story — demoted into an expander so it doesn't compete with the headline
-# (Oliver: keep low-value operational metrics out of the overview).
+# (keep low-value operational metrics out of the overview).
 run_cost = loader.total_cost(run.run_dir)
 cost_stages = loader.cost_by_stage(run.run_dir)
 if run_cost or cost_stages:

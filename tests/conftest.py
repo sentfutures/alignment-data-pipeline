@@ -77,9 +77,6 @@ def _seed_rng():
 def _api_guard(monkeypatch):
     """Fake credentials, reset shared.api globals, and block the API seam."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-not-a-real-key")
-    # bedrock backend's bearer key: same override rationale — a real key in .env
-    # must never be visible to a test
-    monkeypatch.setenv("CHAD_AWS_BEDROCK_KEY", "ABSKTW-test-not-a-real-key")
     monkeypatch.setattr(api, "_config", {})
     monkeypatch.setattr(api, "_client", None)
     monkeypatch.setattr(api, "_cost_log_path", None)
