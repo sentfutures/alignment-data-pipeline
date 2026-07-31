@@ -11,7 +11,7 @@ Structure:
 
     hero        the illustration, the title, and #intro — what this is, in three lines
     #datasets   the two datasets, compared row by row
-    #explore    which would you like to explore? — two buttons
+    #explore    walk through a dataset generation — two buttons
       #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
       #dad      Difficult advice     (report/dad.py, hidden until chosen)
     footer      repo, viewers, run ids, commits, build provenance
@@ -144,7 +144,7 @@ def section_explore():
     comparison directly above, and repeating them here only made the buttons hard to
     read as buttons.
     """
-    return C.section("explore", "Explore example results",
+    return C.section("explore", "Walk through a dataset generation",
                      R.chooser([("sdf", sdf.SECTION_TITLE), ("dad", dad.SECTION_TITLE)]))
 
 

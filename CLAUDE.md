@@ -142,6 +142,69 @@ SDF layers 3-5 embed the constitution (and, for layers 3-4, the formatted princi
 - **Committed run outputs are deliberate.** Smoke/validation runs under `outputs/*/runs/` are kept in git as reviewable examples of pipeline behavior at each design stage; `local_*`-labeled runs and `latest` pointers stay untracked (gitignore covers all pipelines incl. pref). Prune only with team agreement. When a PR both changes pipeline code and commits a fresh run demonstrating it, prefer landing them as separate PRs (code first, then the run) — bundling them produces diffs dominated by generated data (PR #73: two committed runs made up 71% of the diff's additions), which is hard for both human and automated review to work through. `.gitattributes` marks these paths `linguist-generated` so GitHub's UI collapses them either way.
 - **Final DAD records contain only user + assistant messages** — system prompts, reasoning library scaffolding, annotations, and the constitution are stripped before training records are written
 
+## The handoff page (`report/`)
+
+`python report/build_report.py --dad-run <run> --sdf-run <run>` builds **one** file,
+`report/index.html`, covering both datasets. Full detail is in `report/README.md`; what
+follows is what must not be undone by accident.
+
+**Audience and shape.** Written for an ML researcher at another lab with no context and
+about forty seconds. Hero (illustration, title, intro) → `#datasets` comparison →
+`#explore` chooser → `#sdf` / `#dad` report panels → footer. **Synthetic documents comes
+first everywhere** — comparison, chooser, panel order. No contents rail.
+
+**Naming.** The two datasets are **Synthetic documents** (`sdf`) and **Difficult
+advice** (`dad`). The words "corpus" and "corpora" do not appear on the page. Both are
+midtraining datasets — "SFT" names the *format* of the difficult-advice data (chat
+transcripts), not a different training phase — and the comparison says so.
+
+**Content style.** British English in prose, American in code. Sentence case for names
+and labels. Cut on sight: aphoristic two-beat deks (at most two `> ` deks on the whole
+page), negation-as-emphasis ("a habit rather than a value"), portentous closers, and any
+sentence explaining why a section exists. `common.editorial_words()` prints the page's
+authored-prose count at build time and `test_the_prose_has_a_ceiling` fails if it grows.
+
+**Two rules the tests enforce.** No number is ever typed into a prose file — figures are
+`{{placeholders}}` resolved from the pinned runs at build time, and the page's own prose
+has no facts available at all. And each report's weaknesses beat is *derived* from its
+audit's verdicts, never written; `evals/audit_sdf.py` only prints its verdicts, so
+`report/sdf.py` re-applies the eval's own thresholds. The delivery regression is stated
+in prose exactly **once**; the tile, the scoreboard row and the derived weakness carry
+the same number as data.
+
+**Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero
+and the Sentient Futures mark are inlined as data URIs from `report/assets/`, the
+GitHub and Hugging Face marks are inline SVG, and the outbound `↗` is drawn rather than
+typed (as a glyph it is a hairline that differs per font, and this page gets printed).
+Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
+allows a `data:` src and nothing else off-page.
+
+**Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links (mono,
+600, 2px accent underline), outline buttons (`.lbtn`, `.choice`, 4px radius) and one
+filled button (`.cta`). Cream fills with a border are not a control style. Status
+colours (`--good/--warn/--bad`) and the chart series hues stay reserved; the palette
+test recomputes every contrast pair from the tokens.
+
+**The chooser hides things, deliberately.** Neither report is open on load. `#dad` /
+`#sdf` in the URL opens one (so the dataset card's deep links land), a hash naming
+anything inside a report opens the report it lives in, printing expands both, and
+switching scrolls the chooser exactly out of frame. The cost — Cmd-F cannot see a closed
+report — was accepted.
+
+**Layout cannot be tested by asserting on HTML.** Two real bugs shipped past the suite
+and were only caught by measuring in a browser: a bare `1fr` grid track grown past the
+page by a wide child (the comparison landed 116px off centre), and a deep link scrolling
+before the multi-megabyte hero had laid out. If you touch layout, measure it — see
+"Checking it renders" in `report/README.md` for the chromium + puppeteer snippet.
+
+**Open TODOs.** No licence is set for either dataset, and the licence row was removed, so
+the page now says nothing about it. Run ids, commits and backends left the page with the
+footer text. The pinned SDF run is the committed 100-document one; the 477-document
+`fullscale-500-opus5` run lives on `origin/aidan/sdf-500-run-and-report`. `page.MAKER_URL`
+is inferred from the team's domain. `prompts/README.md` is a version or two behind the
+code (it says step 1a takes no prompt, and predates the `step1c_gate` / `step1d_refine`
+renames and `step2_select.txt`).
+
 ## Directory Structure
 
 ```

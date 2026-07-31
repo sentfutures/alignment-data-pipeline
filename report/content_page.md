@@ -11,7 +11,7 @@ fails the build. The page's own prose has NO facts available at all — every fi
 is rendered by a section from its run — so any {{placeholder}} here fails the build.
 
 The hero is the illustration, the title and `intro`, centred — so `title` has to stand up
-on its own, and `intro` reads as its second half rather than as a section. Two paragraphs
+on its own, and `intro` reads as its second half rather than as a section. Three paragraphs
 and it stops: the two datasets are named once, below, as the comparison's masthead. The
 arrow on an outbound link is added by the renderer — do not type one here. The reader has
 forty seconds: let the comparison do the comparing. Deks are rationed: the page carries
@@ -36,7 +36,9 @@ Teaching models to reason about animal welfare
 
 <!-- id: intro -->
 
-Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) describes how teaching a model the reasons behind a behaviour beats teaching the behaviour itself, and that the final rewrite against the constitution carries most of the benefit.
+Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) found that a model learns more from the reasons behind a behaviour than from the behaviour itself.
+
+Documents were the better way to teach a model something new, and conversations showed it reasoning through someone else's hard decision. Training on both worked better than training on either alone.
 
 We have built two training dataset generation pipelines based on their methods, for a neglected subject almost no training data covers well: the welfare consideration of nonhuman sentient beings.
 

@@ -47,8 +47,8 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 | Anchor | What it is |
 |---|---|
 | hero | The illustration, the title, and the three lines that follow from it (*Teaching Claude Why*, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing. |
-| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Five rows — what it is for, what a record is, how many records, how many prompt templates, licence — because the reader is deciding whether to run the pipeline, not shopping for a dataset. Dates, model ids and the composition spread live in the report that goes into them. The foot of each column is its dataset viewer. |
-| `#explore` | "Which would you like to explore?" — two buttons carrying each dataset's name, one line and its figures. |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Four rows — what it is for, what a record is, how many prompt templates, how many records — because the reader is deciding whether to run the pipeline, not shopping for a dataset. Dates, model ids and the composition spread live in the report that goes into them. The two figure rows carry the way to what they count: the figure at the column's left edge, an outline button at its right (the prompts on GitHub, the published sample on Hugging Face). Labels are right-aligned, one line each, vertically centred. |
+| `#explore` | "Walk through a dataset generation" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred so each sits under its own column. |
 | `#sdf` | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen. |
 | `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
 | footer | Repo and both viewers as buttons, one provenance line per run, and the build claim. |
@@ -83,7 +83,7 @@ The cost is real and was accepted deliberately: Cmd-F cannot see a closed report
 |---|---|
 | `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset *is*, also used under each chooser button); `*_use` are what each is *for*. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
 | `content_dad.md` | **Difficult-advice prose.** The file to iterate on for that report. |
-| `page.py` | The page: hero, comparison table, caveats, chooser, footer, and the one `document()` call. |
+| `page.py` | The page: hero, comparison, chooser, footer, and the one `document()` call. |
 | `dad.py` | The `#dad` beats: `facts()`, the block builders, `derived_warnings()`. |
 | `sdf.py` | The `#sdf` beats — small on purpose; see "Finishing the second report". |
 | `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser. |
@@ -103,8 +103,9 @@ figures reach prose only with an explicit degraded string — `{{library_clause}
 `{{near_dup_pct}}`, `{{length_pct}}` — so a run missing the paid pass renders "an
 unmeasured share" where the figure would be and the sentence survives. The page's own
 prose has exactly two facts available, `{{gen_models}}` and `{{judge_models}}`, both of
-which name models in the caveats strip. Do not add a bare conditional number to prose;
-add a clause to the owning module's `facts()`.
+The page's own prose has no facts at all (`PAGE_FACTS = {}`), so a placeholder in
+content_page.md is a build error. Do not add a bare conditional number to prose; add a
+clause to the owning module's `facts()`.
 
 **2. The weaknesses beats are derived, not written.** Every BAD/OK verdict the DAD audit
 recorded, plus provenance rules (non-`api` backend, uncommitted changes, small n) and
@@ -164,9 +165,15 @@ before you email it.
 - **A link is a typographic object**: `var(--mono)` at `.92em`, weight 600, accent
   coloured, with a 2px accent underline. Buttons are not links — `.lbtn`, `.choice` and
   `.cta` each set their own `font:` shorthand, which beats the bare `a` rule.
-- **One solid button.** `.cta.solid` — accent ground, cream text — is reserved for the
-  one action the page is asking for, "Read the report". Everything else is an outline
-  button (`.lbtn`, `.choice`) or a text link.
+- **One filled button.** `.cta` — accent ground, cream text — is the end-of-report call
+  to the other dataset, the one action the page asks for. Everything else is an outline
+  button (`.lbtn`, `.choice`), a plain icon link (`.ilink`, in the footer), or prose.
+- **Two CSS traps, both hit and both commented in place.** `section` must use
+  `minmax(0,1fr)`, never a bare `1fr`: a child with a definite width wider than the
+  column grows the track past the page, and every percentage resolved against that grid
+  area then points right of centre (measured: the comparison landed 116px off). And
+  `.cmp th` sets the rule, alignment and padding for every cell, so a `.cmp-k` override
+  has to out-specify it — `.cmp th.cmp-k` — not merely follow it.
 - **A link that leaves the page says so**, with an arrow that is *drawn* — `EXT_ARROW`,
   an inline SVG at `stroke-width:2` in `currentColor`. As a glyph (U+2197) it is a
   hairline in most faces and a different shape in every one, and this page is printed and
@@ -225,7 +232,7 @@ field labels hang off their left, outside the pair.
 pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_page.py
 ```
 
-156 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
+172 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
 placeholder contract, the provenance floor, the warnings table, the prose count);
 `test_dad_report.py` covers the dilemma section along five risk axes — degradation,
 self-containment, candour, saying the regression once, colour integrity;
