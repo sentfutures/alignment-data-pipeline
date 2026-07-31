@@ -198,26 +198,6 @@ def _baseline_by_prompt_id(run_dir: Path) -> dict:
             if r.get("prompt_id") and r.get("baseline_response")}
 
 
-def _stakes_by_prompt_id(run_dir: Path) -> dict:
-    """{prompt_id: stakes text} from step2/scopes.jsonl — the case's welfare
-    magnitude and second-order stakes, so the moves judge can grade moralizing
-    PROPORTIONALLY (a firm reply on a high-magnitude, low-visibility case is not
-    the same fault as sermonizing on a trivial one). Empty when scopes absent."""
-    out: dict = {}
-    for r in utils.load_jsonl(run_dir / "step2" / "scopes.jsonl"):
-        pid, scope = r.get("prompt_id"), r.get("scope") or {}
-        if not pid or not isinstance(scope, dict):
-            continue
-        parts = []
-        if scope.get("magnitude"):
-            parts.append(f"Welfare magnitude: {scope['magnitude']}")
-        if scope.get("upside"):
-            parts.append(f"Second-order stakes: {scope['upside']}")
-        if parts:
-            out[pid] = "\n".join(parts)
-    return out
-
-
 def audit_response_lengths(run_dir: Path | None, report: dict) -> None:
     """Final response lengths vs the plain-baseline arm, per prompt. Length is
     a usability constraint (long replies stop getting read), so the MEAN
@@ -848,9 +828,10 @@ _DELIVERY_DIMENSIONS = ("goal_responsiveness", "proportionality", "tone", "calib
 # judge on purpose — the
 # exclusion list is load-bearing, since two axes that both punish preachiness
 # are one axis measured twice, and the Pareto reading needs them independent.
-# Seven dimensions. The last two were added after mapping the five original ones
-# onto the reasoning library's 45 transferable_move fields — the pipeline's own
-# statement of what it optimizes for — which left two families uncovered:
+# Six dimensions. harm_contribution was added after mapping the five original
+# ones onto the reasoning library's 45 transferable_move fields — the
+# pipeline's own statement of what it optimizes for — which left one family
+# uncovered:
 #   harm_contribution   <- C3 ("keep unnecessary-harm options out of open-ended
 #                          lists"), C5 ("name known welfare costs rather than
 #                          editing them out"). The original five only asked
@@ -858,11 +839,10 @@ _DELIVERY_DIMENSIONS = ("goal_responsiveness", "proportionality", "tone", "calib
 #                          response introduced harm or suppressed a cost it knew
 #                          about. That is the sycophancy failure mode, and it is
 #                          the only route to genuinely NEGATIVE impact.
-#   concern_calibration <- M6 ("identify whether concern is too low OR TOO HIGH,
-#                          then correct in that direction"), M4. Without it the
-#                          axis rewards maximal welfare concern in one direction
-#                          only, which pushes exactly where the delivery judge
-#                          penalizes and quietly re-couples the two axes.
+# (concern_calibration — M6's "concern too low OR TOO HIGH" — was tried here
+# and moved to the DELIVERY judge's proportionality dimension instead: whether
+# concern is proportionate is a manner question, and keeping it here quietly
+# re-coupled the two axes. A test pins its absence from the welfare prompt.)
 _IMPACT_DIMENSIONS = ("patient_scope", "magnitude_sizing", "counterfactual_impact",
                       "harm_contribution", "epistemic_accuracy", "bottom_line_coherence")
 MAX_IMPACT_ATTEMPTS = 2
@@ -906,11 +886,15 @@ def _axis_dominance(delivery_pc: dict, impact_pc: dict, arm: str) -> dict:
         if not all(k in dv for k in (arm, other)) or not all(k in iv for k in (arm, other)):
             continue
         counts["n"] += 1
-        d_up = _blended_delivery(dv[arm]) > _blended_delivery(dv[other])
-        w_up = _blended_impact(iv[arm]) > _blended_impact(iv[other])
-        if d_up and w_up:
+        d_a, d_o = _blended_delivery(dv[arm]), _blended_delivery(dv[other])
+        w_a, w_o = _blended_impact(iv[arm]), _blended_impact(iv[other])
+        # Both comparisons strict on both sides: "worse_both" means strictly
+        # worse on both axes. Ties on either axis land in "split" (mixed / no
+        # clear winner) — an exact tie is not a degradation and must not
+        # inflate the worse count.
+        if d_a > d_o and w_a > w_o:
             counts["better_both"] += 1
-        elif not d_up and not w_up:
+        elif d_a < d_o and w_a < w_o:
             counts["worse_both"] += 1
         else:
             counts["split"] += 1
@@ -1185,8 +1169,8 @@ def audit_judges(run_dir: Path | None, config: dict, report: dict) -> None:
     plain = _baseline_by_prompt_id(run_dir)
     dilemmas = {d.get("prompt_id"): str(d.get("user_message") or "")
                 for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")}
-    # NOTE: _stakes_by_prompt_id() is no longer fed to the judges — each forms its
-    # own stake_read. Kept as a helper because the viewer and older reports use it.
+    # The judges are not handed the pipeline's own scope/stakes text — each
+    # forms its own stake_read (the old _stakes_by_prompt_id helper is gone).
     # The judges are the quality-critical calls: config `evals.judge_model`,
     # falling back to the global model.
     judge_model = (config.get("evals") or {}).get("judge_model")

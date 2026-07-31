@@ -686,6 +686,18 @@ def test_composite_and_dominance_are_reported_per_arm(tmp_path, stub_claude):
     assert report["delivery"]["per_case"]["AW-0001"]["pipeline"]["user_asks"] == ["a"]
 
 
+def test_dominance_tie_counts_as_split_not_worse():
+    """Regression (PR #107 review): an exact tie on both axes used to fall
+    into worse_both — 'no change' must never inflate the worse count."""
+    tied = {"AW-0001": {"pipeline": {"score": 7}, "plain": {"score": 7}}}
+    dom = audit_dad._axis_dominance(tied, tied, "pipeline")
+    assert dom == {"better_both": 0, "worse_both": 0, "split": 1, "n": 1}
+
+    down = {"AW-0001": {"pipeline": {"score": 3}, "plain": {"score": 7}}}
+    dom = audit_dad._axis_dominance(down, down, "pipeline")
+    assert dom["worse_both"] == 1  # strictly worse on both still counts
+
+
 def test_welfare_impact_judge_scores_each_arm_and_keeps_raws(tmp_path, stub_claude):
     # The impact axis is reported on its OWN, never blended into delivery —
     # the prompt's exclusion list is what keeps the two axes independent.

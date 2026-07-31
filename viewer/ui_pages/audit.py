@@ -285,7 +285,10 @@ def _render_pareto() -> None:
     _wi = report.get("welfare_impact") or {}
     pm, bm = dv.get("pipeline_mean"), dv.get("plain_mean")
     wp, wb = _wi.get("pipeline_mean"), _wi.get("plain_mean")
-    if not per_case or None in (wp, wb) or not wb:
+    # Guard BOTH judges' means: each pair is divided below, and a judge that
+    # failed for every response in one arm leaves its mean None (a whole-arm
+    # zero mean is likewise undividable).
+    if not per_case or None in (wp, wb, pm, bm) or not wb or not bm:
         return
     st.subheader("Welfare impact ↔ delivery quality")
     # The two percentages can rest on different numbers of records (a judge
