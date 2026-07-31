@@ -1,0 +1,888 @@
+{
+ "dimensions": [
+  {
+   "dimension": "sdf-matrix",
+   "summary": "The rebuilt SDF matrix pipeline is substantially stronger than what the July audit saw. The composition machinery (shared/matrix.py + compose_prompts.py) genuinely delivers its \"composition by construction\" promise: largest-remainder deck sampling gives exact per-axis marginals, weights are validated all-or-nothing with a sum check, reserved slots are rejected in variables.txt, and an unusually good contract-test suite pins the real templates to the real variables file (plan-axis coverage, no orphan axes, species-pool coverage, locale mapping, seed determinism). The rewritten layers 3/4 and the new plan stage fixed the old truncation blind spot — stop_reason is checked fail-closed (only end_turn accepted), failed/truncated/malformed work is never checkpointed, poison calls are isolated per item, and an all-pending-failed SystemExit guard catches systemic outages; layer12 has exemplary test coverage of these paths. The residual risk clusters in two places. First, layer 5 is the odd stage out: it alone never inspects stop_reason (routing retryable truncations/refusals into the checkpointed 5/5/5 sentinel, i.e. a permanent silent drop under the default threshold of 7) and it trusts judge-emitted score fields without type/shape validation, where a string score wedges the run at the gate after checkpointing and missing keys silently zero-score a paid rewrite. Second, the shared done-detection idiom (existing-record AND checkpoint conjunction, identical in all four stage files) plus the unvalidated reuse of a possibly-partial prompts.jsonl means certain inconsistent-but-reachable states (torn writes, manual cleanup, hard crash) degrade to silently missing documents rather than retries or loud errors — and no stage or orchestrator ever reconciles final corpus count against the planned n_prompts, so nothing downstream would notice. Test coverage of the failure branches is complete for layer12 but thins out for layers 3-5 (layer4's exception/truncation/SystemExit paths are entirely untested — the 83% coverage gap). All fixes are small; none require design changes.",
+   "findings": [
+    {
+     "title": "Checkpointed id with missing jsonl record is silently dropped in all four stages",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 38,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "pending = [d for d in drafts if d[\"doc_id\"] not in existing and not checkpoint.is_done(d[\"doc_id\"])] (layer4_rewrite.py:38-41). An id that is in the checkpoint but absent from rewrites.jsonl joins neither `results` (built only from `existing`) nor `pending`, so it is never retried and never reaches downstream layers — no warning is printed. Since mark_done always runs AFTER append_jsonl in every stage, a checkpointed id should always have a record; the conjunction can only ever convert 'retry' into 'silently skip'. The identical idiom appears in all four stage files.",
+     "failure_scenario": "A run crashes hard (power loss / kill -9) so the buffered rewrites.jsonl append is lost while the separately-written _checkpoint.json survives — or an operator deletes a torn/bad line from a stage jsonl during recovery from the known load_jsonl partial-line crash but leaves the checkpoint. On --resume the document vanishes from the run: not rescored, not redrafted, absent from the final corpus, with no message. Nothing reconciles corpus size against sdf.n_prompts, so a delivered corpus is silently short.",
+     "recommendation": "Drop `and not checkpoint.is_done(...)` from the pending filter in all four stages (record presence in the stage jsonl is the true done signal; the checkpoint adds nothing because mark_done follows append_jsonl) — or keep it but detect the inconsistent state explicitly: `orphans = [id for id in checkpoint ids if id not in existing]` and either warn loudly and re-queue them or abort. Additionally have run.py print a per-layer reconciliation line (planned N, planned-ok M, drafted K, rewritten J, scored I, corpus H) so silent drops become visible.",
+     "instances": [
+      "sdf_pipeline/layer12_plan.py:54-57",
+      "sdf_pipeline/layer3_draft.py:39-42",
+      "sdf_pipeline/layer4_rewrite.py:38-41",
+      "sdf_pipeline/layer5_score.py:43-46"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified the pending-filter conjunction at all four cited locations (layer12_plan.py:54-57, layer3_draft.py:39-42, layer4_rewrite.py:38-41, layer5_score.py:43-46): an id in _checkpoint.json but missing from the stage jsonl joins neither results (built solely from the jsonl) nor pending, with no warning. append_jsonl precedes mark_done in every stage, so the is_done clause can only convert retry into silent skip. Both scenario paths hold: neither append_jsonl nor Checkpoint.mark_done fsyncs (shared/utils.py:48-52, 445-453), so power loss can persist the checkpoint while losing the jsonl append; and load_jsonl (utils.py:55-65) has no per-line error handling, so an operator deleting a torn line while leaving the checkpoint reproduces the drop. sdf_pipeline/run.py contains no corpus-size reconciliation against sdf.n_prompts."
+    },
+    {
+     "title": "Layer 5 never checks stop_reason: truncation/refusal becomes a checkpointed 5/5/5 permanent drop",
+     "file": "sdf_pipeline/layer5_score.py",
+     "line": 56,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "score_one calls api.call_claude without return_stop_reason=True (layer5_score.py:56-63); a max_tokens-truncated or refused response (empty/partial text) hits extract_json_object, raises JSONDecodeError, and falls into the {5,5,5, \"Parse error.\"} record (lines 71-74) which is appended and checkpoint.mark_done'd (lines 94-95). Layers 12/3/4 all request stop_reason and skip-without-checkpoint on stop != \"end_turn\" (e.g. layer3_draft.py:84-86); api.py's own docstring says callers feeding training records \"should also reject on stop_reason via return_stop_reason\" (shared/api.py:727-729).",
+     "failure_scenario": "The judge model's refusal classifier fires on one document (the claude_code backend surfaces this as stop_reason='refusal' with empty text — the exact pattern seen live on DAD scope calls), or a verbose judge reply hits the 4000-token config cap mid-notes. The doc is scored 5/5/5, checkpointed, and — with the default min_score_threshold of 7 — permanently gated out of the corpus. The paid draft + rewrite is silently discarded and --resume will never re-score it, even though a retry (the remedy every sibling stage uses for exactly this failure class) would very likely succeed.",
+     "recommendation": "Pass return_stop_reason=True in score_one and, mirroring layers 3/4, `if stop != \"end_turn\": print(retry message); return None`-style skip without checkpointing (count it separately from failed_calls or include it — either way don't checkpoint). This confines the tracked 5/5/5 sentinel to genuine parse failures on complete responses, which is the only case its \"re-running would re-bill without new information\" rationale actually holds for.",
+     "instances": [
+      "sdf_pipeline/layer5_score.py:56-63",
+      "sdf_pipeline/layer5_score.py:69-74"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every claim: layer5_score.py:56-63 omits return_stop_reason; strict extract_json_object raises JSONDecodeError on empty/truncated text, hitting the 5/5/5 \"Parse error.\" fallback (lines 71-74) which is appended and checkpointed (lines 94-95) and never re-scored on resume (lines 41-46); with min_score_threshold=7 (config.yaml:33) and max_tokens=4000 (config.yaml:19) the doc is permanently gated out (lines 105-108). Layers 12/3/4 all request stop_reason and skip-without-checkpoint (layer3_draft.py:84-86 etc.), and shared/api.py:726-729 contains the quoted guidance (as an inline comment, not a docstring — trivial mislabel). The module docstring documents the checkpoint-on-parse-error tradeoff as deliberate, but its premise (retry adds no information) does not hold for truncation/refusal, so the finding's scenario stands."
+    },
+    {
+     "title": "Layer 5 judge scores are unvalidated: a non-numeric score wedges the run at the gate after checkpointing; missing keys silently zero-score",
+     "file": "sdf_pipeline/layer5_score.py",
+     "line": 80,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "scores.get(\"alignment\", 0) etc. (layer5_score.py:79-82) store whatever JSON type the judge emitted, and the gate compares it raw: r[\"scores\"][\"alignment\"] >= threshold (line 107). A string score (\"alignment\": \"8\") raises TypeError ('>=' not supported between str and int) — but only AFTER the record was appended to scores.jsonl and checkpointed (lines 94-95). On --resume the bad record is reloaded into `results` from `existing` (line 42) and the gate crashes again: the run is permanently wedged until someone hand-edits scores.jsonl. Separately, a parseable object missing the score keys (e.g. the judge nesting them under {\"scores\": {...}}) defaults to 0/0/0 — below any threshold — and is checkpointed without the \"Parse error.\" flag the sentinel path gets.",
+     "failure_scenario": "The judge runs at the pipeline-global temperature 1.0 over thousands of documents; one reply emits \"8\" as a string or wraps the three integers in a nested object. String case: every subsequent run and resume of layer 5 dies with TypeError at the gate — a full-scale run that already paid for all its scoring cannot finish. Nested/missing-key case: a good document is recorded 0/0/0, permanently gated out, and looks like a legitimate quality failure in the score report rather than a judge slip.",
+     "recommendation": "Validate the three scores at parse time: `try: a = int(scores[\"alignment\"]) ... except (KeyError, TypeError, ValueError):` and route the failure into the existing parse-error sentinel (so it is at least flagged \"Parse error.\" for manual review) or, better, into the un-checkpointed retry path. Add tests: a string-valued score, and an object missing the keys, must not wedge the gate or silently zero-score. Also range-check 1-10 while there.",
+     "instances": [
+      "sdf_pipeline/layer5_score.py:79-82",
+      "sdf_pipeline/layer5_score.py:105-108"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every cited line in sdf_pipeline/layer5_score.py at current HEAD: lines 79-82 store judge values unvalidated (extract_json_object in shared/utils.py checks only dict shape, not keys/types), line 107 compares raw against int threshold 7 so a string score raises TypeError only after lines 94-95 already appended and checkpointed the record, and line 42 reloads the poisoned record from scores.jsonl on every --resume, re-crashing the gate — the wedge is real and permanent without hand-editing. The missing-key case also holds: a parseable object lacking the score keys defaults to 0/0/0 with empty notes (no \"Parse error.\" sentinel, which fires only on JSONDecodeError) and is silently gated out. The judge runs at the global temperature 1.0 (no per-call override at lines 56-63), making the failure scenario plausible at scale."
+    },
+    {
+     "title": "Partial or empty prompts.jsonl is reused on resume with no count check, silently shrinking the run",
+     "file": "sdf_pipeline/layer12_plan.py",
+     "line": 35,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "if prompts_path.exists(): prompts = utils.load_jsonl(prompts_path) (layer12_plan.py:35-37) — existence alone is treated as completeness; len(prompts) is never compared to sdf[\"n_prompts\"]. The file is written record-by-record in a plain append loop (lines 48-49) after the full list is composed, so a disk-full IOError, kill, or crash inside that loop leaves a well-formed but short file that every later --resume silently accepts as the whole plan.",
+     "failure_scenario": "A 5000-prompt full-scale run dies partway through the prompts.jsonl write loop (disk full is the realistic trigger — the exception propagates, the partial file stays). The operator fixes the disk and runs --resume: the stage prints \"Reusing 3200 composed prompts\", plans/drafts/scores only those, and the run completes 'successfully' with a 3200-document corpus. Beyond the missing 1800 documents, the exact-marginals guarantee is gone — a prefix of the shuffled decks no longer matches the variables.txt weights exactly — and nothing downstream ever checks the count.",
+     "recommendation": "After reloading, verify `len(prompts) == sdf[\"n_prompts\"]` and abort with a clear message on mismatch (composition is seeded and reads the run's frozen snapshot, so deleting the file and recomposing is safe and reproducible — say so in the error). Alternatively write prompts to a temp file and os.replace() into place so prompts.jsonl existing implies it is complete.",
+     "instances": [
+      "sdf_pipeline/layer12_plan.py:35-37",
+      "sdf_pipeline/layer12_plan.py:48-49"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified sdf_pipeline/layer12_plan.py:35-37 (existence check, load, \"Reusing N\" print — no len(prompts) vs sdf[\"n_prompts\"] comparison anywhere) and lines 48-49 (per-record append_jsonl loop after the full list is composed). load_jsonl (shared/utils.py:55-65) accepts any well-formed short file, resume plans only the loaded prompt_ids, and deck_sample (shared/matrix.py:137-150) guarantees exact per-variable marginals only over the full n — a prefix breaks that guarantee. Minor nuance: a disk-full failure can leave a torn last line that makes resume crash loudly with JSONDecodeError instead of silently shrinking, but a kill/crash between appends (or disk-full at a record boundary) produces exactly the silent scenario claimed."
+    },
+    {
+     "title": "Failure-path tests missing for layers 3-5: layer4's exception/truncation/SystemExit branches are entirely untested",
+     "file": "sdf_pipeline/layer4_rewrite.py",
+     "line": 62,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "Coverage report: layer4_rewrite.py 83% missing 62-66 (the per-item exception handler), 73-75 (raw is None retry path), 77-78 (truncation retry path), 97 (all-failed SystemExit); layer3_draft.py missing 85-86 (truncation branch); layer5_score.py missing 64-68 (API-exception skip), 91-92 (failed_calls counting), 99 (SystemExit). test_sdf_layers.py confirms: TestLayer4Rewrite (line 246) has no poison-call, truncation, or systemic-failure test, TestLayer5Score none either — only TestLayer12Plan covers all three. CLAUDE.md's testing rules require a malformed-response fallback and money-path coverage for every stage.",
+     "failure_scenario": "The poison-call isolation and truncation-retry logic in layer 4 — the alignment-critical, most expensive stage — is exactly the code that protects paid work when a $50+ run hits a usage-policy false positive or a max_tokens truncation. It is currently unexecuted by CI: a future edit that breaks the `raw is None` tuple contract, checkpoints truncated rewrites, or inverts the SystemExit condition merges green and is only discovered mid-paid-run.",
+     "recommendation": "Port layer12's three tests (test_one_poison_call_does_not_kill_the_layer, test_truncated_*_retried_on_resume, test_all_*_calls_failing_is_a_systemic_error) to TestLayer3Draft (truncation only — the other two exist), TestLayer4Rewrite (all three), and TestLayer5Score (poison-skip + systemic). The dispatcher-stub pattern is already in the file; this is an afternoon of copy-adapt.",
+     "instances": [
+      "sdf_pipeline/layer4_rewrite.py:62-66,73-78,97",
+      "sdf_pipeline/layer3_draft.py:85-86",
+      "sdf_pipeline/layer5_score.py:64-68,91-92,99"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Read sdf_pipeline/layer4_rewrite.py, layer5_score.py, layer3_draft.py and tests/test_sdf_layers.py at current main: layer4's exception handler (62-66), raw-is-None retry (72-75), truncation branch (76-78), and SystemExit (96-100) exist and no test in TestLayer4Rewrite (line 246) exercises any of them (no raising stub, no non-end_turn tuple, no pytest.raises); same for layer5's exception skip (64-68), failed_calls (90-92), SystemExit (98-102); layer3 misses only the truncation branch (84-86) as claimed, having poison/systemic tests at lines 212/235. TestLayer12Plan is indeed the only class covering all three failure modes, and the e2e smoke test is happy-path only. Exact coverage percentages could not be re-run (coverage/pytest-cov not installed; read-only), but branch-by-branch inspection matches every claimed missing range within one line. Minor nit: layer4 does have a malformed-response (missing-tags) test, so only the exception/truncation/SystemExit gap — the finding's core claim — stands, and it stands fully."
+    },
+    {
+     "title": "A downstream-only axis with zero values silently empties the entire deck sample",
+     "file": "shared/matrix.py",
+     "line": 151,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "deck_sample builds one deck per axis and returns [dict(zip(axes, row)) for row in zip(*decks)] (matrix.py:151); an axis with no values yields an empty deck and the unstrict zip truncates every other deck to zero rows — verified live: deck_sample({\"a\": [\"x\",\"y\"], \"b\": []}, ..., n=10) returns 0 assignments with no error. compose_records' missing-values guard (compose_prompts.py:286-291) checks only plan_axes; downstream-only axes (explicitly supported — variables consumed by layer3.txt but not layers1-2.txt) are appended unchecked at line 299.",
+     "failure_scenario": "A contributor adds a new layer3-only axis to variables.txt, then comments out all its values while iterating on the list (the file encourages comment dividers). Every real axis today is a plan axis so nothing currently trips this, but the moment such an axis exists the whole run composes zero prompts — the pipeline prints \"deck-sampled 0 prompts\" / \"Composed 0 prompts\" and finishes cleanly with an empty corpus rather than raising, and the orphan-axis contract test does not catch emptiness (the axis is still 'consumed').",
+     "recommendation": "In compose_records, extend the missing-values check to every sampled axis, not just plan_axes: `missing = [n for n in axes if not values.get(n)]`. Belt-and-braces: pass strict=True to both zips in deck_sample so a length mismatch can never truncate silently, and add a parse-level error (or the same check in split_weights) for a header with zero values.",
+     "instances": [
+      "shared/matrix.py:148-151",
+      "sdf_pipeline/compose_prompts.py:286-299"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "is_incoherent fails open on malformed plans: INCOHERENT in the working notes converts a retryable failure into a checkpointed rejection",
+     "file": "sdf_pipeline/compose_prompts.py",
+     "line": 239,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "When a plan has no <document_description> tags, is_incoherent falls back to a bare word-scan of the first 2000 characters (compose_prompts.py:236-239: `return bool(INCOHERENT_RE.search(plan[:2000]))`) — a window that contains the <document_planning> working notes. In layer12_plan.py:89-91, description-None + incoherent-True is checkpointed as a deliberate rejection instead of taking the retry path, and layer3 drops it (layer3_draft.py:36).",
+     "failure_scenario": "The template itself instructs the model about the INCOHERENT convention, so planning notes plausibly discuss it (\"checking whether this combination is INCOHERENT — no, a podcast about pest control works...\"). If that same response then mangles or omits the description tags — the exact malformed case the fail-closed design is meant to retry — the word-scan flags it incoherent, layer12 checkpoints it as a deliberate rejection, and the combination is silently and permanently dropped from the corpus instead of being retried on resume.",
+     "recommendation": "Scope the fallback word-scan to tag-less LEGACY plans only, and make it stricter for current output: treat INCOHERENT as deliberate only when it appears inside <document_description> tags (the template mandates it there); a tag-less response should always take the retry path regardless of vocabulary. One-line change in is_incoherent plus a test with INCOHERENT in the planning notes and no description tags.",
+     "instances": [
+      "sdf_pipeline/compose_prompts.py:236-239",
+      "sdf_pipeline/layer12_plan.py:87-102"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Layer 12 plan calls don't cache the shared system prompt though every sibling stage does",
+     "file": "sdf_pipeline/layer12_plan.py",
+     "line": 61,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "layer12_plan.py:61-68 calls api.call_claude without cache_system=True, while layers 3, 4, and 5 all pass cache_system=True for their identical-across-calls system prompts (e.g. layer3_draft.py:67). The plan stage's system prompt (the preamble, ~900 words) is likewise byte-identical across all n_prompts calls.",
+     "failure_scenario": "No correctness impact; at full scale (5000 plan calls) the identical preamble is re-billed as fresh input tokens on every call. The saving is modest (the preamble may sit near the provider's minimum cacheable size), but the inconsistency also reads as an oversight to the receiving lab reviewing the four stages side by side.",
+     "recommendation": "Add cache_system=True to the layer12 call for consistency (call_claude/no-op semantics below the cache minimum make it harmless if the preamble is too short to cache), or add a one-line comment stating why it is deliberately omitted.",
+     "instances": [
+      "sdf_pipeline/layer12_plan.py:61-68"
+     ],
+     "dimension": "sdf-matrix",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "dad-rebuild",
+   "summary": "The rebuilt DAD pipeline is in substantially better shape than typical for its churn rate: coverage is 94-100% across the charter files with genuinely behavioral tests (resume-makes-no-calls, fail-open paths, refusal fallbacks are all pinned), extraction is fail-closed everywhere, rejects are checkpointed per-kind (INCOHERENT / draft / refine / scope), and the parallel_map \"writes on the main thread\" contract is respected in every fan-out. The remaining defects cluster in four places. (1) Truncation/refusal parity is almost — but not quite — complete: 1a and 1b reject stop_reason \"refusal\" explicitly, while 2b, step 3, and baseline only reject max_tokens/empty/echo, so a mid-stream classifier cut (documented as occurring in this pipeline on welfare topics) can ship a partial draft into the training corpus. (2) The gid registry (git-tracked, shared across runs, consumed by audit_dad/diversity) has three collision/renumbering paths: silent fresh-start on a corrupt file (test-pinned), non-atomic last-writer-wins saves under concurrent runs or git merges, and stamp-before-save crash windows in every stage. (3) The step-1 money path got materially riskier in the rebuild: one pass now holds three paid fan-out stages (1b+1c+1d, ~3x the dealt count in calls) entirely in memory before the first record write, and all retry budgets (draft attempts, gate redraft counts, gate feedback) are process-local, resetting on resume. (4) Structurally, step1_dilemmas.py's 533-line run() with five nested closures and six loop-carried mutable dicts is the file's real comprehension risk — the module's checklist/rendering half is fine and separable. dad_pipeline/run.py, baseline.py, compose_scenarios.py, and reasoning_library.py are clean apart from the noted low-severity items; the offline dealing logic in compose_scenarios is well-validated at deal time before any spend.",
+   "findings": [
+    {
+     "title": "2b/step-3/baseline accept refusal-truncated output into records",
+     "file": "dad_pipeline/step2_responses.py",
+     "line": 407,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "step2_responses.py:407 rejects a 2b draft only for `not response or stop_reason == \"max_tokens\" or looks_like_transcript_echo(...)` — stop_reason \"refusal\" with non-empty text passes. step3_rewrite.py:91 and baseline.py:64 have the same gap. The API leg returns the raw stop_reason (shared/api.py:735) and 1a documents real mid-stream refusal cuts: \"Opus's refusal classifier cutting the stream (seen intermittently on insect-welfare plans, 2026-07-19)\" (step1_dilemmas.py:673-679). 1a (step1_dilemmas.py:679) and 1b (step1_dilemmas.py:844) explicitly reject `stop_reason == \"refusal\"`; api.py:726-729 states the invariant: callers that build training records should reject on stop_reason.",
+     "failure_scenario": "A 2b response on an insect-welfare dilemma is cut mid-argument by the refusal classifier after several paragraphs (stop_reason=\"refusal\", non-empty text). It passes the line-407 check, is checkpointed into responses.jsonl, and step 3 fluently rewrites the half-finished argument into a plausible-looking training record — silently weaker data on exactly the corpus's core topic, undetectable downstream. A refusal-cut step-3 rewrite ships to final/dad_corpus.jsonl directly.",
+     "recommendation": "Add `or stop_reason == \"refusal\"` to the skip conditions at step2_responses.py:407, step3_rewrite.py:91, and baseline.py:64 (skip without checkpointing, same as max_tokens, so --resume retries). For strict parity with 1a, also treat refusal-stopped 2a scope replies as unusable attempts at step2_responses.py:306 instead of parsing them. Add one stub_claude test per stage mirroring test_refusal_stopped_plan_is_retried_with_reason_on_file.",
+     "instances": [
+      "dad_pipeline/step2_responses.py:407 — 2b draft accepted on refusal stop",
+      "dad_pipeline/step3_rewrite.py:91 — rewrite accepted on refusal stop (ships straight to final corpus)",
+      "dad_pipeline/baseline.py:64 — control arm accepted on refusal stop (viewer-only, lower impact)",
+      "dad_pipeline/step2_responses.py:306 — refusal-stopped 2a scope reply is still parsed (accepted if the JSON happens to be complete)"
+     ],
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified all cited lines in the current worktree: step2_responses.py:407, step3_rewrite.py:91, and baseline.py:64 each reject only empty/max_tokens (plus transcript-echo for the first two) and let stop_reason==\"refusal\" with non-empty text pass into checkpointed records; step2_responses.py:306 parses refusal-stopped 2a replies (refusal handling at line 355 engages only on parse failure). shared/api.py:735 returns the raw stop_reason and the 726-729 comment states the reject-on-stop_reason invariant; step1_dilemmas.py:679 and :844 explicitly reject \"refusal\" and document real mid-stream refusal cuts on insect-welfare content (2026-07-19), so the partial-text refusal mechanism is observed, not hypothetical. Step 3 output demonstrably feeds final/dad_corpus.jsonl. No factual error found; every instance, line number, and the failure scenario hold as stated. | Read all cited sites: step2_responses.py:407, step3_rewrite.py:91, and baseline.py:64 each reject only empty/max_tokens/echo output, so non-empty text with stop_reason=\"refusal\" is accepted; the 2b record drops stop_reason so nothing downstream can catch it, and step-3 results ship directly to final/dad_corpus.jsonl (step3_rewrite.py:126-142). Reachable under the default config (config.yaml backend: api; shared/api.py:735 returns the raw stop_reason, with the invariant stated at 726-729), and refusal-with-partial-text is documented as observed live (step1_dilemmas.py:673-679) and modeled in tests for 1a (test_dad_steps.py:625-626). The 2a instance (line 306) also holds — a refusal-stopped scope is parsed and accepted if valid; the line-355 fallback only engages on parse failure. No test covers non-empty refusal at 2b/step-3/baseline; severity high is justified since refusal cuts cluster on the corpus's core topic (insect welfare) and produce silently truncated training records. Only mitigating factor: the claude_code backend surfaces refusals as empty text, but that is the dev backend, not the full-scale default."
+    },
+    {
+     "title": "gid registry can silently collide or renumber across runs, merges, and crashes",
+     "file": "dad_pipeline/id_registry.py",
+     "line": 86,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "IdRegistry.__init__ swallows a corrupt registry (`except (json.JSONDecodeError, OSError): loaded = {}`, id_registry.py:84-87) and starts every kind back at 1 (assign is `max(table.values(), default=0) + 1`, line 98) — pinned as current behavior by tests/test_id_registry.py:41 (test_corrupt_registry_starts_fresh). save() is a non-atomic full overwrite (lines 105-110) of a git-tracked file shared across runs (`git ls-files` shows outputs/dad/id_registry.json tracked). Every stage stamps gids onto appended records before saving the registry: step1_dilemmas.py:967 (stamp) vs :1003 (save, once per pass); step2_responses.py:469 vs :476; backfill_gids.py rewrites run files incrementally but saves the registry only after ALL runs (line 142-143). Gids are consumed as cross-run join keys by evals/audit_dad.py:167-170 and evals/diversity.py:135-146.",
+     "failure_scenario": "Two contributors run the pipeline on separate branches; git merge of id_registry.json leaves conflict markers; the next run's IdRegistry silently loads {} and re-mints P-0001/R-0001/E-0001 for new content — numbers already stamped on committed runs for different artifacts. The audit and diversity reports then join different responses under one R-####, misattributing quality evidence across runs. Same collision via crash between record append and registry.save() (unregistered stamped gids get re-allocated to other content by the next run), or via a backfill interrupted before its single end-of-walk save.",
+     "recommendation": "1) Fail loudly on an unparseable existing registry (SystemExit telling the user to restore it from git) instead of silently resetting — flip test_corrupt_registry_starts_fresh deliberately. 2) Make save() atomic (write to a temp file in the same dir, os.replace). 3) Save the registry before or atomically with each batch of stamped records (step1 currently saves once per pass; backfill once per invocation — save per run_dir in backfill_run). 4) Document that concurrent DAD runs share one registry and are not safe; consider an fcntl lock or per-run allocation journal if concurrent runs are expected.",
+     "instances": [
+      "dad_pipeline/id_registry.py:84-87 — silent fresh-start on corrupt registry (test-pinned)",
+      "dad_pipeline/id_registry.py:98,105-110 — max+1 allocation over a non-atomic, last-writer-wins JSON",
+      "dad_pipeline/step1_dilemmas.py:967→1003 — prompt gids stamped per record, registry saved once per pass",
+      "dad_pipeline/step2_responses.py:469→476 — response gids stamped, saved per batch (small window)",
+      "dad_pipeline/backfill_gids.py:142-143 — registry saved only after every run is relabeled; interruption orphans all stamped gids"
+     ],
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every cited site: id_registry.py:84-87 swallows corrupt JSON into loaded={} (pinned by tests/test_id_registry.py:41), line 98 is max+1 allocation, save() at 105-110 is a non-atomic full overwrite of the git-tracked outputs/dad/id_registry.json (confirmed via git ls-files). Stamp-before-save windows exist exactly as claimed (step1_dilemmas.py:967 stamp vs :1003 save-after-loop, plus 581/591/622; step2_responses.py:469 vs :476; backfill_gids.py:143 single end-of-walk save), so a crash or a merge-conflicted registry causes silent re-minting of gids already stamped on committed runs. Gids are consumed as stable cross-run identifiers by evals/audit_dad.py:167-170 and evals/diversity.py:135-148, and the module's own docstring says gids exist to align artifacts across runs, so collisions misattribute evidence as the scenario describes. | Verified every cited location: silent fresh-start on corrupt registry (id_registry.py:84-91, test-pinned at tests/test_id_registry.py:41), max+1 allocation (line 98), non-atomic overwrite save (105-110), git-tracked shared outputs/dad/id_registry.json with no merge driver, stamp-before-save windows in step1_dilemmas.py (967 vs 1003), step2_responses.py (469 vs 476), and backfill_gids.py's single end-of-walk save (142-143); audit_dad.py:157-170 and diversity.py:135-148 consume gids as cross-run join keys. The scenario is reachable under real configurations — stamping is unconditional, contributors share the file across branches, and crashes/resumes are an expected operating mode; a clean (non-conflicting) merge can even assign the same number to two different fingerprints since both branches allocate the same max+1 and assign() never checks value uniqueness. Severity high is justified for silent cross-run identity corruption of the designed join key, though impact is confined to audit/diversity/viewer attribution, not training-record content."
+    },
+    {
+     "title": "Step-1 pass holds 1b+1c+1d spend in memory; retry budgets reset on resume",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 817,
+     "severity": "high",
+     "effort": "M",
+     "evidence": "Within one drafting pass, the 1b fan-out (line 833) fills the in-memory `drafted` dict (line 817), the 1c fan-out (line 875) fills `verdict_by_pid`, and the 1d fan-out (line 929) fills `refined_by_pid`; the first dilemmas.jsonl append happens only in the serial assembly loop at line 1002. For count=40 that is ~120 paid calls held in memory before any record write. The known ledger item covers only \"1b drafts held only in memory during a pass\" — the rebuild composed two more paid stages into the same window, tripling the exposure. Additionally, all loop budgets are process-local: draft_attempts (line 782), gate_attempts/gate_feedback (lines 787-788). gate.jsonl and draft_failures.jsonl are appended but never reloaded on resume.",
+     "failure_scenario": "A full-scale run (count=400) crashes during the 1d refine fan-out of pass 1 (network outage, Ctrl-C): ~1,200 paid calls (400 drafts + 400 gates + partial refines) are discarded and fully re-billed on --resume. Separately, a scenario that had burned 2 of its 3 gate redrafts before a crash resumes at attempt 1 with its gate feedback lost — it can consume up to 3 more redraft cycles (extra spend) and its redraft no longer carries the gate's objections, while gate.jsonl's attempt numbering restarts, corrupting the provenance trail.",
+     "recommendation": "Checkpoint the 1b draft as soon as it is accepted (e.g. append {scenario_id, pass, draft} to a step1/drafts_pending.jsonl consumed and cleared at record assembly), so a crash between 1b and record-write re-runs only the gate/refine, not the drafts. Rebuild draft_attempts and gate_attempts/gate_feedback on resume from draft_failures.jsonl and gate.jsonl (both already carry the needed per-scenario records) so MAX_DRAFT_ATTEMPTS and MAX_GATE_REDRAFTS are budgets per scenario, not per process. Add a resume test asserting a scenario with 2 logged gate rejections gets exactly 1 more redraft.",
+     "instances": [
+      "dad_pipeline/step1_dilemmas.py:817,867,921 — drafted/verdict_by_pid/refined_by_pid all pass-scoped in memory; first write at line 1002",
+      "dad_pipeline/step1_dilemmas.py:782,787-788 — draft_attempts/gate_attempts/gate_feedback never persisted or reloaded"
+     ],
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Within one step-1 drafting pass, the 1b fan-out (line 833) fills the in-memory `drafted` dict (line 817), the 1c fan-out (line 875) fills `verdict_by_pid` (line 868), and the 1d fan-out (line 929) fills `refined_by_pid` (line 921); the first dilemmas.jsonl append happens only in the serial assembly loop at line 1002. Under shipped defaults (gate and refine both enabled, count=40, Opus models) that is ~120 paid calls held in memory before any record write, and exceptions from gate/refine calls propagate uncaught through parallel_map, so a crash mid-pass (network outage exhausting retries, Ctrl-C) discards and re-bills the whole pass on --resume — violating parallel_map's own documented contract that yielded items are checkpointed. The prior audit ledger item already covered the 1b batch call plus refine results held in memory; the rebuild added one further paid stage (the 1c gate) and converted 1b to per-scenario fan-out, roughly tripling the number of paid calls in the unwritten window. Separately, all loop budgets are process-local: draft_attempts (line 782) and gate_attempts/gate_feedback (lines 787-788) are never persisted, and gate.jsonl/draft_failures.jsonl are appended but never reloaded — so a scenario that burned 2 of 3 gate redrafts before a crash resumes with a fresh budget of 3 (extra spend), its first post-resume draft loses the gate's objections, and gate.jsonl attempt numbering restarts at 1 for the same scenario_id, making the provenance trail ambiguous. Loss scales linearly with dilemmas.count (~$3-5 per crash at the default 40; ~10x that at a 400-example full-scale run).",
+     "verifier_notes": "Verified every cited mechanism: `drafted` (line 817) filled by the 1b parallel_map fan-out (833-834), `verdict_by_pid` (declared 868, one line off the finding's 867) filled by the 1c fan-out (875-877), `refined_by_pid` (921) filled by the 1d fan-out (929-931), and the only dilemmas.jsonl append in the drafting loop is line 1002 (`output_path` = dilemmas.jsonl, line 502) in the serial assembly loop after all three fan-outs — so a crash during 1d discards the whole pass's paid drafts+gates+refines, and resume (examples reloaded from dilemmas.jsonl at line 551 -> `accepted` at 775) re-bills all of them; gate/refine default enabled (lines 522, 528). Budgets are process-local as claimed: `draft_attempts` (782), `gate_attempts`/`gate_feedback` (787-788) are never persisted; gate.jsonl (`gate_path`, written only at 896) and draft_failures.jsonl (840/847/854) are append-only and never read back, so after a resume gate attempt numbering restarts at 1 (895) and redrafts lose their `{redraft_feedback}` (810-811), permitting up to MAX_GATE_REDRAFTS=3 fresh cycles. Only nit: verdict_by_pid is declared at line 868, not 867, in the \"other instances\" list. | Verified against dad_pipeline/step1_dilemmas.py and config.yaml: all three fan-outs (1b line 833, 1c line 875, 1d line 929) fill pass-scoped in-memory dicts with first dilemmas.jsonl write at line 1002; defaults (gate: true, refine: true, count: 40, Opus) make ~120 paid calls per pass genuinely at risk, and gate_draft/refine_draft have no exception handling so a tenacity-exhausted outage or Ctrl-C propagates through parallel_map and discards the pass. Resume reloads only dilemmas/refine_rejects/draft_rejects (lines 551-561); draft_attempts/gate_attempts/gate_feedback (782, 787-788) are process-local and gate.jsonl/draft_failures.jsonl are never reloaded, so the budget-reset and provenance-restart scenario is real; no test covers mid-pass crash or budget persistence. Two details are wrong: the committed ledger item (CODE_QUALITY_REPORT.md@8a40278 line 65) already covered 1b batch + refine held in memory — the rebuild added one new paid stage (the 1c gate), not two — and verdict_by_pid is defined at line 868, not 867; also count=400 is hypothetical (default 40, ~$3-5 per crash event, scaling linearly)."
+    },
+    {
+     "title": "Uncaught API exceptions in new fan-out workers discard completed sibling work",
+     "file": "dad_pipeline/step2_responses.py",
+     "line": 299,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "The known ledger covers uncaught API exceptions only for 1c gate/1d refine (~L367/L434). The rebuild added five more fan-out workers with the same shape: step2's fused process_dilemma calls call_claude at lines 299 (scope), 319 (select), and 395 (respond) with no try/except; step1 _plan at line 668; step1 _draft at line 812 (plus template.format KeyError inside render_draft_prompt); step3 rewrite_response at step3_rewrite.py:64; baseline_call at baseline.py:50. utils.parallel_map (shared/utils.py:17-30) yields via pool.map in input order, so an exception on item k kills the consuming loop: completed-but-unyielded results for items > k are dropped unwritten, and the fused step2 worker makes each dropped unit worth 2+per_prompt paid calls.",
+     "failure_scenario": "During step 2 with workers=8, dilemma 0's scope call exhausts tenacity on a persistent 529 and raises; dilemmas 1-7 have already completed their scope+select+response calls (~24 paid calls) but their results are still queued behind item 0 in pool.map's in-order iterator — the exception aborts the run, nothing is checkpointed, and all of it is re-billed on --resume. In the fused worker, a raise on the last 2b sample likewise discards that dilemma's already-paid scope and select.",
+     "recommendation": "Wrap each worker body in try/except around the terminal API-error types (the same set _call_with_retry re-raises), returning an explicit failure sentinel that the main-thread loop logs to the stage's *_failures.jsonl and skips (leaving the item un-checkpointed for --resume) — this makes one item's outage cost exactly one item. Apply uniformly to the five new workers and the two known gate/refine sites in the same change.",
+     "instances": [
+      "dad_pipeline/step2_responses.py:299,319,395 — fused scope/select/respond worker (largest unit of loss)",
+      "dad_pipeline/step1_dilemmas.py:668 — 1a _plan worker",
+      "dad_pipeline/step1_dilemmas.py:812 — 1b _draft worker (also KeyError from render_draft_prompt template contract check)",
+      "dad_pipeline/step3_rewrite.py:64 — rewrite worker",
+      "dad_pipeline/baseline.py:50 — baseline worker"
+     ],
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "All five worker call sites are exact and uncaught: step2_responses.py:299/319/395 (fused process_dilemma; only except in the file is a JSON-parse helper), step1_dilemmas.py:668 (_plan) and :812 (_draft, whose render_draft_prompt docstring confirms \"Any other placeholder... raises KeyError — the render is the contract check\"), step3_rewrite.py:64, baseline.py:50 — each consumed via utils.parallel_map (step2:432, step1:722/:834, step3:82, baseline:58). parallel_map (shared/utils.py:17-30) yields via pool.map in input order, and shared/api.py's tenacity decorator (stop_after_attempt(8), no reraise=True) raises RetryError on a persistent retryable 529, so an exception on item k aborts the consuming loop before completed items >k are yielded — they are dropped unwritten/uncheckpointed and re-billed on --resume, exactly as parallel_map's own docstring concedes (\"items already yielded are safely checkpointed and --resume picks up the rest\"). The fused step2 unit is indeed 2+per_prompt paid calls (scope+select+responses). Only immaterial nit: the ledger cross-reference \"~L367/L434\" pairs the labels in swapped order (L370 is the 1d refine call, L436 the 1c gate call)."
+    },
+    {
+     "title": "Gate-unusable fail-open ships the record with no on-record stamp",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 909,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "When every gate attempt is unparseable (passed is None), lines 909-913 only print and ship — the shipped record carries no marker, unlike the two sibling degraded paths: gate-cap failures stamp `gate_failures` (line 986-987) and refine failures stamp `refine_failed` (line 988-989). The behavior is test-pinned (tests/test_dad_steps.py:131, \"ships the 1b draft unstamped\"), so provenance exists only by joining gate.jsonl on scenario_id.",
+     "failure_scenario": "An API hiccup makes the gate model return prose instead of JSON for 30 of 400 drafts; all 30 ship never-judged prompts into dilemmas.jsonl indistinguishable from gate-passed ones. A downstream reviewer filtering the corpus for quality flags (`gate_failures`, `refine_failed`) concludes these records passed the gate; only someone who separately joins gate.jsonl's `passed: null` rows discovers a whole slice was never quality-checked.",
+     "recommendation": "Stamp `record[\"gate_unusable\"] = True` in the assembly loop for scenarios whose verdict was None (mirroring `refine_failed`), and flip the pinned assertion in test_gate_unusable_after_retries_ships_draft_fail_open deliberately, per the CLAUDE.md spec-first rule. Keep the fail-open shipping behavior itself unchanged.",
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified dad_pipeline/step1_dilemmas.py: the `elif passed is None:` branch at line 909 only prints (lines 912-913) and the scenario proceeds through `shipping` (line 915) into dilemmas.jsonl (output_path, line 502) with no marker, while the sibling degraded paths do stamp — `gate_failures` set at line 906 and written at 986-987, `refine_failed` set at 960 and written at 988-989. The behavior is test-pinned exactly as claimed: tests/test_dad_steps.py:131 `test_gate_unusable_after_retries_ships_draft_fail_open` asserts `\"gate_failures\" not in e` with the comment \"ships the 1b draft unstamped\". Provenance for never-judged records exists only in gate.jsonl (`passed: null` rows logged at lines 894-896, joinable on scenario_id) plus raw replies in gate_failures.jsonl, so the failure scenario — unparseable gate replies (MAX_GATE_ATTEMPTS=2, line 404) shipping records indistinguishable from gate-passed ones to anyone filtering on record-level flags — holds as stated."
+    },
+    {
+     "title": "step1_dilemmas.run() is a 533-line function with six loop-carried mutable dicts",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 482,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "run() spans lines 482-1015: config-contract guard, seed import, 1a deal, 1a plan (with the nested 45-line _plan closure), then a 12-iteration while-loop composing 1b/1c/1d with five nested closures (_plan, _draft, _note_failure, _gate, _refine) and six pieces of closure-captured mutable state (accepted, drafted, draft_attempts, gate_attempts, gate_feedback, refine_rejected/draft_rejected). The module additionally hosts ~230 lines of checklist/tally/rendering (lines 91-337) used by the viewer, unrelated to orchestration. Coverage is 94%, but every recent fix (gate split, refusal fallback, redraft feedback) has landed inside this one function.",
+     "failure_scenario": "Concrete maintenance cost at the file's demonstrated churn rate: a contributor adding the next quality stage (or fixing the resume-budget issue above) must reason about which of six dicts each closure reads/mutates across three fan-outs and a serial assembly loop; a missed update to `accepted` or `gate_feedback` produces a scenario that silently redrafts forever or ships twice, and the 12-pass SystemExit backstop is the only guard. Review of any step-1 PR requires re-reading ~500 lines of context.",
+     "recommendation": "Three-way split, keeping run() as a thin orchestrator: (1) move the checklist/tally/format functions (lines 91-337) to a step1_checklist.py imported by run and the viewer; (2) extract the 1a deal+plan block (lines 594-759) into `plan_scenarios(config, prompts_dir, output_dir, registry) -> list[dict]`; (3) extract the while-loop body into a `draft_gate_refine_pass(...)` function taking an explicit PassState dataclass (drafted/budgets/feedback), which also makes the resume-budget fix a natural constructor-from-logs. Tests already drive run()'s public contract, so the split is behavior-preserving under the existing suite.",
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "step1_dilemmas.run() is a 534-line function (lines 482-1015) with six pieces of loop-carried mutable state and five nested closures. It comprises a config-contract guard, seed import, 1a deal, 1a plan (with the nested 68-line _plan closure), then a while-loop capped at 12 passes composing 1b/1c/1d with four nested closures (_draft, _note_failure, _gate, _refine). The loop-carried state is three dicts (draft_attempts, gate_attempts, gate_feedback), three sets (accepted, refine_rejected, draft_rejected), plus a per-pass drafted dict; four of these (gate_feedback, draft_attempts, draft_rejected, drafted) are closure-captured, while accepted and gate_attempts mutate in the serial assembly code. The module additionally hosts ~250 lines of checklist/tally/card-rendering helpers (lines 91-345) imported by the viewer. Recent fixes (gate split, refusal fallback, redraft feedback) all landed inside this one function, and a missed update to accepted or gate_feedback re-drafts/re-ships a scenario every pass with the 12-pass SystemExit as the only backstop.",
+     "verifier_notes": "Read run() in full (dad_pipeline/step1_dilemmas.py:482-1015): the function is 534 lines, contains the config guard, seed import, 1a deal/plan, the 12-pass while loop with SystemExit backstop, and all six named pieces of loop-carried mutable state; viewer imports (viewer/rendering.py:22, viewer/ui_pages/lineage.py:12) and git log (gate split, refusal fallback, redraft feedback commits) confirm the coupling and churn claims. Details are off: _plan is 68 lines (not 45) and sits before the while loop (the loop holds four closures, not five); three of the six \"dicts\" are sets, drafted is re-created per pass, and accepted/gate_attempts are mutated only in the serial loop body, not inside closures. The failure scenario holds: a missed accepted.add() would re-ship a scenario each pass with only the 12-pass cap as guard. The 94% coverage figure was not re-measured (read-only constraint) but is not load-bearing."
+    },
+    {
+     "title": "backfill_gids rewrites run artifacts in place non-atomically and stamps null gids",
+     "file": "dad_pipeline/backfill_gids.py",
+     "line": 54,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "_label_file rewrites entire run files (step2/responses.jsonl, step3/rewrites.jsonl, final/dad_corpus.jsonl) via utils.save_jsonl in \"w\" mode (backfill_gids.py:54; shared/utils.py:39-45 truncates then writes with no temp/rename). Separately, _insert_after inserts the key even when the computed gid is None: rewrites() at lines 100-101 can stamp `response_gid: null` (no draft_response), and final() at lines 115-116 can stamp `example_gid: null` when only a response gid resolved — and a null-valued gid key is falsy, so the skip guards (`rec.get(\"example_gid\")`) treat the record as unlabeled forever.",
+     "failure_scenario": "Backfill is Ctrl-C'd (or crashes on a malformed record — load_jsonl raises on any bad line) midway through rewriting an uncommitted run's final/dad_corpus.jsonl: the file is left truncated, destroying paid pipeline output that git cannot restore. Independently, a rewrites.jsonl record without draft_response gets `response_gid: null` written into a committed artifact, and every future backfill re-processes it as unlabeled.",
+     "recommendation": "In _label_file, write to `path.with_suffix('.tmp')` and os.replace() over the original; skip inserting a key when its value is None (make _insert_after no-op on None, or guard at the call sites). Add a test that an interrupt-simulating exception mid-walk leaves every file either fully old or fully new.",
+     "dimension": "dad-rebuild",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "backfill_gids.py rewrites run artifacts (step2/responses.jsonl, step3/rewrites.jsonl, final/dad_corpus.jsonl) in place non-atomically: _label_file (backfill_gids.py:54) calls utils.save_jsonl in \"w\" mode (shared/utils.py:39-45, truncate-then-write, no temp/rename), so an interruption during the write (Ctrl-C, kill, disk full) leaves the file truncated, destroying uncommitted paid pipeline output. (A malformed record cannot cause this — load_jsonl raises before that file's write begins.) Separately, _insert_after stamps null gids: rewrites() (lines 100-101) writes response_gid: null when draft_response is absent, and final() (lines 115-116) writes example_gid: null when only a response gid resolved. In final(), the skip guard checks only example_gid (line 107), so a null-example_gid record is re-processed and rewritten on every future backfill; in rewrites(), the guard checks either gid (line 98), so a record with a real example_gid but null response_gid is skipped thereafter — only records with both gids null loop forever there.",
+     "verifier_notes": "Verified backfill_gids.py:54 calls utils.save_jsonl (utils.py:39-45, \"w\" mode, no atomic rename) and that _insert_after unconditionally stamps None-valued gids at lines 100-101 and 115-116; all cited lines match. Two scenario details are wrong: a malformed record makes load_jsonl raise before that file's save starts, so it cannot truncate the file (only mid-write interruption can); and the rewrites() \"unlabeled forever\" claim fails in the cited case because the line-98 guard checks example_gid OR response_gid, so a record with a real example_gid and null response_gid is skipped on later runs. The final() forever-reprocess claim does hold since line 107 checks only example_gid."
+    },
+    {
+     "title": "Record assembly indexes p[\"taxa_category\"] which legacy scenarios may lack",
+     "file": "dad_pipeline/step1_dilemmas.py",
+     "line": 977,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "The shipped record does `\"taxa_category\": p[\"taxa_category\"]` (line 977) while every neighboring field on the same record uses .get() (lines 978-982), and the legacy-card renderer treats the field as optional (`p.get('taxa_hint', p.get('taxa_category', ''))`, compose_scenarios.py:782) — the code elsewhere assumes pre-plan legacy scenarios can lack it. run() explicitly supports resuming such legacy runs (legacy_run path, lines 605-615).",
+     "failure_scenario": "Resuming a pre-taxa legacy run under current code: the scenario drafts, gates, and refines successfully (3 paid calls), then record assembly raises KeyError at line 977 — the pass's remaining in-memory work is discarded, and every resume crashes at the same point, permanently wedging the run.",
+     "recommendation": "Use `p.get(\"taxa_category\")` to match the neighbors (coverage_tally already tolerates a missing/None value at line 219), or fail loudly before any 1b spend if taxa_category is required for all scenarios the run will draft.",
+     "dimension": "dad-rebuild",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Resuming an already-complete run re-fires the paid auto-evals",
+     "file": "dad_pipeline/run.py",
+     "line": 168,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "run_auto_evals fires whenever step 3 completes with a non-empty corpus (`if final and auto_evals_enabled(config)`, run.py:168), with no marker that the evals already ran for this corpus. Step 3 is fully checkpointed, so `--resume` on a finished run makes zero pipeline calls but still launches audit_dad.py `--reasons` (a paid LLM pass, run.py:52-53) and diversity.py (paid embeddings) again.",
+     "failure_scenario": "A contributor resumes a completed full-scale run to confirm it is done (or after a crash inside the eval subprocess itself); the pipeline re-bills the full reasons pass and embedding audit on an unchanged corpus — a surprise cost on every such invocation, billed to the global cost log where it is easy to miss.",
+     "recommendation": "Write a small marker (e.g. run_dir/evals/_auto_evals_done.json recording the corpus file's record count or mtime) after a successful eval pass and skip re-running when it matches, with a --force-evals escape hatch; or at minimum print the expected cost and require the corpus to have changed since the last pass.",
+     "dimension": "dad-rebuild",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "audit-dad",
+   "summary": "The DAD corpus-audit subsystem is far stronger than typical eval code: thresholds live in one place (the eval writes display rows + verdicts; the viewer renders them without duplicating logic), the paid pass logs raw unparseable replies to reason_failures.jsonl, extraction failures are counted and rendered as gaps (\"a missing bar is a gap, not a zero\"), showcase highlights are verbatim-validated fail-closed, and the 88%-covered test suite genuinely exercises failure modes (extraction failure counting, delivery clamps, span rejection). The July SDF failure class (\"parse failures counted as clean\") was mostly designed out — but not everywhere: three judge-parse slips still silently change metric semantics instead of registering as failures (the corpus-distinct consolidation fallback is the worst, inflating a substance headline with no marker), the per-prompt keying of every response-side section silently drops data on multi-sample runs, and the auto-fired ~370-call paid pass has no checkpointing, so an interruption re-bills everything — against the repo's own money-path rule. The untested 12% is precisely the fallback/skip branches plus main()'s orchestration, and the 0%-coverage viewer page still computes a few headline percent claims inline (most decision logic correctly lives in tested rendering.py). Structurally, the 2,997-line module is navigable via consistent section banners and data-driven YAML maps, but it has visibly outgrown one file (duplicate section banners, a \"main\" divider 480 lines before main, a 185-statement audit_reasons); it needs a mechanical package split before delivery, not a rewrite.",
+   "findings": [
+    {
+     "title": "Judge-parse slips silently change metric semantics instead of counting as failures",
+     "file": "evals/audit_dad.py",
+     "line": 2019,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "arm_summary: `except Exception: distinct = sorted(set(all_reasons))` — if the one consolidation call per arm fails to parse (or is truncated; shared/api.py:677 only WARNs on non-end_turn stop_reason, and salvage_json_objects can't recover a truncated string array), 'corpus-level distinct considerations' silently becomes an exact-string dedupe over all per-response items, counting every paraphrase as distinct, with no failure counter, row note, or report field. Same class: judge_survival (lines 1986-1988) drops anchored items whose verdict isn't exactly kept/weakened/dropped, silently shrinking the retention numerator AND denominator; _classify_reason_types (1713-1720) returns {} on any exception and never checks len(labels)==len(reasons), so extra/missing labels silently skew the reason-type histograms and composition Vendi. Coverage confirms 2018-2019 and 1713-1714 are never tested.",
+     "failure_scenario": "On a 40-example run the pipeline-arm consolidation reply (a ~240-string JSON array) is truncated by the max_tokens cap; extract_json_array raises; the fallback counts ~200 'distinct' considerations vs plain's consolidated ~60. The report row and the viewer's corpus-distinct expander show the pipeline 'widening the substance' 3x — the exact evidence claim a receiving lab reads — with nothing indicating the number came from a degraded path.",
+     "recommendation": "Treat every fallback as a counted, visible event: on consolidation failure set a `consolidation: \"exact-fallback\"` field in the arm summary and append a warning note to the row; count non-enum survival verdicts into an `unparsed` bucket reported next to kept/weakened/dropped; in _classify_reason_types, require len(labels)==len(reasons) (else count a typing failure and skip that response). Add one test per path (the stub_claude dispatcher already supports this).",
+     "instances": [
+      "evals/audit_dad.py:2018-2019 (consolidation fallback, both arms)",
+      "evals/audit_dad.py:1986-1988 (survival verdict filter)",
+      "evals/audit_dad.py:1713-1720 (reason-type classification: silent {} + no length check)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified all cited code: evals/audit_dad.py:2018-2019 has exactly `except Exception: distinct = sorted(set(all_reasons))` with no failure counter, row note, or report field, and the \"corpus-level distinct considerations\" row (line 2084) renders the number with no degraded-path indicator; lines 1986-1988 filter anchored items to verdicts in (\"kept\",\"weakened\",\"dropped\"), silently shrinking both verdict_counts and total_anchored (line 2106); _classify_reason_types (1713-1714) returns {} on any exception and the loop (1716-1719) never checks len(labels)==len(reasons), and type_hist feeds both the reason_types histogram (2022-2025) and the composition Vendi matrix (line 1757). The truncation mechanism holds: call_claude at 2014 doesn't request stop_reason (shared/api.py:677 and :730 only print WARNING on non-end_turn), extract_json (shared/utils.py:111-115) raises on a truncated container, and salvage_json_objects (utils.py:118-151) brace-matches only {...} objects so a truncated string array yields nothing — the recover path re-raises and the exact-set fallback fires. tests/test_audit_dad.py covers extraction/survival/delivery failures but never makes the consolidation or reason-type calls fail, confirming the coverage claim. Only trivial nuance: api.py:677 is the claude_code backend path, with the identical API-backend check at line 730 — substance unchanged."
+    },
+    {
+     "title": "_final_by_prompt_id keys by prompt_id, silently dropping all but one sample on multi-sample runs",
+     "file": "evals/audit_dad.py",
+     "line": 664,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "`out[rw[\"prompt_id\"]] = text` keeps whichever step-3 rewrite record iterates last per prompt_id. config.yaml:83 (`per_prompt`) allows multiple independent 2b samples per dilemma, and step3_rewrite.py writes one final record per sample (sample_index preserved, step3_rewrite.py:112). Every response-side section — lengths, tracked tics, rhetorical moves, style fingerprint, jargon, lexical, structure, the paid considerations/delivery/showcase passes — reads this helper, so on a per_prompt>1 run they all audit an arbitrary ~1/per_prompt subset of the shipped corpus. openings_dad.py handles sample_index explicitly (its 'within-case spread' check exists precisely for multi-sample runs), showing the subsystem knows such runs occur.",
+     "failure_scenario": "A team runs per_prompt: 2 to double the corpus. The audit report headline says '40 responses scanned' for an 80-record corpus; a tic present only in the dropped samples reads as 0%; the delivery mean and the pipeline-vs-plain considerations lift describe half the delivered training data, and nothing in the report or viewer flags the discrepancy.",
+     "recommendation": "Either key the join by record_id (auditing every final record, pairing plain per prompt_id) or, minimally, have _final_by_prompt_id count the dropped records and surface a prominent warning row ('N of M final records audited — multi-sample run, one sample per prompt') plus a report field; add a per_prompt=2 fixture test asserting the count.",
+     "instances": [
+      "evals/audit_dad.py:656-666 (helper)",
+      "all callers: audit_response_lengths, audit_tracked_tics, audit_rhetorical_moves, audit_style_fingerprint, audit_jargon, audit_lexical, audit_structure, audit_reasons, audit_showcase, audit_move_candidates, audit_tic_candidates"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified _final_by_prompt_id (evals/audit_dad.py:656-666) keys by prompt_id with last-write-wins (assignment at line 665; cited 664 is the enclosing if-guard — trivial offset). config.yaml:83 per_prompt allows multiple samples; step2_responses.py generates them and step3_rewrite.py writes one rewrites.jsonl record and one final record per sample with sample_index preserved (step3_rewrite.py:112), so per_prompt>1 runs lose all but one sample per prompt in this helper. All 11 claimed callers confirmed at lines 624/712/828/982/1143/1207/1339/1403/1854/2320/2749, including the paid --reasons/showcase/move-candidate LLM passes, and headline rows print len(pipe) so the report would state the reduced count with no discrepancy flag. openings_dad.py does key by (prompt_id, sample_index) and runs a within-case-spread check, confirming the claimed contrast."
+    },
+    {
+     "title": "Auto-fired paid --reasons pass has no checkpointing; interruption re-bills every completed call",
+     "file": "evals/audit_dad.py",
+     "line": 1936,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "audit_reasons accumulates all results in the in-memory per_case dict (lines 1933-1955); the report is written only at the end of main() (line 2991). The pass makes ~9 LLM calls per example (2 extractions + 2 check-backs + up to 2 typings + 1 survival + 2 delivery), ~370 calls on a default 40-example run, plus consolidations, showcase, and move discovery — comparable in call count to a paid pipeline step. It is fired automatically after every full run (dad_pipeline/run.py:50-53). A Ctrl-C, crash, or exhausted rate limit mid-pass discards everything; re-running --reasons restarts from zero. CLAUDE.md's own test rules call resume correctness 'what protects paid work'. Also, the pass-cost snapshot (lines 1853, 2122) closes before audit_showcase and audit_move_candidates run, so the recorded mpr.cost_usd — rendered in the viewer as 'paid pass $X' — understates the actual paid-pass spend.",
+     "failure_scenario": "A full-scale run's auto-eval dies at the delivery stage after ~300 successful calls (rate-limit exhaustion propagating as per-item failures is handled, but a process kill is not); the operator re-runs audit_dad.py --reasons and pays for all ~300 calls again. Separately, the viewer reports a pass cost that omits the showcase/discovery calls every single run.",
+     "recommendation": "Persist per-item results as they complete (append-only jsonl under <run>/audit/, keyed by (prompt_id, arm, stage), mirroring the pipeline's checkpoint convention) and skip already-judged items on re-run; move the cost snapshot to after audit_move_candidates (or take per-stage snapshots) so the recorded cost covers the whole pass.",
+     "instances": [
+      "evals/audit_dad.py:1933-1955 (extraction results in memory)",
+      "evals/audit_dad.py:1996-2004 (survival)",
+      "evals/audit_dad.py:2177-2183 (delivery)",
+      "evals/audit_dad.py:1853+2122 (cost snapshot excludes showcase/discovery)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every cited line: per_case accumulates in memory (audit_dad.py:1933-1955, survival 1996-2004, delivery 2177-2183) with the report written only once at main() end (2991); the only mid-pass write is reason_failures.jsonl (failure evidence, not resume state), and carry_forward_reasons cannot rescue an interrupted pass since it needs a previously written report. Per-item exceptions are caught but a process kill/Ctrl-C is not, so all completed paid calls are lost and a --reasons re-run restarts from zero; the pass is auto-fired after every full run (dad_pipeline/run.py:50-53, gated at 168-169). The cost snapshot (1853/2122) is the file's only get_total_cost pair and the viewer renders mpr.cost_usd as \"paid pass $X\" (viewer/ui_pages/audit.py:571-572); the understatement is actually larger than claimed — the snapshot also closes before the delivery judging (lines 2149-2183) inside audit_reasons itself, so ~2 delivery calls per example are excluded in addition to showcase/move-discovery calls."
+    },
+    {
+     "title": "The untested 12% of audit_dad.py is exactly the failure/fallback paths plus main()'s orchestration",
+     "file": "evals/audit_dad.py",
+     "line": 2901,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "Coverage report: main() (2901-2993) is entirely untested — including the carry-forward trigger, corrupt-old-report handling (2973-2975), --limit, section-ordering dependencies (the anti-padding guard at 2071 reads response_lengths computed earlier in main's ordering), and report writing. _stakes_by_prompt_id's whole body (682-691) is never executed, so every delivery-judge test runs with '(stakes unavailable for this case)' — a key rename in step2 scopes.jsonl would silently strip stakes from ALL delivery grading (proportionality is graded against stakes by design) with zero test failing. Also uncovered: check-back exception path (1916-1917), consolidation fallback (2018-2019), showcase judge-exception continue (2387-2388), and the delivery/showcase/moves/composition carry-forward branches (2432-2469).",
+     "failure_scenario": "A contributor renames scope['upside'] to scope['second_order'] in step 2; pytest stays green; from then on every delivery score in every audit report is judged without case stakes, systematically shifting proportionality grades on high-stakes cases — quality evidence drifts with no signal. Similarly, a regression in main()'s carry-forward wiring (e.g., the JSON-decode fallback) would drop paid data on offline re-runs unnoticed.",
+     "recommendation": "Add: (1) a test writing step2/scopes.jsonl and asserting the stakes text reaches the delivery-judge prompt (assert on stub_claude's captured calls); (2) an end-to-end main() test on a tmp run dir (offline path + carry-forward path + corrupt-old-report path), following the existing tmp_path conventions; (3) targeted tests for the fallback branches named in finding 1.",
+     "instances": [
+      "evals/audit_dad.py:682-691 (_stakes_by_prompt_id)",
+      "evals/audit_dad.py:2901-2993 (main)",
+      "evals/audit_dad.py:2432-2469 (carry-forward sub-branches)",
+      "evals/audit_dad.py:1916-1917, 2018-2019, 2387-2388 (paid-pass fallbacks)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "The untested portion of evals/audit_dad.py is exactly the failure/fallback paths plus main()'s orchestration. main() (2900-2993) is entirely untested — including the carry-forward trigger, corrupt-old-report handling (2972-2975), --limit, section-ordering dependencies (the anti-padding guard at 2071 reads response_lengths computed earlier in main's ordering), and report writing. _stakes_by_prompt_id's loop body (682-691) is never executed, so every delivery-judge test runs with '(stakes unavailable for this case)' — a key rename of scope['upside']/scope['magnitude'] in step-2 scopes.jsonl would silently strip stakes from ALL delivery grading with zero test failing. Also uncovered: check-back exception path (1916-1917), consolidation fallback (2018-2019), showcase judge-exception continue (2387-2388), and — within carry_forward_reasons — the delivery, showcase, and reason_composition carry branches (2432, 2434, 2438) plus the rhetorical-move candidate graft (2452); the moves branch and gid-restamp/gloss-carry logic (2435-2436, 2442-2445, 2466-2468) ARE covered by existing tests.",
+     "verifier_notes": "Independent settrace coverage run over the full suite confirms: main() (2900-2993) entirely untested including --limit, corrupt-report fallback (2972-2975), carry-forward trigger, and report writing; _stakes_by_prompt_id's loop body (682-691) never executes (function IS called at 1862, but no test scopes.jsonl carries a scope dict), so every delivery-judge test grades with the '(stakes unavailable for this case)' fallback at 2156 — and the upside/magnitude keys are the real step-2 contract (step2_scope.txt, step2_responses.py:154-155), so the rename scenario holds with pytest green. Paid-pass fallbacks 1916-1917, 2018-2019, 2387-2388 are all uncovered as claimed. One instance is wrong: the moves carry-forward branch (2435-2436) IS covered by test_carry_forward_retags_paid_per_case_with_current_gids (tests/test_audit_dad.py:245), and much of 2442-2468 (gid restamp, gloss carry) executes; only the delivery (2432), showcase (2434), reason_composition (2438), and candidate-graft (2452) bodies are uncovered."
+    },
+    {
+     "title": "audit_dad.py has outgrown a single module: 2,997 lines with visible structural decay",
+     "file": "evals/audit_dad.py",
+     "line": 2508,
+     "severity": "medium",
+     "effort": "L",
+     "evidence": "The file is navigable thanks to consistent '# ----- section' banners and data-driven YAML maps, but the seams are failing: the '# ----- main' banner at 2508 is immediately followed by a second '# ----- lexical diversity' banner (2511, duplicating the one at 1263) and ~390 more lines of section code before main() at 2900; the headline section (audit_valuable_welfare_considerations, 2805) lives at the bottom though it renders first; audit_reasons is a 314-line function with five nested closures (ruff: complexity 50, 185 statements), and audit_rhetorical_moves/audit_showcase/carry_forward_reasons all breach complexity limits. The module mixes five concerns: report/row plumbing, ~18 offline sections, shared geometry math (Vendi/PCA also used semantically by the viewer), the paid LLM judges with their ~150 lines of embedded prompt text, and the CLI.",
+     "failure_scenario": "Concrete maintenance cost: a contributor adding a section must scroll a 159KB file where 'lexical diversity' names two different things and code after the 'main' banner isn't main; reviewers of the delivery hand-off face the repo's largest file with its quality-critical judge prompts buried mid-file; merge conflicts concentrate here because every audit change touches one module.",
+     "recommendation": "Mechanical split into a package, no behavior change: evals/audit_dad/{report.py (section/row/verdict plumbing + gid map), offline.py (free sections), geometry.py (_char_tfidf/_vendi_from_matrix/_lexical_geometry/_l2_rows), paid.py (audit_reasons/showcase/move-candidates + prompt constants, with judge prompts moved to prompts/tools/ like consideration_extraction.txt already is), cli.py (main + carry-forward)}. Keep evals/audit_dad.py as a thin re-export shim so tests and run.py's subprocess invocation are untouched; fix the duplicate/misplaced banners in the same PR.",
+     "instances": [
+      "evals/audit_dad.py:1263 vs 2511 (duplicate 'lexical diversity' banners)",
+      "evals/audit_dad.py:2508 ('main' banner 392 lines before main)",
+      "evals/audit_dad.py:1821-2256 (audit_reasons, 314 lines)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "evals/audit_dad.py has outgrown a single module: 2,997 lines (~159KB) with visible structural decay — the '# ----- main' banner at 2508 is immediately followed by a duplicate '# ----- lexical diversity' banner (2511, repeating 1263) and 389 more lines of section code before main() at 2900; the headline section audit_valuable_welfare_considerations (2805) lives at the bottom though the viewer renders it near the top; audit_reasons (1821-2256) is a 436-line function with six nested defs and complexity far above any lint limit, and audit_rhetorical_moves/audit_showcase/carry_forward_reasons also breach complexity limits; the module mixes report plumbing, ~20 audit sections, geometry math, ~156 lines of embedded LLM judge prompts, and the CLI.",
+     "verifier_notes": "Checked every cited line in evals/audit_dad.py at current HEAD: file is exactly 2,997 lines / ~159KB; '# ----- main' banner at 2508 is followed at 2511 by a duplicate 'lexical diversity' banner (first at 1263) with main() at 2900; audit_valuable_welfare_considerations at 2805 while the viewer consumes it near the top of the audit page (viewer/ui_pages/audit.py:367); embedded judge prompts total 156 lines; AST analysis confirms audit_reasons, audit_rhetorical_moves, audit_showcase, and carry_forward_reasons all far exceed conventional complexity limits. Two details are wrong: audit_reasons (1821-2256) is 436 lines, not 314, and it has six nested defs, not five; the exact ruff figures (complexity 50, 185 statements) could not be reproduced since ruff is not installed, though the magnitude clearly holds."
+    },
+    {
+     "title": "Viewer audit page computes headline percent claims inline, duplicating the same lift with two definitions, at 0% coverage",
+     "file": "viewer/ui_pages/audit.py",
+     "line": 317,
+     "severity": "medium",
+     "effort": "M",
+     "evidence": "The page mostly honors the repo's Streamlit-stays-logic-free rule (row-building lives in tested viewer/rendering.py), but the boldfaced numeric claims a lab reads first are computed inline in the 1,337-line, 0%-covered page: _render_pareto (317-319) derives '+X% considerations' from mpr.mean_unique while the headline block (380-384) derives its 'adds X% more' from _ic.parent (mean_reasoning+mean_alternative, with a different legacy-report reconstruction path at audit_dad.py:2842-2849) — two computations of the same claim that diverge on legacy-shaped reports; line 317 also guards b_mean but not bm before dividing by it. Additional in-page logic: Pearson-r computation (866-867), gloss-parsing fallback (1104-1107), and Pareto mean-diamonds recomputed from the both-axes-filtered subset (351) rather than the report's recorded means.",
+     "failure_scenario": "A refactor of the report shape (like the recent reasons/alternatives merge) changes one lift computation but not the other; the page then shows '+42% considerations' in the Pareto blurb and 'adds 55% more' in the headline for the same run — contradictory quality evidence in the artifact shown to the receiving lab — and no test can catch it because the file has zero coverage.",
+     "recommendation": "Move the lift/tradeoff computations into viewer/rendering.py as pure functions (e.g., audit_headline_lifts(report) returning one consistent pair used by both blocks), add tests covering current + legacy report shapes and the plain-mean-zero edge, and have the page only format the returned values — matching the pattern already used for every chart-row helper.",
+     "instances": [
+      "viewer/ui_pages/audit.py:315-319 (Pareto blurb lift, mean_unique-based)",
+      "viewer/ui_pages/audit.py:380-384 (headline lift, parent-based)",
+      "viewer/ui_pages/audit.py:866-867 (inline Pearson r)",
+      "viewer/ui_pages/audit.py:1104-1107 (gloss parsing fallback)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified all cited lines in viewer/ui_pages/audit.py (1,337 lines, no test references ui_pages): lines 315-319 compute the Pareto blurb lift inline from moral_patient_reasons.mean_unique, and the guard `None not in (pm, bm, p_mean, b_mean) and b_mean` checks b_mean's truthiness but only bm's None-ness before dividing `pm / bm` at line 319. Lines 380-384 compute the headline lift from _ic[\"parent\"], which evals/audit_dad.py builds as mean_reasoning + mean_alternative (2838-2841) with the legacy reconstruction path exactly at 2842-2849 (reasons = old mean_unique, alternatives = old moves block) — so the two lifts measure the same claim via different paths and genuinely diverge on legacy-shaped reports where mean_unique excludes alternatives. The secondary instances also hold: inline Pearson r at 866-867, gloss-parsing fallback at 1104-1107, and line 351's mean diamonds recomputed via df.groupby over rows that rendering.audit_delivery_pareto_rows explicitly filters to records with both axes, rather than the report's recorded pipeline_mean/plain_mean."
+    },
+    {
+     "title": "Response-openings gloss claims a pipeline-vs-plain comparison the check never performs",
+     "file": "evals/audit_dad.py",
+     "line": 1474,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "The section gloss stored in the report and rendered verbatim by the viewer says 'WHAT: which opening MOVE each reply uses, pipeline vs plain Claude — named families are known tics', but audit_response_openings only reads pipeline drafts (step2/responses.jsonl) and finals; openings_dad.load_responses (openings_dad.py:104-122) has no baseline-arm path, and no plain-arm numbers appear in any row of the section.",
+     "failure_scenario": "A lab reviewer reading the audit page's methodology text believes opener-family collapse was measured against the plain-Claude control (as every neighboring response section genuinely is) and treats the family shares as a differential signal; the stated methodology of the delivered quality evidence is wrong.",
+     "recommendation": "Either scan _baseline_by_prompt_id through the same stage_stats and add a plain column (consistent with the sibling sections), or correct the gloss to say the check covers pipeline drafts and finals only.",
+     "instances": [
+      "evals/audit_dad.py:1471-1479 (gloss)",
+      "evals/openings_dad.py:104-122 (no baseline path)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Jargon pipeline-vs-plain excess computed over un-intersected arm populations",
+     "file": "evals/audit_dad.py",
+     "line": 634,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "`excess = total - sum(b_counts.values())` with the inline comment '(same prompts)', but pipe comes from the step3/final join and plain from baseline_responses.jsonl with no key intersection; the verdict divides max(excess,0) by n=len(pipe). audit_response_lengths (741-748) and rendering.audit_batch_totals both deliberately restrict to paired records — this section doesn't.",
+     "failure_scenario": "Auditing a run whose step 3 completed for 25 of 40 dilemmas (interrupted run, manual audit): plain jargon is summed over 40 responses vs pipeline over 25, deflating the excess and awarding a GOOD 'scaffolding bleed' verdict the paired comparison would not give — the verdict row explicitly presented as 'the real signal' for insider-vocabulary leak.",
+     "recommendation": "Intersect the two dicts on prompt_id before totalling (pipe_paired = {k: v for k, v in pipe.items() if k in plain}), report the paired n in the row, and add a test with asymmetric arm coverage.",
+     "instances": [
+      "evals/audit_dad.py:629-642"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Curated YAML data files: syntax/regex errors crash the whole audit; review_tics writes raw text and can't filter the plain arm",
+     "file": "evals/audit_dad.py",
+     "line": 929,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "load_moves compiles moves.yaml patterns with re.compile and catches only FileNotFoundError (918-921); load_tic_lists/load_tic_surfaces likewise catch only FileNotFoundError (774-777, 794-797) — a YAML syntax error or invalid regex introduced by the promote/curation workflow raises uncaught, killing the entire audit (including the free sections and the auto post-run eval subprocess). review_tics.py builds YAML by raw string insertion (promote line 99 quotes the phrase but not `family`; ignore_phrase line 118 same for reason), so a value containing a double quote or colon corrupts tics.yaml and triggers exactly that crash on the next run. Its `list --arm` choices (line 168) omit 'plain' even though the audit's mirror screen writes plain-arm candidates (audit_dad.py:2762) and the viewer displays them.",
+     "failure_scenario": "A reviewer runs `review_tics.py promote 'the \"welfare\" question' --origin pipeline-origin`; tics.yaml becomes unparseable; every subsequent audit run (auto-fired after each paid pipeline run) exits nonzero and no audit_report.json is written until someone hand-repairs the YAML.",
+     "recommendation": "Catch yaml.YAMLError and re.error in the three loaders and degrade to an explicit skipped-section row naming the bad file/pattern; in review_tics, yaml-escape inserted values (yaml.safe_dump the inline map) and validate the file round-trips with yaml.safe_load before writing; add 'plain' to the --arm choices.",
+     "instances": [
+      "evals/audit_dad.py:774-777, 794-797, 918-921, 929",
+      "evals/review_tics.py:99, 118, 168"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Carried-forward paid data has no staleness marker in the report JSON or viewer",
+     "file": "evals/audit_dad.py",
+     "line": 2423,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "carry_forward_reasons copies moral_patient_reasons/delivery/showcase/reason_composition from the previous report wholesale; the only indication is a terminal print in main() (2977-2978). The JSON carries no carried_forward flag or original-pass timestamp, so the viewer renders the paid headline, Pareto scatter, and showcase identically whether the numbers were measured against the current corpus or a previous state of it.",
+     "failure_scenario": "A run is resumed and step 3 produces additional final records; a free offline audit re-run refreshes all offline sections against the new corpus but carries the paid sections from the smaller corpus; the viewer shows a considerations headline and showcase whose underlying response set no longer matches the offline sections beside them, with no visible indicator.",
+     "recommendation": "Stamp report['moral_patient_reasons']['carried_forward'] = {'from_n': old n, 'at': old report timestamp} in carry_forward_reasons, warn when the carried per_case keys differ from the current _final_by_prompt_id keys, and render a small caption in the viewer when the flag is present.",
+     "instances": [
+      "evals/audit_dad.py:2423-2471",
+      "viewer/ui_pages/audit.py:306-312 (renders delivery unconditionally)"
+     ],
+     "dimension": "audit-dad",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "publish-hf",
+   "summary": "The HF publishing path is one of the strongest-engineered modules in the repo, and the code matches CLAUDE.md's documented contract on every headline claim I checked: delete_patterns are correctly scoped to the published pipeline (evals/publish_hf.py:682-683, asserted by tests/test_publish_hf.py:710-722); the rmtree guard from PR history (397552e/bfa1bc4) exists and covers staging-dir == run_dir, run_dir/final, and run_dir/audit with four regression tests; report_content.json (the only editorial input) is verifiably excluded from staging and upload; the sibling's metadata is fetched outside the staging tree so neither its files nor hf_hub_download's .cache dir can enter the upload (asserted at test line 899-909); --dry-run provably makes zero Hub calls (raise_on_call stub); and the card is built from measured audit fields with per-stage model overrides surfaced, exactly as documented. Token handling is clean: HF_TOKEN is loaded via load_dotenv and picked up by huggingface_hub's own env handling — it is never printed, staged, or written to any manifest or card, and the card's Source link matches the actual git remote (sentfutures org). The ruff PLW1510 subprocess finding is in dad_pipeline/run.py:61, not in this file — nothing subprocess-related exists in the publishing path. The untested 3% is precisely the three unwrapped Hub seams (_create_repo, _list_repo_files, _download_file bodies) plus the __main__ guard. The residual risks are at the edges the tests could not reach: stage_run will still rmtree any pre-existing directory that isn't the input run (a wrong --staging-dir can delete a different paid run wholesale, in --dry-run too); a re-publish reusing an existing --tag silently leaves the tag on the old commit while printing success (a stale version pointer on a public dataset); and the whole delete-then-add correctness rests on huggingface_hub's add-wins-over-delete precedence under a floor-only version pin (>=0.25). These are all small, targeted fixes; none undermine the overall assessment that this delivery mechanism is careful, well-documented, and unusually well-tested.",
+   "findings": [
+    {
+     "title": "stage_run rmtree deletes any pre-existing --staging-dir that isn't the input run — including other paid run directories",
+     "file": "evals/publish_hf.py",
+     "line": 145,
+     "severity": "high",
+     "effort": "S",
+     "evidence": "stage_run wipes the staging target unconditionally: `if staging_dir.exists(): shutil.rmtree(staging_dir)` (lines 145-146). The guard above (lines 129-139) only refuses a staging dir that equals/contains THIS run_dir, run_dir/final, or run_dir/audit. Any other existing directory — a sibling run under outputs/sdf/runs/, or any user directory — passes the guard and is recursively deleted. The guard's own comment acknowledges mistyped --staging-dir as the threat model (\"an easy typo, since those are real, well-known subdirectory names\"), and tests (test_publish_hf.py:218-249) only cover the three self-overlap cases. Note --dry-run runs the same stage_run wipe, so the \"no Hub API calls\" safety promise does not extend to local disk.",
+     "failure_scenario": "Operator publishes run A and tab-completes the wrong path into --staging-dir: `python evals/publish_hf.py --input outputs/sdf/runs/2026-07-25_run-A --staging-dir outputs/sdf/runs/2026-07-20_local_full-scale`. The guard passes (run B is not run A), rmtree silently deletes run B — an uncommitted local_* full-scale run worth $50-500 of paid API calls — before any output appears. The same happens under --dry-run, which the user reasonably believes is side-effect-free.",
+     "recommendation": "Before rmtree, refuse any pre-existing non-empty --staging-dir that wasn't created by this tool: have stage_run drop a marker file (e.g. .publish_hf_staging) into every staging root it creates, and only rmtree a non-empty existing dir if the marker is present (or if its entries are limited to README.md/sdf/dad). Add regression tests mirroring test_staging_dir_equal_to_run_dir_is_rejected for a sibling run dir and an arbitrary populated dir.",
+     "instances": [
+      "evals/publish_hf.py:145-146 (unconditional rmtree)",
+      "evals/publish_hf.py:129-139 (guard limited to the input run's own paths)"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified evals/publish_hf.py at current main: the unconditional `shutil.rmtree(staging_dir)` is at lines 145-146, and the guard at lines 129-139 only rejects staging dirs that equal/contain run_dir, run_dir/final, or run_dir/audit — any other existing directory (including a sibling paid run) passes and is recursively deleted. The --dry-run claim holds: main() calls stage_run (line 604) before the dry-run branch (line 629), so a user-supplied --staging-dir is wiped even in dry-run mode despite the \"no Hub API calls made\" message. Tests at tests/test_publish_hf.py:218-249 cover only the three self-overlap rejection cases plus the containing-run_dir case; no test protects sibling directories, and the wipe-on-reuse behavior is asserted as intentional at lines 199-216. | Verified evals/publish_hf.py lines 129-146: the guard only refuses staging dirs that equal/contain run_dir, run_dir/final, or run_dir/audit, then rmtree unconditionally deletes any other pre-existing --staging-dir with no prompt. main() calls stage_run (line 604) before the --dry-run early return (line 629), so --dry-run with --staging-dir performs the same wipe (dry-run without --staging-dir uses a fresh mkdtemp and is safe — consistent with the scenario as stated). tests/test_publish_hf.py:218-249 covers only the self-overlap rejections plus a nested-allowed case; no test protects a sibling run directory. Severity high is justified: uncommitted local_* full-scale runs are gitignored siblings under outputs/*/runs/, exactly the tab-completion-adjacent targets, and the guard's own comment names mistyped paths as the threat model."
+    },
+    {
+     "title": "Re-publish with an existing --tag silently leaves the tag on the old commit while printing success",
+     "file": "evals/publish_hf.py",
+     "line": 558,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "_create_tag passes exist_ok=True (line 558) so \"a retried publish with the same --tag (e.g. after fixing a typo'd --input) must not die here\". I verified installed huggingface_hub 1.25.1: create_tag with exist_ok=True swallows the 409 and does NOT move the existing tag. main() then prints `Tag: {args.tag}` (line 690) unconditionally. The comment's own motivating scenario — first publish completed with a typo'd --input, then re-published corrected with the same tag — is exactly the case where the tag was already created on the bad commit and now silently stays there.",
+     "failure_scenario": "Publish run A with --tag sdf-v1-fullscale (tag lands on commit A, wrong data). Fix --input, republish with the same tag: the corrected corpus uploads as commit B, create_tag 409s and is swallowed, the script prints \"Tag: sdf-v1-fullscale\" as if applied. Anyone loading the dataset with revision=\"sdf-v1-fullscale\" — e.g. the frontier lab pinning the delivered snapshot — gets the typo'd run's data forever, with the script's own output claiming otherwise.",
+     "recommendation": "In _create_tag, catch the exists case explicitly (or pre-check via list_repo_refs): if the tag already exists, compare its target commit to the just-created upload commit; if they differ, print a loud warning telling the operator to delete_tag and re-tag (or offer a --retag flag that does delete_tag + create_tag). Never print \"Tag: X\" when the tag was not actually moved to this commit.",
+     "instances": [
+      "evals/publish_hf.py:553-558",
+      "evals/publish_hf.py:685-690 (unconditional success print)"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified evals/publish_hf.py at current checkout: line 558 passes exist_ok=True in _create_tag, and main() prints \"Tag: {args.tag}\" at line 690 whenever --tag is given, with no existence check or tag move. Verified installed huggingface_hub 1.25.1 source (hf_api.py:7120-7125): create_tag swallows a 409 when exist_ok=True and never relocates an existing tag, and _create_tag passes no revision anyway. So a same-tag republish after a bad first publish leaves the tag on the old commit while the script reports success — exactly the finding's failure scenario. Cited lines and both claimed instances (553-558, 685-690) are accurate."
+    },
+    {
+     "title": "Publish correctness depends on upload_folder's add-wins-over-delete precedence under a floor-only huggingface_hub pin",
+     "file": "evals/publish_hf.py",
+     "line": 682,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "delete_patterns [f\"{pipeline_tag}/audit/*\", f\"{pipeline_tag}/card_meta.json\"] (lines 682-683) match the very files being freshly staged in the same commit — every publish uploads sdf/audit/*.json while also listing sdf/audit/* for deletion. The comment (lines 679-681) says this is \"Safe... because upload_folder drops any deletion whose path is also being added\", \"verified against the installed huggingface_hub\" — but requirements.txt:14 pins only `huggingface_hub>=0.25` (installed: 1.25.1; the floor spans a full major-version range), and no test or runtime check can verify the real library's precedence (stub_hf replaces the wrapper entirely).",
+     "failure_scenario": "A contributor or CI environment resolves a huggingface_hub version whose delete/add precedence differs (or a future release changes it): every publish then uploads and immediately deletes its own audit files and card_meta.json, publishing the corpus with the quality-evidence directory silently missing from the public dataset — exactly the misstated-evidence failure the card exists to prevent.",
+     "recommendation": "Pin a tested version range for huggingface_hub in requirements.txt (e.g. >=1.0,<2), and add a cheap post-publish verification in main(): call _list_repo_files after upload and assert every staged path (relative to staging_dir) is present, failing loudly if any staged file is missing from the commit.",
+     "instances": [
+      "evals/publish_hf.py:674-683",
+      "requirements.txt:14"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Card lists per-stage model overrides as a nameless de-duplicated set, losing which stage each model ran",
+     "file": "evals/publish_hf.py",
+     "line": 304,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "models_used collects `sorted({v for k, v in ... if k.endswith(\"_model\") ...})` (lines 304-307) — the knob names (k) are discarded and values de-duplicated — and _dataset_section renders \"- **per-stage models**: `m1`, `m2`\" (lines 337-338). CLAUDE.md's rationale for this feature is provenance accuracy (\"the per-stage *_model knobs... are what actually generated the records\"), but the rendered card cannot distinguish a model that did the alignment-critical layer-4 rewrite from one that only did layer-5 scoring.",
+     "failure_scenario": "A run with sdf.draft_model=claude-haiku-4-5 and sdf.score_model=claude-opus-5 (Opus only judging, never generating) renders \"per-stage models: claude-haiku-4-5, claude-opus-5\" — a lab reader reasonably concludes Opus generated content when it only scored it; the converse misreading (assuming the cheap model wrote the corpus) is equally available. The provenance claim the card was built to make is ambiguous exactly where it matters.",
+     "recommendation": "Render knob->model pairs instead of a value set: change models_used to return sorted (knob, model) tuples for overrides differing from the default, and render e.g. \"- **per-stage models**: `rewrite_model: claude-opus-5`, `score_model: claude-opus-5`\". Update test_card_surfaces_per_stage_model_overrides and TestModelsUsed accordingly.",
+     "instances": [
+      "evals/publish_hf.py:304-307",
+      "evals/publish_hf.py:337-338"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "DAD language metadata hardcoded to [\"en\"], ignoring the run's language_distribution in the staged manifest",
+     "file": "evals/publish_hf.py",
+     "line": 275,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "detected_languages returns [\"en\"] for any non-sdf pipeline (lines 275-276). The docstring justifies this by the dad language_distribution DEFAULT being English-only, but config.yaml:95 shows language_distribution is a real knob (currently `en: 1.0`), and the run's full config snapshot — including that knob — is already staged in run_manifest.json right next to where detected_languages reads audit_report.json. The measured/declared truth is available and unread.",
+     "failure_scenario": "A future DAD run sets language_distribution to e.g. {en: 0.5, es: 0.5}; publishing it declares language: [en] in the card frontmatter. Hub language filtering, the dataset viewer, and anyone relying on the card's metadata misdescribe a half-Spanish corpus as English-only — on a card whose stated design is 'built entirely from measured fields'.",
+     "recommendation": "In detected_languages, for the dad pipeline read the staged run_manifest.json's config.language_distribution (keys with weight > 0, mapped through the existing LANGUAGE_CODES-style codes — dad's keys are already ISO codes) and fall back to [\"en\"] only when absent. Add a test with a multilingual language_distribution manifest.",
+     "instances": [
+      "evals/publish_hf.py:275-276",
+      "config.yaml:95-96"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Untested 3% is the three Hub-API wrapper bodies whose hardcoded kwargs are safety-relevant",
+     "file": "evals/publish_hf.py",
+     "line": 426,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "Coverage misses lines 427-428 (_create_repo body), 447-448 (_list_repo_files), 452-453 (_download_file), and 694 (__main__ guard). The stub_hf fixture (tests/conftest.py:249-309) replaces all five wrappers at the module boundary, so end-to-end tests never execute these bodies; TestHubApiWrappers (test_publish_hf.py:596-635) gives _upload_folder and _create_tag direct fake-HfApi tests asserting their kwargs (exist_ok=True, delete_patterns forwarding), but the other three wrappers have no such tests — their repo_type=\"dataset\", exist_ok=True, and local_dir kwargs are never asserted anywhere.",
+     "failure_scenario": "A refactor drops repo_type=\"dataset\" from _create_repo: the full offline suite stays green, and the next real publish creates a MODEL repo named animal-welfare-mid-training-datasets (or crashes on a second publish if exist_ok is lost). Same class of silent drift for _list_repo_files/_download_file kwargs, on which sibling preservation depends.",
+     "recommendation": "Add three tests to TestHubApiWrappers mirroring test_create_tag_passes_exist_ok: monkeypatch huggingface_hub.HfApi with a recording fake and assert _create_repo passes repo_type=\"dataset\"/exist_ok=True, _list_repo_files passes repo_type=\"dataset\", and _download_file passes repo_type=\"dataset\" and forwards local_dir. This closes the meaningful part of the 3% (line 694 is the __main__ guard and fine to leave).",
+     "instances": [
+      "evals/publish_hf.py:426-428",
+      "evals/publish_hf.py:446-448",
+      "evals/publish_hf.py:451-456",
+      "tests/conftest.py:249-309 (stub replaces wrappers wholesale)"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "No pre-publish sanity interlocks: dev/dirty/empty runs publish to the canonical public repo without warning",
+     "file": "evals/publish_hf.py",
+     "line": 582,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "main() (line 582 onward) accepts any run dir with a final corpus: nothing inspects the staged manifest's label (e.g. `dev`, `local_*`), git_dirty (create_run_dir records both — shared/utils.py:348-358), or n_docs==0 (an interrupted run can leave an empty final corpus; stage_run happily reports 0 and the card just omits the count line at 322-324). CLAUDE.md line 61 carries the entire burden as policy: 'Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot.'",
+     "failure_scenario": "A human (or an agent that missed the CLAUDE.md banner) runs publish against outputs/sdf/latest, which points at yesterday's 5-doc claude_code smoke run: the canonical public dataset's sdf config is overwritten with 5 dev documents, its audit files cleared by delete_patterns, and only Hub git history can restore the prior snapshot. Zero output from the tool distinguishes this from an intended publish.",
+     "recommendation": "Add cheap interlocks in main() after staging: refuse n_docs==0 outright; print a prominent warning and require an explicit --allow-dev (or interactive confirmation) when the manifest label is dev/local_* or git_dirty is true. This turns the documented human-only policy into a mechanical backstop without blocking legitimate publishes.",
+     "instances": [
+      "evals/publish_hf.py:582-604",
+      "evals/publish_hf.py:322-324 (zero count silently omitted from card)"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "--dry-run preview omits the destructive half of the publish (delete_patterns, tag, commit message)",
+     "file": "evals/publish_hf.py",
+     "line": 629,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "The dry-run branch (lines 629-641) prints the staged files, the card, and the documented sibling-blindness note, but never shows the delete_patterns that a real publish would send (lines 682-683), the tag it would create, or the commit message. The sibling-blindness gap is documented; these are the remaining fidelity gaps between preview and real publish beyond network access.",
+     "failure_scenario": "An operator uses --dry-run to review exactly what a publish will do before touching the canonical repo, sees only additions, and is surprised that the real publish also deletes <pipeline>/audit/* and <pipeline>/card_meta.json on the Hub (e.g. removing a hand-uploaded audit file they expected to keep), or that their un-prefixed --tag lands repo-wide.",
+     "recommendation": "In the dry-run branch, print the exact upload_folder arguments a real publish would use: repo_id, commit message, delete_patterns list, and the --tag (with the repo-wide-tag caveat). Two print statements; extend test_dry_run_makes_no_hub_calls to assert they appear.",
+     "instances": [
+      "evals/publish_hf.py:629-641"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "mypy noise from variable shadowing and context-manager union in publish_hf.py",
+     "file": "evals/publish_hf.py",
+     "line": 174,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "Three of the module's four mypy errors come from reusing `f` at line 174 (`for f in sorted(audit_src.glob(pattern))`) after `with open(...) as f:` at line 158 bound it as a TextIOWrapper; the fourth is staging_ctx being assigned both nullcontext and TemporaryDirectory (lines 592-598). All are false alarms behaviorally, but they mask real errors in the mypy report for the delivery-critical module.",
+     "failure_scenario": "Concrete maintenance cost only: a contributor running mypy on the publishing path sees four pre-existing errors and learns to ignore the file's type output, so a future genuine type error (e.g. a Path/str mix in a Hub call) scrolls past unnoticed.",
+     "recommendation": "Rename the loop variable at line 174 (e.g. `src`) and annotate staging_ctx as contextlib.AbstractContextManager[str] (or restructure with a single exit-stack). Zero behavior change; clears all four mypy errors in the file.",
+     "instances": [
+      "evals/publish_hf.py:158 vs 174 (f shadowing)",
+      "evals/publish_hf.py:592-598 (staging_ctx union)"
+     ],
+     "dimension": "publish-hf",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "shared-infra",
+   "summary": "The shared infrastructure has grown substantially since July and is in good shape overall. (a) Backend parity: the bedrock leg reuses the api code path (same retry classification via anthropic exception types, max_tokens enforced, model ids translated only at the wire, unsupported models fail loudly) and is test-covered; pricing constants in _PRICING were verified against current published rates (Opus 5 $5/$25, Fable $10/$50, Haiku $1/$5) and the prompt-cache multipliers (1.25x write / 0.1x read) are correct, as is the temperature-rejection gate for the Claude 5 family / Opus 4.7+. (b) The auto backend's empty-system api-leg rule is correctly implemented (`use_cc = _cc_demoted is None and bool(full_system)`), demotion is loud, sticky, re-serves the failed call, never triggers on per-item refusals, and every cost record names the effective backend — all pinned by tests. (c) Thread-safety under parallel_map is handled: cost-log appends are lock-serialized, attempt counters are thread-local, and the remaining warn-flag/demotion races are benign duplicates. (e) July's positive claims still hold: parallel_map keeps its in-order, main-thread-writes contract, and cost logs are per-run (each run.py passes run_dir/cost_log.jsonl) with stage/item_id/backend tags. (f) The vendored 1.68MB cl100k_base blob is keyed by tiktoken's own sha1 cache name, wired via TIKTOKEN_CACHE_DIR setdefault, and the offline-tests guarantee holds (token-boundary tests run under pytest-socket in the required smoke check). The real residual risks are at the seams: the subscription path deliberately doesn't enforce max_tokens, and the DAD/pref truncation gates are fail-open equality checks that only work on the api backend's stop_reason vocabulary (SDF's gates are fail-closed and correct); the Gemini embeddings leg trusts response alignment with no length check while the embedding cache makes any misalignment permanent; and token-level truncation of embedding inputs is silent, so a diversity report can understate how much text its metrics actually saw.",
+   "findings": [
+    {
+     "title": "DAD/pref truncation gates fail open on subscription-served (claude_code/auto) calls",
+     "file": "shared/api.py",
+     "line": 585,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "call_claude's docstring states max_tokens is \"Enforced on the api backend only — Claude Code applies its own output cap\"; the claude_code leg returns whatever stop_reason the CLI's ResultMessage carries (claude_agent_sdk types.py declares `stop_reason: str | None = None`) and api.py:677 only WARNS on non-end_turn values. The DAD and pref gates test equality with one value: dad_pipeline/baseline.py:64 `if not response or stop_reason == \"max_tokens\"`, dad_pipeline/step2_responses.py:407, dad_pipeline/step3_rewrite.py:91, pref_pipeline/run.py:166, dad_pipeline/step1_dilemmas.py:371/688. By contrast every SDF layer gates fail-closed: sdf_pipeline/layer3_draft.py:84 `if stop != \"end_turn\"`.",
+     "failure_scenario": "A dev run on backend claude_code (the documented default for dev runs) has a response truncated by the CLI's own output cap, and the CLI reports stop_reason as None or a value other than 'max_tokens' (the field is Optional and CLI-version-dependent). The truncated text is not caught by `stop_reason == \"max_tokens\"`, passes the non-empty check, is checkpointed as a completed DAD training record, and --resume never retries it — a mid-sentence assistant reply lands in dad_corpus.jsonl with only a stderr warning scrolled past. The same records survive step 3 because its gate has the same shape.",
+     "recommendation": "Normalize the gate to fail-closed like the SDF layers: in each DAD/pref call site replace `stop_reason == \"max_tokens\"` rejection with acceptance-only-on `stop_reason in (\"end_turn\", \"stop_sequence\")` (refusal is already surfaced as 'refusal' and empty text). Alternatively, normalize inside call_claude: map any claude_code stop_reason outside the known api vocabulary to a sentinel the callers already reject. Add one test driving a DAD step through stub_claude returning stop_reason=None to pin the behavior.",
+     "instances": [
+      "dad_pipeline/baseline.py:64",
+      "dad_pipeline/step2_responses.py:306",
+      "dad_pipeline/step2_responses.py:407",
+      "dad_pipeline/step3_rewrite.py:91",
+      "dad_pipeline/step1_dilemmas.py:371",
+      "dad_pipeline/step1_dilemmas.py:688",
+      "pref_pipeline/run.py:166"
+     ],
+     "dimension": "shared-infra",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified every cited line: api.py:583-586 docstring matches the quote, api.py:543 returns the SDK ResultMessage stop_reason unchanged (declared `str | None = None` in claude_agent_sdk/types.py:1034/1209), and api.py:677 only warns on non-end_turn/stop_sequence values before returning the text. All seven DAD/pref gates test `stop_reason == \"max_tokens\"` exactly as cited, while SDF layers (layer12_plan.py:84, layer3_draft.py:84, layer4_rewrite.py:76) gate `stop != \"end_turn\"` fail-closed; step2_responses.py:407 and step3_rewrite.py:91 accept free prose with no structural check, and checkpoint.mark_done (step3_rewrite.py:123) makes the truncated record permanent under --resume, so the scenario holds. Minor nuances that don't overturn it: step1_dilemmas' gates (371, 679/688) are backed by closed-tag parsing that usually catches truncation, and step2's scope gate (306) is followed by _valid_scope — the unmitigated path is exactly step2 drafts, step3 rewrites, baseline, and pref arms."
+    },
+    {
+     "title": "Gemini embeddings leg never validates vector count/order against the batch",
+     "file": "shared/embeddings.py",
+     "line": 201,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "`vectors = [e[\"values\"] for e in resp.json()[\"embeddings\"]]` returns whatever the batchEmbedContents response contains, with no check that len(vectors) == len(batch) and no per-item index to order by. The OpenAI leg is defensive (_openai_normalize sorts by d.index, embeddings.py:206-209, and has a test pinning it); the Gemini leg has nothing. Downstream, evals/diversity.py embed_with_cache (diversity.py:209-215) zips the returned vectors against the requested texts and persists them into embeddings_cache.npz keyed by sha256(model+text).",
+     "failure_scenario": "A Gemini response omits or reorders entries (partial failure, API contract change, or an error object in the embeddings array). zip() in embed_with_cache silently pairs vector k with text k anyway, every document after the gap gets its neighbor's embedding, and the misattributed vectors are written to the per-run embedding cache — so the delivered diversity_report.json names the wrong documents as near-duplicates, and reruns reuse the poisoned cache instead of correcting it.",
+     "recommendation": "In _gemini_transport, after parsing, raise (e.g. GeminiTransientError for a retry, or ValueError to fail loudly) when len(vectors) != len(batch) or when any entry lacks 'values'. Mirror the OpenAI-leg test with a stubbed short response asserting the loud failure.",
+     "dimension": "shared-infra",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified shared/embeddings.py:201 is exactly `vectors = [e[\"values\"] for e in resp.json()[\"embeddings\"]]` with no len(vectors)==len(batch) check, and Gemini batchEmbedContents entries carry no index; embed_texts just `rows.extend(vectors)` with no count check either. The OpenAI leg does sort by d.index (_openai_normalize, lines 206-209) and tests/test_embeddings.py:112 pins that ordering. Downstream, evals/diversity.py embed_with_cache (lines 209-215) zips idxs with vectors — zip truncates silently, so a gap shifts every later vector onto its neighbor's text — and persists misattributed vectors to audit/embeddings_cache.npz (keyed sha256(model+text), saved after every chunk before any consistency check), so reruns reuse the poisoned cache. Minor nuance not affecting the verdict: a pure omission would also leave the final missing key unpopulated, crashing np.stack (KeyError, diversity.py:218) on the first run — but the poisoned cache is already saved and the rerun then delivers the wrong report; a pure reorder is fully silent as claimed."
+    },
+    {
+     "title": "Token-level truncation of embedding inputs is silent and uncounted in the diversity report",
+     "file": "shared/embeddings.py",
+     "line": 300,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "embed_texts silently truncates every input to the model token window: `texts = [truncate_to_tokens(t, cap, model) for t in texts]` (cap = 8192 OpenAI / 2048 Gemini). The only caller, evals/diversity.py, counts truncation solely at the character level: `truncated = sum(1 for _, text, _ in sampled if len(text) > args.max_chars)` (diversity.py:552) and reports it as n_truncated (diversity.py:584-585). The boundary itself is correct and test-pinned (tests/test_embeddings.py TestTokenTruncation, offline via the vendored cl100k ranks), but no count of token-capped texts ever reaches the report. The docstring even acknowledges: \"Callers that care about how much was cut should truncate (and report) first\" — the caller doesn't.",
+     "failure_scenario": "A matrix-pipeline SDF run with native-script documents (the matrix cultures include Japan/China written in their languages — shared/entity_pools.py:101-122): a 7,000-char Japanese document is ~8.7k cl100k tokens, over the 8192 OpenAI window, and far over Gemini's 2048. Every such document is embedded as a prefix; n_truncated reports 0 because 7000 chars <= max_chars; the delivered diversity_report.json presents near-dup rates and Vendi scores computed on fractional documents with no disclosure. On a Gemini run (GEMINI_API_KEY only), even a typical ~4k-token English SDF doc is halved silently once max_chars is raised.",
+     "recommendation": "Make the truncation observable: either have embed_texts return/expose a count of token-capped inputs (or accept a callback), or have diversity.py pre-truncate with truncate_to_tokens and count how many texts changed, reporting a token_truncated row next to the char-level one. Add a warning when the resolved model is gemini-* and typical corpus documents exceed 2048 tokens.",
+     "dimension": "shared-infra",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "embed_texts silently truncates every input to the model token window at shared/embeddings.py:300 (cap = 8192 OpenAI / 2048 Gemini), and its docstring (lines 285-286) explicitly delegates reporting to callers. Its two callers are evals/diversity.py and evals/openings_dad.py:194 (embedding_report, which embeds first sentences too short for the cap to matter); the material caller, diversity.py, counts truncation solely at the character level (line 552, default --max-chars 7000) and reports it as \"truncated for embedding\" (lines 583-585) and n_truncated (line 752), so no count of token-capped texts ever reaches the report. Consequence as stated: a matrix-pipeline native-script (e.g. Japanese, ~1.25-1.5 cl100k tokens/char) document of 7,000 chars exceeds the 8192-token OpenAI window and is embedded as a prefix while n_truncated reports 0; on a GEMINI_API_KEY-only run (2048-token cap) the silent cut becomes severe once max_chars is raised.",
+     "verifier_notes": "Verified shared/embeddings.py:300 (silent token truncation, caps 8192/2048 at lines 58/76), the verbatim docstring at lines 285-286, diversity.py:552 char-only counting with default max_chars=7000, the CJK token math (backed by the code's own comments at embeddings.py:50-51 and diversity.py:525-527), native-script matrix cultures in entity_pools.py:96-121, the GEMINI_API_KEY-only default-model path (embeddings.py:104-107), and TestTokenTruncation at tests/test_embeddings.py:155. Two details are wrong: diversity.py is not the only caller of embed_texts (evals/openings_dad.py:194 also calls it, on first sentences where the cap is immaterial), and the n_truncated JSON key is at diversity.py:752 — lines 584-585 are the printed/report-section \"truncated for embedding\" entries. Core claim and failure scenario hold as stated."
+    },
+    {
+     "title": "Cost log prices claude-sonnet-5 at post-intro rates, overstating spend ~1.5x through 2026-08-31",
+     "file": "shared/api.py",
+     "line": 65,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "_PRICING has \"claude-sonnet-5\": (3.00, 15.00). Current published pricing carries an introductory rate of $2.00/$10.00 per MTok through 2026-08-31 (standard $3/$15 after). All other entries verified correct: opus-5 (5/25), fable-5 (10/50), haiku-4-5 (1/5), and the cache multipliers at _log_usage lines 245-250 (1.25x write, 0.1x read) match the published 5-minute-ephemeral rates.",
+     "failure_scenario": "Sonnet 5 is the global default model (config.yaml). Every per-stage cost breakdown, the viewer's run-list costs, and the ~$0.20-0.25/example DAD cost anchor cited in CLAUDE.md are computed at 1.5x the actual billed rate for the whole intro window — the exact period in which the pipeline is being delivered and its cost evidence quoted to the receiving lab.",
+     "recommendation": "Either update the sonnet-5 entry to the intro rates with a dated comment to flip back after 2026-08-31, or add a comment on the entry noting the known overstatement so cost figures quoted from the log are caveated. The existing 'console is the source of truth' comment does not name this model-specific skew.",
+     "dimension": "shared-infra",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "diversity.py --ideas report path has no end-to-end test",
+     "file": "evals/diversity.py",
+     "line": 701,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "Coverage shows evals/diversity.py lines 703-735 (the entire `if args.ideas:` block in main(): api.init, summary collection, second embedding pass through the shared cache, ideas_report assembly) unexercised. The helpers (idea_summaries, idea_text) have unit tests (tests/test_diversity_eval.py:341-352), but nothing drives main() with --ideas, unlike the well-tested non-ideas main flow (test_happy_path_writes_report_and_flags_duplicates etc.).",
+     "failure_scenario": "A regression in the ideas block — e.g. a key mismatch between the `summaries` dict and `s_ids`, or the ideas summaries colliding with document embeddings in the shared embeddings_cache.npz — ships silently; the idea-level near-dup verdict (one of the headline rows in the delivered diversity evidence) is produced by an untested path that combines two stubbed seams (call_claude + embed_texts) only ever tested separately.",
+     "recommendation": "Add one main()-level test that runs diversity.py with --ideas against a tiny corpus using stub_claude (dispatcher returning one-line summaries) and stub_embeddings, asserting ideas_report lands in diversity_report.json with the expected n/failures/over_* keys and that summary calls carry stage=eval_diversity_ideas.",
+     "dimension": "shared-infra",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  },
+  {
+   "dimension": "delivery-process",
+   "summary": "Delivery-readiness has improved substantially in substance but the process/tooling posture is unchanged since July, and a handful of doc/hygiene items would be the first things a receiving lab trips over. The good news first: CLAUDE.md is unusually well-maintained against the rebuilt architecture — I verified the auto-evals claim (config.yaml dad.evals.auto wired through dad_pipeline/run.py:35-68), the publish_hf delete_patterns scoping (publish_hf.py:682), the matrix config keys (config.yaml:30-32), INCOHERENT checkpointing (layer12_plan.py), and .env.example's existence; .gitattributes deliberately handles both committed runs and the vendored blob; and a scan of all 998 committed output files found no API keys, HF tokens, or emails. The bad news: (1) the toolchain gap is now bigger in absolute terms — 16.8k source LOC across 48 files with a 7-line pyproject.toml, no lockfile, no lint/format/type/coverage gate, CI still compileall+pytest, and today's mechanical run shows 140 ruff errors, 157 mypy errors, 64/71 files unformatted, 68% coverage with several shipping modules at 0%; (2) requirements drift is real (numpy imported in four source modules but undeclared; tqdm/jsonlines dead; seven deps fully unpinned) meaning the exact environment that generated the delivered corpora is unreproducible; (3) committed audit reports leak a contributor's macOS home path, and publish_hf.py uploads those same files verbatim to the public HF dataset; (4) CLAUDE.md's dad_segmented/ reference points at a directory that has never existed in git history — a trust-damaging error in the one file agents and lab engineers read first; (5) the README's setup clone URL still points at the pre-rename GitHub org (org renames don't redirect and the old name is squattable); and (6) open issue #53 asserts \"SDF is currently broken out-of-the-box on main\" against code that no longer exists. All but the tooling program are under-a-day fixes; I'd treat the path-leak scrub, the dad_segmented reconciliation, the org-URL fix, and closing #53 as pre-delivery blockers on effort-to-impact grounds.",
+   "findings": [
+    {
+     "title": "Toolchain gates still absent at 16.8k LOC: no lint/format/type/coverage gate, 7-line pyproject, CI is compileall+pytest",
+     "file": "pyproject.toml",
+     "line": 1,
+     "severity": "medium",
+     "effort": "L",
+     "evidence": "pyproject.toml is 7 lines of pytest config only — no [project] metadata, no [tool.ruff]/[tool.mypy]/[tool.coverage]. .github/workflows/ci.yml runs pip install -r requirements.txt, compileall, pytest — nothing else. Today's numbers on this checkout: 16,838 source LOC in 48 files (plus 10,149 test LOC in 23 files); ruff reports 140 errors (7 auto-fixable; dominated by C901/PLR complexity — e.g. step1_dilemmas.py run() at complexity 73, viewer/rendering.py render_prompt at 61); mypy reports 157 errors; the v2 mechanical run reports 64/71 files would be reformatted by ruff format; coverage is 68% overall with evals/score_sdf.py, evals/score_dad_parked.py, pref_pipeline/rate.py, viewer/app.py and all viewer/ui_pages at 0%. The claude-code-review.yml prompt (lines 89-95) asks only for bugs/security/CLAUDE.md violations — it still does not instruct the reviewer to enforce the repo's own written policies (tests required for new stages, 'How to test' PR section).",
+     "failure_scenario": "Concrete maintenance cost: every contribution from the non-engineer team re-litigates style and misses mechanical bugs CI could catch (ruff already flags two real B023 loop-variable-binding bugs in step1_dilemmas.py:872,925); a lab receiving the repo runs any standard toolchain, sees 140 lint errors, 157 type errors, and 90% of files unformatted, and has to discount the repo's engineering signal accordingly. The longer adoption waits, the worse the one-time diff: formatting now touches 64 files and will conflict with every in-flight branch.",
+     "recommendation": "Adopt in three separately-landable steps: (1) one mechanical `ruff format` commit across the repo plus a .git-blame-ignore-revs entry, then `ruff format --check` in ci.yml (half a day; coordinate a merge-freeze window with in-flight branches); (2) a curated `[tool.ruff.lint]` config that enables F, B, SIM, PLW and explicitly ignores the C901/PLR complexity family for now, fix the ~30 non-complexity findings, gate in CI (a day — prioritize the two B023 bugs); (3) treat mypy as a multi-day program adopted per-module starting with shared/, not a pre-delivery item. Also add one sentence to the claude-code-review.yml prompt requiring the reviewer to check the PR carries tests for new stages and a 'How to test' section.",
+     "instances": [
+      "pyproject.toml:1-7",
+      ".github/workflows/ci.yml:30-34 (compileall+pytest only)",
+      ".github/workflows/claude-code-review.yml:89-95 (no repo-policy enforcement block)",
+      "scratchpad ruff_findings_v2.txt: 140 errors",
+      "scratchpad mypy_findings_v2.txt: 157 errors",
+      "scratchpad coverage_report_v2.txt: TOTAL 68%, score_sdf.py/rate.py/viewer UI 0%"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "Toolchain gates are absent at 16.8k LOC: pyproject.toml is 7 lines of pytest config with no project metadata or lint/type/format/coverage config; CI (.github/workflows/ci.yml:30-34) runs only pip install, compileall, and pytest. On this checkout: 16,838 source LOC in 48 files (10,149 test LOC in 23 files); the audit's ruff run reports 140 errors (7 auto-fixable; dominated by complexity, e.g. step1_dilemmas.py run() C901=73, viewer/rendering.py render_prompt C901=61); mypy reports 157 errors; ruff format would reformat 64 of 71 tracked .py files; coverage is 68% with score_sdf.py, score_dad_parked.py, rate.py, viewer/app.py, and all viewer/ui_pages at 0%. The claude-code-review.yml prompt (lines 89-95) focuses on bugs/security/CLAUDE.md violations and contains no explicit block enforcing the repo's tests-required or 'How to test' PR policies (though generic CLAUDE.md-violation review is in scope). Correction: the two B023 flags at step1_dilemmas.py:872,925 are functional false positives (each closure is fully consumed within the same loop iteration before `drafted` is rebound), so they illustrate lint noise a gate would surface, not real bugs CI is currently missing.",
+     "verifier_notes": "Verified pyproject.toml (7 lines, pytest-only), ci.yml:30-34 (compileall+pytest only), exact LOC counts (16,838/48 source, 10,149/23 test), scratchpad tallies (ruff 140 errors/7 fixable incl. complexity 73/61, mypy 157, coverage 68% with the named 0% files), and independently reproduced the 64/71 ruff-format number. The one factual error: the two B023 flags at step1_dilemmas.py:872,925 are NOT real bugs — each closure capturing `drafted` is fully consumed by the zip/parallel_map loop within the same outer-loop iteration before `drafted` is rebound, so they are functional false positives. Also slightly overstated: the review prompt's CLAUDE.md-violations bullet (lines 92-93) nominally puts repo policies in scope, though no explicit tests-required/'How to test' enforcement block exists."
+    },
+    {
+     "title": "Requirements drift: numpy imported but undeclared, tqdm/jsonlines dead, seven deps unpinned, no lockfile",
+     "file": "requirements.txt",
+     "line": 6,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "numpy is imported directly in shared/textstats.py:21, shared/embeddings.py:31, evals/audit_dad.py:41, evals/diversity.py:59 (and tests/conftest.py:36) but does not appear in requirements.txt — it installs only as a transitive dependency of pandas/streamlit. shared/__init__.py's Python-floor comment even says 'matching numpy' for a dep the file never declares. tqdm (line 6) and jsonlines (line 7) are imported nowhere in the repo (verified by grep). pandas, pyyaml, python-dotenv, tqdm, jsonlines, tenacity, faker carry no version constraint at all; the rest are floors-only; there is no lockfile of any kind in the repo root.",
+     "failure_scenario": "A future pandas release that relaxes its numpy requirement, or a contributor slimming deps, silently breaks four modules including the diversity eval. More important for delivery: the exact dependency set that generated the shipped corpora is unreproducible — a lab re-running an audit with a different numpy/pandas/wordfreq resolution can get different near-dup/diversity numbers than the committed reports, with no way to tell whether the pipeline or the environment changed.",
+     "recommendation": "Add `numpy>=1.26` explicitly; delete tqdm and jsonlines; generate and commit a lock (uv `uv pip compile` or pip-tools `requirements.lock.txt`) from the floors file, and switch ci.yml to install from the lock so CI proves the pinned set. Record the lock hash in run_manifest.json if you want run-level reproducibility.",
+     "instances": [
+      "requirements.txt:6-7 (tqdm, jsonlines dead)",
+      "requirements.txt:3-5,8,10 (unpinned)",
+      "shared/textstats.py:21",
+      "shared/embeddings.py:31",
+      "evals/audit_dad.py:41",
+      "evals/diversity.py:59",
+      "shared/__init__.py MIN_PYTHON comment"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "All factual assertions verified against current main. numpy is imported at exactly the cited lines (shared/textstats.py:21, shared/embeddings.py:31, evals/audit_dad.py:41, evals/diversity.py:59, tests/conftest.py:36) and appears nowhere in requirements.txt, while shared/__init__.py:3 justifies MIN_PYTHON with \"numpy needs >=3.12\". grep finds zero imports of tqdm or jsonlines anywhere in the repo, yet they sit at requirements.txt:6-7; pandas, pyyaml, python-dotenv, tqdm, jsonlines, tenacity, faker (lines 3-8, 10) carry no version constraint, all others are floors-only, and no lockfile exists in the repo root (pyproject.toml contains only pytest config, no dependency section). The failure/reproducibility scenario follows directly from numpy being purely transitive and the dependency set being unresolvable to a fixed state."
+    },
+    {
+     "title": "Committed audit reports embed a contributor's home path; publish_hf.py uploads those files verbatim to the public HF dataset",
+     "file": "evals/diversity.py",
+     "line": 745,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "audit_dad.py:2919, diversity.py:745, and audit_sdf.py:561 all write `\"input\": str(args.input)` into their reports. Three committed files already carry `/Users/<contributor>/Documents/alignment-data-pipeline/...` (a contributor's macOS username and home layout), public on GitHub now: outputs/dad/runs/2026-07-19_18-11_smoke3-postmerge/audit/audit_report.json and diversity_report.json, and outputs/dad/runs/2026-07-20_20-51_bedrock-40/audit/diversity_report.json. evals/publish_hf.py:173-178 stages every audit/*.{json,jsonl,html} file verbatim (excluding only report_content.json), so publishing any such run puts the path on the public Hugging Face dataset. bedrock-40 is the newest committed DAD run — if it was the run behind the just-merged DAD config publish (PRs #105/#106), the path is already live on sentientfutures/animal-welfare-mid-training-datasets.",
+     "failure_scenario": "Any contributor who runs an audit (or whose auto-eval resolves an absolute run path) bakes their machine username into a report that the repo's conventions then commit and publish. The lab receiving the repo — and anyone browsing the public HF dataset — sees contributors' local usernames and directory structures; scrubbing after publication requires a force-push/re-upload and the git history keeps it forever.",
+     "recommendation": "Change all three writers to record a repo-relative or run-id-only value (`Path(args.input).name` or relpath against PIPELINE_OUTPUT_ROOT); add a belt-and-braces sanitizer in publish_hf.py stage_run that rewrites any `/Users/<contributor>` or `/home/<contributor>` prefix in staged JSON `input` fields; scrub the three committed files in a small PR; and check whether the published DAD config on the Hub carries the path — if so re-publish after the scrub.",
+     "instances": [
+      "evals/audit_dad.py:2919",
+      "evals/audit_sdf.py:561",
+      "evals/publish_hf.py:173-178 (verbatim staging)",
+      "outputs/dad/runs/2026-07-19_18-11_smoke3-postmerge/audit/audit_report.json",
+      "outputs/dad/runs/2026-07-19_18-11_smoke3-postmerge/audit/diversity_report.json",
+      "outputs/dad/runs/2026-07-20_20-51_bedrock-40/audit/diversity_report.json"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified all three code sites write \"input\": str(args.input) at exactly the cited lines (diversity.py:745, audit_dad.py:2919, audit_sdf.py:561), and publish_hf.py:173-178 stages audit/*.{json,jsonl,html} verbatim excluding only report_content.json. The three cited committed files are tracked on origin/main and contain /Users/<contributor>/Documents/alignment-data-pipeline/... ; unauthenticated GitHub API confirms the repo is public. Finding actually understates scope: run_manifest.json in two additional runs (2026-07-09_17-16_repair-retention-smoke3, 2026-07-10_17-41_sevenaxis-smoke3) also embeds the contributor path, and publish_hf.py:161-164 copies run_manifest.json verbatim as well. The HF-already-live claim is hedged (\"if\") and unverifiable from this sandbox but not load-bearing."
+    },
+    {
+     "title": "CLAUDE.md documents a dad_segmented/ pipeline that has never existed in git history",
+     "file": "CLAUDE.md",
+     "line": 19,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "CLAUDE.md:19 is a prominent call-out box: '`dad_segmented/` is an experimental, parked pipeline … See `dad_segmented/README.md`', and CLAUDE.md:166 lists it in the directory structure ('EXPERIMENTAL / PARKED sibling of dad_pipeline'). The directory is absent from the working tree at main (464c5bd), and `git log --all -- dad_segmented` returns zero commits — it never landed on any fetched ref, so this is not a deletion; the doc references work that was never pushed.",
+     "failure_scenario": "Every Claude session and every lab engineer reads CLAUDE.md first, is warned to ignore a pipeline that isn't there, and greps for dad_segmented/README.md to find nothing. Beyond the wasted time, a directory-structure listing that names a nonexistent module tells a reviewer the delivered docs were not verified against the delivered tree, discounting the (otherwise largely accurate) rest of the file.",
+     "recommendation": "Decide which side is wrong: if the segmented experiment lives on someone's unpushed branch, either push it or delete both CLAUDE.md references (lines 19 and 166) until it lands; if it was abandoned, delete the references. Add a pre-delivery doc check: grep every path mentioned in CLAUDE.md/README against `git ls-files`.",
+     "instances": [
+      "CLAUDE.md:19",
+      "CLAUDE.md:166"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Verified CLAUDE.md at checked-out commit 464c5bd: line 19 is the exact call-out box and line 166 the directory-structure entry, both as quoted. The dad_segmented/ directory is absent from the working tree and from the trees of 464c5bd and local main (7a6bd47), and `git log --all -- 'dad_segmented*'` returns zero commits on any fetched ref, so dad_segmented/README.md has never existed. Committed run manifests (outputs/dad/runs/2026-07-18_18-07_smoke10-main/run_manifest.json and three others) even list dad_segmented/, prompts/dad_segmented/, and tests/test_dad_segmented*.py as untracked-at-run-time files, confirming the work existed only locally and was never pushed."
+    },
+    {
+     "title": "README setup instructions still point at the pre-rename GitHub org (Mycelium-tools)",
+     "file": "README.md",
+     "line": 121,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "README.md:121: `git clone https://github.com/Mycelium-tools/alignment-data-pipeline.git`; git-workflow-guide.md:57 gives a PR-creation URL under the same old org. The repo now lives under sentfutures (HEAD is 'Merge pull request #106 from sentfutures/…'). GitHub does not redirect organization renames, and the vacated org name becomes claimable by anyone.",
+     "failure_scenario": "A lab engineer following the README's own setup section clones a URL that 404s today — or, if the abandoned org name is ever registered by a third party, clones someone else's repository, which is a textbook namesquatting supply-chain vector for a repo about to be handed to a frontier lab.",
+     "recommendation": "Update both URLs to the sentfutures org (or make them org-agnostic: 'clone your fork / this repo's URL'); grep the repo for 'Mycelium' before delivery and consider registering or archiving awareness of the old org name.",
+     "instances": [
+      "README.md:121",
+      "git-workflow-guide.md:57"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "README.md:121 and git-workflow-guide.md:57 still reference the old GitHub org (Mycelium-tools) although the repo's canonical home is now sentfutures/alignment-data-pipeline. However, the repo was transferred (not the org renamed): GitHub 301-redirects the old URL, git clone of the old URL works today and fetches the current HEAD, and the Mycelium-tools org still exists so its name is not claimable by third parties. The stale URLs should still be updated — the transfer redirect is fragile (it silently breaks if a same-named repo is ever created under the old org) — but the \"404s today / namesquattable vacated org\" scenario is wrong, and severity should be low rather than medium.",
+     "verifier_notes": "Verified both cited lines exist verbatim and that origin/HEAD point at sentfutures. Empirically refuted the failure scenario: git ls-remote on the Mycelium-tools URL succeeds (returns current HEAD 464c5bd) via GitHub's repository-transfer 301 redirect to repo id 1282690376 (= sentfutures/alignment-data-pipeline). The Mycelium-tools org still exists (id 260084359), so it is neither vacated nor claimable; the stale-doc claim holds but the mechanism and severity need correction."
+    },
+    {
+     "title": "README pipeline sections drifted from the rebuilt code: stale DAD sub-stage description and 30x-stale cost estimate",
+     "file": "README.md",
+     "line": 195,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "README.md:195 tells a first-time user the 6-document quick test 'costs roughly $0.05–0.15'; open issue #54 (filed against the sonnet-5 default) puts the real figure near $4 — ~30x — and the line is still unchanged on main. README.md:61 describes DAD step 1 as 1a/1b plus '1c (optional, on by default) reviews and rewrites each draft', but the current code has a mandatory 1c pass/fail gate (step1_dilemmas.py:408 gate_draft, with an explicit no-fallback prompt_gate_model at lines 778-781) and a separate 1d refine stage (step1_dilemmas.py:347 refine_draft) — matching CLAUDE.md:97/154, so the README describes a design two revisions old. Root-level config.sonnet-cli.yaml is referenced by neither README nor CLAUDE.md (only its own header comment explains it).",
+     "failure_scenario": "A contributor budgets a 'under a dollar' smoke test and spends $4-8; a lab engineer cross-reading README and CLAUDE.md finds them disagreeing about how many paid calls DAD step 1 makes per example (3 vs 4), and cannot tell which document reflects the code that produced the delivered corpora without reading the pipeline source.",
+     "recommendation": "Refresh README's quick-test cost from a recent cost_log.jsonl (closing issue #54), rewrite README.md:61's step-1 row to the 1a-1d structure (copy CLAUDE.md:154's wording), and add one line to README/CLAUDE.md explaining config.sonnet-cli.yaml's purpose or move it under a configs/ dir.",
+     "instances": [
+      "README.md:195 ($0.05–0.15 vs ~$4, tracked as open issue #54)",
+      "README.md:61 (1c described as optional refine; code has 1c gate + 1d refine)",
+      "config.sonnet-cli.yaml:1 (undocumented root config)"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED_WITH_CORRECTIONS",
+     "corrected_claim": "README pipeline sections drifted from the rebuilt code: README.md:195 still says a 6-document quick test \"costs roughly $0.05–0.15\" while open issue #54 measured ~$4.05 under the still-current claude-sonnet-5 default (~30x stale); README.md:61 describes DAD step 1 as 1a/1b plus \"1c (optional, on by default) reviews and rewrites each draft\", but the code has a 1c pass/fail gate (step1_dilemmas.py:408 gate_draft, optional but on by default via dad.dilemmas.gate — not mandatory — with an explicit no-fallback prompt_gate_model at lines 778-781) plus a separate 1d refine stage (line 347 refine_draft), matching CLAUDE.md's 1a–1d description (4 paid calls per example vs the README's 3); root-level config.sonnet-cli.yaml is referenced by neither README nor CLAUDE.md.",
+     "verifier_notes": "Verified README.md:195 and :61 verbatim on current main; gh confirms issue #54 is OPEN with a measured $4.05 vs the README's $0.05–0.15, and config.yaml still defaults to claude-sonnet-5 on the api backend. step1_dilemmas.py confirms gate_draft at 408, refine_draft at 347, and the no-fallback prompt_gate_model comment at 778-781; CLAUDE.md describes 1a–1d each as a paid call, so the 3-vs-4 cross-document disagreement in the scenario is real. config.sonnet-cli.yaml exists at root and grep finds no reference in README or CLAUDE.md. Sole correction: the 1c gate is not \"mandatory\" — it is optional and on by default (dad.dilemmas.gate, lines 519-523), the same optionality the README ascribes to its outdated 1c."
+    },
+    {
+     "title": "Open issue #53 claims 'SDF is currently broken out-of-the-box on main' against code deleted in the matrix rebuild",
+     "file": "sdf_pipeline/run.py",
+     "line": 4,
+     "severity": "medium",
+     "effort": "S",
+     "evidence": "Issue #53 (open, untouched since 2026-07-08) reports a crash in 'SDF Layer 1' generating document types, and its body states 'SDF is currently broken out-of-the-box on main'. sdf_pipeline/run.py:4-5 documents that layers 1-2 are now deterministic matrix composition plus one plan call per document (module layer12_plan.py); no layer1 module or 'Generating N document types' call exists anywhere in sdf_pipeline/ (verified by directory listing). Related staleness: issue #24 (MANTA CSV missing, docs claiming rows 0-99 imported) and issue #30 (README refresh) also predate the rebuild.",
+     "failure_scenario": "A lab doing due diligence skims the open-issue list — standard practice before accepting a codebase — and reads an open, un-rebutted claim that the flagship pipeline crashes with the default config. That materially misstates current quality: the crash path was deleted wholesale by the matrix rebuild, but nothing on the tracker says so.",
+     "recommendation": "Triage the open-issue list before delivery: close #53 with a comment pointing at the matrix rebuild (compose_prompts.py/layer12_plan.py) and noting the reported path no longer exists; re-verify #24 and #30 against current main and close or retitle them; fix #54 alongside the README cost line.",
+     "instances": [
+      "issue #53 (SDF Layer 1 truncation — module deleted)",
+      "issue #24 (MANTA CSV claim)",
+      "issue #30 (README refresh)",
+      "issue #54 (quick-test cost — see README finding)"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "CONFIRMED",
+     "verifier_notes": "Issue #53 is OPEN, last updated 2026-07-08, has zero comments (un-rebutted), and its body states verbatim \"SDF is currently broken out-of-the-box on `main`\", citing a crash in sdf_pipeline/layer1_document_types.py. That module was deleted by commit 18ede29 (\"Promote the matrix pipeline\", 2026-07-11); the current sdf_pipeline/ contains only layer12_plan.py plus layers 3-5, run.py:4-7 documents the deterministic matrix composition exactly as the finding claims, and no \"Generating N document types\" call exists anywhere in the package. The instance list also checks out: issues #24 (updated 2026-07-02), #30 (2026-07-02), and #54 (2026-07-08) are all open and predate the rebuild. The failure scenario stands — anyone skimming the open-issue tracker sees an uncorrected claim that the flagship pipeline crashes on the default path."
+    },
+    {
+     "title": "Vendored 1.68MB tiktoken BPE blob has no in-tree provenance, license, or refresh note",
+     "file": "vendor/tiktoken/9b5ad71b2ce5302211f9c61530b329a4922fc6a4",
+     "line": 1,
+     "severity": "low",
+     "effort": "S",
+     "evidence": "vendor/tiktoken/ contains a single 1,681,126-byte file named only by its cache hash (the cl100k_base BPE ranks). The rationale lives solely in shared/embeddings.py:60-67 (offline tests + fresh CI can't fetch the ranks). .gitattributes:10 correctly marks the path binary/linguist-vendored, but the vendor directory itself carries no README, no license attribution (the ranks ship from openai/tiktoken, MIT), no source URL, and no instructions for regenerating the file if the embedding model or encoding changes.",
+     "failure_scenario": "Concrete maintenance/delivery cost: a lab's third-party-code audit finds an opaque hash-named 1.6MB blob with no license or provenance and has to reverse-engineer it from a comment in a different module; a future contributor switching embedding models won't know how to produce the sibling cache file (the filename is the sha1 of tiktoken's download URL, which is nowhere written down).",
+     "recommendation": "Add vendor/tiktoken/README.md stating: what the file is (cl100k_base ranks), where it came from (openai/tiktoken's public blob URL), its license (MIT, with a copy of or pointer to the upstream LICENSE), why it's vendored (embeddings.py:60-67 rationale), and the one-liner to regenerate it (run tiktoken with TIKTOKEN_CACHE_DIR=vendor/tiktoken and copy the resulting cache file).",
+     "instances": [
+      "vendor/tiktoken/9b5ad71b2ce5302211f9c61530b329a4922fc6a4 (1,681,126 bytes)",
+      "shared/embeddings.py:60-67 (only documentation)",
+      ".gitattributes:10 (binary/linguist-vendored, correctly set)"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "UNVERIFIED"
+    },
+    {
+     "title": "Global outputs/cost_log.jsonl is a committed append-only file shared by all contributors",
+     "file": "outputs/cost_log.jsonl",
+     "line": 1,
+     "severity": "info",
+     "effort": "S",
+     "evidence": "outputs/cost_log.jsonl (403 lines) is tracked and has been appended to across 6 commits ('evals: commit al-gap-fixes diversity report + appended cost log'); every eval invocation on any contributor's machine appends to it (per CLAUDE.md:103, evals log to the global file). .gitattributes:6 marks it linguist-generated, so the tracking is deliberate. Otherwise the committed-outputs rescan came back clean: 998 tracked files under outputs/, no API keys, HF tokens, or email addresses found (the only leak is the home-path finding above).",
+     "failure_scenario": "Two contributors who run evals on different branches both append to the same file and produce a guaranteed same-file merge conflict on JSONL lines that carry no run attribution; over time the file grows unboundedly and its spend records can't be tied to the runs that incurred them.",
+     "recommendation": "Either stop tracking the global log (gitignore it like `latest`, keeping per-run cost logs as the committed record) or shard it per contributor/run (e.g. outputs/cost_logs/<user>.jsonl) so appends never collide; if keeping it, note the merge-conflict convention in CLAUDE.md.",
+     "instances": [
+      "outputs/cost_log.jsonl (403 lines, 6 commits of append history)",
+      ".gitattributes:6"
+     ],
+     "dimension": "delivery-process",
+     "verdict": "UNVERIFIED"
+    }
+   ]
+  }
+ ],
+ "verdict_counts": {
+  "CONFIRMED": 21,
+  "UNVERIFIED": 20,
+  "CONFIRMED_WITH_CORRECTIONS": 9
+ }
+}
