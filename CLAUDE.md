@@ -108,9 +108,9 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 REPO=sentientfutures/animal-welfare-training-dataset
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare midtraining datasets" --tag sdf-v1-<run-label>
+    --pretty-name "Animal-welfare training dataset" --tag sdf-v1-<run-label>
 python evals/publish_hf.py --input outputs/dad/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare midtraining datasets" --tag dad-v1-<run-label>
+    --pretty-name "Animal-welfare training dataset" --tag dad-v1-<run-label>
 ```
 
 ## Run Organization
