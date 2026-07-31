@@ -55,7 +55,7 @@ python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
 ```
 
-> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-mid-training-datasets` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-training-dataset` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
 
 That one repo holds **both** corpora as separate HF *configs* (each gets its own selector in the dataset viewer), staged under per-pipeline subdirectories — `sdf/` and `dad/`, each with its corpus jsonl, `run_manifest.json`, and `audit/`. Consequences worth knowing before running it:
 
@@ -73,12 +73,12 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 # runs whose real generation stages were all Opus). Requires a Hub token with
 # write access to the target repo/org, one time (`huggingface-cli login`, or
 # HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
-REPO=sentientfutures/animal-welfare-mid-training-datasets
+REPO=sentientfutures/animal-welfare-training-dataset
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare midtraining datasets" --tag sdf-v1-<run-label>
+    --pretty-name "Animal-welfare training dataset" --tag sdf-v1-<run-label>
 python evals/publish_hf.py --input outputs/dad/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare midtraining datasets" --tag dad-v1-<run-label>
+    --pretty-name "Animal-welfare training dataset" --tag dad-v1-<run-label>
 ```
 
 ## Run Organization

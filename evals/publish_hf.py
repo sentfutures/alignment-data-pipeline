@@ -46,7 +46,7 @@ Tags are repo-wide, so with more than one dataset in the repo they should be
 prefixed per pipeline (`sdf-v1-…`, `dad-v1-…`) to stay unambiguous.
 
 Usage:
-  REPO=sentientfutures/animal-welfare-mid-training-datasets
+  REPO=sentientfutures/animal-welfare-training-dataset
   python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
   python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
       --tag sdf-v1-fullscale-500-opus5
@@ -351,10 +351,14 @@ def detected_languages(dataset_dir: Path, pipeline_tag: str) -> list[str]:
     return codes or ["en"]
 
 
-PIPELINE_NAMES = {"sdf": "SDF corpus", "dad": "DAD corpus"}
+PIPELINE_NAMES = {"sdf": "Synthetic documents", "dad": "Difficult advice Q&A"}
 # What one record counts AS, per pipeline — SDF ships documents, DAD ships
 # chat examples. Used for the "N <unit>." line under each section heading.
 PIPELINE_UNITS = {"sdf": "documents", "dad": "chat examples"}
+# Human-readable HF dataset-viewer config names (the tab labels), decoupled
+# from the internal pipeline_tag used for staged directory paths, discovery
+# tags, and --tag prefixes — those stay "sdf"/"dad".
+CONFIG_LABELS = {"sdf": "synthetic documents", "dad": "difficult advice Q&A"}
 
 
 def models_used(manifest: dict, pipeline_tag: str) -> tuple[str | None, list[str]]:
@@ -386,7 +390,7 @@ def _dataset_section(ds: dict) -> list[str]:
     content = ds.get("content") or {}
 
     heading = content.get("title") or PIPELINE_NAMES.get(tag, f"{tag.upper()} corpus")
-    lines = ["", f"## {heading} (`{tag}` config)"]
+    lines = ["", f"## {heading} (`{CONFIG_LABELS.get(tag, tag)}` config)"]
     if content.get("subtitle"):
         lines += ["", content["subtitle"]]
 
@@ -481,7 +485,7 @@ def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:
     configs = []
     for i, ds in enumerate(datasets):
         entry = {
-            "config_name": ds["pipeline"],
+            "config_name": CONFIG_LABELS.get(ds["pipeline"], ds["pipeline"]),
             "data_files": [
                 {"split": "train",
                  "path": f"{ds['pipeline']}/{ds['staged']['corpus_file']}"},
@@ -671,7 +675,7 @@ def main() -> None:
                              "publish as ONE combined corpus whose source_run "
                              "column names each row's run; SDF takes exactly one.")
     parser.add_argument("--repo-id", required=True,
-                        help="e.g. sentientfutures/animal-welfare-mid-training-datasets")
+                        help="e.g. sentientfutures/animal-welfare-training-dataset")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
     parser.add_argument("--tag", default=None,
                         help="Tag to create on the upload commit. Tags are repo-wide, so "

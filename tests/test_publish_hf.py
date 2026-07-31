@@ -397,7 +397,7 @@ class TestCombinedPublish:
         assert "dad/audit/2026-07-29_23-58_archetype1000/" in card
         # the frontmatter still declares exactly one dad config
         fm = yaml.safe_load(card.split("---")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
 
     def test_single_run_layout_is_unchanged(self, tmp_path):
         """One --input keeps the original shape: top-level run_manifest.json,
@@ -543,7 +543,7 @@ class TestBuildCard:
         # own pretty_name is the repo-level name, not one dataset's title
         assert "pretty_name: test-datasets" in card
         assert "# test-datasets" in card
-        assert "## SDF corpus audit — 477 documents (`sdf` config)" in card
+        assert "## SDF corpus audit — 477 documents (`synthetic documents` config)" in card
         assert "A test subtitle." in card
         assert "license: cc-by-4.0" in card
         # config paths are subdir-qualified now
@@ -570,7 +570,7 @@ class TestBuildCard:
                                             manifest=None)
         staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
         card = _one_card(dataset_dir, staged, content=None)
-        assert "## SDF corpus (`sdf` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
 
     def test_includes_provenance_from_manifest(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
@@ -676,7 +676,7 @@ class TestModelsUsed:
         assert [(l, v) for l, v, _ in rows] == [("Examples (offline audit)", "40")]
         card = _one_card(dataset_dir, staged)
         assert "40 chat examples." in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
 
 
 class TestMultiDatasetCard:
@@ -699,7 +699,7 @@ class TestMultiDatasetCard:
     def test_declares_both_configs_with_sdf_default(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         assert fm["configs"][1]["data_files"][0]["path"] == "dad/dad_corpus.jsonl"
         # only the first entry is the viewer's default
@@ -736,11 +736,11 @@ class TestMultiDatasetCard:
 
     def test_both_sections_present_with_own_provenance(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        assert "## SDF corpus (`sdf` config)" in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
         assert "3 documents." in card       # sdf fixture default docs=3
         assert "40 chat examples." in card
-        assert card.index("`sdf` config") < card.index("`dad` config")
+        assert card.index("`synthetic documents` config") < card.index("`difficult advice Q&A` config")
 
 
 class TestHubApiWrappers:
@@ -929,17 +929,17 @@ class TestMainEndToEnd:
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         assert (staging_dir / "dad" / "dad_corpus.jsonl").exists()
-        assert "## DAD corpus (`dad` config)" in (staging_dir / "README.md").read_text()
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in (staging_dir / "README.md").read_text()
 
     def test_pretty_name_defaults_to_repo_id_last_segment(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir),
-                  "--repo-id", "sentientfutures/animal-welfare-mid-training-datasets",
+                  "--repo-id", "sentientfutures/animal-welfare-training-dataset",
                   "--staging-dir", str(staging_dir))
         card = (staging_dir / "README.md").read_text()
-        assert "pretty_name: animal-welfare-mid-training-datasets" in card
+        assert "pretty_name: animal-welfare-training-dataset" in card
 
     def test_explicit_pretty_name_wins(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
@@ -982,13 +982,13 @@ class TestSiblingPreservation:
     def test_dad_publish_keeps_sdf_config_and_section(self, tmp_path, monkeypatch, stub_hf):
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         # sdf keeps default even though dad is the one being published
         assert fm["configs"][0].get("default") is True
         # curated heading restored from the card_meta.json sidecar
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
         # sdf's own measured numbers, read from its Hub-side audit files
         assert "477 documents." in card
         assert "40 chat examples." in card
@@ -1014,7 +1014,7 @@ class TestSiblingPreservation:
         title and subtitle were unrecoverable and its section silently
         downgraded to the generic 'SDF corpus' every time DAD was published."""
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
         assert REPORT_CONTENT["subtitle"] in card
 
     def test_sibling_without_card_meta_falls_back_to_generic_heading(
@@ -1024,7 +1024,7 @@ class TestSiblingPreservation:
         it must still render, just with the generic heading."""
         files = {k: v for k, v in SIBLING_SDF_FILES.items() if k != "sdf/card_meta.json"}
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, files)
-        assert "## SDF corpus (`sdf` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
 
     def test_card_meta_sidecar_is_written_for_the_published_pipeline(
         self, tmp_path, monkeypatch, stub_hf
@@ -1069,9 +1069,9 @@ class TestSiblingPreservation:
         must still be valid rather than declaring a config for missing data."""
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, {})
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
         assert fm["configs"][0].get("default") is True
-        assert "## SDF corpus" not in card
+        assert "## Synthetic documents" not in card
 
     def test_sibling_download_failure_keeps_config_and_does_not_abort(
         self, tmp_path, monkeypatch, stub_hf, capsys
@@ -1109,10 +1109,10 @@ class TestSiblingPreservation:
         card = (staging_dir / "README.md").read_text()
         fm = yaml.safe_load(card.split("---\n")[1])
         # sdf's config entry survives — that's what keeps its data loadable
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         # card_meta.json downloaded fine, so the curated heading survives
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
         # the metrics row sourced from the file that failed is gone...
         assert "Documents (offline audit)" not in card
         # ...the file that DID download still contributes its row...
@@ -1141,7 +1141,7 @@ class TestSiblingPreservation:
         assert any(c["fn"] == "upload_folder" for c in calls)
         card = (staging_dir / "README.md").read_text()
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
 
     def test_sibling_dir_without_a_corpus_is_skipped(self, tmp_path, monkeypatch, stub_hf):
         """A partial sibling dir with metadata but no corpus can't be declared
@@ -1151,4 +1151,4 @@ class TestSiblingPreservation:
             {"sdf/run_manifest.json": MANIFEST, "sdf/audit/audit_report.json": AUDIT_REPORT},
         )
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
