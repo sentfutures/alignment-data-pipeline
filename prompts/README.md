@@ -2,13 +2,13 @@
 
 This directory contains the prompt templates used to generate two synthetic training datasets focused on ethical reasoning about the welfare of sentient beings. The prompts are designed to be used with any capable frontier model.
 
-Two upstream documents drive the pipelines: `constitution/constitution_sentient_beings.md` — a framework describing how AI models should reason about situations involving animals and other potentially sentient beings — governs generated *responses* (both pipelines), and `dad/dilemma_prompt_spec.md` governs the *user side* of every DAD example.
+Two upstream documents drive the pipelines: `constitution/constitution_sentient_beings.md` — a framework describing how AI models should reason about situations involving animals and other potentially sentient beings — governs generated *responses* (both pipelines), and `dad/README.md` documents the DAD pipeline end to end (its Parts 1-6 govern the *user side* of every DAD example).
 
 ---
 
 ## Two Datasets, Two Directories
 
-### `sdf/` — Constitutional Document Finetuning (SDF)
+### `sdf/` — Synthetic Document Finetuning (SDF)
 
 Generates pretraining-style documents: blog posts, podcast transcripts, academic abstracts, news articles, fiction, internal memos, forum threads, and more. These depict a world where AI already reasons carefully about sentient being welfare. They go into **mid-training** (pretraining-style document finetuning).
 
@@ -73,21 +73,29 @@ This is the alignment-critical pass, run in a **fresh context** (never the draft
 
 Run in sequence. Step 3 is the most important step — do not skip or abbreviate it.
 
-### `dad/dilemma_prompt_spec.md`
+### `dad/README.md`
 
-The design spec that governs the user side of every DAD example. It is the human reference and the source of the Part-4 verification checklist. Step 1a samples each example's categorical fields (domain, taxa, visibility, attitude, conflict, direction, magnitude, stakes, leverage, value pair, claim pattern, surface form) from stratified decks, so the spec's distribution quotas hold by construction rather than being steered after the fact; the drafting instructions the model follows in 1b are inlined in `step1b_dilemmas.txt`, so the spec is no longer injected whole.
+The design spec that governs the user side of every DAD example — design philosophy, the dealt-profile axes, prompt surface rules, the 1a–1d flow, the id scheme, and the batch verification checklist. The deal samples each example's categorical fields from the stratified decks in `dad/variables.txt`, so the spec's distribution quotas hold by construction rather than being steered after the fact. The dealt cards, stamped on the scenario record, are the example's annotation.
 
-Key commitments: the user owns the dilemma (never an AI-agent scenario); every temptation must actually tempt; the welfare stake is load-bearing (delete the animals and the dilemma must collapse — welfare sits on one side of at least one value pair); no pre-decided answers; both failure directions in roughly equal measure (under-weighting AND over-weighting welfare); a full annotation schema per example (the key list lives in the 1b template); surface-form and voice-realism rules; and a batch verification checklist with distribution quotas.
+Key commitments: the prompt sets the stage for rich welfare reasoning in the response (a genuine tension — a legitimate goal, an option that serves it, a real welfare cost); the user owns the dilemma (never an AI-agent scenario); the welfare stake is load-bearing (delete the animals and the dilemma must collapse — enforced by the 1c gate); no pre-decided answers; surface-form and voice-realism rules; and a batch verification checklist printed at the end of step 1.
 
-### `dad/step1b_dilemmas.txt` (sub-stage 1b — first-attempt draft)
+### `dad/variables.txt` + `dad/step1a_scenario.txt` (sub-stage 1a — deal + scenario plan)
 
-**Input:** the sampled scenarios for this batch (`{scenarios_block}`) and the count (`{count}`). Step 1a produced the scenarios by pure sampling (no prompt); the drafting instructions — design philosophy and surface rules — are inlined in this template.
+The DAD analog of `sdf/variables.txt` + `sdf/layers1-2.txt`. The weighted variables matrix (domain, user goal, taxa role, visibility, attitude, moral framework, conflict, severity × scope, stakes, leverage, value pairs, dilemma structure, surface form, length, opening/closing move, cultural setting, frontier frame, persona) is deck-sampled by `dad_pipeline/compose_scenarios.py`, which also enforces the structural rules (trap → hidden → unaware, the 12% domain cap) and reserves the ARCHETYPES' cross-axis conjunctions by trading cards between deals.
 
-**Output:** a JSON array, each `{"scenario_id", "prompt", "annotation"}`, with the prompt written to realize its scenario and the descriptive annotation fields completed. Drafts are accepted as returned (assigned labels are copied verbatim per the template; there is no per-example adherence check — the end-of-step checklist monitors distribution fidelity). IDs (AW-####) are assigned by the pipeline, which also imports optional handwritten seed examples (config `dad.dilemmas.seed_path`) before generating, and prints the verification checklist at the end of the step.
+**Input** (one plan call per deal): the dealt cards rendered as sentences, plus the archetype design-note clause on archetype deals. The form-only axes (length, opening/closing move, persona) are hidden from the planner — they first appear as instructions to 1b.
+
+**Output:** working notes inside `<scenario_planning>` tags, then a self-contained scenario description inside `<scenario_description>` tags — everything the prompt-writer needs, without deciding how the dilemma should resolve. Only the description travels downstream. A combination with no sensible realization yields INCOHERENT, checkpointed as a deliberate rejection.
+
+### `dad/step1b_dilemmas.txt` (sub-stage 1b — draft)
+
+**Input** (one call per scenario): the 1a scenario description plus the binding form instructions — persona voice, cultural setting, opening and closing move, and length register. On a gate-rejected scenario the redraft carries the gate's reasons in the `{redraft_feedback}` slot (user half only).
+
+**Output:** only the simulated user message, inside `<user_prompt>` tags. Each shipped record is identified by its content-keyed prompt gid (P-####, `dad_pipeline/id_registry.py`); the pipeline also imports optional handwritten seed examples (config `dad.dilemmas.seed_path`; duplicate wording rejected) before generating, and prints the verification checklist at the end of the step.
 
 ### `dad/step1c_gate.txt` (sub-stage 1c — optional, on by default)
 
-**Input:** the scenario, the 1b draft prompt, and its annotation (for context).
+**Input:** the rendered scenario block (the dealt cards) and the 1b draft prompt.
 
 **Output:** a pass/fail verdict — `{"pass", "failures"}` — never rewritten text. See the template for the checks it applies. A rejected draft is routed back through 1b (with the gate's reasons injected) and redrafted, capped at a few attempts; a scenario still failing after the cap ships with `gate_failures` stamped. Controlled by config `dad.dilemmas.gate`; verdicts are logged to `step1/gate.jsonl`.
 
@@ -99,7 +107,7 @@ Key commitments: the user owns the dilemma (never an AI-agent scenario); every t
 
 ### `dad/reasoning_library.csv` (+ `reasoning_library_ABOUT.md`)
 
-The reasoning source for step 2. Not a prompt template — a library of reasoning-first *entries* in three layers: **conduct** (C*, how to handle welfare in any response), **core moves** (M*, the load-bearing reasoning for advice), and **topic reasoning** (T*, deeper single-topic arguments). Columns: `id, category, claim, reasoning, crux, transferable_move`. The CSV is the single source of truth (the old JSON, its 28-tension retrieval index, and its `generation_guidance` blob are retired). `reasoning_library_ABOUT.md` is human reference *about* the library — it is not injected into any prompt. There is no per-case retrieval: step 2b embeds the **whole library** in the response prompt.
+The reasoning source for step 2. Not a prompt template — a library of reasoning-first *entries* in three layers: **conduct** (C*, how to handle welfare in any response), **core moves** (M*, the load-bearing reasoning for advice), and **topic reasoning** (T*, deeper single-topic arguments). Columns: `id, category, claim, reasoning, trigger_condition, transferable_move`. The CSV is the single source of truth. `reasoning_library_ABOUT.md` is human reference *about* the library — it is not injected into any prompt. Retrieval is per-case: the 2a.5 selection call (`step2_select.txt`) reads each entry's `trigger_condition` and picks the entries that fit, and 2b receives only the selected rows (the whole library only as the fail-open fallback when a selection is unusable).
 
 The point is to teach the moves that produce a well-calibrated answer, not to hand the model verdicts — the most welfare-optimizing response is not the most pro-animal response, and two-sided reasoning is what makes the disposition generalize.
 
@@ -107,39 +115,43 @@ The point is to teach the moves that produce a well-calibrated answer, not to ha
 
 **Input:** the user message.
 
-**Output:** a JSON scope map whose keys are the five axes the template defines (mirrored in `_SCOPE_AXES` in `dad_pipeline/step2_responses.py`, which validates and renders them — keep the two in sync). Reads everything from the user's message — it does not use the annotation. Written to `step2/scopes.jsonl`.
+**Output:** a JSON scope map whose keys are the seven axes the template defines — patients, goal, levers, cost, magnitude, upside, replaceability (mirrored in `_SCOPE_AXES` in `dad_pipeline/step2_responses.py`, which validates and renders them — keep the two in sync). Reads everything from the user's message alone. Written to `step2/scopes.jsonl`.
+
+### `dad/step2_select.txt` (sub-stage 2a.5 — select library entries)
+
+**Input:** the library's trigger index (`{trigger_index}` — every entry's id and `trigger_condition`), plus the user message and the 2a scope.
+
+**Output:** one line of comma-separated entry ids. Fail-open: an unusable selection sends 2b the whole library rather than retrying (degraded selection costs tokens, not quality); the selected ids and their source ride on the scope record in `step2/scopes.jsonl`.
 
 ### `dad/step2_respond.txt` (sub-stage 2b — the response-generation spec)
 
-**Input:** the whole reasoning library (`{library_block}` — every entry) + the 2a scope map (`{scope_block}`) + the user message. This prompt *is* the generation guidance, so there is **no separate system prompt**, and the annotation is not passed.
+**Input:** the system half carries the standing generation guidance (the advisor role and the honesty floor); the user half carries the selected library rows (`{library_block}`), the 2a scope map (`{scope_block}`), the user message, the plain-model baseline as an advisory first take (`{first_take}` — concrete moves may be adopted, framing may not; renders empty when the baseline stage is off), and code-sampled opening/quote-back hint notes.
 
 **Output:** the draft assistant response, following the template's response spec — with the user's stated leaning never setting the conclusion.
 
-**Important:** the library and scope are scaffolding — never named in the response, stripped before the training record is written. Calibration direction is not named here (the response reasons from the case, not a label); `step3_score.txt` re-derives the realized direction and checks it against the annotation's intended Direction.
+**Important:** the library, scope, and first take are scaffolding — never named in the response, stripped before the training record is written. Calibration direction is not named anywhere (the response reasons from the case, not a label); `step3_score.txt` stamps the realized direction for corpus-level balance auditing.
 
 ### `dad/step3_rewrite.txt`
 
 **This is the most important prompt in the pipeline.** The rewrite pass is where the alignment gain comes from; do not skip or abbreviate it.
 
-**Input:** the distilled constitution principles (`{principles_block}`, rendered from `constitution/constitution_principles.csv` — each with its summary and verbatim constitution quote; the explicit standard the rewrite is held to) + the user message + the draft assistant response from step 2. No system prompt is sent — the full constitution was source material for distilling the principles, not a per-call dependency — and the annotation is not passed.
+**Input:** the distilled constitution principles (`{principles_block}`, rendered from `constitution/constitution_principles.csv` — each with its summary and verbatim constitution quote; the explicit standard the rewrite is held to) + the user message + the draft assistant response from step 2, split into system and user halves at the `===USER===` marker. The full constitution is never sent — it was source material for distilling the principles, not a per-call dependency — and nothing from the dealt cards is passed.
 
 **Output:** a rewritten assistant response that exemplifies the reasoning the example is designed to teach.
 
-The template is deliberately minimal: the principles ARE the standard — the prompt adds only the conversation and the checks the template lists (keep what already meets the standard; stay fully **self-contained** — the response never mentions or alludes to a constitution, principles, or instructions, and reads as the assistant's own thinking). An earlier version carried a long requirements list and violations taxonomy; that instruction style belongs to the SDF document rewrite, and for DAD it was replaced by the principles themselves.
+The template is deliberately minimal: the principles ARE the standard — the prompt adds only the conversation and the checks the template lists (keep what already meets the standard; stay fully **self-contained** — the response never mentions or alludes to a constitution, principles, or instructions, and reads as the assistant's own thinking).
 
-**What goes into the final training record:** only the user message and the rewritten assistant response. Strip the system prompt, the reasoning library scaffolding, and the annotation before writing the training record. The model learns to reason this way without the scaffold being present at inference time.
+**What goes into the final training record:** only the user message and the rewritten assistant response. Strip the system prompt and the reasoning-library/scope scaffolding before writing the training record. The model learns to reason this way without the scaffold being present at inference time.
 
 ---
 
 ### `dad/step3_score.txt`
 
-**Input:** one finished conversation from step 3 (user message + rewritten response).
+**Input:** one finished conversation from step 3 (user message + rewritten response) — nothing else; every judgment is made from the conversation alone.
 
-**Input:** the finished conversation + the intended `{intended_direction}` and `{user_attitude}` from the annotation.
+**Output:** a JSON quality report — eight 1-10 dimensions (`embodiment` (teach-why), `helpfulness`, `calibration`, `naturalness`, `reasoning`, `evidence`, `situational_awareness`, `logical_consistency`), three boolean auto-reject checks (`honest_dealing` false = reject, `self_contained` false = reject — any constitution/principles leakage — and `tracks_attitude` true = reject — the reply keyed on the user's tone rather than the ethics), a `realized_direction` stamp (under/over-weighting/mixed, for corpus-level balance auditing — there is no intended direction to match), and `notes` naming any formulaic pattern.
 
-**Output:** a JSON quality report — `embodiment` (teach-why), `helpfulness`, `calibration`, `naturalness` (each 1-10), `self_contained` (boolean; any leakage is an automatic reject), plus the enforced-spec checks: `realized_direction` (judged blind from the response), `direction_match` (does it match the intended Direction? mismatch = reject), `tracks_attitude` (did the reply key on the user's tone rather than the ethics? true = reject), and `notes` naming any formulaic pattern.
-
-The final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF, and the enforcement half of using Direction as an enforced spec. Not yet wired into `run.py` — run it manually to spot-check step-3 output before handoff.
+The candidate final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF. Not yet wired into `run.py` — run it manually to spot-check step-3 output before handoff.
 
 ## Corpus Tools
 
@@ -157,11 +169,11 @@ Adapted from the DeepMind SDF post's scan → cluster → autorate pipeline: mod
 
 **Fresh context for rewrite steps.** Layer 4 (SDF) and step 3 (DAD) should use a new context window, not the same one that generated the original content. A model reviewing its own output in the same context tends to rationalize rather than improve.
 
-**Diversity over volume.** A corpus of 300 genuinely diverse, high-quality documents is more valuable than 1,000 generic ones. Use the looping technique in layer 3 (brainstorm multiple angles, pick the most different ones), and let the DAD spec's coverage tally + batch checklist steer each generation batch toward the distributions the spec requires.
+**Diversity over volume.** A corpus of 300 genuinely diverse, high-quality documents is more valuable than 1,000 generic ones. Composition is engineered by construction — the SDF matrix and the DAD deal set the distributions up front — and the batch checklist and corpus audits verify that the generated batch realized them.
 
-**The response library is sampling scaffolding only.** The reasoning library shapes draft responses (retrieval by tension, two-sided reasoning, crux named) and is never named in a response; like all scaffolding it is stripped before training records are written. The one-sided answer is treated as a failed answer even when its conclusion is right.
+**The response library is sampling scaffolding only.** The reasoning library shapes draft responses (per-case trigger retrieval, two-sided reasoning) and is never named in a response; like all scaffolding it is stripped before training records are written. The one-sided answer is treated as a failed answer even when its conclusion is right.
 
-**Language.** The pipeline currently runs English-only (`language_distribution: {en: 1.0}` in `config.yaml`). The multilingual plumbing is still in place — restore a broader `language_distribution` to re-enable Mandarin, Hindi, and other languages, which can improve generalization and reflect the global reach of these ethical questions.
+**Language.** Language rides on the culture axes: SDF's culture variable fixes each document's language and idiom, and DAD's cultural-setting axis writes a marked slice of prompts in the named region's language. Reweight those axes in the two `variables.txt` files to shift the language mix.
 
 ---
 
@@ -170,7 +182,7 @@ Adapted from the DeepMind SDF post's scan → cluster → autorate pipeline: mod
 The minimal package for a lab to reproduce this pipeline internally:
 
 1. `constitution/constitution_claude.md` and `constitution/constitution_sentient_beings.md`
-2. This entire `prompts/` directory (including `dad/dilemma_prompt_spec.md`, which governs the DAD user side)
-3. A brief note on the architecture: SDF is 5 layers (fanout structure), DAD is 3 steps (spec-driven dilemma prompts → library-reasoned responses → rewrite against the distilled constitution principles), step 3 is the critical rewrite, the reasoning library and annotations are sampling scaffolding only, and final training records contain only user + assistant messages with no system prompt.
+2. This entire `prompts/` directory (including `dad/README.md`, the end-to-end DAD pipeline spec)
+3. A brief note on the architecture: SDF is 5 layers (fanout structure), DAD is 3 steps (spec-driven dilemma prompts → library-reasoned responses → rewrite against the distilled constitution principles), step 3 is the critical rewrite, the reasoning library and scope maps are sampling scaffolding only, and final training records contain only user + assistant messages with no system prompt.
 
 Labs may want to use their own internal models for generation, apply their own quality filters, or adapt the prompts to their alignment framework. The prompts are designed to be model-agnostic and easy to modify.
