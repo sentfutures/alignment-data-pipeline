@@ -397,7 +397,8 @@ def _labels(audit):
 
 # ------------------------------------------------------------------ beats
 
-def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=()):
+def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=(),
+                   hf_href="", repo_href=""):
     """One record's whole trail through the run, then the rest as a carousel.
 
     Every block here is verbatim from a file in the run directory: the cards the composer
@@ -405,6 +406,12 @@ def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=()):
     and the library entries stage 2 pulled, the answer, and what stage 3 changed in it.
     Nothing is author-supplied, and a step whose artefact is missing names the file it
     wanted rather than disappearing.
+
+    THE TWO WAYS OUT SIT AT THE FOOT OF THIS BEAT, and this is the only place in the report
+    they appear. A reader who has just followed one record from dealt cards to shipped
+    answer is as close to running this themselves as they will get; before this pass the
+    whole report — ten thousand words of it — carried no link at all, so that reader had to
+    scroll back past everything they had read to find one.
     """
     blocks = [R.sub("dad-example", "One example, end to end"),
               C.prose(content, "example_intro", f)]
@@ -429,7 +436,21 @@ def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=()):
                                  (lineage or {}).get(primary) or {}, labels))
     if extras:
         blocks.append(carousel(extras, by_pid_rw, labels))
+    blocks.append(_ways_out(hf_href, repo_href))
     return "".join(b for b in blocks if b)
+
+
+def _ways_out(hf_href, repo_href):
+    """The records themselves, and the pipeline that made them. Same two destinations and
+    the same two labels the other report uses, so the pair reads as one thing wherever a
+    reader meets it."""
+    links = []
+    if hf_href:
+        links.append(R.linkbutton(hf_href, "Browse the records", "hf", meta="dataset viewer"))
+    if repo_href:
+        links.append(R.linkbutton(repo_href, "The pipeline", "github",
+                                  meta="every stage template"))
+    return f"<div class='lbtns'>{''.join(links)}</div>" if links else ""
 
 
 def lineage_blocks(pid, rw, base, lin, labels):
@@ -1321,7 +1342,8 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
 # ------------------------------------------------------------------ assembly
 
 def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewrites=None,
-           lineage=None, n_prompt_templates=None, run_id="", example=None):
+           lineage=None, n_prompt_templates=None, run_id="", example=None,
+           hf_href="", repo_href=""):
     """The whole ``#dad`` section body, in skeleton order. Pure: no filesystem, no argv.
 
     Returns one flat string of blocks. report/page.py wraps it in ``<section id='dad'>``
@@ -1335,7 +1357,8 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
     return "".join([
         blocks_lede(content, f),
         blocks_built(content, f),
-        blocks_example(content, f, rewrites, baseline, lineage, labels, picks),
+        blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
+                       hf_href=hf_href, repo_href=repo_href),
         blocks_weak(content, f),
         blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks),
     ])

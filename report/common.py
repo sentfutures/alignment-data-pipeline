@@ -138,11 +138,18 @@ def prose(content, key, f):
     return R.paragraphs(fill(content.get(key, ""), f))
 
 
-def section(sid, heading, *blocks):
-    """A section. A falsy heading omits the <h2> — for a section whose own content is
-    its title, like the comparison, whose two column mastheads say what it is."""
+def section(sid, heading, *blocks, heading_class=""):
+    """A section. A falsy heading omits the <h2>.
+
+    ``heading_class='vh'`` renders the heading for screen readers only — for a section
+    whose own content is its title, like the comparison, whose two column mastheads say
+    what it is on screen. Omitting the heading entirely was the older answer and it cost
+    a reader navigating by heading the whole comparison: pressing H went from the page
+    title to the chooser, past both datasets.
+    """
     body = "".join(b for b in blocks if b)
-    head = f"<h2>{R.esc(heading)}</h2>" if heading else ""
+    cls = f" class='{heading_class}'" if heading_class else ""
+    head = f"<h2{cls}>{R.esc(heading)}</h2>" if heading else ""
     return f"<section id='{sid}'>{head}{body}</section>"
 
 

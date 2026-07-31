@@ -802,6 +802,25 @@ class TestLineage:
     def test_no_example_data_is_reported_not_crashed(self):
         assert "No worked example" in strip_tags(build(audit={"n_prompts": 1}))
 
+    def test_the_report_carries_a_way_to_the_records_and_the_pipeline(self):
+        """The whole report — ten thousand words of it — carried no link at all, so a
+        reader who had just followed one record end to end, which is the moment they are
+        most likely to want the data, had to scroll back past everything they had read to
+        find one. The pair sits at the foot of the worked example, where that happens."""
+        html = build(content=content(example_pick="AW-0001"), baseline=BASELINE,
+                     rewrites=REWRITES, lineage=LINEAGE)
+        panel = html[html.index("<section id='dad'"):html.index("<footer")]
+        assert panel.count("class='lbtn'") == 2, "two destinations, and only two"
+        assert P.HF_DAD in panel and P.REPO_URL in panel
+        example = panel[panel.index("id='dad-example'"):panel.index("id='dad-weak'")]
+        assert "class='lbtns'" in example, "not in the appendix, and not before the trail"
+        assert example.index("class='lbtns'") > example.index("Stage 3")
+
+    def test_a_report_built_without_destinations_carries_no_empty_button_row(self):
+        assert "class='lbtns'" not in D.blocks(audit=AUDIT_FULL, content=content(),
+                                               rewrites=REWRITES, baseline=BASELINE,
+                                               lineage=LINEAGE)
+
 
 class TestColourIntegrity:
     def test_status_colors_are_not_series_colors(self):
@@ -1034,10 +1053,31 @@ class TestRenderPrimitives:
     def test_tabs_leave_one_pane_visible(self):
         """No-JS is the case that matters: the markup itself has to show a record."""
         html = R.tabs([("a", "R-1", "one", True), ("b", "R-2", "two", False)])
-        assert "<div class='pane-x' id='a' role='tabpanel'>" in html
-        assert "<div class='pane-x' id='b' role='tabpanel' hidden>" in html
+        assert "<div class='pane-x' id='a' role='tabpanel' aria-labelledby='tab-a'>" in html
+        assert "<div class='pane-x' id='b' role='tabpanel' aria-labelledby='tab-b' hidden>" in html
         assert html.count("class='tab'") == 2
         assert "aria-selected='true'" in html and "aria-selected='false'" in html
+
+    def test_every_pane_is_named_by_the_button_that_opens_it(self):
+        """A tabpanel with no accessible name is announced as a bare group — which here
+        means an unlabelled 1,200-word transcript."""
+        html = R.tabs([("a", "R-1", "one", True), ("b", "R-2", "two", False)])
+        for pid in ("a", "b"):
+            assert f"id='tab-{pid}'" in html
+            assert f"aria-labelledby='tab-{pid}'" in html
+
+    def test_the_carousel_is_a_tab_set_and_finishes_the_pattern(self):
+        """This one really is a tab set — exactly one pane is open at all times — so it
+        owes the rest of role='tab': one tab in the tab order at a time, and the arrow
+        keys. The page carried no keydown handler at all before this."""
+        html = R.tabs([("a", "R-1", "one", True), ("b", "R-2", "two", False)])
+        assert "tabindex='0'" in html and "tabindex='-1'" in html
+        assert html.count("tabindex='0'") == 1
+        js = R.JS
+        assert "keydown" in js
+        for key in ("ArrowRight", "ArrowLeft", "Home", "End"):
+            assert key in js
+        assert "o.setAttribute('tabindex',on?'0':'-1')" in js
 
     def test_tabs_of_nothing_render_nothing(self):
         assert R.tabs([]) == ""

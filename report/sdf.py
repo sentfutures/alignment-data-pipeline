@@ -27,6 +27,10 @@ CONTENT_IDS = ("sdf_what", "sdf_soon")
 
 SECTION_ID = "sdf"
 SECTION_TITLE = "Synthetic documents"
+# This report is the anchor and the figures, not the written report. Read by page.py to
+# say so in the comparison, where a reader sees it BEFORE choosing. Flip it to False in
+# the same commit that lands the beats below.
+IS_PLACEHOLDER = True
 
 _STAGE_KNOBS = ("plan_model", "draft_model", "rewrite_model", "score_model")
 

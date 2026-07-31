@@ -103,9 +103,16 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
          _with_button("", HF_DAD, "Example dataset", "hf")),
     ]
     actions = []
-    columns = [(sdf.SECTION_TITLE, C.fill(content.get("sdf_desc", ""), f)),
+    # The chip is the only warning a reader gets that one of these two reports is 200 words
+    # and the other is 10,000. Without it the choice is a coin flip, and the documents
+    # column — which is first here, first in the chooser and first in the panels — is the
+    # side that loses it. It comes off sdf.IS_PLACEHOLDER, so it leaves with the stub.
+    columns = [(sdf.SECTION_TITLE, C.fill(content.get("sdf_desc", ""), f),
+                "Report in preparation" if sdf.IS_PLACEHOLDER else ""),
                (dad.SECTION_TITLE, C.fill(content.get("dad_desc", ""), f))]
-    return C.section("datasets", "", R.compare(columns, rows, actions))
+    # The heading is heard, not seen: the two mastheads are the heading on screen.
+    return C.section("datasets", "The two datasets", R.compare(columns, rows, actions),
+                     heading_class="vh")
 
 
 def _prompts_cell(kwargs, href):
@@ -154,15 +161,29 @@ def section_explore(panels, outlines):
                          rails, panels))
 
 
-def footer(maker_icon=""):
-    """Who made it, and the two places to go. Nothing else: the run ids and commits that
-    used to sit here are provenance for a reader who is already deep in a report, not
-    for the last line of the page."""
+def footer(maker_icon="", runs=()):
+    """Who made it, where to go, and which runs this page was built from.
+
+    The provenance was taken off the page once, on the grounds that a run id is for a
+    reader already deep in a report rather than for the last line — right about where it
+    belongs, wrong about the consequence, because it then appeared nowhere at all. A page
+    whose every figure is derived from two run directories has to name them, or nothing on
+    it can be located in the repository, reproduced, or cited. Here is where a reader
+    looks for that, and it stays out of the reports themselves.
+
+    ``runs`` is [(dataset name, run_id, manifest)]; a dataset with no run is skipped, so a
+    page built without one carries no half-line about it.
+    """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
+    provenance = "".join(
+        f"<p class='foot-run'>{R.esc(name)} — "
+        f"{C.meta_line(run_id=run_id, manifest=manifest)}</p>"
+        for name, run_id, manifest in runs if run_id)
     return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>"
+            + provenance)
 
 
 # ------------------------------------------------------------------ assembly
@@ -188,7 +209,8 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
     if dad_kwargs:
         bodies.append((dad.SECTION_ID,
                        f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
-                       + dad.blocks(content=content, example=example, **dad_kwargs)))
+                       + dad.blocks(content=content, example=example,
+                                    hf_href=HF_DAD, repo_href=REPO_URL, **dad_kwargs)))
     panels = "".join(R.panel(pid, html) for pid, html in bodies)
     outlines = {pid: R.outline(html) for pid, html in bodies}
     sections = [
@@ -199,7 +221,9 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
         "title": title,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT),
                            intro=C.prose(content, "intro", f)),
-        "footer": footer(maker_icon),
+        "footer": footer(maker_icon, runs=(
+            (sdf.SECTION_TITLE, sdf_kwargs.get("run_id"), sdf_kwargs.get("manifest")),
+            (dad.SECTION_TITLE, dad_kwargs.get("run_id"), dad_kwargs.get("manifest")))),
     }
     return "".join(sections), head
 

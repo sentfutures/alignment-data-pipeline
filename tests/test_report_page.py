@@ -133,8 +133,21 @@ class TestShape:
         assert ids == ["datasets", "explore", "sdf", "dad"]
         assert re.findall(r"<h2>([^<]*)</h2>", html) == [
             "Walk through a dataset generation", S.SECTION_TITLE, D.SECTION_TITLE]
-        # The comparison is titled by its own two mastheads, not by a heading over them.
-        assert "<section id='datasets'><div class='cmp-wrap'>" in html
+        # The comparison is titled by its own two mastheads on screen — and by a heading
+        # a screen reader can find, because heading navigation skipped it entirely.
+        assert re.match(r"<section id='datasets'><h2 class='vh'>[^<]+</h2><div class='cmp-wrap'>",
+                        re.search(r"<section id='datasets'>.*", html).group(0))
+
+    def test_the_comparison_has_a_heading_that_is_heard_and_not_seen(self):
+        """Pressing H went from the page title to the chooser, past both datasets — the
+        one section a reader is meant to read in a single pass had no heading at all.
+        It has one now, and it is off screen: the mastheads stay the visible title."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        head = re.search(r"<section id='datasets'>(<h2[^>]*>[^<]*</h2>)", html).group(1)
+        assert "class='vh'" in head and strip_tags(head).strip()
+        rule = re.search(r"\.vh\{[^}]*\}", html).group(0)
+        assert "position:absolute" in rule and "clip-path:inset(50%)" in rule
+        assert "display:none" not in rule, "display:none would hide it from a screen reader too"
 
     def test_the_page_itself_has_no_rail_but_a_report_does(self):
         """The page's own navigation is still one choice — a rail of five page-wide links
@@ -203,15 +216,28 @@ class TestShape:
         assert "<li>" not in hero and "<ul>" not in hero
         assert hero.count("<p>") == 3
 
-    def test_the_footer_is_one_line_who_made_it_and_where_to_go(self):
-        """No run ids, no commits, no build claim: the last line of the page is not
-        where a reader goes looking for provenance."""
-        html = build(sdf_inputs=SDF_INPUTS)
+    def test_the_footer_names_the_runs_the_page_was_built_from(self):
+        """Provenance was taken off the page entirely, and then appeared nowhere: no run
+        id, no commit, no backend, anywhere. A page whose every figure is derived from two
+        run directories has to name them or nothing on it can be located or cited. It
+        belongs at the foot, under the maker line — not inside a report."""
+        html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
         assert f"A project by <a href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
-        for gone in ("2026-07-20_20-51_bedrock-40", "bedrock", "git ", "build time"):
-            assert gone not in strip_tags(foot), gone
+        assert foot.index("A project by") < foot.index("class='foot-run'")
+        text = strip_tags(foot)
+        for run in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"]):
+            assert run in text
+        assert text.count("run ") == 2 and "git " in text
+
+    def test_a_dataset_with_no_run_gets_no_half_provenance_line(self):
+        """Built without a run, the page says nothing about it rather than printing a
+        line of question marks."""
+        html = P.build(content=content())          # no dad run, no sdf run
+        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
+        assert "class='foot-run'" not in foot
+        assert P.MAKER in foot                     # the rest of the footer is unchanged
 
     def test_the_footer_links_are_links_not_buttons(self):
         """Two destinations, each with its mark and the outbound arrow, floated right."""
@@ -353,17 +379,36 @@ class TestChooser:
             panel = re.search(rf"<section id='{pid}' class='panel'[^>]*>", html).group(0)
             assert "hidden" in panel
             assert f"aria-labelledby='choose-{pid}'" in panel
-        assert html.count("aria-selected='false'") == 2
-        assert "aria-selected='true'" not in html
+        assert html.count("aria-expanded='false'") == 2
+        assert "aria-expanded='true'" not in html
 
-    def test_the_buttons_are_a_real_tab_control(self):
+    def test_the_buttons_are_a_disclosure_pair_not_a_tab_set(self):
+        """This was `role='tablist'` with two `role='tab'`s, which promises what the
+        control cannot do: a tablist always has exactly one selected tab, and nothing here
+        is selected on load — that is the whole point of the chooser. A screen reader
+        announced "tab, 1 of 2, not selected" twice, and the arrow keys the pattern
+        requires did nothing. Two buttons that expand a region say what actually happens.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
         choices = re.search(r"<div class='choices'[^>]*>.*?</div>", html, re.S).group(0)
-        assert "role='tablist'" in html
+        assert "role='tablist'" not in choices and "role='tab'" not in choices
         for pid, label in (("dad", D.SECTION_TITLE), ("sdf", S.SECTION_TITLE)):
             assert f"aria-controls='{pid}'" in choices
             assert f"id='choose-{pid}'" in choices
             assert label in choices
+        assert choices.count("aria-expanded=") == 2
+        # and the open state is driven by the same attribute the markup ships
+        assert ".choice[aria-expanded=true]{background:var(--accent)" in html
+        assert "b.setAttribute('aria-expanded',on?'true':'false')" in html
+
+    def test_the_page_has_a_visible_focus_ring_on_its_buttons(self):
+        """The chooser and the carousel are the only controls on the page, and `button`
+        was the one selector missing from the focus rule — so they fell back to the UA
+        ring, the one focus treatment nobody here designed."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"a:focus-visible[^{]*\{[^}]*\}", html).group(0)
+        assert "button:focus-visible" in rule
+        assert "outline:2px solid var(--accent)" in rule
 
     def test_the_buttons_are_two_names_and_nothing_else(self):
         """What each dataset is and how big it is are in the comparison directly above.
@@ -578,6 +623,33 @@ class TestStickyBar:
         bar = re.search(r"<div class='choicebar'>.*?<div class='railcol'>", html, re.S).group(0)
         assert bar.count("<a ") == 0, bar[:300]
         assert "class='beats'" not in html
+
+
+class TestNarrowLayout:
+    """Below 760px the page is one column. The risk is the one that actually shipped: a
+    media block that collapses the grid and then re-places its children with a selector
+    too weak to do it, so the page reads as one word per line on a phone."""
+
+    def _small(self):
+        html = build(sdf_inputs=SDF_INPUTS)
+        return html[html.index("@media (max-width:760px)"):html.index("@media (max-width:620px)")]
+
+    def test_the_single_column_keeps_the_named_grid_lines(self):
+        """Every bleed rule on the page places its item BY NAME. Collapsing the grid to a
+        bare minmax(0,1fr) deletes those names, and a placement against a name that does
+        not exist resolves into a 0px implicit track."""
+        rule = re.search(r"section\{grid-template-columns:([^}]*)\}", self._small()).group(1)
+        for line in ("[text-start]", "text-end", "full-end"):
+            assert line in rule, rule
+
+    def test_the_narrow_block_does_not_re_place_children_with_a_weaker_selector(self):
+        """`section>*{grid-column:1}` is (0,0,1). It loses to `section>figure` (0,0,2) and
+        to `section>.explore-body` (0,1,1) — the chooser, both rails and both reports —
+        which keep pointing at the names this block used to delete. Keeping the names is
+        what makes the re-placement unnecessary, and !important unnecessary with it."""
+        small = self._small()
+        assert "section>*{grid-column:1}" not in small
+        assert "!important" not in small
 
 
 class TestContentsRail:
@@ -955,6 +1027,29 @@ class TestSdfPlaceholder:
         section = html[html.index("<section id='sdf'"):]
         assert "No audit output was supplied" in strip_tags(section)
         assert P.HF_SDF in section
+
+    def test_the_comparison_says_this_report_is_not_written_yet(self):
+        """This column is first in the comparison, first in the chooser and first in the
+        panels, and it opens ~200 words against the other's ~10,000. Unmarked, half of
+        the readers this page is for spend their one minute on a stub and learn that the
+        project is unfinished before they learn what it does."""
+        html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
+        heads = re.search(r"<thead>.*?</thead>", html, re.S).group(0)
+        sdf_col, dad_col = heads.split("</th>")[0], heads.split("</th>")[1]
+        assert S.SECTION_TITLE in sdf_col and "class='cmp-s'" in sdf_col
+        assert "in preparation" in strip_tags(sdf_col).lower()
+        assert "class='cmp-s'" not in dad_col, "the written report carries no such chip"
+
+    def test_the_chip_is_neutral_because_it_is_a_state_not_a_verdict(self):
+        html = build(sdf_inputs=SDF_INPUTS)
+        chip = re.search(r"<span class='cmp-s'>(<span class='chip[^']*'>)", html).group(1)
+        assert chip == "<span class='chip'>", chip
+
+    def test_the_chip_leaves_with_the_placeholder(self, monkeypatch):
+        """It is one flag, so the day the report is written the comparison stops
+        advertising a stub without anyone remembering to delete a string."""
+        monkeypatch.setattr(S, "IS_PLACEHOLDER", False)
+        assert "class='cmp-s'" not in build(sdf_inputs=SDF_INPUTS)
 
 
 class TestBrevity:

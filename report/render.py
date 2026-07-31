@@ -586,16 +586,27 @@ def linkbutton(href, label, name="", meta=""):
 def compare(columns, rows, actions=()):
     """The two datasets, side by side, with their names as the masthead.
 
-    columns: [(name, description)]. rows: [(label, cell, cell)]. actions: [(cell, cell)],
-    one row of buttons at the foot of each column.
+    columns: [(name, description)] or [(name, description, status)]. rows:
+    [(label, cell, cell)]. actions: [(cell, cell)], one row of buttons at the foot of
+    each column.
 
     A comparison is a table — the whole point is that "records" lines up with "records" —
     but the names carry the section instead of a heading above it, so the header cells do
     the work a masthead would.
+
+    ``status`` is a neutral chip under the name, for the one thing a reader has to know
+    before they choose rather than after: that one of these two reports is not written yet.
+    It is a chip because on this page a chip is what a state looks like, and neutral
+    because "in preparation" is a fact about the page, not a verdict on the dataset.
     """
-    heads = "".join(f"<th><span class='cmp-name'>{esc(name)}</span>"
-                    + (f"<span class='cmp-d'>{inline_md(desc)}</span>" if desc else "")
-                    + "</th>" for name, desc in columns)
+    cells = []
+    for col in columns:
+        name, desc, status = (list(col) + [""])[:3]
+        cells.append(f"<th><span class='cmp-name'>{esc(name)}</span>"
+                     + (f"<span class='cmp-s'>{chip(status)}</span>" if status else "")
+                     + (f"<span class='cmp-d'>{inline_md(desc)}</span>" if desc else "")
+                     + "</th>")
+    heads = "".join(cells)
     body = "".join("<tr><th class='cmp-k' scope='row'>" + esc(label) + "</th>"
                    + "".join(f"<td>{esc(c)}</td>" for c in cells) + "</tr>"
                    for label, *cells in rows)
@@ -673,36 +684,52 @@ def chooser(options, prompt=""):
     ``.choices`` is 40rem centred, so a report would scroll up either side of it. The
     bar stays ONE ROW — a row of section links hung underneath it read as clutter on the
     control; that job belongs to the rail beside the report.
+
+    THIS IS A DISCLOSURE PAIR, NOT A TAB SET, and it is marked up as one. It was
+    ``role='tablist'`` with two ``role='tab'``s, which promises things this control does
+    not do and cannot: a tablist always has exactly one selected tab, and nothing is
+    selected here on load — that is the whole point of the chooser — so a screen reader
+    announced "tab, 1 of 2, not selected" twice and arrow keys did nothing. Two buttons
+    carrying ``aria-expanded`` describe what actually happens: each one opens a region,
+    both can be closed, and Tab plus Enter is the entire interaction.
     """
     buttons = []
     for pid, label in options:
         buttons.append(
-            f"<button class='choice' type='button' role='tab' aria-selected='false' "
+            f"<button class='choice' type='button' aria-expanded='false' "
             f"aria-controls='{esc(pid)}' data-panel='{esc(pid)}' id='choose-{esc(pid)}'>"
             f"{esc(label)}<span class='choice-a' aria-hidden='true'>&darr;</span></button>")
     return ((f"<p class='choose-q'>{inline_md(prompt)}</p>" if prompt else "")
-            + f"<div class='choicebar'><div class='choices' role='tablist'>"
+            + f"<div class='choicebar'><div class='choices'>"
               f"{''.join(buttons)}</div></div>")
 
 
 def tabs(panes):
     """Several records behind one set of buttons. panes: [(id, label, body, open_)].
 
-    The same mechanism as the chooser, not a second one: buttons carry ``data-pane`` and
-    the page's own inline JS toggles ``hidden``. The pane marked open renders WITHOUT
-    ``hidden``, so with JS off this degrades to one visible record rather than to none,
-    and the print rule expands the rest.
+    The pane marked open renders WITHOUT ``hidden``, so with JS off this degrades to one
+    visible record rather than to none, and the print rule expands the rest.
+
+    Unlike the chooser, this one IS a tab set — exactly one pane is open at all times —
+    so it keeps ``role='tab'`` and owes the rest of that pattern: one tab in the tab order
+    at a time (``tabindex`` roves with the selection) and Left/Right/Home/End across the
+    set, both in the page's own inline JS.
     """
     kept = [p for p in panes if p]
     if not kept:
         return ""
     btns = "".join(
-        f"<button class='tab' type='button' role='tab' data-pane='{esc(pid)}' "
+        f"<button class='tab' type='button' role='tab' id='tab-{esc(pid)}' "
+        f"data-pane='{esc(pid)}' tabindex='{'0' if open_ else '-1'}' "
         f"aria-selected='{'true' if open_ else 'false'}' "
         f"aria-controls='{esc(pid)}'>{esc(label)}</button>"
         for pid, label, _, open_ in kept)
+    # Each pane is named by the button that opens it: a tabpanel with no accessible name
+    # is announced as a bare group, which on this page means an unlabelled 1,200-word
+    # transcript. The id on the button is what makes that association possible.
     bodies = "".join(
-        f"<div class='pane-x' id='{esc(pid)}' role='tabpanel'"
+        f"<div class='pane-x' id='{esc(pid)}' role='tabpanel' "
+        f"aria-labelledby='tab-{esc(pid)}'"
         f"{'' if open_ else ' hidden'}>{body}</div>"
         for pid, _, body, open_ in kept)
     return (f"<div class='carousel'><div class='tabs' role='tablist'>{btns}</div>"
@@ -716,7 +743,7 @@ def panel(pid, body):
     from when the chooser scrolled away behind the reader; the bar it lives in is pinned
     now, so the other report is one click away from anywhere in this one.
     """
-    return (f"<section id='{esc(pid)}' class='panel' role='tabpanel' "
+    return (f"<section id='{esc(pid)}' class='panel' "
             f"aria-labelledby='choose-{esc(pid)}' hidden>{body}</section>")
 
 
@@ -751,7 +778,12 @@ CSS = """
 --surface-0:#f7f4ea;--surface-1:#f1ebdd;--surface-2:#e9e1cd;
 --border:#cec3a6;--hairline:#ded5be;--grid:#e1d9c4;--axis:#bcaf90;
 --text-primary:#1a1712;--text-secondary:#4a443c;--text-muted:#675f54;
---accent:#3b2fa0;--accent-wash:#eae7f7;--accent-edge:#c9c3ea;
+/* --accent-edge is a CONTROL BOUNDARY, so it answers to WCAG 1.4.11's 3:1 rather than to
+   the 4.5:1 the text pairs above take. The old #c9c3ea reached 1.53:1 on the paper — the
+   two chooser buttons, which are the page's only decision, had a border a low-vision
+   reader could not see, and the accent text inside made them read as links. This measures
+   3.48:1 on --surface-0 and 3.15:1 on --accent-wash, so it holds in the hover state too. */
+--accent:#3b2fa0;--accent-wash:#eae7f7;--accent-edge:#8279c5;
 --series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;
 --series-5:#e87ba4;--series-6:#008300;--series-7:#4a3aa7;--series-8:#e34948;
 --good:#0ca30c;--warn:#fab219;--bad:#d03b3b;
@@ -765,6 +797,12 @@ html{--serif:ui-serif,Charter,"Bitstream Charter","Iowan Old Style","Source Seri
 --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace}
 body{margin:0;background:var(--surface-0);color:var(--text-primary);
 font:1.0625rem/1.62 var(--serif);-webkit-text-size-adjust:100%}
+/* Heard, never seen. The comparison's own heading is its two column mastheads, which is
+   right on screen and invisible to a reader navigating by heading — pressing H jumped from
+   the page title straight past the entire comparison. This gives that section a heading in
+   the outline without putting one over the top of it. */
+.vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+clip-path:inset(50%);white-space:nowrap;border:0}
 .skip{position:absolute;left:-9999px}
 .skip:focus{left:12px;top:12px;z-index:20;background:var(--surface-0);padding:8px 12px;
 border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
@@ -959,7 +997,7 @@ border-radius:4px;cursor:pointer;font:650 var(--label)/1.3 var(--serif);
 font-size:calc(var(--label)*(1 - .12*var(--t)));color:var(--accent);text-align:left;
 transition:padding .2s ease,font-size .2s ease}
 .choice:hover{background:var(--accent-wash)}
-.choice[aria-selected=true]{background:var(--accent);border-color:var(--accent);
+.choice[aria-expanded=true]{background:var(--accent);border-color:var(--accent);
 color:var(--surface-0)}
 /* The arrow goes as the bar tightens: it means "the report is below", which is stale once
    the reader is inside the report, and losing it is half of why the shrunk bar reads as
@@ -1003,6 +1041,7 @@ width:var(--cmp-col)}
 .cmp .cmp-corner{border:0;width:var(--cmp-label)}
 .cmp-name{display:block;font:600 1.28rem/1.2 var(--serif);letter-spacing:-.012em;
 color:var(--text-primary)}
+.cmp-s{display:block;margin-top:.5rem}
 .cmp-d{display:block;margin-top:.75rem;font:.85rem/1.55 var(--sans);color:var(--text-muted)}
 /* Flush right, hard against the pair, and never wrapped: the labels are an index down
    the side of the comparison, and an index that breaks over two lines stops reading as
@@ -1127,14 +1166,20 @@ a{font-family:var(--mono);font-weight:600;font-size:.92em;letter-spacing:-.01em;
 color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
 text-underline-offset:3px;text-decoration-color:var(--accent)}
 a:hover{background:var(--accent-wash)}
-a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--accent);
-outline-offset:2px}
+/* button is in this list because the page HAS buttons — the chooser and the carousel —
+   and without it the only controls on the page fall back to the UA's own ring, which is
+   the one focus treatment nobody here designed. */
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* One line: who made it on the left, where to go on the right. */
 footer.foot{margin-top:5rem;padding-top:1.1rem;border-top:1px solid var(--border);
 font:.85rem/1.6 var(--sans);color:var(--text-muted);
 display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
 footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
+/* Which runs this page was built from. Its own line under the two above, at the size the
+   rest of the footer takes: a reader looking for it is looking deliberately. */
+.foot-run{flex:1 0 100%;font-size:.8rem}
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
    the page stays one file. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
@@ -1185,8 +1230,17 @@ display:flex;flex-wrap:wrap;column-gap:.4rem}
    mid-row between another beat's stages and the two levels stopped reading as two. */
 .rail .r-b{margin-top:.3rem;flex:0 0 100%}
 .rail a[aria-current=true]{border-left-color:transparent;border-bottom-color:var(--accent)}}
-@media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
-section>*{grid-column:1}.pair{grid-template-columns:1fr}
+/* One column, WITH THE NAMED LINES STILL DEFINED. Collapsing the grid to a bare
+   minmax(0,1fr) and re-placing the children with `section>*{grid-column:1}` looks like it
+   works and does not: that selector is (0,0,1) and loses to `section>figure` (0,0,2) and
+   to `section>.explore-body` (0,1,1), which keep pointing at text-start/full-end after the
+   names have been deleted — so every figure, the comparison, and the whole chooser (bar,
+   rails, both reports) land in a 0px implicit track and the prose inside them wraps one
+   word per line. Naming both lines on the single track instead leaves every existing
+   placement valid, so nothing has to be re-placed and no !important is needed. */
+@media (max-width:760px){
+section{grid-template-columns:[text-start] minmax(0,1fr) [text-end full-end]}
+.pair{grid-template-columns:1fr}
 /* The bar stays pinned on a phone, so it has to stay ONE ROW: stacking the two buttons
    is ~10rem of permanent chrome, a quarter of a small screen. Two columns and tighter
    type instead — restating the tokens, so the shrink still interpolates off them. */
@@ -1248,10 +1302,21 @@ t.style.top=(e.clientY-32)+'px';}});
    markup, so with this script absent the carousel still shows a record. */
 [].forEach.call(document.querySelectorAll('.carousel'),function(c){
 var tabs=[].slice.call(c.querySelectorAll('.tab'));
-tabs.forEach(function(b){b.addEventListener('click',function(){
-tabs.forEach(function(o){var on=o===b;o.setAttribute('aria-selected',on?'true':'false');
+function show(b,focus){tabs.forEach(function(o){var on=o===b;
+o.setAttribute('aria-selected',on?'true':'false');
+/* The tab order holds ONE tab per set, and it is the open one: a reader tabbing through a
+   report should pass the carousel in one press, then reach its records with the arrows —
+   which is the half of the pattern role='tab' was promising and not delivering. */
+o.setAttribute('tabindex',on?'0':'-1');
 var p=document.getElementById(o.getAttribute('data-pane'));
-if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});});});});
+if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});
+if(focus)b.focus();}
+tabs.forEach(function(b,i){b.addEventListener('click',function(){show(b);});
+b.addEventListener('keydown',function(e){var k=e.key,n=null;
+if(k==='ArrowRight'||k==='ArrowDown')n=tabs[(i+1)%tabs.length];
+else if(k==='ArrowLeft'||k==='ArrowUp')n=tabs[(i-1+tabs.length)%tabs.length];
+else if(k==='Home')n=tabs[0];else if(k==='End')n=tabs[tabs.length-1];
+if(n){e.preventDefault();show(n,true);}});});});
 var choices=[].slice.call(document.querySelectorAll('.choice'));
 if(!choices.length)return;
 /* Where the bar SITS, not where it is painted. Once sticky takes hold, the bar's own
@@ -1298,7 +1363,9 @@ if(!queued)queued=requestAnimationFrame(onScroll);},{passive:true});
 window.addEventListener('resize',onScroll);onScroll();
 function open(id,to){
 choices.forEach(function(b){var on=b.getAttribute('data-panel')===id;
-b.setAttribute('aria-selected',on?'true':'false');
+/* aria-expanded, not aria-selected: this is a disclosure pair. Both can read false, which
+   is the state the page loads in and the state a tablist is not allowed to have. */
+b.setAttribute('aria-expanded',on?'true':'false');
 var p=document.getElementById(b.getAttribute('data-panel'));
 if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});
 links=[];

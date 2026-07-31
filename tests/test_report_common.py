@@ -222,6 +222,19 @@ class TestPalette:
             r = _ratio(t[ink], t[surface])
             assert r >= 4.5, f"--{ink} on --{surface} is {r:.2f}:1, below AA's 4.5"
 
+    # (boundary token, surface it is drawn on) for every CONTROL edge. These answer to
+    # WCAG 1.4.11's 3:1, not to the 4.5:1 above — and nothing else on the page did, so
+    # the chooser's border sat at 1.53:1 and the only decision the page asks for had an
+    # edge a low-vision reader could not find.
+    CONTROL_EDGES = [("accent-edge", "surface-0"), ("accent-edge", "accent-wash")]
+
+    def test_control_boundaries_meet_wcag_non_text_contrast(self):
+        t = _tokens()
+        for edge, surface in self.CONTROL_EDGES:
+            assert edge in t and surface in t, f"missing token: {edge} / {surface}"
+            r = _ratio(t[edge], t[surface])
+            assert r >= 3.0, f"--{edge} on --{surface} is {r:.2f}:1, below 1.4.11's 3.0"
+
     def test_the_accent_is_not_a_status_or_series_colour(self):
         """A selection or a link must never read as a verdict, so the one accent this
         page has is kept clear of the reserved hues and of the chart series."""
