@@ -183,14 +183,12 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
         f"<h2>{R.esc(sdf.SECTION_TITLE)}</h2>"
         + sdf.blocks(content=content, f=sdf_facts, run_id=sdf_kwargs.get("run_id", ""),
                      audit=sdf_kwargs.get("audit"), diversity=sdf_kwargs.get("diversity"),
-                     manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF, repo_href=REPO_URL),
-        cta=(dad.SECTION_ID, f"{dad.SECTION_TITLE} example"))]
+                     manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF, repo_href=REPO_URL))]
     if dad_kwargs:
         panels.append(R.panel(
             dad.SECTION_ID,
             f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
-            + dad.blocks(content=content, example=example, **dad_kwargs),
-            cta=(sdf.SECTION_ID, f"{sdf.SECTION_TITLE} example")))
+            + dad.blocks(content=content, example=example, **dad_kwargs)))
     sections = [
         section_datasets(content, f, dad_kwargs, dad_facts, sdf_kwargs, sdf_facts),
         section_explore("".join(panels)),
@@ -207,8 +205,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
 def _dad_facts(kwargs):
     if not kwargs.get("audit"):
         return {}
-    return dad.facts(kwargs["audit"], kwargs.get("manifest"), kwargs.get("diversity"),
-                     kwargs.get("costs"), kwargs.get("corpus"), kwargs.get("deals"))
+    return dad.facts(kwargs["audit"], kwargs.get("manifest"), kwargs.get("diversity"))
 
 
 def _sdf_facts(kwargs):

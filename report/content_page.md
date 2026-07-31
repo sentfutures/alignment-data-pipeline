@@ -38,7 +38,7 @@ Teaching models to reason about animal welfare
 
 Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) found that a model learns more from the reasons behind a behaviour than from the behaviour itself.
 
-Documents were the better way to teach a model something new, and conversations showed it reasoning through someone else's hard decision. Training on both worked better than training on either alone.
+Pre-training style documents were the better way to teach a model something new, and conversations showed it reasoning through someone else's hard decision. Training on both worked better than training on either alone.
 
 We have built two training dataset generation pipelines based on their methods, for a neglected subject almost no training data covers well: the welfare consideration of nonhuman sentient beings.
 

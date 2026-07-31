@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """The dilemma corpus's section of the handoff page: the ``#dad`` beats.
 
-The audience is a technical reader at another lab — someone deciding whether the method
-and its measurement are sound, and whether to run the pipeline themselves. That is a
-different job from the Streamlit corpus-audit page, which is organised by what the eval
-measured; this is organised by what a reader needs, in the order they need it.
+The audience is a technical reader at another lab — someone deciding whether the method is
+sound and worth running. That is a different job from the Streamlit corpus-audit page,
+which is organised by what the eval measured; this is organised by what a reader needs, in
+the order they need it.
+
+What the section is, and is not: it is **the process** and **one record's whole trail
+through it**. It is not a results report, and it does not document how to install or run
+the pipeline — no commands, no costs, no per-stage model table. That belongs in the
+repository README, and it was cut from here deliberately.
 
 This module builds BLOCKS, not a page: ``blocks()`` returns the section's body, and
 report/page.py wraps it in the one ``<section id='dad'>`` on the artefact. Blocks stay
 flat — a figure has to be a direct child of the section for the CSS grid to bleed it
 past the text measure, so nothing here wraps a beat in a container.
 
-Two rules make the artefact trustworthy, and both are enforced here rather than left to
-an author's discipline:
+Three rules make the artefact trustworthy, and all three are enforced here rather than
+left to an author's discipline:
 
   1. No number is ever typed into the prose. The prose file may interpolate
      ``{{placeholders}}``, which resolve against facts computed from the run's own audit
@@ -21,10 +26,15 @@ an author's discipline:
      string, so a run without the paid pass says "not measured on this run" instead of
      shipping a stale sentence.
 
-  2. The weaknesses section is DERIVED, not written. Every BAD/OK verdict in the audit,
-     plus a fixed set of provenance rules, emits its own line whether or not anyone
-     remembered to write it up. Editorial prose adds to that floor; it cannot replace
-     it, and the view may collapse rows but only with a visible count.
+  2. The caveats a reader sees carry NO figures. ``blocks_weak()`` is handed no ``audit``
+     at all, so a number from one run cannot reach a list that claims to hold for every
+     run of the pipeline.
+
+  3. What this run's audit flagged is DERIVED, not written, and it is in the appendix.
+     Every BAD/OK verdict, plus a fixed set of provenance rules, emits its own line
+     whether or not anyone remembered to write it up. Generalising rule 2's caveats did
+     not soften this: the floor is computed, and the view may collapse rows but only with
+     a visible count.
 
 Built by report/build_report.py. stdlib only, and deliberately no imports from viewer/
 or shared/.
@@ -37,9 +47,9 @@ from report import render as R
 
 CONTENT_IDS = (
     "dad_what",
-    "method_intro", "stage1", "stage2", "stage3", "control", "reproduce",
+    "method_intro", "stage1", "stage2", "stage3", "control",
     "example_pick", "example_extra", "example_intro",
-    "weaknesses_intro", "judge_limits",
+    "caveats",
     "appendix_intro", "judged_caveat", "checks_intro",
 )
 
@@ -50,9 +60,13 @@ SECTION_TITLE = "Difficult advice"
 # learns it once; the ids are prefixed because both sections live in one document.
 #
 # The stages come before the worked example on purpose: the chooser above asks the reader
-# to walk through a dataset generation, and a walk needs its steps named first. There is
-# no "what we measured" beat — this report is not a results report, and the run's own
-# measurements are either a descriptive tile here or a drawer in the appendix.
+# to walk through a dataset generation, and a walk needs its steps named first.
+#
+# Four beats are open and one is drawers. What a reader has to read is the process, one
+# record's whole trail, and the caveats that hold for any run of this pipeline. Everything
+# specific to THIS run — the judged comparison, its regression, every chart, every check,
+# the derived floor — is in the appendix. How to install and run the pipeline is in the
+# repository README and is not on this page at all.
 BEATS = (
     ("dad-what", "What it is"),
     ("dad-built", "How it is built"),
@@ -65,23 +79,6 @@ BEATS = (
 _STAGE_KNOBS = ("scenario_model", "prompt_draft_model", "prompt_gate_model",
                 "prompt_refine_model", "response_scope_model", "response_select_model",
                 "response_draft_model", "constitution_rewrite_model")
-
-# stage tag in cost_log.jsonl -> display name, in pipeline order. Both baseline tags are
-# listed because the pipeline writes `baseline_response` and this table used to name only
-# `baseline`, which put the control's cost at the bottom of the drawer as a raw tag.
-# common.stage_cost_table skips a tag the log does not carry, so listing both is safe.
-_STAGE_LABELS = (
-    ("scenario_plan", "1a · scenario plan"),
-    ("prompt_draft", "1b · prompt draft"),
-    ("prompt_gate", "1c · quality gate"),
-    ("prompt_refine", "1d · refine"),
-    ("baseline", "control · plain model"),
-    ("baseline_response", "control · plain model"),
-    ("response_scope", "2a · scope"),
-    ("response_select", "2a.5 · library select"),
-    ("response_draft", "2b · response draft"),
-    ("constitution_rewrite", "3 · constitution rewrite"),
-)
 
 _DELIVERY_DIMS = ("goal_responsiveness", "proportionality", "tone", "calibration")
 
@@ -100,15 +97,16 @@ def load_inputs(run_dir):
     if audit is None:
         raise SystemExit(f"No audit report at {run_dir / 'audit' / 'audit_report.json'} — "
                          f"run: python evals/audit_dad.py --input {run_dir} --reasons")
+    # Deliberately narrow: the page shows the process and the records, so it reads the
+    # step files and the audit. The cost log and the dealt-scenario records are not loaded
+    # because nothing renders them any more — what a run cost belongs in the repository,
+    # not in a hand-off page.
     return {
         "audit": audit,
         "diversity": C.read_json(run_dir / "audit" / "diversity_report.json"),
         "manifest": C.read_json(run_dir / "run_manifest.json"),
-        "corpus": C.read_jsonl(run_dir / "final" / "dad_corpus.jsonl"),
         "baseline": C.read_jsonl(run_dir / "baseline" / "baseline_responses.jsonl"),
         "rewrites": C.read_jsonl(run_dir / "step3" / "rewrites.jsonl"),
-        "costs": C.read_jsonl(run_dir / "cost_log.jsonl"),
-        "deals": C.read_jsonl(run_dir / "step1" / "scenario_deals.jsonl"),
         "lineage": read_lineage(run_dir, audit),
         "n_prompt_templates": C.prompt_count(run_dir, "step*.txt"),
         "run_id": run_dir.name,
@@ -202,35 +200,6 @@ def read_lineage(run_dir, audit=None):
     return out
 
 
-# The dealt axes the comparison table reports as this corpus's spread, in the order
-# they read: what the decision is about, whose welfare is at stake, where it happens.
-_SPREAD_AXES = (("domain", "domains"), ("taxa_category", "taxa groups"),
-                ("cultural_setting", "cultural settings"))
-
-
-def spread(deals):
-    """How wide the dealt combinations run, straight off step 1's own deal records.
-
-    Counted from the deals rather than the shipped corpus because the deal is where
-    the spread is engineered — a rejected scenario still tells you what the matrix
-    covers.
-    """
-    if not deals:
-        return ""
-    out = []
-    for key, label in _SPREAD_AXES:
-        seen = set()
-        for deal in deals:
-            value = deal.get(key)
-            if isinstance(value, list):
-                seen.update(v for v in value if v)
-            elif value:
-                seen.add(value)
-        if seen:
-            out.append(f"{len(seen)} {label}")
-    return " · ".join(out)
-
-
 # ------------------------------------------------------------------ facts
 
 def _considerations(audit):
@@ -278,15 +247,18 @@ def _models(manifest):
             "per_stage": {k: (dad.get(k) or glob) for k in _STAGE_KNOBS}}
 
 
-def facts(audit, manifest=None, diversity=None, costs=None, corpus=None, deals=None):
+def facts(audit, manifest=None, diversity=None):
     """Every number the prose can interpolate, computed once, in one place.
 
     Run-conditional figures reach prose only with a degraded default — a run missing
     the paid pass renders "an unmeasured share" where the figure would be, so the
     sentence survives and its claim does not. The delivery comparison is deliberately
     NOT available to prose as a clause: it is stated once, by _delivery_statement().
+
+    Everything here is consumed by the appendix or by ``derived_warnings()``. The
+    difficult-advice prose a reader sees interpolates exactly one of them,
+    ``{{library_clause}}`` — the caveats are generalised and carry no run figures at all.
     """
-    n_shipped = len(corpus) if corpus else None
     mpr = audit.get("moral_patient_reasons") or {}
     surv = mpr.get("survival") or {}
     rl = audit.get("response_lengths") or {}
@@ -295,21 +267,11 @@ def facts(audit, manifest=None, diversity=None, costs=None, corpus=None, deals=N
     lib = audit.get("library_coverage") or {}
     cons = _considerations(audit)
     models = _models(manifest)
-    cost_agg = C.costs_by_stage(costs)
-    total_cost = sum(v["cost"] for v in cost_agg.values())
     n = audit.get("n_prompts") or 0
     n_measured = (mpr.get("pipeline") or {}).get("n") or rl.get("n") or n
     anchored = (surv.get("kept") or 0) + (surv.get("weakened") or 0) + (surv.get("dropped") or 0)
     f = {
         "n": n,
-        # Dealt and shipped are different numbers — this run dealt 40 and shipped 39,
-        # because one scenario was rejected at stage 2a — and the page says so rather
-        # than quietly reporting whichever is larger.
-        "n_shipped": n_shipped,
-        "records_clause": (f"{n_shipped:,} shipped records, from {n:,} dilemmas dealt"
-                           if n_shipped and n and n_shipped != n else
-                           f"{n_shipped:,} shipped records" if n_shipped else None),
-        "spread_clause": spread(deals) or None,
         "judge_arms_clause": _judge_arms_clause(audit),
         "n_measured": n_measured,
         "n_pipeline": (mpr.get("pipeline") or {}).get("n"),
@@ -321,8 +283,6 @@ def facts(audit, manifest=None, diversity=None, costs=None, corpus=None, deals=N
         "judge_model": mpr.get("judge_model") or delivery.get("model") or mpr.get("model") or "?",
         "gen_models": ", ".join(models["stage_models"]) or "?",
         "backend": models["backend"] or "?",
-        "cost_total": f"${total_cost:,.2f}" if total_cost else None,
-        "cost_per_example": f"${total_cost / n:,.2f}" if total_cost and n else None,
     }
     if cons and cons.get("plain"):
         f["considerations_pipeline"] = f"{cons['pipeline']:.1f}"
@@ -373,12 +333,9 @@ def facts(audit, manifest=None, diversity=None, costs=None, corpus=None, deals=N
     # Degraded defaults. A run that never had the measurement gets a sentence that says
     # so, in the same place the finding would have been.
     for key, default in (
-        ("cost_total", "not logged"), ("cost_per_example", "not logged"),
         ("length_pct", "an unmeasured amount"), ("near_dup_pct", "an unmeasured share"),
         ("library_clause", "an animal-ethics reasoning library"),
         ("added_per_answer", "an unmeasured number of"),
-        ("records_clause", "the records this run shipped"),
-        ("spread_clause", "a weighted matrix of dealt combinations"),
         ("judge_arms_clause", "not measured on this run"),
     ):
         f.setdefault(key, default)
@@ -433,35 +390,6 @@ def _labels(audit):
     return {pid: (gids or {}).get("response") or pid
             for pid, gids in (audit.get("gid_map") or {}).items()}
 
-
-# ------------------------------------------------------------------ what it is
-
-def what_tiles(f, diversity=None):
-    """Three descriptive numbers: how many records, how distinct, what they cost.
-
-    No comparison and no direction chip. What this dataset is does not depend on how it
-    scored against a plain model, and a reader who wants that comparison opens the
-    appendix.
-
-    A tile is omitted rather than zeroed: the diversity pass is optional, and a
-    ``.get("score", 0)`` would print "0.0 effectively distinct records" on a run that
-    simply never measured it.
-    """
-    items = []
-    if f.get("n_shipped"):
-        items.append(R.stat(f"{f['n_shipped']:,}", "shipped records",
-                            f.get("spread_clause") if f.get("spread_clause") !=
-                            "a weighted matrix of dealt combinations" else ""))
-    vendi = (diversity or {}).get("vendi") or {}
-    if vendi.get("score"):
-        items.append(R.stat(f"{vendi['score']:.1f}", "effectively distinct records",
-                            f"of {diversity.get('n_records', '?')} actual records; "
-                            f"{f.get('near_dup_pct', '?')} sit above 0.90 cosine "
-                            f"similarity to their nearest neighbour"))
-    if f.get("cost_per_example") not in (None, "not logged"):
-        items.append(R.stat(f["cost_per_example"], "per example, end to end",
-                            f"{f['cost_total']} for this run"))
-    return R.tiles(items)
 
 
 # ------------------------------------------------------------------ beats
@@ -787,16 +715,14 @@ def scoreboard(audit, f, cons):
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
 
 
-def blocks_what(content, f, diversity=None):
-    """What the dataset is, and three numbers describing it.
+def blocks_what(content, f):
+    """What the dataset is: prose, and nothing else.
 
-    Takes no ``audit`` and no ``cons`` on purpose: this beat cannot lead with a judged
-    figure because it is not given one. The comparison against a plain model lives in a
-    single appendix drawer, and every chart this run supports lives there too.
+    Takes no ``audit`` and no figures on purpose. The record count is already in the
+    comparison table above this report, and how distinct the records are or what they cost
+    is a measurement rather than what the dataset *is* — both are in the appendix.
     """
-    return "".join(b for b in (R.sub("dad-what", "What it is"),
-                               C.prose(content, "dad_what", f),
-                               what_tiles(f, diversity)) if b)
+    return R.sub("dad-what", "What it is") + C.prose(content, "dad_what", f)
 
 
 def _delivery_statement(audit, f):
@@ -964,6 +890,10 @@ def judged_drawer(audit, content, f, cons, labels):
             f"control answers: {mpr['failures']} extractions failed and are excluded, so the "
             "comparison is not fully matched."))
 
+    # The one place the delivery regression is written out in prose. It belongs with the
+    # comparison it is about, rather than in the caveats beat, which is generalised.
+    body.append(_delivery_statement(audit, f))
+
     board = scoreboard(audit, f, cons)
     if board:
         body.append("<h4>Measure by measure</h4>")
@@ -1020,32 +950,19 @@ def checks_table(audit, diversity):
 
 # ------------------------------------------------------------------ method
 
-def blocks_built(content, f, manifest, costs, run_id):
-    """The three stages, the control, and the command that reproduces all of it."""
+def blocks_built(content, f):
+    """The three stages and the control. The process, and nothing about deployment.
+
+    No costs, no per-stage model table, no commands: how to install and run this pipeline
+    is the repository README's job, and a hand-off page that explains it is a hand-off
+    page a reader has to skim past to reach the thing they came for.
+    """
     blocks = [R.sub("dad-built", "How it is built"), C.prose(content, "method_intro", f)]
     for key, heading in (("stage1", "Stage 1 · the dilemma"),
                          ("stage2", "Stage 2 · the reasoning"),
                          ("stage3", "Stage 3 · the constitution rewrite"),
                          ("control", "The control arm")):
         blocks.append(f"<h4>{R.esc(heading)}</h4>{C.prose(content, key, f)}")
-    table = C.stage_cost_table(costs, _STAGE_LABELS)
-    if table:
-        blocks.append(R.details("Per-stage cost and model", table,
-                                meta=f"{f.get('cost_total', '?')} for this run"))
-    elif _models(manifest)["stage_models"]:
-        blocks.append(R.details("Per-stage model", R.table(
-            ["stage", "model"], [(k.replace("_model", "").replace("_", " "), v)
-                                 for k, v in _models(manifest)["per_stage"].items()])))
-    blocks.append("<h4>Running it yourself</h4>")
-    blocks.append(C.prose(content, "reproduce", f))
-    cmd = ("# generate a dataset\n"
-           "python dad_pipeline/run.py --config config.yaml --label my-run\n\n"
-           "# the evals run automatically; to re-run them on an existing run:\n"
-           "python evals/audit_dad.py --input outputs/dad/latest --reasons\n"
-           "python evals/diversity.py --input outputs/dad/latest\n\n"
-           "# rebuild this page\n"
-           f"python report/build_report.py --dad-run outputs/dad/runs/{run_id}")
-    blocks.append(f"<pre>{R.esc(cmd)}</pre>")
     return "".join(blocks)
 
 
@@ -1215,25 +1132,34 @@ def derived_warnings(audit, manifest, f):
     return sorted(out, key=lambda w: 0 if w[0] == "BAD" else 1)
 
 
-def blocks_weak(audit, content, f, manifest):
-    """The derived floor, then what the measurements cannot settle.
+def blocks_weak(content, f):
+    """What is wrong with the method, in general — not with this run.
 
-    This is where the delivery regression is written out — once, by
-    ``_delivery_statement()``, as a caveat rather than as a result. The appendix's
-    scoreboard row and the derived weakness carry the same number as data, which is not
-    the same as saying it again.
+    Authored bullets, deliberately carrying no figures: a reader deciding whether to use
+    this pipeline needs to know that the judges share a model family with the generator and
+    that nothing here shows a trained model behaves better, and neither of those facts is a
+    property of one run. It takes no ``audit`` at all, so a run number cannot get in.
 
-    The subhead below is code's, not the prose file's: h3 is the beat level inside a
-    section, so a prose `### ` would put it level with "Where it is weak" itself.
+    The run's own findings are not softened by this and are not gone: every BAD and OK
+    verdict its audit recorded still renders, derived and unfiltered, in the appendix
+    drawer built by ``audit_flags_drawer()``.
     """
-    return "".join(b for b in (
-        R.sub("dad-weak", "Where it is weak"),
-        C.prose(content, "weaknesses_intro", f),
-        _delivery_statement(audit, f),
-        C.warnings_table(derived_warnings(audit, manifest, f)),
-        "<h4>What these measurements do not establish</h4>",
-        C.prose(content, "judge_limits", f),
-    ) if b)
+    return R.sub("dad-weak", "Where it is weak") + C.prose(content, "caveats", f)
+
+
+def audit_flags_drawer(audit, f, manifest):
+    """The derived floor, in the appendix with the rest of this run's own numbers.
+
+    Still computed, never authored, and never filtered — ``warnings_table`` may collapse
+    rows into a counted drawer but the list itself is whole. It sits here rather than in
+    the caveats beat because every row is specific to one run.
+    """
+    warnings = derived_warnings(audit, manifest, f)
+    if not warnings:
+        return ""
+    bad = sum(1 for sev, _ in warnings if sev == "BAD")
+    return R.details("What this run's audit flagged", C.warnings_table(warnings),
+                     meta=f"{len(warnings)} findings · {bad} BAD")
 
 
 # ------------------------------------------------------------------ appendix
@@ -1286,14 +1212,17 @@ def _appendix_charts(audit, f, cons):
     return out + _footprint_figures(audit, f)
 
 
-def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, picks=()):
+def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest=None,
+                    picks=()):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
-    Every chart lands here — the page above carries none — and so does the whole judged
-    comparison, which leads the appendix because a reader who came looking for it should
-    find it first.
+    Every chart lands here — the page above carries none — and so does everything specific
+    to one run: the judged comparison, and the derived floor of what this run's own audit
+    flagged. The beats above are the process, the records, and caveats that hold for any
+    run of this pipeline.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
+              audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels)]
 
     charts = _appendix_charts(audit, f, cons)
@@ -1381,24 +1310,22 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, picks=
 
 # ------------------------------------------------------------------ assembly
 
-def blocks(*, audit, content, diversity=None, manifest=None, corpus=None, baseline=None,
-           rewrites=None, costs=None, deals=None, lineage=None, n_prompt_templates=None,
-           run_id="", example=None):
+def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewrites=None,
+           lineage=None, n_prompt_templates=None, run_id="", example=None):
     """The whole ``#dad`` section body, in skeleton order. Pure: no filesystem, no argv.
 
     Returns one flat string of blocks. report/page.py wraps it in ``<section id='dad'>``
     with the h2; every block here is therefore a grid child of that section, which is
     what lets figures bleed past the text measure.
     """
-    f = facts(audit, manifest, diversity, costs, corpus, deals)
+    f = facts(audit, manifest, diversity)
     cons = _considerations(audit)
     labels = _labels(audit)
-    run = run_id or (manifest or {}).get("run_id", "<run_id>")
     picks = (example,) if example else ()
     return "".join([
-        blocks_what(content, f, diversity),
-        blocks_built(content, f, manifest, costs, run),
+        blocks_what(content, f),
+        blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks),
-        blocks_weak(audit, content, f, manifest),
-        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, picks),
+        blocks_weak(content, f),
+        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks),
     ])

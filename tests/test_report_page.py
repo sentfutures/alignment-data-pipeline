@@ -44,12 +44,10 @@ DAD_AUDIT = {
 DAD_MANIFEST = {"created_at": "2026-07-20T20:51:58", "git_commit": "326e4567", "git_dirty": True,
                 "config": {"backend": "bedrock", "model": "claude-sonnet-5",
                            "dad": {"constitution_rewrite_model": "claude-opus-4-8"}}}
-DAD_DEALS = [{"domain": ["public policy / law"], "taxa_category": "farmed animals",
-              "cultural_setting": "Brazil, written in Portuguese"},
-             {"domain": ["consumer choice", "public policy / law"], "taxa_category": "companion",
-              "cultural_setting": "Japan, written in Japanese"}]
-DAD_INPUTS = {"audit": DAD_AUDIT, "manifest": DAD_MANIFEST, "deals": DAD_DEALS,
-              "corpus": [{"record_id": "AW-0001"}] * 39, "costs": [],
+# No costs, corpus or deals: the report shows the process and the records, so the loader
+# stopped reading the cost log and the dealt-scenario file when the cost tiles and the
+# per-stage cost drawer came off the page.
+DAD_INPUTS = {"audit": DAD_AUDIT, "manifest": DAD_MANIFEST,
               "n_prompt_templates": 8, "run_id": "2026-07-20_20-51_bedrock-40"}
 
 SDF_AUDIT = {"n_docs": 100,
@@ -95,6 +93,27 @@ def build(**kwargs):
 def strip_tags(html):
     text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.S)
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text))
+
+
+def _bar_rem(html, t):
+    """The chooser bar's height in rem loose (t=0) or tight (t=1), from the CSS.
+
+    Derived rather than pinned: the bar is six tokens and five interpolations, and what
+    matters about it — that a deep-linked beat clears it, that tightening it actually
+    tightens it — has to follow the declarations rather than a number typed in here.
+    """
+    bar = re.search(r"\.choicebar\{[^}]*\}", html).group(0)
+    btn = re.search(r"\.choice\{[^}]*\}", html).group(0)
+    tok = {k: float(re.search(rf"--{k}:([\d.]+)rem", bar).group(1))
+           for k in ("pad", "btn-y", "label")}
+    pad_f = float(re.search(r"var\(--pad\)\*\(1 - ([\d.]+)\*", bar).group(1))
+    btn_f = float(re.search(r"var\(--btn-y\)\*\(1 - ([\d.]+)\*", btn).group(1))
+    label_f = float(re.search(r"var\(--label\)\*\(1 - ([\d.]+)\*", btn).group(1))
+    line_h = float(re.search(r"font:650 var\(--label\)/([\d.]+)", btn).group(1))
+    return (2 * tok["pad"] * (1 - pad_f * t)
+            + 2 * tok["btn-y"] * (1 - btn_f * t)
+            + tok["label"] * (1 - label_f * t) * line_h
+            + 2 / 16)  # the buttons' 1px borders
 
 
 class TestShape:
@@ -235,11 +254,11 @@ class TestShape:
             assert want in rule, rule
 
     def test_the_buttons_are_not_dragged_along_with_the_links(self):
-        """.lbtn, .choice and .cta are actions, and each sets its own font shorthand so
+        """.lbtn, .choice and .tab are actions, and each sets its own font shorthand so
         a bare `a` rule cannot reach them. The outbound buttons are deliberately mono,
         matching the links; they just say so themselves."""
         html = build(sdf_inputs=SDF_INPUTS)
-        for cls in ("\n.lbtn{", ".choice{", ".cta{"):
+        for cls in ("\n.lbtn{", ".choice{", ".tab{"):
             start = html.index(cls)
             rule = html[start:html.index("}", start)]
             assert "font:" in rule, rule          # its own shorthand beats the `a` rule
@@ -330,28 +349,31 @@ class TestChooser:
                                                *D.SECTION_TITLE.split(), "&darr;"]
 
     def test_the_choice_lines_up_with_what_is_being_chosen(self):
-        """40rem centred is exactly the two dataset columns above (2 x 20rem), so each
-        button sits under its own column instead of off to the left with the prose."""
+        """At rest, 40rem centred is exactly the two dataset columns above (2 x 20rem), so
+        each button sits under its own column instead of off to the left with the prose.
+        It narrows from there as the bar tightens, which only moves the pair inwards."""
         html = build(sdf_inputs=SDF_INPUTS)
-        assert re.search(r"\.choices\{[^}]*width:min\(100%,40rem\)", html)
+        assert re.search(r"\.choicebar\{[^}]*--w:40rem", html)
+        assert re.search(r"\.choices\{[^}]*width:min\(100%,calc\(var\(--w\)", html)
         assert re.search(r"\.choices\{[^}]*margin:0 auto", html)
         assert re.search(r"#explore>h2\{[^}]*text-align:center", html)
         # A descendant selector here would centre and stretch both report titles too:
         # every panel opens with its own <h2>, and the panels are inside #explore.
         assert "#explore h2{" not in html
 
-    def test_each_report_ends_by_offering_the_other(self):
-        """The dataset a reader did not choose is one click from the end of the one
-        they did, which is the whole reason a chooser is allowed to hide things."""
+    def test_a_report_ends_where_its_content_ends(self):
+        """There was a filled button here offering the other dataset, from when the
+        chooser scrolled away behind the reader. The bar is pinned now, so the way across
+        is on screen throughout and a second one at the foot of every report was a button
+        the page did not need."""
         html = build(sdf_inputs=SDF_INPUTS)
-        sdf_panel = html[html.index("<section id='sdf'"):html.index("<section id='dad'")]
-        assert "class='panel-cta'" in sdf_panel
-        assert f"data-panel='dad'>{D.SECTION_TITLE} example" in sdf_panel
-        dad_panel = html[html.index("<section id='dad'"):]
-        assert f"data-panel='sdf'>{S.SECTION_TITLE} example" in dad_panel
-        # A filled button, not a text link: it is the one thing the page asks for here.
-        rule = html[html.index("\n.cta{"):html.index("}", html.index("\n.cta{"))]
-        assert "background:var(--accent)" in rule and "color:var(--surface-0)" in rule
+        assert "panel-cta" not in html
+        assert "class='cta'" not in html and ".cta{" not in html
+        for title in (S.SECTION_TITLE, D.SECTION_TITLE):
+            assert f"{title} example" not in html
+        # Every button that opens a report is a tab, and both live in the bar.
+        bar = re.search(r"<div class='choicebar'>.*?</div></div>", html, re.S).group(0)
+        assert html.count("data-panel=") == bar.count("data-panel=") == 2
 
     def test_hiding_a_panel_actually_hides_it(self):
         """A panel is a <section>, and section{display:grid} beats the browser's own
@@ -416,31 +438,91 @@ class TestStickyBar:
         bar's own rect and offsetTop report where it is painted, not where it sits."""
         html = build(sdf_inputs=SDF_INPUTS)
         script = html[html.index("<script>"):]
-        assert "querySelector('.explore-body')" in script
-        assert ".choicebar" not in script  # the script never measures the bar itself
-        # A tab and the end-of-report button now want the same thing.
-        assert "querySelectorAll('.choice,.cta')" in script
+        assert "flow.getBoundingClientRect()" in script
+        # Nothing measures the bar. The script writes --p on it and reads nothing from it.
+        assert "bar.getBoundingClientRect" not in script
+        assert "open(id,true);mark(id)" in script  # pressing a tab scrolls and marks
 
     def test_the_page_owns_the_smoothness_not_the_script(self):
         """An explicit behavior:'smooth' beats the CSS, so prefers-reduced-motion could
-        not turn it off — which is what the old .cta scroll did."""
+        not turn it off — which is what the old scroll-out-of-frame handler did."""
         html = build()
         assert "behavior:'smooth'" not in html
         assert "scroll-behavior:smooth" in html
         assert "scroll-behavior:auto" in html[html.index("prefers-reduced-motion"):]
 
     def test_a_deep_linked_beat_lands_clear_of_the_pinned_bar(self):
-        """Recomputed from the declarations the bar is built out of, so tightening the
-        buttons without revisiting the headroom fails here rather than in a browser."""
+        """Recomputed from the tokens the bar is built out of, so retuning the buttons
+        without revisiting the headroom fails here rather than in a browser. Measured
+        against the bar at REST, which is the taller of its two states."""
         html = build()
-        pad = float(re.search(r"\.choicebar\{[^}]*padding:([\d.]+)rem", html).group(1))
-        btn = float(re.search(r"\.choice\{[^}]*padding:([\d.]+)rem", html).group(1))
-        size, lh = re.search(r"\.choice\{[^}]*font:650 ([\d.]+)rem/([\d.]+)", html).groups()
-        bar = 2 * pad + 2 * btn + float(size) * float(lh) + 2 / 16  # + the 1px borders
+        bar = _bar_rem(html, 0)
         for target in (r"h3\[id\]\{scroll-margin-top:([\d.]+)rem", r"\.panel\{[^}]*"
                        r"scroll-margin-top:([\d.]+)rem"):
             head = float(re.search(target, html).group(1))
             assert head > bar, f"a beat lands under the {bar:.2f}rem bar"
+
+    def test_the_bar_has_two_sizes_and_the_tight_one_is_smaller(self):
+        """Loose it is right; pinned over a report it is heavy. Both states are one set of
+        numbers — every dimension is an interpolation off --t — and each factor can only
+        make the bar smaller. An inverted sign here would grow it over the reading column."""
+        html = build()
+        assert re.search(r"\.choicebar\{--t:0;", html)      # loose by default
+        assert ".choicebar.tight{--t:1}" in html            # the one thing the script sets
+        for name, rule in (("bar-pad", r"\.choicebar\{[^}]*\}"), ("pair", r"\.choices\{[^}]*\}"),
+                           ("button", r"\.choice\{[^}]*\}"), ("arrow", r"\.choice-a\{[^}]*\}")):
+            block = re.search(rule, html).group(0)
+            found = re.findall(r"\(1 - ([\d.]+)\*var\(--t\)\)", block)
+            assert found, f"{name} does not interpolate off --t: {block}"
+            for f in found:
+                assert 0 < float(f) < 1, f"{name} factor {f} does not shrink the bar"
+        # Tight has to be markedly lighter than loose, or the change is not worth animating:
+        # measured 83px -> 52px in Chromium.
+        assert _bar_rem(html, 1) < 0.7 * _bar_rem(html, 0)
+        # The pair narrows too, and its floor is measured rather than chosen: below 27.5rem
+        # "Synthetic documents" wraps and the tight bar ends up TALLER than the loose one
+        # (measured at 202px per button in Chromium).
+        rest = float(re.search(r"--w:([\d.]+)rem", html).group(1))
+        w_f = float(re.search(r"width:min\(100%,calc\(var\(--w\)\*\(1 - ([\d.]+)\*var\(--t\)",
+                              html).group(1))
+        assert rest * (1 - w_f) >= 27.5, f"the pair shrinks to {rest * (1 - w_f)}rem and wraps"
+
+    def test_the_bar_crosses_once_rather_than_tracking_the_scroll(self):
+        """A size that followed the scroll meant the bar moved whenever the page did, which
+        reads as distraction beside prose. It crosses a trigger instead — and two of them,
+        because one threshold lets a reader parked on the boundary flip a layout change back
+        and forth. The script sets a flag and nothing else; the sizes are CSS."""
+        script = build()[build().index("<script>"):]
+        assert "querySelector('.explore-body')" in script
+        assert "classList.toggle('tight'" in script
+        assert "setProperty" not in script  # no per-frame value written into the bar
+        tight = int(re.search(r"TIGHT=(\d+)", script).group(1))
+        loose = int(re.search(r"LOOSE=(\d+)", script).group(1))
+        assert 0 < loose < tight, f"the thresholds do not hold apart: {loose} then {tight}"
+        assert "requestAnimationFrame(tighten)" in script
+        assert "addEventListener('scroll'" in script and "addEventListener('resize'" in script
+
+    def test_the_animation_is_a_transition_so_reduced_motion_can_stop_it(self):
+        """The animated properties are the concrete ones, not --t: a custom property is
+        discrete unless it is registered, and putting the transition on padding, width and
+        font-size is also what lets the page's own prefers-reduced-motion rule turn it off
+        with the transition:none it applies to everything."""
+        html = build()
+        for rule, prop in ((r"\.choicebar\{[^}]*\}", "transition:padding"),
+                           (r"\.choices\{[^}]*\}", "transition:width"),
+                           (r"\.choice\{[^}]*\}", "transition:padding"),
+                           (r"\.choice-a\{[^}]*\}", "transition:font-size")):
+            block = re.search(rule, html).group(0)
+            assert prop in block, block
+        reduced = html[html.index("@media (prefers-reduced-motion:reduce){"):]
+        assert "transition:none!important" in reduced[:120]
+
+    def test_the_browser_does_not_correct_the_scroll_the_shrink_causes(self):
+        """Measured: with scroll anchoring left on, tightening the pinned bar moves the
+        report, the browser compensates by moving the scroll, and that moves the very
+        element the trigger is measured from — so the bar settled 31px below the top of the
+        screen, or bounced between its two sizes depending on where the reader stopped."""
+        assert re.search(r"\.explore-body\{[^}]*overflow-anchor:none", build())
 
     def test_the_bar_stays_one_row_on_a_phone(self):
         """Stacked, the two buttons are ~10rem of permanently pinned chrome — a quarter
@@ -448,8 +530,9 @@ class TestStickyBar:
         html = build()
         small = html[html.index("@media (max-width:760px)"):html.index("@media (max-width:620px)")]
         assert ".choices{grid-template-columns:1fr}" not in small
-        assert re.search(r"\.choice\{[^}]*font-size:1rem", small)
-        assert re.search(r"\.choicebar\{padding:[\d.]+rem 0\}", small)
+        # Tokens, not sizes: the breakpoint restates them and the shrink still works.
+        assert re.search(r"\.choicebar\{[^}]*--label:1rem", small)
+        assert re.search(r"\.choicebar\{[^}]*--btn-y:[\d.]+rem", small)
 
 
 class TestComparisonTable:
@@ -562,14 +645,13 @@ class TestComparisonTable:
         assert "not published yet" in strip_tags(table)
         assert P.HF_SDF in table  # the viewer link still works
 
-    def test_a_run_without_deals_says_nothing_rather_than_guessing(self):
-        html = build(dad_inputs={**DAD_INPUTS, "deals": []})
-        assert "domains" not in strip_tags(html)
-
-    def test_the_dealt_spread_reaches_the_page_when_the_run_has_it(self):
-        """The counterpart to the test above, which passed vacuously while spread() was
-        computed and never rendered anywhere."""
-        assert "domains" in strip_tags(build(dad_inputs=DAD_INPUTS))
+    def test_the_comparison_does_not_report_a_dealt_spread(self):
+        """The dealt spread came off the page with the descriptive tiles, and the loader
+        stopped reading scenario_deals.jsonl with it. The comparison's job is what a
+        record is and how many there are; how wide the matrix runs is the pipeline's
+        documentation, not a cell in a table read in one pass."""
+        assert "domains" not in strip_tags(build(dad_inputs=DAD_INPUTS))
+        assert not hasattr(D, "spread")
 
 
 class TestSdfPlaceholder:
@@ -639,17 +721,18 @@ class TestBrevity:
     def test_the_report_a_reader_reads_has_its_own_ceiling(self):
         """The whole-page count above is dominated by the appendix, which is closed
         drawers a reader opens on purpose. What has to stay short is the part that is
-        open: the difficult-advice beats before the appendix. Restructuring the report
-        away from a results narrative took ~160 words out of here, and this is the
-        assertion that stops them coming back one caption at a time.
+        open: the difficult-advice beats before the appendix. Two rounds of cutting took
+        that from 1,199 words to under 800 — dropping the results narrative, then the
+        cost tiles, the commands and the run-specific caveats — and this is the assertion
+        that stops them coming back one caption at a time.
 
-        Measures 860 against these fixtures, so the ceiling is a sixth of headroom — not
-        the third the whole-page one carries, because this is the number being defended.
+        The ceiling carries a sixth of headroom over the measured value, not the third the
+        whole-page one carries, because this is the number being defended.
         """
         html = self.page()
         section = html[html.index("<section id='dad'"):]
         read_first = section[:section.index("id='dad-appendix'")]
-        assert C.editorial_words(read_first) < 1000
+        assert C.editorial_words(read_first) < 800
 
     def test_the_method_is_credited_once_where_the_reader_starts(self):
         """The Teaching Claude Why grounding was on both of the pages this replaces, and
@@ -670,6 +753,21 @@ class TestBrevity:
         """A section renamed in a module and not in its prose file, or a prose block
         left behind after a rename, is a build error rather than a silent hole."""
         assert set(shipped_content()) == set(P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS)
+
+    def test_the_shipped_caveats_hold_for_any_run(self):
+        """The caveats beat is about the method, so it carries no figure and no
+        placeholder — a run number in it would be false the next time the pipeline runs.
+        Checked against the shipped prose, because the fixtures cannot prove it."""
+        caveats = shipped_content()["caveats"]
+        assert not re.search(r"\d", caveats), caveats
+        assert "{{" not in caveats
+
+    def test_the_shipped_prose_does_not_explain_how_to_run_anything(self):
+        """Installation and invocation are the repository README's job. This page is the
+        process and the records."""
+        prose = " ".join(shipped_content().values())
+        for gone in ("pip install", "python ", "config.yaml", "--config", "$ "):
+            assert gone not in prose, gone
 
 
 class TestFacts:

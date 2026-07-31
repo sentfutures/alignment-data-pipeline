@@ -651,20 +651,15 @@ def tabs(panes):
             f"{bodies}</div>")
 
 
-def panel(pid, body, cta=None):
+def panel(pid, body):
     """One chooser panel: closed until its button is pressed.
 
-    ``cta`` is (other_panel_id, label) and renders at the bottom as the way across, so
-    the dataset a reader did not choose is still offered to them once they finish.
+    It ends where its content ends. There was a button here offering the other dataset,
+    from when the chooser scrolled away behind the reader; the bar it lives in is pinned
+    now, so the other report is one click away from anywhere in this one.
     """
-    tail = ""
-    if cta:
-        other, label = cta
-        tail = (f"<p class='panel-cta'><button class='cta' type='button' "
-                f"data-panel='{esc(other)}'>{esc(label)}"
-                f"<span aria-hidden='true'> &rarr;</span></button></p>")
     return (f"<section id='{esc(pid)}' class='panel' role='tabpanel' "
-            f"aria-labelledby='choose-{esc(pid)}' hidden>{body}{tail}</section>")
+            f"aria-labelledby='choose-{esc(pid)}' hidden>{body}</section>")
 
 
 def explore_body(bar, panels):
@@ -791,34 +786,60 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    descendant selector here centres and stretches both report titles too. */
 #explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem}
 /* The bar's travel. min-width:0 for the reason main has it: it is a grid item now, and a
-   grid track takes its automatic minimum from the item's min-content size. */
-.explore-body{min-width:0}
+   grid track takes its automatic minimum from the item's min-content size.
+
+   overflow-anchor:none is load-bearing, and was measured: shrinking the pinned bar moves
+   the report under it, so scroll anchoring "corrects" the scroll by the same amount, which
+   moves this wrapper's top, which is what the shrink is computed FROM. With anchoring on,
+   the bar settled at 52px while sitting 31px BELOW the top of the screen, or bounced
+   between 52 and 83 depending on where the reader stopped. */
+.explore-body{min-width:0;overflow-anchor:none}
 /* Pinned to the top of the screen for as long as a report is being read, carrying the
    page's own background so the report scrolls under it and out of sight. Full column
    width, not the buttons' 40rem, or a figure would scroll up either side of it.
-   z-index:5 sits under #tip (9) and .skip:focus (20) and over everything else. */
-.choicebar{position:sticky;top:0;z-index:5;background:var(--surface-0);padding:.8rem 0}
-.choices{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;
-width:min(100%,40rem);margin:0 auto}
+   z-index:5 sits under #tip (9) and .skip:focus (20) and over everything else.
+
+   It TIGHTENS ONCE, at a trigger point, because at rest it is right and pinned over a
+   report it is heavy: --t is a flag, 0 loose and 1 tight, the script sets it when the
+   reader is past the trigger, and every dimension below is one interpolation off it, so
+   the two states are one set of numbers. Measured in Chromium: 83px tall and 40rem wide
+   loose, 52px and 30rem tight. A size that tracked the scroll continuously read as
+   distracting — the bar moved whenever the page did — so this crosses once and settles.
+   The six sizes are tokens, so each breakpoint restates only the tokens.
+
+   The transition lives on the concrete properties rather than on --t (a custom property
+   is discrete unless it is registered), which is also what lets the reduced-motion rule
+   at the foot of this stylesheet turn the animation off with the same transition:none it
+   applies to everything else. */
+.choicebar{--t:0;--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
+--w:40rem;position:sticky;top:0;z-index:5;background:var(--surface-0);
+padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease}
+.choicebar.tight{--t:1}
+/* The pair narrows with everything else, 40rem to 30rem, staying centred as it goes. The
+   floor is measured, not chosen: below 27.5rem "Synthetic documents" wraps to two lines
+   and the shrunk bar is taller than the one it replaced, so .25 is as far as this goes. */
+.choices{display:grid;grid-template-columns:1fr 1fr;
+gap:calc(var(--gap)*(1 - .35*var(--t)));
+width:min(100%,calc(var(--w)*(1 - .25*var(--t))));margin:0 auto;
+transition:width .2s ease,gap .2s ease}
 /* Two names and an arrow, in the accent. The cream fill with a border was doing duty as
    a button, a card, a chip and a code block at once, and had stopped meaning anything;
    an outline in the accent that fills when you choose says "this is a control". */
 .choice{display:flex;align-items:center;justify-content:space-between;gap:1rem;
-padding:1rem 1.25rem;background:none;border:1px solid var(--accent-edge);
-border-radius:4px;cursor:pointer;font:650 1.14rem/1.3 var(--serif);color:var(--accent);
-text-align:left}
+padding:calc(var(--btn-y)*(1 - .5*var(--t))) calc(var(--btn-x)*(1 - .2*var(--t)));
+background:none;border:1px solid var(--accent-edge);
+border-radius:4px;cursor:pointer;font:650 var(--label)/1.3 var(--serif);
+font-size:calc(var(--label)*(1 - .12*var(--t)));color:var(--accent);text-align:left;
+transition:padding .2s ease,font-size .2s ease}
 .choice:hover{background:var(--accent-wash)}
 .choice[aria-selected=true]{background:var(--accent);border-color:var(--accent);
 color:var(--surface-0)}
-.choice-a{font:400 1.1rem/1 var(--sans);opacity:.8}
+/* The arrow goes as the bar tightens: it means "the report is below", which is stale once
+   the reader is inside the report, and losing it is half of why the shrunk bar reads as
+   lighter. */
+.choice-a{font:400 1.1rem/1 var(--sans);font-size:calc(1.1rem*(1 - .2*var(--t)));
+opacity:calc(.8 - .8*var(--t));transition:font-size .2s ease,opacity .2s ease}
 .panel{margin-top:3.2rem;scroll-margin-top:7rem}
-.panel-cta{margin:3rem 0 0;padding-top:1.2rem;border-top:1px solid var(--border)}
-/* The primary button: the same shape as the outline ones, filled. It is the one thing
-   the page asks a reader to do at the end of a report. */
-.cta{display:inline-flex;align-items:center;gap:.45rem;padding:.6rem 1rem;cursor:pointer;
-background:var(--accent);border:1px solid var(--accent);border-radius:4px;
-font:600 .82rem/1.3 var(--mono);letter-spacing:-.01em;color:var(--surface-0)}
-.cta:hover{background:var(--text-primary);border-color:var(--text-primary)}
 /* The comparison: a table, but the names are its masthead rather than a heading over
    the top of it, and the last row is what a reader does next.
 
@@ -973,7 +994,7 @@ mark{background:var(--mark);color:inherit;padding:0 .1em}
 ::selection{background:var(--accent);color:var(--surface-0)}
 /* A link is a typographic object, not a coloured word: mono against the serif, bold
    enough to hold the accent, and underlined in the accent rather than in a tint of it.
-   Buttons are unaffected — .lbtn, .choice, .cta and .skip each set their own font
+   Buttons are unaffected — .lbtn, .choice, .tab and .skip each set their own font
    shorthand, which beats a bare element selector. */
 a{font-family:var(--mono);font-weight:600;font-size:.92em;letter-spacing:-.01em;
 color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
@@ -1022,15 +1043,14 @@ z-index:9;max-width:320px}
 section>*{grid-column:1}.pair{grid-template-columns:1fr}
 /* The bar stays pinned on a phone, so it has to stay ONE ROW: stacking the two buttons
    is ~10rem of permanent chrome, a quarter of a small screen. Two columns and tighter
-   type instead. A bare font-size keeps the .choice shorthand's 1.3 line-height. */
-.choicebar{padding:.6rem 0}.choices{gap:.7rem}
-.choice{padding:.7rem .8rem;font-size:1rem}}
+   type instead — restating the tokens, so the shrink still interpolates off them. */
+.choicebar{--pad:.6rem;--gap:.7rem;--btn-y:.7rem;--btn-x:.8rem;--label:1rem}}
 @media (max-width:620px){body{font-size:1rem}.shell{padding:0 16px 70px}
 /* Tighter again, and the arrow goes: at this width both labels wrap to two lines and
    space-between drops the arrow beside a ragged edge. It is decorative — the pair still
    reads as a control. */
-.choicebar{padding:.5rem 0}.choices{gap:.6rem}
-.choice{padding:.6rem .7rem;font-size:.95rem}.choice-a{display:none}
+.choicebar{--pad:.5rem;--gap:.6rem;--btn-y:.6rem;--btn-x:.7rem;--label:.95rem}
+.choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
@@ -1041,7 +1061,7 @@ h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
 @page{margin:16mm 14mm}
 :root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
 body{font-size:10.5pt;line-height:1.5}
-#tip,.skip,.choicebar,.panel-cta{display:none}
+#tip,.skip,.choicebar{display:none}
 .shell,section{display:block;max-width:none}
 .hero{padding:0 0 1.5rem;display:block;text-align:left}
 /* A sheet of paper is narrower than the bleed the centred pair needs, and the labels
@@ -1091,6 +1111,21 @@ if(!choices.length)return;
    the bar is its first child, so its top IS the bar's flow top — which is also the
    sticky threshold, so nothing jumps as the bar pins. */
 var flow=document.querySelector('.explore-body');
+/* The bar tightens once, when the reader crosses TIGHT pixels past it, and loosens again
+   at LOOSE. Two thresholds rather than one: with a single one, a reader parked on the
+   boundary flips the bar back and forth, and the size change is a layout change. All the
+   script does is set the flag — the sizes and the animation are CSS.
+
+   Measured from .explore-body for the reason above and one more: the shrink cannot move
+   the wrapper's top, so this cannot feed itself. Measuring the bar, whose height is the
+   thing being changed, is the flicker. */
+var bar=document.querySelector('.choicebar'),TIGHT=96,LOOSE=24,queued=0;
+function tighten(){queued=0;if(!bar||!flow)return;
+var past=-flow.getBoundingClientRect().top;
+bar.classList.toggle('tight',past>(bar.classList.contains('tight')?LOOSE:TIGHT));}
+window.addEventListener('scroll',function(){
+if(!queued)queued=requestAnimationFrame(tighten);},{passive:true});
+window.addEventListener('resize',tighten);tighten();
 function open(id,to){
 choices.forEach(function(b){var on=b.getAttribute('data-panel')===id;
 b.setAttribute('aria-selected',on?'true':'false');
@@ -1112,11 +1147,9 @@ else location.hash=id;}
 function fromHash(){var id=(location.hash||'').slice(1);if(!id)return false;
 var el=document.getElementById(id);var p=el&&el.closest?el.closest('.panel'):null;
 if(!p)return false;open(p.id,id);return true;}
-/* One handler for both: a tab and the end-of-report button open a report and put the bar
-   back at the top of the screen. */
-[].forEach.call(document.querySelectorAll('.choice,.cta'),function(b){
-b.addEventListener('click',function(){var id=b.getAttribute('data-panel');
-open(id,true);mark(id);});});
+/* Pressing a tab opens its report and puts the bar back at the top of the screen. */
+choices.forEach(function(b){b.addEventListener('click',function(){
+var id=b.getAttribute('data-panel');open(id,true);mark(id);});});
 window.addEventListener('hashchange',fromHash);
 /* Wait for load, not parse: the hero image is a data URI several megabytes long, and
    scrolling to a deep-linked beat before it has laid out puts the reader thousands of

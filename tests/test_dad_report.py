@@ -10,13 +10,15 @@ Six things carry real risk here and get most of the coverage:
     partial run and say what is missing rather than quietly omitting it.
   * **Self-containment.** The artefact's whole format exists so it can be opened
     offline from a filesystem. One external asset reference breaks that.
-  * **Candour.** The weaknesses beat is derived from the data, not written, so the
-    failing checks are asserted to survive into the HTML; the view may collapse rows
-    but only with a visible count.
-  * **Not leading with the judge.** The report is not a results report: no judged
-    figure appears outside the appendix, and the delivery regression is stated in prose
-    exactly once, as a caveat. Demotion is not deletion — the numbers are all still on
-    the page, in one drawer.
+  * **Candour.** The caveats a reader sees are authored and general, so they carry no run
+    figures at all; what the run's own audit flagged is derived, and asserted to survive
+    into the appendix even with the caveats prose emptied. The view may collapse rows but
+    only with a visible count.
+  * **Not leading with the judge, and not documenting deployment.** The report is the
+    process and the records: no judged figure appears outside the appendix, the delivery
+    regression is stated in prose exactly once, beside the comparison it qualifies, and
+    nothing on the page explains how to run the pipeline. Demotion is not deletion — the
+    numbers are all still on the page, in drawers.
   * **The lineage.** The worked example is assembled from the run's own step files, so
     each step either renders or names the artefact it wanted.
   * **Colour integrity.** Arm colours must follow the arm rather than the row order,
@@ -214,6 +216,20 @@ def without_corpus_text(html):
     return _CORPUS_TEXT.sub(" ", html)
 
 
+def beat(html, anchor):
+    """One beat's body: after its own <h3> and before the next one.
+
+    Slicing on ``index("id='dad-weak'")`` looks right and is not: it keeps the tail of its
+    own opening tag and the head of the next beat's ``<h3``, and that stray ``3`` breaks
+    any assertion about digits in a beat.
+    """
+    section = dad_section(html)
+    start = section.index(f"<h3 id='{anchor}'")
+    body = section[section.index(">", start) + 1:]
+    nxt = body.find("<h3 id=")
+    return body if nxt == -1 else body[:nxt]
+
+
 def make_run_dir(tmp_path, audit=None, diversity=DIVERSITY, manifest=MANIFEST, costs=COSTS):
     run_dir = tmp_path / "runs" / "2026-07-20_20-51_bedrock-40"
     (run_dir / "audit").mkdir(parents=True)
@@ -302,17 +318,19 @@ class TestFacts:
         clean["moves"]["stance"]["pipeline"]["moralizes"] = 0.0
         assert D.facts(clean)["footprint_regressions"].startswith("None of these")
 
-    def test_spread_counts_the_dealt_axes(self):
-        """Counted off step 1's deals, where the spread is engineered — and a list
-        value (a scenario with two domains) counts as two, not one."""
-        deals = [{"domain": ["a", "b"], "taxa_category": "x"}, {"domain": ["b"]}]
-        assert D.spread(deals) == "2 domains · 1 taxa groups"
-        assert D.spread([]) == ""
+    def test_facts_carry_no_cost_or_scale_figures(self):
+        """Cost per example and the dealt spread came off the page with the descriptive
+        tiles, and their facts came off with them: a fact nothing renders is a fact that
+        will end up in prose."""
+        f = D.facts(AUDIT_FULL, MANIFEST)
+        for gone in ("cost_total", "cost_per_example", "n_shipped", "records_clause",
+                     "spread_clause"):
+            assert gone not in f, gone
 
 
 class TestBuildSection:
     def test_builds_every_beat(self):
-        html = build(diversity=DIVERSITY, manifest=MANIFEST, costs=COSTS,
+        html = build(diversity=DIVERSITY, manifest=MANIFEST,
                      baseline=BASELINE, rewrites=REWRITES, lineage=LINEAGE, run_id="run-x")
         for anchor, label in D.BEATS:
             assert f"<h3 id='{anchor}'>{label}</h3>" in html
@@ -502,13 +520,12 @@ class TestSayingItOnce:
         assert len(said) == 1, said
         assert "bad-note" in html[:html.index(said[0])].rsplit("<p", 1)[-1]
 
-    def test_it_is_stated_in_the_caveats_not_in_the_opening(self):
-        """It is a caveat about the measurement, not the report's finding, so it belongs
-        with the other weaknesses rather than in the reader's first screen."""
+    def test_it_is_stated_beside_the_comparison_it_is_about(self):
+        """Inside the appendix's judged drawer. The caveats beat is generalised — it holds
+        for any run — so a figure from this one cannot live there."""
         section = dad_section(build(audit=self._regressed(), manifest=MANIFEST))
-        assert (section.index("id='dad-weak'") < section.index("went the wrong way")
-                < section.index("id='dad-appendix'"))
-        assert "wrong way" not in section[:section.index("id='dad-example'")]
+        assert section.index("id='dad-appendix'") < section.index("went the wrong way")
+        assert "wrong way" not in section[:section.index("id='dad-appendix'")]
 
     def test_the_number_still_reaches_the_appendix_and_the_weaknesses(self):
         """Demotion is not deletion: the same number is data in two more places."""
@@ -546,15 +563,15 @@ class TestChartsAreEvidence:
         html = build(diversity=DIVERSITY, manifest=MANIFEST)
         assert "figures · On this run" in html
 
-    def test_the_what_beat_carries_no_comparison(self):
-        """It says what the dataset is. A lift, a score out of ten or a direction chip
-        there would make the first thing a reader sees a claim about a plain model."""
-        section = dad_section(build(diversity=DIVERSITY, manifest=MANIFEST, corpus=CORPUS))
-        what = section[section.index("id='dad-what'"):section.index("id='dad-built'")]
-        for banned in ("the control", "/10", "chip", "+", "regression"):
-            assert banned not in strip_tags(what), banned
-        # The descriptive tiles are there: how many records, and how distinct they are.
-        assert "shipped records" in what and "effectively distinct records" in what
+    def test_the_what_beat_is_prose_and_nothing_else(self):
+        """It says what the dataset is. No comparison and no tiles — the record count is in
+        the comparison table above the report, and how distinct the records are is a
+        measurement, which is what the appendix is for."""
+        what = beat(build(diversity=DIVERSITY, manifest=MANIFEST), "dad-what")
+        for banned in ("the control", "/10", "chip", "regression", "class='tiles'",
+                       "class='scroll'", "<figure"):
+            assert banned not in what, banned
+        assert what.count("<p") == what.count("</p>") >= 1  # prose, and only prose
 
 
 class TestDegradation:
@@ -586,14 +603,26 @@ class TestDegradation:
         assert section.index("Substance against manner") > section.index("id='dad-appendix'")
 
     def test_bare_audit_still_carries_the_narrative(self):
+        """The process and the caveats are authored, so they survive an audit with nothing
+        in it — which is the point of keeping figures out of them."""
         html = build(audit={"n_prompts": 3})
         assert "Prose for method_intro." in html
-        assert "Prose for reproduce." in html
+        assert "Prose for caveats." in html
+
+    def test_the_page_does_not_explain_how_to_run_the_pipeline(self):
+        """That is the repository README's job. A hand-off page that documents installation
+        is a page a reader skims past to reach what they came for."""
+        html = build(manifest=MANIFEST)
+        text = strip_tags(html)
+        assert "<pre>" not in html
+        for gone in ("Running it yourself", "config.yaml", "per example", "Per-stage cost",
+                     "dad_pipeline/run.py"):
+            assert gone not in text, gone
 
     def test_missing_manifest_diversity_and_costs(self):
         """With no diversity pass the distinctness tile is ABSENT, not 0.0 — the trap
         that `.get("score", 0)` walks straight into."""
-        html = build(manifest=None, diversity=None, costs=None)
+        html = build(manifest=None, diversity=None)
         assert "id='dad-what'" in html
         assert "effectively distinct records" not in html
         assert "0.0" not in strip_tags(dad_section(html))
@@ -758,7 +787,7 @@ class TestColourIntegrity:
     def test_every_chart_carries_an_accessible_name(self):
         """Charts are named; the button icons are decorative and marked aria-hidden,
         which is the correct treatment for a mark that repeats its own label."""
-        html = build(diversity=DIVERSITY, manifest=MANIFEST, costs=COSTS,
+        html = build(diversity=DIVERSITY, manifest=MANIFEST,
                      baseline=BASELINE, rewrites=REWRITES)
         for svg in re.findall(r"<svg\b.*?</svg>", html, flags=re.S):
             assert "<title>" in svg or "aria-hidden='true'" in svg
@@ -831,10 +860,26 @@ class TestCandour:
         warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
         assert any(sev == "BAD" and "showcase" in w for sev, w in warnings)
 
-    def test_weaknesses_render_without_any_editorial_prose(self):
-        html = build(content=content(weaknesses_intro=""), manifest=MANIFEST)
-        section = html[html.find("id='dad-weak'"):html.find("id='dad-appendix'")]
-        assert "BAD" in section
+    def test_the_derived_floor_is_still_on_the_page(self):
+        """Generalising the caveats a reader sees must not lose the floor. Every BAD the
+        audit recorded still renders, still derived, in the appendix — and it renders with
+        the caveats prose emptied, because none of it is authored."""
+        section = dad_section(build(content=content(caveats=""), manifest=MANIFEST))
+        appendix = strip_tags(section[section.index("id='dad-appendix'"):])
+        assert "BAD" in appendix
+        assert "What this run's audit flagged" in appendix
+        # Every row the audit produced, matched on a distinctive phrase of its own wording.
+        for _, text in D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST)):
+            probe = re.sub(r"\s+", " ", re.sub(r"[*`]", "", text))[:45]
+            assert probe in appendix, probe
+
+    def test_the_caveats_carry_no_run_figures(self):
+        """The beat holds for any run of this pipeline, so a number in it is a bug. It is
+        given no audit at all, which is what makes that true by construction."""
+        weak = beat(build(manifest=MANIFEST, diversity=DIVERSITY), "dad-weak")
+        assert not re.search(r"\d", strip_tags(weak)), strip_tags(weak)
+        for run_specific in ("bedrock", "uncommitted", "BAD", "the control's"):
+            assert run_specific not in weak, run_specific
 
     def test_every_check_is_listed_in_the_appendix(self):
         """The 24-row table moved out of the main flow, but it did not leave the page:
@@ -851,13 +896,13 @@ class TestCandour:
         text = strip_tags(build(audit=audit, diversity=None))
         assert "not run on this run" in text
 
-    def test_the_judge_caveats_sit_with_the_weaknesses(self):
-        """They used to close a "what we measured" beat. That beat is gone, and a caveat
-        about the measurements belongs with the other caveats."""
-        section = dad_section(build(manifest=MANIFEST))
-        weak = section[section.index("id='dad-weak'"):section.index("id='dad-appendix'")]
-        assert "What these measurements do not establish" in weak
-        assert "Prose for judge_limits." in weak
+    def test_the_caveats_are_authored_and_general(self):
+        """One list, about the method. The run-specific findings are one beat further on,
+        derived; these are the things a reader should know before running the pipeline at
+        all, and they do not change from run to run."""
+        weak = beat(build(manifest=MANIFEST), "dad-weak")
+        assert "Prose for caveats." in weak
+        assert "<table" not in weak  # the derived floor is not here
 
 
 class TestRenderPrimitives:
@@ -1024,8 +1069,10 @@ class TestCLI:
         assert kwargs["audit"]["n_prompts"] == 2
         assert kwargs["baseline"][0]["prompt_id"] == "AW-0001"
         assert kwargs["diversity"]["vendi"]["score"] == 5.15
-        assert kwargs["deals"][0]["taxa_category"] == "farmed animals"
         assert "content" not in kwargs  # the page owns one content namespace
+        # The cost log and the dealt-scenario file are deliberately not read: nothing
+        # renders them since the cost figures came off the page.
+        assert "costs" not in kwargs and "deals" not in kwargs and "corpus" not in kwargs
 
     def test_every_loaded_key_is_a_blocks_parameter(self, tmp_path):
         """page.py splats these straight into dad.blocks(), so a key added to the loader
