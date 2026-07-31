@@ -3,12 +3,9 @@
 #       max_tokens caps, truncation-rejection dynamics, and the exact prompt
 #       context are reproduced. Use for full-scale runs, evals, and any run whose
 #       outputs are meant to represent pipeline behavior.
-# claude_code = your Claude subscription via the Claude Code CLI (dev iteration).
-# auto = subscription when available, api otherwise (dev iteration on a budget);
-#        empty-system calls (the DAD baseline arm) always go to the api so the
-#        plain-model condition stays exact, and an exhausted usage window falls
-#        back to the api mid-run. Caveats vs api: max_tokens not enforced and
-#        ~3K tokens of CLI scaffolding in context on subscription-served calls.
+# claude_code / auto = dev-iteration backends for local work without an API key;
+#       they do not reproduce api's request semantics, so they are never used for
+#       runs meant to represent pipeline behavior. See CLAUDE.md "Dev backends".
 backend: api
 model: claude-sonnet-5
 max_tokens: 4000
@@ -52,7 +49,7 @@ dad:
   # 2a refusal fallback, same semantics as scenario_refusal_fallback_model:
   # stage-model retries first (a stochastic refusal clears), then ONE
   # last-ditch attempt on this model. Seen live: Opus 5's classifier refused a
-  # biosecurity-framed scope 3x (opus5-smoke-40 AW-0009); dropping the prompt
+  # biosecurity-framed scope three times; dropping the prompt
   # would bias the corpus away from that content. null = no switch.
   scope_refusal_fallback_model: claude-opus-4-8
   response_select_model: claude-opus-5          # 2a.5: library-entry selection over the trigger index (falls back to response_scope_model if unset)
@@ -70,7 +67,7 @@ dad:
     seed_path: null   # optional JSONL of handwritten examples ({prompt|user_message, annotation?})
     scenario_seed: null  # optional int for reproducible scenario generation; scenarios persist per run either way
     gate: true        # step 1c: pass/fail quality gate on each 1b draft (load-bearing, honors its cards, self-contained, cohesive); a reject routes the scenario back for redraft, capped at 3
-    refine: true      # step 1d: review-and-rewrite each gate-passed draft (tic-thinning, dealt-card enforcement, unfixable rejection). NOTE: `refine` was the gate's legacy alias before 2026-07-20; a config setting refine without gate is refused loudly rather than guessed at
+    refine: true      # step 1d: review-and-rewrite each gate-passed draft (tic-thinning, dealt-card enforcement, unfixable rejection). Setting this without `gate` (or vice versa) is refused loudly rather than guessed at — they toggle two separate paid stages
   responses:
     per_prompt: 1  # independent samples per dilemma; each reasons from the reasoning library
 

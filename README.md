@@ -183,31 +183,15 @@ cp .env.example .env           # then add your ANTHROPIC_API_KEY
 
 ### Authentication
 
-The pipeline supports two backends, selected by the `backend` key in `config.yaml`:
+Runs are billed per token to the `ANTHROPIC_API_KEY` in your `.env`, via
+`backend: api` in `config.yaml`. That is the committed default and the mode to
+use for every real run: it is the only one that reproduces `max_tokens` caps,
+truncation-rejection behavior, and the exact prompt context, so a run's outputs
+represent what the pipeline does.
 
-- **`backend: api`**: calls the Anthropic API directly, billed per token to the `ANTHROPIC_API_KEY` in your `.env`. Use this for full-scale runs and evals.
-- **`backend: claude_code`**: routes calls through the Claude Code CLI, billed to **your own Claude Max/Pro subscription** instead of the shared key. No `ANTHROPIC_API_KEY` needed. Use this for dev/iteration runs.
-- **`backend: auto`**: prefers your subscription and falls back to the API key; a dev-iteration mode. Routing is per call: **calls with an empty system prompt (the DAD baseline) always take the API leg** so the plain-model condition stays exact (avoiding the neutral stand-in caveat below); everything else runs on `claude_code` until it can't serve the run (sdk/CLI missing, usage window exhausted, or a persistently failing CLI), at which point the rest of the run is served by the API, announced loudly. Each cost-log record's `backend` field names the leg that actually served that call. Requires `ANTHROPIC_API_KEY` (it is the fallback leg). **Not for representative runs:** subscription-served calls inherit the `claude_code` caveats (no `max_tokens` enforcement, CLI scaffolding in context), so runs whose outputs must represent pipeline behavior belong on `backend: api`.
-
-To use it, set `backend: claude_code` in `config.yaml` and give the Claude Code CLI credentials one of two ways:
-
-1. **Reuse your interactive login (simplest).** If you already use [Claude Code](https://claude.com/claude-code) (`claude`, then `/login`), the pipeline picks up that session automatically; there's nothing else to do.
-2. **Generate a token for `.env`.** Install [Claude Code](https://claude.com/claude-code), then run:
-   ```bash
-   claude setup-token     # opens a browser; approve with your Claude account
-   ```
-   Copy the printed token into your `.env`:
-   ```
-   CLAUDE_CODE_OAUTH_TOKEN=<paste the token here>
-   ```
-   This is a Claude Code OAuth token tied to your subscription (valid ~1 year), **not** an Anthropic API key. Despite the name, no Console/API key is involved. Use this path for CI or any non-interactive machine.
-
-Caveats for `backend: claude_code`:
-
-- **Usage limits.** Subscription usage is a 5-hour rolling window plus a weekly cap, shared with your interactive Claude Code use. Dev-scale runs fit comfortably; a full-scale run will exhaust the window. If a run hits the limit it stops with a clear message. Progress is checkpointed, so continue later with `--resume`.
-- **Per-call overhead.** Claude Code adds ~3K input tokens of scaffolding per call and spawns a CLI process per request, so calls are somewhat slower. `max_tokens` from `config.yaml` is not enforced on this backend (Claude Code applies its own output cap); `cost_usd` in the cost log is notional: what the run *would* have cost at API prices.
-- **Empty system prompts get a neutral stand-in.** Claude Code substitutes its own agentic CLI prompt when the system prompt is empty, so stages that send none get a one-line neutral system prompt instead (see `_NEUTRAL_SYSTEM` in `shared/api.py`). The only empty-system call in the pipelines is the **DAD baseline** (every generation stage sends a real system prompt). On `auto` the baseline always takes the API leg for exactly this reason, but on pure `claude_code` it gets the stand-in and is **not reproduced exactly**. The backend prints a one-time warning when it does this. Run DAD on `backend: api` when a faithful plain-model baseline matters (and keep full-scale corpus runs on `api` regardless).
-- **Policy note.** Anthropic's docs steer programmatic workloads toward API keys; running this pipeline on your own subscription is the same posture as using Claude Code itself, but it's a gray area. Keep it to dev-scale runs.
+A `claude_code` dev backend also exists for local iteration without an API key;
+see `CLAUDE.md` if you are contributing. Runs whose outputs are meant to
+represent pipeline behavior belong on `api`.
 
 ---
 
