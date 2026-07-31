@@ -8,12 +8,6 @@ welfare-impact judges, showcase examples, and move-discovery candidates), all
 labelled INTERNAL DEV SIGNAL — the deterministic offline checks are what a
 reviewer trusts.
 
-The old health-check tail (structural skeletons, openers/closers, jargon,
-lexical/structural variation, response openings, library selection/coverage,
-locale-taxa and frontier-frame realization) was retired 2026-07-30: nobody was
-reading it. Old audit_report.json files still carry those sections; the viewer
-simply no longer renders them.
-
 Offline and free — no API calls — so it can run after every run. Each check
 prints a GOOD/OK/BAD verdict where a threshold is meaningful; the run's
 ``audit/audit_report.json`` is written for run-over-run comparison.
@@ -630,9 +624,9 @@ def audit_move_candidates(run_dir: Path | None, config: dict, report: dict) -> N
 
     def _discover(texts: list[str]) -> tuple[list[dict], int]:
         """One discovery call over FULL responses (up to the char budget);
-        returns (candidates, n_texts_sent). Measured on scope200-40: with the
-        old 20-doc/800-char sample the first firing of nearly every tracked
-        move sat past the cutoff, so discovery only ever saw opening moves."""
+        returns (candidates, n_texts_sent). Measured live: with a
+        20-doc/800-char sample the first firing of nearly every tracked move sat
+        past the cutoff, so discovery only ever saw opening moves."""
         sample, used = [], 0
         for t in texts:
             if used + len(t) > _MOVE_DISCOVERY_CHAR_BUDGET:
@@ -816,8 +810,8 @@ DELIVERY_SYSTEM = (
 
 DELIVERY_USER = "USER MESSAGE: {user_message}\n\nRESPONSE: {response}"
 
-# Both judges grade on 0-100 (was 0-10 through 2026-07-28). Reports carry
-# "score_max" so a reader can tell which scale a stored run used; absent means 10.
+# Both judges grade on 0-100. Reports carry "score_max" so a reader can tell
+# which scale a stored run used; runs recorded without the field used 0-10.
 JUDGE_SCORE_MAX = 100
 _DELIVERY_FLAG_BELOW = 50
 
@@ -830,10 +824,10 @@ _DELIVERY_DIMENSIONS = ("goal_responsiveness", "proportionality", "tone", "calib
 # Volume of welfare substance says nothing about whether the substance does any
 # good: whether the right beings were identified, whether the harm was sized to
 # the decision, whether following the advice would change anything, or whether
-# the response's own recommendation follows from its reasoning (E-0667: plain
-# stated "smaller animals mean more individuals harmed" and still ranked small
-# oily fish first — the retired considerations count graded it HIGHER than the
-# pipeline). This judge measures that. It is kept UNCORRELATED with the delivery
+# the response's own recommendation follows from its reasoning (a plain answer
+# that stated "smaller animals mean more individuals harmed" and still ranked
+# small oily fish first would pass a count of considerations raised). This judge
+# measures that. It is kept UNCORRELATED with the delivery
 # judge on purpose — the
 # exclusion list is load-bearing, since two axes that both punish preachiness
 # are one axis measured twice, and the Pareto reading needs them independent.
@@ -858,9 +852,9 @@ MAX_IMPACT_ATTEMPTS = 2
 
 # Same blend as delivery, same reason: the holistic verdict is the construct the
 # judge was asked for and lets one fatal failure sink a response, while the
-# sub-dimensions supply resolution. Measured on archetype10: the raw holistic put
-# 9 of 10 pipeline responses on exactly 9 (two distinct values in the arm), so it
-# could not detect a pipeline regression at all.
+# sub-dimensions supply resolution. Measured on a 10-example run, the raw
+# holistic put 9 of 10 pipeline responses on exactly 9 (two distinct values in
+# the arm), so it could not detect a pipeline regression at all.
 _IMPACT_HOLISTIC_WEIGHT = 0.7
 
 
@@ -1087,7 +1081,7 @@ WELFARE_USER = "USER MESSAGE: {user_message}\n\nRESPONSE TO EVALUATE: {response}
 # refusal scoring 2 on goal_responsiveness) sink a response that is otherwise
 # polite and calibrated — an average would dilute that to a passing 7.
 # The sub-dimensions supply RESOLUTION. Measured on the 117 fully-scored pairs
-# of the pareto200 run: the holistic integer used only 4 distinct values across
+# of a 200-example run: the holistic integer used only 4 distinct values across
 # 234 responses (6, 7, 8, 9), which is why small runs report "9.0 for
 # everything". Blending gives 21 distinct values, drops the paired-difference SD
 # from 0.702 to 0.640, and lifts the pipeline-vs-plain z from 2.76 to 3.30 —
@@ -1203,13 +1197,13 @@ def audit_judges(run_dir: Path | None, config: dict, report: dict) -> None:
         prompt = (DELIVERY_USER
                   .replace("{user_message}", dilemmas.get(pid, ""))
                   .replace("{response}", text))
-        # Bounded retry + raw-keeping contract. Measured on the archetype10
-        # run: every "failure" re-ran clean at
+        # Bounded retry + raw-keeping contract. Measured live: every "failure"
+        # re-ran clean at
         # temp 1 while a previously-clean call failed, i.e. the judge
         # intermittently returns an object with no delivery_quality field (the
         # recover=True salvage can land on a non-verdict object) — per-call
         # randomness, not a property of the record. A single unretried call was
-        # dropping ~19% of delivery scores (70 of ~370 on pareto200), and the
+        # dropping ~19% of delivery scores (70 of ~370 on a 200-example run), and the
         # bare `except` discarded the raw, leaving the shape undiagnosable.
         obj = None
         attempts_log: list = []
@@ -1242,8 +1236,8 @@ def audit_judges(run_dir: Path | None, config: dict, report: dict) -> None:
             except (KeyError, TypeError, ValueError):
                 continue
         return pid, arm, {"score": score, "note": str(obj.get("quality_note") or "").strip(),
-                          # the judge's OWN read of the case, replacing the
-                          # pipeline-supplied stakes it used to be handed
+                          # the judge's OWN read of the case — it is never
+                          # handed the pipeline's own stakes assessment
                           "stake_read": str(obj.get("stake_read") or "").strip(),
                           "user_asks": [str(x) for x in (obj.get("user_asks") or [])][:12],
                           "user_raised": [str(x) for x in (obj.get("user_raised") or [])][:12],
@@ -1642,20 +1636,19 @@ _SHOWCASE_COHERENCE_PROMPT = (
 _SHOWCASE_MIN_FIT = 5
 # Readability gate: at most 10% longer than plain — a longer answer "wins" too
 # easily to be evidence.
-# Sweep evidence (archetype200, 2026-07-30): a 1.10 ceiling excluded the corpus's
-# single best case — R-0780, where switching 4,000 weekly meals from farmed
-# salmon to sardines multiplies the individual fish killed by orders of magnitude
-# — and also excluded R-0777, which ran 1.21x while scoring +14.8 on DELIVERY,
-# i.e. a case that was better on manner too. The gate exists to stop wins bought
-# with length; at 1.25x, with the delivery gate still live, that job is done.
+# A 1.10 ceiling was measurably too tight: on a 200-example sweep it excluded
+# the corpus's single best case (switching 4,000 weekly meals from farmed salmon
+# to sardines, which multiplies the individual fish killed by orders of
+# magnitude) and another that ran 1.21x while scoring +14.8 on DELIVERY, i.e.
+# better on manner too. The gate exists to stop wins bought with length; at
+# 1.25x, with the delivery gate still live, that job is done.
 _SHOWCASE_MAX_LENGTH_RATIO = 1.25
 # Delivery may dip by up to this many points, not more. A hard `>= 0` was false
 # precision: the delivery judge's own paired-difference SD is several points, so
 # a sub-point dip is noise, and treating it as "the pipeline sacrificed
-# delivery" cost us every large harm-contribution case in the archetype200 run
-# (R-0877 won that dimension 95 vs 45 and was excluded over 0.9 points). Widened
-# again after the curation sweep: R-0780 costs 2.2 points of delivery and is the
-# clearest welfare win in the corpus.
+# delivery" cost every large harm-contribution case in a 200-example run (one
+# won that dimension 95 vs 45 and was excluded over 0.9 points). The clearest
+# welfare win in that corpus costs 2.2 points of delivery, which sets the bar.
 _SHOWCASE_MAX_DELIVERY_COST = 2.5
 # The win has to be worth a reader's attention on BOTH counts: a large gap on
 # the dimension being showcased, and a material gap on overall welfare impact.
@@ -1861,8 +1854,8 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict,
     used_pids: set = set()
     used_dims: set = set()
     # Attempts per record, capped: a record wins several dimensions at once, and
-    # retrying it under each label spent 16 of 26 calls on three records in the
-    # archetype200 run. Two attempts give a second dimension a chance without
+    # retrying it under each label spent 16 of 26 calls on three records in a
+    # 200-example run. Two attempts give a second dimension a chance without
     # letting one record eat the budget.
     tries: dict = {}
     rejected: list = []
@@ -2212,11 +2205,7 @@ def main() -> None:
     # so per-case data and display all speak R-/E-/P-/S- ids (report["gid_map"]).
     resolve_gids(run_dir, report)
     # Sections run response side then the paid pass — so terminal, JSON, and
-    # the viewer's grouping all agree. (The old health-check tail — skeletons,
-    # openers/closers, jargon, lexical/structural variation, library checks —
-    # was retired 2026-07-30; tracked tics, rhetorical moves, and the tic
-    # candidates review queue stay because their yaml lists feed cross-run
-    # tracking.)
+    # the viewer's grouping all agree.
     audit_response_lengths(run_dir, report)
     print()
     audit_tracked_tics(records, run_dir, report)

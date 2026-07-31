@@ -184,7 +184,7 @@ class TestRenderAndExtract:
         assert cs.extract_description("<scenario_description></scenario_description>") is None
 
     def test_extract_description_unclosed_is_opt_in(self):
-        # The measured Opus behavior (~20% of plan attempts, 2026-07-19 n=40):
+        # The measured Opus behavior (~20% of plan attempts):
         # complete planning block, opening tag, complete description, end of
         # turn — no closing tag.
         unclosed = ("<scenario_planning>notes</scenario_planning>\n"
@@ -229,7 +229,7 @@ class TestRenderAndExtract:
         assert "Cultural setting" not in block
 
     def test_legacy_scenario_block_renders_old_card(self):
-        # pre-plan records: no description; flavor axes render as card lines
+        # records with no description: flavor axes render as card lines
         p = cs.deal_scenarios(1, random.Random(3))[0]
         p["cultural_setting"] = "Jain tradition"
         p.pop("scenario_description", None)
@@ -273,7 +273,7 @@ class TestRenderAndExtract:
         for key in ("surface_form", "visibility", "user_attitude",
                     "opening_move", "closing_move"):
             assert p[key] in user
-        # legacy pre-plan scenarios carry no cards: fall back, don't KeyError
+        # older scenarios carry no cards: fall back, don't KeyError
         legacy = {"scenario_description": "Old scenario.", "length_class": ""}
         _system, user = cs.render_refine_prompt(legacy, "the draft", template)
         assert "(not recorded for this scenario" in user

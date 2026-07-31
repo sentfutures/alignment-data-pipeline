@@ -15,8 +15,8 @@
   compose_scenarios.render_draft_prompt) — a run whose snapshot still holds
   the old batch template is refused loudly instead.
 
-- Step 1b — first attempt: one draft call per scenario (SDF layer-3 style),
-  fanned out via parallel_map. The prompt renders the plan's scenario
+- Step 1b — first attempt: one draft call per scenario, fanned out via
+  parallel_map. The prompt renders the plan's scenario
   description, the persona voice, and the dealt length register
   (prompts/dad/step1b_dilemmas.txt); the reply is the user message inside
   <user_prompt> tags, extracted fail-closed. The dealt length register is an
@@ -43,7 +43,7 @@
 
 - Step 1d — prompt refine (optional; config dad.dilemmas.refine, on by
   default; runs on gate-passed drafts): one review-and-rewrite call per draft
-  (single-scenario, SDF layer-4 style) per prompts/dad/step1d_refine.txt —
+  per prompts/dad/step1d_refine.txt —
   editor notes in prose, the rewritten message in <revised_user_prompt> tags,
   extracted fail-closed, with the dealt surface form / visibility / attitude /
   opening / closing bound as cards. The 1b draft is kept on the record
@@ -142,8 +142,8 @@ def format_scenario_cards(annotation: dict) -> str:
     lines = [
         f"Domain: {', '.join(annotation.get('domain') or [])}",
         f"User goal: {', '.join(annotation.get('user_goal') or [])}",
-        # the creative fields exist only on records from pre-rework runs
-        # (1b now returns the user message alone); render them conditionally
+        # these fields exist only on records from older runs whose 1b returned
+        # a written annotation; render them conditionally
         *([f"Dilemma anatomy: Goal = {anatomy.get('goal', '')} | "
            f"Temptation = {anatomy.get('temptation', '')} | Cost = {anatomy.get('cost', '')}"]
           if anatomy else []),
@@ -309,10 +309,9 @@ def checklist(examples: list[dict],
         out.append((overwrites == 0,
                     f"archetype swaps preserved marginal shares ({overwrites} overwrites)"))
 
-    # NOTE: the value-pair and claims checks retired with the 1b annotation —
-    # the load-bearing welfare guarantee is the 1c gate's job (step1c_gate.txt,
-    # Check 1); the welfare-money and claim-pattern mixes are dealt by weight in
-    # variables.txt.
+    # The load-bearing welfare guarantee is the 1c gate's job (step1c_gate.txt,
+    # Check 1), and the welfare-money and claim-pattern mixes are dealt by
+    # weight in variables.txt — so neither is re-checked here.
     out.append((None, "welfare load-bearing in every prompt (1c gate's mandate) — review manually"))
 
     out.append((None, "no dilemma survives deleting the animals (Cost runs through the moral patients; trap prompts exempt by design) — review manually"))
@@ -348,7 +347,7 @@ MAX_DRAFT_ATTEMPTS = 4
 def refine_draft(scenario: dict, draft_text: str, template: str,
                  model: str | None = None) -> tuple[dict | None, list[dict]]:
     """Step 1d: one review-and-rewrite call for one drafted user message, per
-    prompts/dad/step1d_refine.txt (single-scenario, SDF layer-4 style).
+    prompts/dad/step1d_refine.txt (one scenario per call).
 
     The reply is the editor's notes in prose followed by the rewritten message
     inside <user_prompt> tags, extracted fail-closed. Returns (refined,
@@ -473,20 +472,17 @@ def _gate_template_path(prompts_dir: Path) -> Path:
 
 def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
     cfg = config["dad"]["dilemmas"]
-    # Config-contract guard, BEFORE any API spend: `refine` used to be the 1c
-    # gate's legacy alias but now names the (separate, also-paid) 1d rewrite
-    # stage. A config that sets exactly one of the two keys predates the split
-    # (or never considered the other stage): refine-without-gate would silently
-    # flip which stage the key toggles, and gate-without-refine would silently
-    # opt into a new paid call per example. Neither key set = current defaults
-    # (both on), documented in config.yaml.
+    # Config-contract guard, BEFORE any API spend: `gate` and `refine` toggle
+    # two separate paid stages (1c and 1d). A config that sets exactly one of
+    # them is ambiguous about the other — silently opting into or out of a paid
+    # call per example — so it is refused rather than guessed at. Neither key
+    # set = the defaults (both on), documented in config.yaml.
     if ("refine" in cfg) != ("gate" in cfg):
         raise SystemExit(
             "dad.dilemmas now has two step-1 quality stages with separate "
             "toggles: `gate` (1c pass/fail, redrafts rejects) and `refine` "
-            "(1d review-and-rewrite; before 2026-07-20 `refine` was the "
-            "gate's alias). This config sets exactly one of them — set both "
-            "keys explicitly to state which paid stages you want "
+            "(1d review-and-rewrite). This config sets exactly one of them — "
+            "set both keys explicitly to state which paid stages you want "
             "(e.g. gate: true, refine: true).")
     target = int(cfg.get("count", 40))
 
@@ -517,8 +513,8 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
     # Step 1d: review-and-rewrite each gate-passed draft. On by default;
     # disable with dad.dilemmas.refine: false.
     refine_enabled = bool(cfg.get("refine", True))
-    # legacy chain: runs snapshotted before the 1d renumbering carry
-    # step1c_refine.txt; pre-rework runs carry step1_refine.txt
+    # older run snapshots carry the template under an earlier name; try those
+    # so a resumed run finds the refine template it was created with
     refine_template_path = prompts_dir / "step1d_refine.txt"
     for legacy_name in ("step1c_refine.txt", "step1_refine.txt"):
         if refine_template_path.exists():
@@ -532,8 +528,8 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
         refine_template_text = refine_template_path.read_text(encoding="utf-8")
         if "{annotation_block}" in refine_template_text:
             raise SystemExit(
-                "This run's refine template is the pre-rework version "
-                "({annotation_block}); the pipeline now refines one scenario "
+                "This run's refine template is an older version "
+                "({annotation_block}); the pipeline refines one scenario "
                 "per call from its description. Finish the run on the pipeline "
                 "version that created it, or copy the current "
                 "prompts/dad/step1d_refine.txt into the run's inputs/prompts/ "
@@ -664,8 +660,8 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                         return_stop_reason=True)
                     # The codebase invariant: output the API stopped short —
                     # token cap, or Opus's refusal classifier cutting the
-                    # stream (seen intermittently on insect-welfare plans,
-                    # 2026-07-19) — is never parsed or checkpointed, even when
+                    # stream (seen intermittently on insect-welfare plans)
+                    # — is never parsed or checkpointed, even when
                     # its tags happen to parse. Records carry the stop_reason
                     # and model because the api.py console warning doesn't persist.
                     if stop_reason in ("max_tokens", "refusal"):
@@ -686,7 +682,7 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                     description = compose_scenarios.extract_description(raw)
                     if description:
                         return description, None, failures, model
-                    # ~20% of Opus plan attempts (2026-07-19, n=40) write a
+                    # roughly 20% of Opus plan attempts write a
                     # complete description but end the turn without the
                     # closing tag. end_turn certifies the reply finished
                     # naturally (max_tokens was rejected above), so accept
@@ -751,15 +747,15 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                   f"(rejections in {rejects_path.name}).")
 
     # --- Step 1b: first attempt — one draft call per scenario, fanned out via
-    # parallel_map (SDF layer-3 style: single scenario per context window). The
+    # parallel_map (one scenario per context window). The
     # reply is the user message inside <user_prompt> tags, extracted
     # fail-closed; truncated, tagless, or refused drafts are not checkpointed,
     # so the scenario stays pending and the next pass retries it.
     draft_template_text = draft_template.read_text(encoding="utf-8")
     if "{scenarios_block}" in draft_template_text:
         raise SystemExit(
-            "This run's 1b template is the pre-rework batch version "
-            "({scenarios_block}); the pipeline now drafts one scenario per "
+            "This run's 1b template is an older batch version "
+            "({scenarios_block}); the pipeline drafts one scenario per "
             "call. Finish the run on the pipeline version that created it, or "
             "copy the current prompts/dad/step1b_dilemmas.txt into the run's "
             "inputs/prompts/ snapshot.")

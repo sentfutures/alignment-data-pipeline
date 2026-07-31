@@ -61,7 +61,7 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
             stage="baseline_response", item_id=pid)
         # The plain arm is the ONE call with no system prompt and so no length
         # guidance at all, which makes it the most truncation-prone stage in the
-        # pipeline: pareto200 lost 18 of 190 control arms this way, and every
+        # pipeline: a full run lost 18 of 190 control arms this way, and every
         # skip costs a paid call whose replacement is skipped again on the next
         # resume. Retry once with a doubled budget before giving up (same shape
         # as the step-3 rewrite escalation).

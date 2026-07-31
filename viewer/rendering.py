@@ -363,8 +363,8 @@ def audit_delivery_pareto_rows(delivery_per_case: dict,
     failure); a missing welfare score leaves welfare_pct None so the page can
     decide what to do with the row. Pure so it stays testable."""
     impact_per_case = impact_per_case or {}
-    # Judges graded on 0-100 from 2026-07-28; older reports are 0-10. The report's
-    # "score_max" says which, so the percentage is right for either.
+    # Judges grade on 0-100; reports recorded on the earlier 0-10 scale are
+    # still readable because "score_max" says which scale a report used.
     to_pct = 100.0 / (score_max or 10.0)
     rows = []
     for pid in sorted(delivery_per_case):

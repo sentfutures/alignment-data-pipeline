@@ -188,9 +188,9 @@ else:
                 judged = d.get("draft_user_message") or d.get("user_message")
                 return judged, verdict + (f" — {reasons}" if reasons else "")
             if stage == "step1_refine":
-                # 1d refine: the rewrite (also the sole 1c stage on pre-gate
-                # legacy runs). The gate no longer short-circuits this view —
-                # on composed runs both stages ran and both must show.
+                # 1d refine: the rewrite (also the sole 1c stage on older runs
+                # that predate the gate). The gate does not short-circuit this
+                # view — on composed runs both stages ran and both must show.
                 if d.get("refine_failed"):
                     return d.get("user_message"), "every refine attempt was unusable — the 1b draft shipped"
                 if d.get("draft_user_message") is None:

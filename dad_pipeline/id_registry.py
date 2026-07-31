@@ -14,9 +14,7 @@ each counting up globally and reused whenever the same content appears again:
                         rewritten response pair)
 
 That lets the viewer and the audits align/sort the same artifact across runs.
-Additive — the per-run ids are untouched. (A one-time `backfill_gids.py`
-labeled the pre-registry historical runs; it was removed 2026-07-30 along
-with those runs.)
+Additive — the per-run ids are untouched.
 
 The registry is a git-tracked JSON file shared across runs (one id space); in
 tests it lives under the tmp output root, so it never touches the real one.
@@ -58,8 +56,8 @@ def example_fingerprint(user_message: str, assistant_message: str) -> str:
 
 def prompt_key(rec: dict) -> str:
     """The id that names a record's prompt: prompt_gid (P-####) on current
-    records, falling back to the retired per-run prompt_id (AW-####) so
-    stages, audits, and the viewer keep working on legacy run dirs."""
+    records, falling back to the per-run prompt_id (AW-####) that older runs
+    carry, so stages, audits, and the viewer keep working on those run dirs."""
     return rec.get("prompt_gid") or rec.get("prompt_id") or ""
 
 

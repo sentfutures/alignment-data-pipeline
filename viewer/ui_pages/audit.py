@@ -312,7 +312,7 @@ def _render_pareto() -> None:
     st.markdown(tradeoff)
 
     _wi_pc = _wi.get("per_case") or {}
-    _smax = float(dv.get("score_max") or 10.0)   # 0-100 from 2026-07-28; older runs 0-10
+    _smax = float(dv.get("score_max") or 10.0)   # 0-100; absent = the earlier 0-10 scale
     _to_pct = 100.0 / _smax
     _pareto = rendering.audit_delivery_pareto_rows(per_case, impact_per_case=_wi_pc,
                                                    score_max=_smax)
@@ -525,17 +525,17 @@ _NOT_DISPLAYED = ()
 # in the Diversity header caption. Report titles stay untouched (they are the
 # anchors, skip-list keys, and cross-run identifiers); this is presentation only.
 _DISPLAY_TITLES = {
-    # both the pre- and post-2026-07-25 titles map to the same display name
+    # an earlier section title maps to the same display name
     "Tracked tics (responses)": "Phrases (prompts and responses)",
     "Tracked tics (prompts + responses)": "Phrases (prompts and responses)",
 }
 # Paid-pass sections rendered by custom views above, not the generic group loop.
 _PAID_COMPANIONS = ("Delivery quality", "Welfare impact", "Showcase examples")
-# Retired sections — old reports still carry their data, but nothing renders
-# it anymore: not the group loop, not the verdict summary. Two waves: the
-# considerations extraction chain (replaced by the two holistic judges,
-# 2026-07-29) and the health-check tail (retired 2026-07-30 — no longer
-# checked; tracked tics/moves and the tic-candidates queue stay live).
+# Sections the audit no longer produces. Reports from earlier runs still carry
+# their data, but nothing renders it: not the group loop, not the verdict
+# summary. (The considerations chain was replaced by the two holistic judges;
+# the health-check tail went unread. Tracked tics/moves and the tic-candidates
+# queue stay live.)
 _RETIRED_SECTIONS = ("Valuable welfare considerations", "Important considerations",
                      "Welfare reasoning", "Welfare considerations",
                      "Moral-patient reasons", "Humane alternatives",
@@ -630,8 +630,8 @@ def _render_welfare() -> None:
 
 
 def _render_delivery() -> None:
-    """Delivery quality: the per-response manner score (0-100 from 2026-07-28,
-    0-10 before) and its dimension diagnostics. The Pareto scatter itself lives
+    """Delivery quality: the per-response manner score (0-100, or 0-10 on runs
+    recorded before that scale) and its dimension diagnostics. The Pareto scatter itself lives
     in _render_pareto above, paired against welfare impact. Rendered near the top
     — it's a headline signal, not a health check."""
     dv = report.get("delivery") or {}

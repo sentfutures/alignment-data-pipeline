@@ -95,9 +95,9 @@ def format_entries(library: dict, ids: list[str]) -> str:
 
 
 def system_prompt(library: dict) -> str:
-    """LEGACY — the pipeline no longer sends this; the 2b template is
-    self-contained. Kept for the viewer, which reconstructs the system prompt
-    of runs recorded before that: the conduct rules (C*)."""
+    """Not sent by the pipeline — the 2b template is self-contained. The
+    viewer uses this to reconstruct the system prompt of runs that were
+    recorded with one: the conduct rules (C*)."""
     return (
         "STANDING CONDUCT RULES (apply to every response, whether or not the user "
         "mentions animals):\n\n" + format_entries(library, conduct_ids(library))

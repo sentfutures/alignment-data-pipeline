@@ -13,8 +13,8 @@ self-contained spec out fail-closed (or None for INCOHERENT combinations);
 Structure the weights can't express lives HERE, as named constants:
 
 - TAXA: per-role hint text and concrete species pools, injected as the
-  reserved ``{taxa_hint}`` / ``{taxa_subcategory}`` slots (same pattern as the
-  SDF composer's SPECIES_EXAMPLES). Every ``{taxa_category}`` value must start
+  reserved ``{taxa_hint}`` / ``{taxa_subcategory}`` slots. Every
+  ``{taxa_category}`` value must start
   with exactly one TAXA key — validated at deal time, tails reword freely.
 - The dealt ``{length}`` register is an instruction to the model only — it is
   not measured or enforced anywhere (we trust the model to honor it).
@@ -842,7 +842,7 @@ def extract_user_prompt(reply: str) -> str | None:
 
 
 def render_scenario_block(p: dict) -> str:
-    """The scenario block step 1c reads (and the 1b of pre-rework runs drafted
+    """The scenario block step 1c reads (and the 1b of older runs drafted
     from): the dealt labels, the binding length register, and the plan's
     scenario description. Scenarios from pre-plan runs (no description) render
     the full legacy card instead, so the viewer re-renders old runs faithfully."""

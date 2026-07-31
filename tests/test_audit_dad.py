@@ -199,8 +199,8 @@ def _exhibits(move_name, text):
 
 
 def test_unbundling_precision_rejects_product_bundles_and_list_openers():
-    # the 2026-07-22 precision pass: literal product "bundles" and bare
-    # "two things ..." list openers are NOT the splitting move
+    # precision: literal product "bundles" and bare "two things ..." list
+    # openers are NOT the splitting move
     for fp in [
         "Blended bundle — your real premium tier.",
         "Physical as core, digital as an add-on or bundle.",
@@ -223,8 +223,8 @@ def test_unbundling_recall_catches_the_split_move():
 
 
 def test_ask_before_drafting_recall_and_precision():
-    # wordings from the opus5-smoke-40 corpora (promoted 2026-07-27); the move
-    # quantifies clarification-gating — deliverable withheld pending facts.
+    # wordings observed in real corpora; the move quantifies
+    # clarification-gating — deliverable withheld pending facts.
     for pos in [
         "Tell me which sessions you want and I'll write the student handouts.",
         "Tell me the otter count and daily ration, then I'll draft the schedule.",
@@ -253,8 +253,8 @@ def test_scale_multiplication_recall_and_precision():
         assert not _exhibits("scale-multiplication", neg), neg
 
 
-# --- the 2026-07-30 promotions (archetype200 discovery queue). Each negative
-# below is a REAL false positive the first draft of the patterns fired on, in a
+# --- moves promoted off the discovery queue. Each negative below is a REAL
+# false positive the first draft of the patterns fired on, in a
 # corpus full of procurement talk and comms drafting — they are what the
 # precision tightening was for, so they must stay negative.
 
@@ -384,7 +384,7 @@ def test_verification_step_recall_and_precision():
 
 
 def test_hidden_asymmetry_recall_and_precision():
-    # wordings from scope200-40, where the full-response discovery pass first
+    # wordings from a real corpus, where the full-response discovery pass first
     # surfaced this move (6/40 pipeline vs 1/39 plain)
     for pos in [
         "I'd want that asymmetry visible to you, because the plan protects the "
@@ -402,8 +402,8 @@ def test_hidden_asymmetry_recall_and_precision():
 
 
 def test_offer_coda_recall_and_precision():
-    # plain Claude's signature sign-off, promoted 2026-07-25 (44% of plain
-    # closings vs 0% autonomy-coda on scope200-40); multilingual patterns
+    # plain Claude's signature sign-off (44% of plain closings, against 0% for
+    # the autonomy coda in the same corpus); multilingual patterns
     for pos in [
         "Want me to draft the press statement so you can see how it reads?",
         "If you'd like, I can sketch the rubric with placeholder numbers.",
@@ -503,8 +503,8 @@ def test_unbundling_announcement_is_subset_of_the_move():
 
 
 def test_unbundling_announcement_catches_run_together_family():
-    # 2026-07-22 recall widen: the "run together / weighing as one" announcements
-    # the first pattern set missed
+    # recall: the "run together / weighing as one" announcements the first
+    # pattern set missed
     for pos in [
         "Two things you've run together are worth answering separately.",
         "So I'd take the two things you've run together and handle them differently.",
@@ -1109,8 +1109,8 @@ def test_showcase_rejects_an_unverifiable_quote(tmp_path, stub_claude, bad_quote
 def test_showcase_retries_the_story_when_a_quote_cant_be_verified(tmp_path, stub_claude):
     # A bad quote set is a formatting slip, not a verdict, and it is not
     # reproducible (the Claude 5 family accepts no sampling parameters, so these
-    # calls can't be pinned): R-0879 failed quote verification on two
-    # archetype200 runs and returned six clean quotes on a third. One fresh
+    # calls can't be pinned): the same record failed quote verification on two
+    # runs and returned six clean quotes on a third. One fresh
     # story call rescues it; the GATE verdict is never re-rolled.
     run = _write_run_with_responses(tmp_path, [("AW-0001", _PIPE_TEXT, _PLAIN_TEXT)],
                                     user_message=_USER_TEXT)
@@ -1228,7 +1228,7 @@ def test_showcase_skips_a_case_whose_overall_welfare_barely_moved(tmp_path, stub
 def test_showcase_tolerates_a_sub_point_delivery_dip(tmp_path, stub_claude):
     # A hard "delivery gap >= 0" was false precision — the judge's own paired
     # SD is several points — and it excluded every large harm-contribution case
-    # on archetype200 (R-0877 won that dimension 95 vs 45, dropped over 0.9
+    # in a full run (one won that dimension 95 vs 45 and was dropped over 0.9
     # points). A dip inside the tolerance ships; one past it does not.
     def run_with(delivery_plain):
         run = _write_run_with_responses(tmp_path / f"d{delivery_plain}",
@@ -1508,8 +1508,8 @@ def test_load_tic_surfaces_defaults_to_response():
 
 def test_load_tic_surfaces_honors_an_explicit_prompt_label(tmp_path):
     # The prompt surface is a loader capability, not a property of whatever is
-    # on the live watchlist (which is response-only as of the 2026-07-30
-    # demotions), so drive it from a written file rather than the real one.
+    # on the live watchlist (currently response-only), so drive it from a
+    # written file rather than the real one.
     f = tmp_path / "tics.yaml"
     f.write_text("watch:\n  pipeline-origin:\n"
                  "    - {phrase: prompt side, surface: prompt}\n"
@@ -1525,11 +1525,11 @@ def test_load_tic_lists_reads_watch_and_ignore():
     assert "worth naming" in watch["pipeline-origin"]       # kept performed-candor tic
     assert "capacity to suffer" in watch["pipeline-origin"]
     assert "push back on" in watch["plain-origin"]          # kept plain-origin tic
-    # promoted 2026-07-30 off the archetype200 run
+    # promoted off a full run's discovery queue
     assert "load bearing" in watch["pipeline-origin"]       # scaffold bleed
     assert "the honest" in watch["plain-origin"]            # plain's biggest habit
-    # demoted 2026-07-27 (dead on Opus 5) and 2026-07-30 (under 5% in both arms)
-    # — off watch but NOT ignore-listed, so the candidate screen re-surfaces them
+    # demoted for going dead on current models, or falling under 5% in both
+    # arms — off watch but NOT ignore-listed, so the candidate screen re-surfaces them
     for demoted in ("gut check", "cuts both ways", "overthinking", "highest leverage",
                     "going back and forth"):
         assert all(demoted not in phrases for phrases in watch.values()), demoted
@@ -1540,8 +1540,8 @@ def test_load_tic_lists_reads_watch_and_ignore():
     # them and the candidate queue won't re-surface them...
     assert {"you're the one", "yours to", "is your call"} <= ignore
     # ...and the verbatim engrams that were kept alongside their moves
-    # ("genuinely yours", "cuts both ways") were themselves demoted on
-    # 2026-07-30 for falling under 5% in both arms — the moves still track the
+    # ("genuinely yours", "cuts both ways") were themselves demoted for
+    # falling under 5% in both arms — the moves still track the
     # wider gambits, so nothing is lost, and the engrams can re-earn a place.
     assert "genuinely yours" not in watch["pipeline-origin"]
     assert {m["name"] for m in audit_dad.load_moves()} >= {"cuts-both-ways", "autonomy-coda"}

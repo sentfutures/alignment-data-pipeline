@@ -219,8 +219,8 @@ def extract_json_array(text: str, recover: bool = False) -> list:
         # '[', sometimes no commas): extract_json legitimately parses ONE of
         # those objects, so the except-branch salvage above never runs and a
         # fully recoverable reply was being discarded. Observed live at ~14% of
-        # eval judge calls (11/79 on the scope200-40 --reasons pass, every one
-        # of this shape). Salvaging here reads the whole stream.
+        # eval judge calls in one paid pass (11 of 79), every one of this shape.
+        # Salvaging here reads the whole stream.
         if (objs := salvage_json_objects(text)) and len(objs) > 1:
             return objs
     raise json.JSONDecodeError("JSON value is not an array", text, 0)
