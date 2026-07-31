@@ -47,20 +47,20 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 
 ## The page
 
-| Anchor | What it is |
-|---|---|
-| hero | The illustration, the title, and the three lines that follow from it (*Teaching Claude Why*, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing. |
-| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Four rows — what it is for, what a record is, how many prompt templates, where an example dataset can be read — because the reader is deciding whether to run the pipeline, not shopping for a dataset. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
-| `#explore` | "Walk through a dataset generation" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are *inside* this section, in `.explore-body` — see "The chooser". |
-| `#sdf` | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen. |
-| `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
-| footer | Repo and both viewers as buttons, one provenance line per run, and the build claim. |
+| Anchor      | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hero        | The illustration, the title, and the three lines that follow from it (_Teaching Claude Why_, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset _is_) are the heading. Four rows — what it is for, what a record is, how many prompt templates, where an example dataset can be read — because the reader is deciding whether to run the pipeline, not shopping for a dataset. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
+| `#explore`  | "Walk through either pipeline" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are _inside_ this section, in `.explore-body` — see "The chooser".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `#sdf`      | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `#dad`      | Difficult advice, in full (`report/dad.py`). Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| footer      | Repo and both viewers as buttons, one provenance line per run, and the build claim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Both reports take the same skeleton, so a reader learns it once: a one-line lede under the
 report's own `<h2>`, then **how it is built / one example end to end / where it is weak /
 appendix**. Each beat is an `<h3>` with its own id (`#dad-weak`, `#dad-example`).
 
-What the dataset *is* has no beat: the `<h2>` says "Difficult advice" and the lede says
+What the dataset _is_ has no beat: the `<h2>` says "Difficult advice" and the lede says
 what that means, in the same sentence the comparison's masthead uses — a reader who
 arrived on `#dad` from a deep link never saw that table. A "What it is" heading over one
 sentence only names what the reader can already see. (`report/sdf.py` still has an
@@ -70,12 +70,22 @@ Three beats are open and the fourth is drawers, and the line between them is wha
 has to read:
 
 - **Open**: the process, one record's whole trail through it, and caveats that hold for
-  *any* run of the pipeline.
-- **Appendix**: everything specific to one run. The judged comparison, the regression
-  statement, every chart, every check, the diversity numbers, and the derived floor of
-  what this run's audit flagged.
+  _any_ run of the pipeline.
+- **Appendix**: everything specific to one run, in **five drawers, one per question a
+  reader has**: what this run's audit flagged (the derived floor, first), the judged
+  comparison against a plain model with its regression statement, every chart, every check,
+  and the worked example's full stage-3 diff.
 
-The stages come *before* the example that walks through them, because that is what the
+  It was eight, and the grouping contradicted itself — a drawer called "every chart from
+  this run" beside two siblings that also held a figure and three stat tiles, so a reader
+  who opened it had no way to know it was not every chart. Three rows now sit inside the
+  drawer whose question they answer: the per-record retention chart is a chart
+  (`_appendix_charts` appends it), and the diversity tiles (`_diversity_block`) and the
+  rhetorical-move glossary (`_moves_drawer`) are the numbers and the gloss behind two rows
+  of the checks table. Nothing was rewritten and nothing was dropped; the drawer meta still
+  names each payload's size, so collapsing still costs the reader nothing.
+
+The stages come _before_ the example that walks through them, because that is what the
 chooser above promises. There is no "what we measured" beat: this is not a results report.
 
 **The page has no contents rail; a report has one.** A column of page-wide links beside a
@@ -87,7 +97,7 @@ their beat. See "The chooser" below. An earlier revision hung those links as a s
 under the bar instead; it read as clutter on the control and came out.
 
 The type scale is the other thing that makes a report skimmable, and it had none: `h3` (a
-beat) was `1.1rem` against a `1.0625rem` body and `h4` (a stage) was `.82rem`, *smaller*
+beat) was `1.1rem` against a `1.0625rem` body and `h4` (a stage) was `.82rem`, _smaller_
 than the prose under it. It steps 2 / 1.4 / 1.12rem now, each level clear of the body text,
 and every beat is chunked off the one before it by a hairline above its `<h3>`.
 `TestTypeScale` keeps it monotonic. `h4` doubles as a label over a block in exactly one
@@ -99,7 +109,7 @@ Neither report is open on load — the choice is the point. Three things make th
 and all three are pinned by `TestChooser`:
 
 - **`#dad` and `#sdf` in the URL open that report**, on load and on `hashchange`, so the
-  dataset card's deep links land where they say they will. A hash naming anything *inside*
+  dataset card's deep links land where they say they will. A hash naming anything _inside_
   a report (`#dad-weak`, from a quoted finding) opens the report it lives in and scrolls
   to it — that is what `closest('.panel')` in the inline JS is for.
 - **The way across is on screen throughout**, because the bar the tabs live in is pinned.
@@ -117,7 +127,7 @@ screen. `TestStickyBar` pins the six things that make that work:
 
 - **The panels live inside `#explore`**, wrapped with the bar and the rails in
   `.explore-body` (`render.explore_body`). A sticky box travels only inside its containing
-  block, and the containing block of a *grid item* is its own grid area — one row, as tall
+  block, and the containing block of a _grid item_ is its own grid area — one row, as tall
   as the buttons — so a sticky bar left loose in `#explore`'s grid has nowhere to go. The
   wrapper is the travel: the bar pins for the length of the open report. It is two columns
   and two rows — the bar across the top, then `.railcol` beside `.panels` — and the panels
@@ -140,11 +150,32 @@ screen. `TestStickyBar` pins the six things that make that work:
   (`render.substep()`), which is why the appendix's `<h4>`s deliberately have none: they sit
   inside closed drawers, and a link to a collapsed heading goes nowhere.
 - **The room for it came out of the shell, not the report.** `.shell` is 67rem rather than
-  the 53rem the page was built at: 12rem of rail plus a 2rem gutter, so the reading column
-  keeps its 38rem measure and the figure track its 792px. A rail taken out of the reading
-  side would have shrunk the figure track, and every chart is drawn at 800px — an 11px label
-  in a 600px track is no longer 11px. `test_the_room_for_the_rail_did_not_come_out_of_the_report`
+  the 53rem the page was built at: 12rem of rail, so the reading column keeps its 38rem
+  measure and the figure track has 812px. A rail taken out of the reading side would have
+  shrunk the figure track, and every chart is drawn at 800px — an 11px label in a 600px
+  track is no longer 11px. `test_the_room_for_the_rail_did_not_come_out_of_the_report`
   recomputes that from the tokens.
+- **Nothing is drawn between the contents and the report.** The gutter was 2rem with a
+  hairline down the middle of it; the line was a second separator, since a fixed column the
+  links never leave, set in the sans with its stages indented under their beat, is already
+  not the prose beside it. The one rule the contents do get is below 900px, _under_ them,
+  where they wrap across the head of the document and need it.
+- **With no line there, the gutter holds the columns apart on its own, and it is 3rem out of
+  the shell's left margin.** `--pull` on `.explore-body` is a negative left margin of
+  2.25rem — exactly what the gutter grew by — so the contents hang into the margin and the
+  reading column does not move: 416px left edge, 812px figure track, charts at their drawn
+  800px. It is clamped to `max(0px,(100vw - 67rem)/2)`, the room outside the shell, so below
+  ~1088px it is 0 and the gutter narrows the reading column instead (as every width between
+  900px and 67rem already does), and print gets 0 for free. `.choicebar` adds `--pull` back:
+  the bar spans both columns, so without it the chooser's centred buttons sit 1.125rem left
+  of the page's centre line.
+- **The contents start level with the report's title.** `.panel` carries a 3.2rem top margin
+  the rail did not, so the first beat sat 48px above the `<h2>` it is the contents of.
+  `.railcol`'s `padding-top` plus the rail's own `.2rem` come to that margin —
+  `test_the_contents_start_level_with_the_report_s_title` recomputes it, because a hardcoded
+  3rem goes stale the moment the panel's margin is retuned. It applies at rest only; once the
+  rail pins, its own `top` places it. Below 900px it is 0: the contents are above the report
+  there, so there is no title to line up with.
 - **Where the reader is: ink and a left edge, never a fill.** The current beat or stage takes
   `aria-current`, and the line for "arrived at" is the heading's **own
   `scroll-margin-top`**, read off the element: the CSS already states how far below the top
@@ -153,7 +184,7 @@ screen. `TestStickyBar` pins the six things that make that work:
   heading behind every jump. Marking runs inside the rAF-throttled scroll callback the bar's
   flag already uses; there is no second listener and no IntersectionObserver.
 - **The script measures `.explore-body`, never the bar.** Once sticky takes hold, the
-  bar's own `getBoundingClientRect()` and `offsetTop` report where it is *painted*, so
+  bar's own `getBoundingClientRect()` and `offsetTop` report where it is _painted_, so
   scrolling to it means scrolling to wherever the reader already was. `.explore-body`'s
   top is the bar's flow top, and that is also the sticky threshold, so nothing jumps as
   the bar pins. Nothing else in the script queries the bar either.
@@ -166,7 +197,13 @@ screen. `TestStickyBar` pins the six things that make that work:
   `behavior`, so `html{scroll-behavior}` — and therefore `prefers-reduced-motion` — still
   owns the smoothness.
 - **Below 900px there is no beside.** The rail becomes a static wrapped block at the head of
-  the report, held to the reading measure so it reads as part of the document. Between 900px
+  the report, held to the reading measure so it reads as part of the document, and **carries
+  its beats only** (`.rail .r-s{display:none}`). Beside the report the two levels are a tree
+  — an indented triplet under a bold parent — and the difficult-advice report names the same
+  three stages twice on purpose, once to explain them and once to walk them. Flattened into
+  a wrapped row the tree is gone and the duplication is all that is left: nine items in
+  which "Stage 2 · the reasoning" appears twice, identically, with nothing to say which is
+  which. Four beats on four lines say the same thing about the report's shape. Between 900px
   and the shell's own 67rem the reading column simply narrows, which needs no rule.
 - **It has two sizes and crosses between them once.** Loose it is 83px tall and 40rem wide,
   lined up under its heading with the two dataset columns; tight it is 52px and 30rem, with
@@ -180,7 +217,7 @@ screen. `TestStickyBar` pins the six things that make that work:
   leave a growing gap above the contents) and every
   dimension is one interpolation off it, so both states are one set of numbers and a
   breakpoint restates only the six tokens. The 30rem floor is measured, not chosen: below
-  27.5rem "Synthetic documents" wraps and the tight bar is *taller* than the loose one, and
+  27.5rem "Synthetic documents" wraps and the tight bar is _taller_ than the loose one, and
   `test_the_bar_has_two_sizes_and_the_tight_one_is_smaller` recomputes it from `--w` and the
   factor. The transition sits on `padding`, `width`, `gap` and `font-size` rather than on
   `--t`, which is both necessary (a custom property is discrete unless registered) and what
@@ -189,7 +226,7 @@ screen. `TestStickyBar` pins the six things that make that work:
 - **`overflow-anchor:none` on the wrapper.** Shrinking the pinned bar moves the report
   under it, so scroll anchoring corrects the scroll by the same amount — moving the element
   `--p` is computed from. Measured with anchoring on: the bar settled at 52px while sitting
-  31px *below* the top of the screen, or flipped between its two sizes depending on where
+  31px _below_ the top of the screen, or flipped between its two sizes depending on where
   the reader stopped. Resizing every frame costs nothing measurable otherwise (120 scroll
   frames: 16.6ms mean, no frame over 20ms, same as with the driver off).
 
@@ -202,16 +239,16 @@ buttons are ~10rem of permanent chrome, a quarter of a phone screen.
 
 ## Files
 
-| File | Role |
-|---|---|
-| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset *is*, also used under each chooser button); `*_use` are what each is *for*. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
-| `content_dad.md` | **Difficult-advice prose.** The file to iterate on for that report. |
-| `page.py` | The page: hero, comparison, chooser, footer, and the one `document()` call. |
-| `dad.py` | The `#dad` beats: `facts()`, the block builders, `read_lineage()`, `judged_drawer()`, `derived_warnings()`. |
-| `sdf.py` | The `#sdf` beats — small on purpose; see "Finishing the second report". |
-| `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser. |
-| `render.py` | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge. |
-| `build_report.py` | The CLI. |
+| File              | Role                                                                                                                                                                                                                                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset _is_, also used under each chooser button); `*_use` are what each is _for_. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
+| `content_dad.md`  | **Difficult-advice prose.** The file to iterate on for that report.                                                                                                                                                                                                                                                           |
+| `page.py`         | The page: hero, comparison, chooser, footer, and the one `document()` call.                                                                                                                                                                                                                                                   |
+| `dad.py`          | The `#dad` beats: `facts()`, the block builders, `read_lineage()`, `judged_drawer()`, `derived_warnings()`.                                                                                                                                                                                                                   |
+| `sdf.py`          | The `#sdf` beats — small on purpose; see "Finishing the second report".                                                                                                                                                                                                                                                       |
+| `common.py`       | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser.                                                                                                                                                                                         |
+| `render.py`       | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge.                                                                                                                                                                                                                                            |
+| `build_report.py` | The CLI.                                                                                                                                                                                                                                                                                                                      |
 
 Each report module exposes `blocks()`, returning its body as one flat string; `page.py`
 wraps that in `render.panel()`, which is the `<section>`, and both panels go inside
@@ -246,8 +283,8 @@ delivery pass) — is still emitted by `derived_warnings()` whether or not anyon
 up, and renders in the appendix's "What this run's audit flagged" drawer.
 
 Generalising the visible caveats must not lose that floor, and
-`test_the_derived_floor_is_still_on_the_page` builds with the caveats prose *emptied* and
-asserts every derived row is still there. `evals/audit_sdf.py` only *prints* its verdicts,
+`test_the_derived_floor_is_still_on_the_page` builds with the caveats prose _emptied_ and
+asserts every derived row is still there. `evals/audit_sdf.py` only _prints_ its verdicts,
 so `sdf.derived_warnings()` re-applies the eval's own thresholds instead.
 `warnings_table()` may **collapse** rows into a drawer, and the drawer states how many it
 holds — collapsing is a view, never a filter.
@@ -260,7 +297,7 @@ its two means over 33 pipeline against 26 control answers: different sets of rec
 page that led with that would rest on its least sound measurement.
 
 Demoted is not deleted, and both halves are pinned by tests. The regression is written in
-prose exactly once, by `dad._delivery_statement()`, *inside* that drawer — next to the
+prose exactly once, by `dad._delivery_statement()`, _inside_ that drawer — next to the
 comparison it is about, because the caveats beat is generalised and a figure from one run
 cannot live there. The scoreboard row and the derived weakness carry the same number as
 data. No figure of any kind appears outside the appendix —
@@ -273,7 +310,7 @@ The judged drawer reads **either** audit schema: the old
 **4. Synthetic documents comes first**, in the comparison, the chooser and the panel
 order, so the page reads in one order throughout.
 
-**5. Both datasets are for midtraining.** "SFT" names the *format* of the difficult-advice
+**5. Both datasets are for midtraining.** "SFT" names the _format_ of the difficult-advice
 data — chat transcripts, consumed as supervised fine-tuning — not a different training
 phase; the documents are consumed as continued pretraining. The "what it is for" row says
 both halves, because internal shorthand has the two sounding like different phases.
@@ -281,13 +318,13 @@ both halves, because internal shorthand has the two sounding like different phas
 **6. Prose has a budget, and two ceilings.** The build prints `editorial_words()` for the
 page it just wrote. `test_the_prose_has_a_ceiling` bounds the whole page;
 `test_the_report_a_reader_reads_has_its_own_ceiling` bounds the difficult-advice beats
-*before* the appendix, which is the part that is open when a reader arrives — the
+_before_ the appendix, which is the part that is open when a reader arrives — the
 whole-page number is dominated by drawers nobody has to read. The second is the one that
 matters: it came down from 1,199 words to under 800 over two rounds of cutting, by dropping
 the results narrative, then the cost tiles, the commands and the run-specific caveats. Deks
 — the aphoristic line under a heading — are rationed to two for the whole page.
 
-`editorial_words()` counts what a person *wrote*, so it skips corpus text, chart internals,
+`editorial_words()` counts what a person _wrote_, so it skips corpus text, chart internals,
 every table and every `<nav>`. The rails are excluded because their labels are the
 document's own headings, already counted where they are written; counting them twice would
 spend the ceiling on navigation and let real prose in underneath it.
@@ -307,6 +344,12 @@ wrote from them, the message that shipped, the scope and the library entries sta
 pulled, the answer, and the three largest things stage 3 changed. Its `<h4>`s reuse the
 stage headings from "How it is built" rather than inventing a second vocabulary.
 
+Each stage opens on a muted line, because stage 2 is the one whose artefacts are all in
+drawers: stages 1 and 3 show theirs inline (the dealt cards, the shipped answer) and stage 2
+was a heading with nothing under it, which reads as a stage that did nothing. The scope
+table stays collapsed — seven axes of dense prose, measured at 889px, and it would sit
+between the message and the answer.
+
 `dad.read_lineage()` assembles it at load time. Two things about the join: only step 1 is
 keyed by `scenario_id` and everything downstream by `prompt_id`, so `step1/dilemmas.jsonl`
 is the join table, with `audit.gid_map[pid]["scenario"]` as the fallback for a run that
@@ -316,13 +359,13 @@ category and claim.
 
 A missing artefact **names the file it wanted** rather than disappearing, because a step
 that silently vanishes reads as a step the pipeline does not have. A key that is not
-available is left *absent* rather than set to `None`, so renderers test membership; null
+available is left _absent_ rather than set to `None`, so renderers test membership; null
 values in the dealt cards are dropped, since rendering an axis with "None" in it is a bug
 that reads as data.
 
 Below it, `render.tabs()` puts the ids in `example_extra` behind one set of buttons, using
 the chooser's own mechanism — `data-pane`, `aria-selected`, the same inline JS. The first
-pane renders *without* `hidden`, so with JS off the carousel degrades to one example
+pane renders _without_ `hidden`, so with JS off the carousel degrades to one example
 rather than to none, and the print rule expands the rest.
 
 **The carousel is inside a closed drawer.** That visible first pane is a second full
@@ -339,6 +382,13 @@ file reference, even a relative one, breaks the "one file" guarantee and
 a `data:` URI, and renders a marked-TODO placeholder at the right proportions if the
 asset is missing.
 
+Its spacing is set in **one** place, `.illo.art{margin:3rem 0 .4rem}`. `.hero .illo` used to
+declare `margin:0` and lose to that rule — same specificity, later in the file — so the hero
+carried a third top margin nothing in its own block accounted for. With that and the two
+6rem margins above the art and the title cut to 3rem, the title lands at ~330px instead of
+~490px and the whole intro is above the fold on a 900px viewport; the comparison, which is
+what does this page's work, starts at ~845px rather than 1,160px.
+
 `report/assets/hero.png` is the artwork as supplied, unedited — an RGBA PNG, so the line
 art sits straight on the cream with no background of its own. It is 2.1 MB, which
 makes the built page ~3 MB — fine for a page you open or publish, worth knowing
@@ -350,7 +400,7 @@ before you email it.
   marks are inline `<svg>`, the hero is a data URI, and the only JS is a tooltip handler,
   the chooser and the example carousel. Enforced by `test_is_self_contained`, which allows
   a `data:` src and nothing else off-page — and which now looks for `url(` and `@import`
-  *outside* the run's own text, because the page quotes three records verbatim and a
+  _outside_ the run's own text, because the page quotes three records verbatim and a
   dilemma that happened to contain a CSS snippet would fail a test about the generator.
 - **One accent, `--accent:#3b2fa0`.** The page's only interaction colour: the text
   selection and every link. Indigo because it cannot collide with anything the palette
@@ -372,10 +422,10 @@ before you email it.
   `.cmp th` sets the rule, alignment and padding for every cell, so a `.cmp-k` override
   has to out-specify it — `.cmp th.cmp-k` — not merely follow it. And a `position:sticky`
   grid item is confined to its own grid area, which is why the chooser bar needs
-  `.explore-body` around it and both panels. And a *stuck* sticky element's own
+  `.explore-body` around it and both panels. And a _stuck_ sticky element's own
   `getBoundingClientRect()`/`offsetTop` report where it is painted, not where it sits, so
   anything scrolling to it has to measure a static element instead.
-- **A link that leaves the page says so**, with an arrow that is *drawn* — `EXT_ARROW`,
+- **A link that leaves the page says so**, with an arrow that is _drawn_ — `EXT_ARROW`,
   an inline SVG at `stroke-width:2` in `currentColor`. As a glyph (U+2197) it is a
   hairline in most faces and a different shape in every one, and this page is printed and
   screenshotted. `inline_md()` adds it to any absolute link automatically, and
@@ -465,16 +515,28 @@ The worked example put two wide tables and six new blocks inside that same grid,
 the class of change the `1fr` trap bit last time, so measure the overflow too:
 
 ```js
-console.log(await pg.evaluate(()=>{
-  document.querySelectorAll('.panel').forEach(p=>p.hidden=false);
-  const s=document.querySelector('#dad');
-  const over=[...s.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>innerWidth+1)
-                                         .map(e=>e.className||e.tagName);
-  return {panel:s.getBoundingClientRect().width, vw:innerWidth, overflowing:over.slice(0,5),
-          beats:[...s.querySelectorAll('h3[id]')].map(h=>h.id)};}));
+console.log(
+  await pg.evaluate(() => {
+    document.querySelectorAll(".panel").forEach((p) => (p.hidden = false));
+    const s = document.querySelector("#dad");
+    const over = [...s.querySelectorAll("*")]
+      .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+      .map((e) => e.className || e.tagName);
+    return {
+      panel: s.getBoundingClientRect().width,
+      vw: innerWidth,
+      overflowing: over.slice(0, 5),
+      beats: [...s.querySelectorAll("h3[id]")].map((h) => h.id),
+    };
+  }),
+);
 // then the carousel: clicking a tab swaps the pane, and only one is visible
-await pg.evaluate(()=>document.querySelectorAll('.tab')[1].click());
-console.log(await pg.evaluate(()=>[...document.querySelectorAll('.pane-x')].map(p=>p.hidden)));
+await pg.evaluate(() => document.querySelectorAll(".tab")[1].click());
+console.log(
+  await pg.evaluate(() =>
+    [...document.querySelectorAll(".pane-x")].map((p) => p.hidden),
+  ),
+);
 ```
 
 `overflowing` must be empty, `panel <= vw`, and `beats` must read in skeleton order. The

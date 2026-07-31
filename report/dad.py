@@ -60,7 +60,7 @@ SECTION_TITLE = "Difficult advice"
 # learns it once; the ids are prefixed because both sections live in one document.
 #
 # The stages come before the worked example on purpose: the chooser above asks the reader
-# to walk through a dataset generation, and a walk needs its steps named first.
+# to Walk through either pipeline, and a walk needs its steps named first.
 #
 # Three beats are open and one is drawers. What a reader has to read is the process, one
 # record's whole trail, and the caveats that hold for any run of this pipeline. Everything
@@ -487,10 +487,14 @@ def lineage_blocks(pid, rw, base, lin, labels):
         out.append(R.quote(user_msg))
 
     out.append(R.substep("dad-example-stage2", "Stage 2 · the reasoning"))
+    # The only stage whose artefacts are all in drawers, so it is the only one that needs
+    # a line saying what is in them: stage 1 opens on its dealt cards and stage 3 on the
+    # answer, and a heading with nothing under it reads as a stage that did nothing.
+    out.append("<p class='muted'>Three artefacts, none of them shipped:</p>")
     if lin.get("scope"):
-        # In a drawer: seven axes of dense prose is the most interesting artefact in the
-        # run and the one most likely to stop a reader walking. Measured at 1,500px, it
-        # sat between the message and the answer.
+        # The scope stays in a drawer. Seven axes of dense prose is the most interesting
+        # artefact in the run and the one most likely to stop a reader walking: measured
+        # at 889px, it would sit between the message and the answer.
         out.append(R.details("What stage 2 worked out before writing anything",
                              _scope_table(lin["scope"]),
                              meta=f"{len(lin['scope'])} axes"))
@@ -1243,6 +1247,54 @@ def _appendix_charts(audit, f, cons):
     return out + _footprint_figures(audit, f)
 
 
+def _diversity_block(diversity):
+    """The numbers behind the checks table's "Semantic diversity" row.
+
+    Inside that drawer rather than beside it: on its own it was a third top-level row of
+    the appendix carrying three tiles, and a reader had no way to tell it apart from the
+    two reference tables it sat under.
+    """
+    if not diversity:
+        return ""
+    vendi = diversity.get("vendi") or {}
+    nn = diversity.get("nn") or {}
+    clusters = ((diversity.get("scopes") or {}).get("combined") or {}).get("clusters") or {}
+    return (
+        "<h4>What the diversity pass measured</h4>"
+        "<p class='muted'>Embedding-space measurements over the final dataset, from "
+        f"<code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"
+        + R.tiles([
+            R.stat(f"{vendi.get('score', 0):.1f}", "effectively distinct records",
+                   f"of {diversity.get('n_records', '?')} actual records; near-duplicates "
+                   f"count as fractions of a record"),
+            R.stat(f"{nn.get('over_0.90', 0):.0%}", "near-duplicate records",
+                   f"cosine similarity above 0.90 to their nearest neighbour; "
+                   f"{nn.get('over_0.80', 0):.0%} above 0.80"),
+            R.stat(f"{clusters.get('evenness', 0):.2f}", "topic-spread evenness",
+                   f"1.00 is perfectly even; the largest cluster holds "
+                   f"{clusters.get('largest_share', 0):.0%} of records"),
+        ]))
+
+
+def _moves_drawer(audit):
+    """The gloss for the checks table's rhetorical-moves row, nested under it.
+
+    A glossary is not a finding, and as a top-level appendix row it read as one.
+    """
+    moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
+    if not moves:
+        return ""
+    return R.details(
+        "What each rhetorical move is",
+        R.table(["move", "what it is", "control", "pipeline"],
+                [(name, d.get("description") or "—",
+                  f"{d.get('plain_share') or 0:.0%}", f"{d.get('pipeline_share') or 0:.0%}")
+                 for name, d in sorted(moves.items(),
+                                       key=lambda kv: -(kv[1].get("pipeline_share") or 0))],
+                align="llrr"),
+        meta=f"{len(moves)} moves")
+
+
 def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest=None,
                     picks=()):
     """Everything that is evidence, collapsed so it costs a reader nothing.
@@ -1251,12 +1303,29 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
     to one run: the judged comparison, and the derived floor of what this run's own audit
     flagged. The beats above are the process, the records, and caveats that hold for any
     run of this pipeline.
+
+    FIVE drawers, each answering a different question: what the audit flagged, how the
+    dataset compares to a plain model, every chart, every check, and the worked example's
+    full diff. It was eight, and the grouping contradicted itself — a drawer called "every
+    chart from this run" with two siblings that also held a figure and three stat tiles, so
+    a reader who opened it had no way to know it was not every chart. What used to be its
+    own row is now inside the drawer whose question it answers: the per-record retention
+    chart is a chart, and the diversity tiles and the rhetorical-move glossary are the
+    numbers and the gloss behind two rows of the checks table.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels)]
 
     charts = _appendix_charts(audit, f, cons)
+    retention = _survival_chart((audit.get("moral_patient_reasons") or {}).get("per_case") or {},
+                                labels)
+    if retention:
+        charts.append(R.figure(
+            title="Considerations kept, weakened, dropped and added, per record",
+            chart=retention,
+            caption="**Every record keeps most of the control's considerations**, so the "
+                    "average is not hiding one where the pipeline threw them away."))
     if charts:
         blocks.append(R.details(
             "Every chart from this run", "".join(charts),
@@ -1279,54 +1348,11 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
             "Every check that ran",
             C.prose(content, "checks_intro", f)
             + checks_table(audit, diversity)
+            + _diversity_block(diversity)
             + "<h4>As the audit recorded them</h4>"
-            + R.table(["check", "group", "worst verdict", "counts"], rows, align="llll"),
+            + R.table(["check", "group", "worst verdict", "counts"], rows, align="llll")
+            + _moves_drawer(audit),
             meta=f"{len(rows)} checks · {verdicted} carry a verdict"))
-
-    moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
-    if moves:
-        blocks.append(R.details(
-            "What each rhetorical move is",
-            R.table(["move", "what it is", "control", "pipeline"],
-                    [(name, d.get("description") or "—",
-                      f"{d.get('plain_share') or 0:.0%}", f"{d.get('pipeline_share') or 0:.0%}")
-                     for name, d in sorted(moves.items(),
-                                           key=lambda kv: -(kv[1].get("pipeline_share") or 0))],
-                    align="llrr"),
-            meta=f"{len(moves)} moves"))
-
-    per_case = (audit.get("moral_patient_reasons") or {}).get("per_case") or {}
-    chart = _survival_chart(per_case, labels)
-    if chart:
-        blocks.append(R.details(
-            "Retention record by record",
-            R.figure(title="Considerations kept, weakened, dropped and added, per record",
-                     chart=chart,
-                     caption="**Every record keeps most of the control's considerations**, "
-                             "so the average is not hiding one where the pipeline threw them "
-                             "away."),
-            meta=f"{len(per_case)} records"))
-
-    if diversity:
-        vendi = diversity.get("vendi") or {}
-        nn = diversity.get("nn") or {}
-        clusters = ((diversity.get("scopes") or {}).get("combined") or {}).get("clusters") or {}
-        blocks.append(R.details(
-            "Dataset diversity",
-            "<p class='muted'>Embedding-space measurements over the final dataset, from "
-            f"<code>{R.esc((diversity or {}).get('embed_model', '?'))}</code>.</p>"
-            + R.tiles([
-                R.stat(f"{vendi.get('score', 0):.1f}", "effectively distinct records",
-                       f"of {diversity.get('n_records', '?')} actual records; near-duplicates "
-                       f"count as fractions of a record"),
-                R.stat(f"{nn.get('over_0.90', 0):.0%}", "near-duplicate records",
-                       f"cosine similarity above 0.90 to their nearest neighbour; "
-                       f"{nn.get('over_0.80', 0):.0%} above 0.80"),
-                R.stat(f"{clusters.get('evenness', 0):.2f}", "topic-spread evenness",
-                       f"1.00 is perfectly even; the largest cluster holds "
-                       f"{clusters.get('largest_share', 0):.0%} of records"),
-            ]),
-            meta=f"{diversity.get('n_records', '?')} records"))
 
     pid, _ = _picks(content, picks, {r.get("prompt_id"): r for r in rewrites or []})
     rw = next((r for r in rewrites or [] if r.get("prompt_id") == pid), None)

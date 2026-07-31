@@ -132,7 +132,7 @@ class TestShape:
         ids = re.findall(r"<section id='([^']+)'", html)
         assert ids == ["datasets", "explore", "sdf", "dad"]
         assert re.findall(r"<h2>([^<]*)</h2>", html) == [
-            "Walk through a dataset generation", S.SECTION_TITLE, D.SECTION_TITLE]
+            "Walk through either pipeline", S.SECTION_TITLE, D.SECTION_TITLE]
         # The comparison is titled by its own two mastheads on screen — and by a heading
         # a screen reader can find, because heading navigation skipped it entirely.
         assert re.match(r"<section id='datasets'><h2 class='vh'>[^<]+</h2><div class='cmp-wrap'>",
@@ -751,17 +751,47 @@ class TestContentsRail:
         assert _rail_top_rem(html, 1) < _rail_top_rem(html, 0)
 
     def test_the_room_for_the_rail_did_not_come_out_of_the_report(self):
-        """The shell widened instead. A rail taken out of the reading column would have
-        narrowed the 38rem measure and shrunk the figure track, and every chart is drawn at
-        800px — an 11px label in a narrower track is no longer 11px."""
+        """The shell widened instead, and the gutter comes out of its left margin. A rail or
+        a gutter taken out of the reading column would have narrowed the 38rem measure or
+        shrunk the figure track, and every chart is drawn at 800px — an 11px label in a
+        narrower track is no longer 11px."""
         html = build(sdf_inputs=SDF_INPUTS)
         shell = float(re.search(r"\.shell\{max-width:([\d.]+)rem", html).group(1))
         rail = float(re.search(r"\.explore-body\{[^}]*--rail:([\d.]+)rem", html).group(1))
         gap = float(re.search(r"\.explore-body\{[^}]*column-gap:([\d.]+)rem", html).group(1))
+        pull = float(re.search(r"\.explore-body\{[^}]*--pull:min\(([\d.]+)rem", html).group(1))
         prose = float(re.search(r"minmax\(0,([\d.]+)rem\) \[text-end\]", html).group(1))
         assert prose == 38
-        # 3.5rem is .shell's own 28px padding either side.
-        assert shell - 3.5 - rail - gap - prose >= 11.5, "the figure track shrank"
+        # 3.5rem is .shell's own 28px padding either side; the pull is width the block takes
+        # back from the margin, so it counts on the reading side.
+        assert shell - 3.5 - rail - gap - prose + pull >= 11.5, "the figure track shrank"
+
+    def test_the_contents_start_level_with_the_report_s_title(self):
+        """The panel carries a top margin the rail does not, so the first beat sat 48px above
+        the <h2> it is the contents of. The column's padding plus the rail's own has to come
+        to that margin — derived here, because a hardcoded 3rem goes stale the moment the
+        panel's margin is retuned. Measured at 1440px: both tops at y=1499."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        panel = float(re.search(r"\.panel\{margin-top:([\d.]+)rem", html).group(1))
+        col = float(re.search(r"\.railcol\{[^}]*padding-top:([\d.]+)rem", html).group(1))
+        rail = float(re.search(r"\.rail\{[^}]*padding:([\d.]+)rem", html).group(1))
+        assert col + rail == panel, f"{col} + {rail} != the panel's {panel}rem"
+        # Below 900px the contents sit above the report, so there is no title to line up with.
+        small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
+        assert re.search(r"\.railcol\{[^}]*padding-top:0", small)
+
+    def test_the_contents_hang_into_the_margin_only_where_there_is_one(self):
+        """The pull is what keeps the reading column still while the gutter grows, and it is
+        clamped against the shell's own width: on a viewport with no margin outside the
+        shell it is 0 and the gutter narrows the reading column instead, rather than pulling
+        the contents off the left of the page. The chooser cancels it so its centred buttons
+        stay on the page's centre line."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"\.explore-body\{[^}]*\}", html).group(0)
+        shell = re.search(r"\.shell\{max-width:([\d.]+)rem", html).group(1)
+        assert f"max(0px,(100vw - {shell}rem)/2)" in rule, rule
+        assert "margin-left:calc(-1*var(--pull))" in rule
+        assert "margin-left:var(--pull)" in re.search(r"\.choicebar\{[^}]*\}", html).group(0)
 
     def test_where_the_reader_is_takes_ink_and_an_edge_not_a_fill(self):
         """An accent FILL on this page means selected — the open tab, the open pane — and
@@ -794,13 +824,18 @@ class TestContentsRail:
     def test_below_the_width_it_fits_the_rail_goes_to_the_top_of_the_report(self):
         """There is no beside on a narrow screen. It becomes a static block at the head of
         the report — where its reader is about to start — rather than a row under the bar,
-        which is the thing this replaced."""
+        which is the thing this replaced.
+
+        A rule under it is the one separator the contents get, and only here: beside the
+        report there is none, because a fixed column of sans links is already not the prose
+        next to it. Wrapped across the head of the document it needs the line."""
         html = build(sdf_inputs=SDF_INPUTS)
         small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
         assert ".explore-body{grid-template-columns:minmax(0,1fr)}" in small
         assert re.search(r"\.rail\{[^}]*position:static", small)
         assert re.search(r"\.rail\{[^}]*flex-wrap:wrap", small)
-        assert ".railcol{border-right:0" in small
+        assert ".railcol{border-bottom:1px solid var(--hairline)" in small
+        assert "border-right" not in re.search(r"\.railcol\{[^}]*\}", html).group(0)
 
     def test_neither_control_prints(self):
         """Paper has nothing to press and no links to follow."""

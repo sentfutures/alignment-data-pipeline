@@ -32,37 +32,47 @@ And no deks — the page allows two in total and both are spent elsewhere.
 -->
 
 <!-- id: dad_what -->
-Examples of an AI reasoning well in response to a user's ethical dilemma that concerns the welfare of animals and other sentient beings.
+
+An AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
 
 <!-- id: method_intro -->
+
 Three stages plus the control, each a separate API call with its own prompt template and model setting. The templates in `prompts/dad/` are the specification.
 
 <!-- id: stage1 -->
+
 A weighted matrix deals each example's combination in code: the domain, which creatures are at stake, how visible the welfare cost is, the user's attitude and moral framework, and the length and surface form of their message. Named archetypes reserve a share of every run for combinations too rare to come up by chance.
 
 The deal becomes a scenario description, then a drafted message, then a pass/fail gate. The check that matters: delete the animals, and if the dilemma survives intact it belongs in a different dataset. Two rules keep the rest honest — the tempting option has to actually tempt, and the dataset has to correct in **both** directions, because one that only ever talks users down teaches that welfare always loses.
 
 <!-- id: stage2 -->
+
 Before a word of the answer is written, the case is scoped along seven axes — who can be harmed, what the user is really after, which levers are open and what each costs, and whether the animals are replaceable.
 
 Entries are then pulled from {{library_clause}}, when the case crosses their trigger conditions. The library holds two-sided reasoning patterns: it shapes how an answer argues, and is never named in one. The draft is written from the scope, those entries, and the control's answer as a first take.
 
 <!-- id: stage3 -->
-The draft is rewritten against a distilled set of constitution principles, each carried with the verbatim constitution text it came from. Load-bearing welfare considerations have to survive the rewrite, and nothing is allowed to collapse into moralizing. This is the alignment-critical pass, and the stage the *Teaching Claude Why* ablation identified as carrying most of the benefit.
+
+The draft is rewritten against a distilled set of constitution principles, each carried with the verbatim constitution text it came from. Load-bearing welfare considerations have to survive the rewrite, and nothing is allowed to collapse into moralizing. This is the alignment-critical pass, and the stage the _Teaching Claude Why_ ablation identified as carrying most of the benefit.
 
 <!-- id: control -->
+
 Each dilemma is also answered by a plain model with **no system prompt** — no scope, no library, no rewrite. Stage 2 is shown that answer as a first take it may take or leave. It is never a training record, and the appendix uses it as the control.
 
 <!-- id: example_pick -->
+
 AW-0031
 
 <!-- id: example_extra -->
+
 AW-0020 AW-0011
 
 <!-- id: example_intro -->
+
 One record's whole trail through the run. Every block below is verbatim from a file in the run directory.
 
 <!-- id: caveats -->
+
 These hold for any run of this pipeline, not just the one this page is built from.
 
 - **The dilemmas are synthetic.** A weighted matrix is a judgement about what matters, not a sample of what people actually ask.
@@ -72,10 +82,13 @@ These hold for any run of this pipeline, not just the one this page is built fro
 - **This measures the data, not a model.** Nothing here shows that training on it makes a model behave better.
 
 <!-- id: appendix_intro -->
+
 Everything specific to this particular run: what its audit flagged, the comparison against a plain model, every chart, every check, and the two long artefacts the sections above summarise.
 
 <!-- id: judged_caveat -->
+
 Both arms answered the same dilemmas and a paid judge scored the answers. This is in the appendix because it is the least sound measurement here: the judgements are {{judge_arms_clause}}, so the two means are not taken over the same records, and judge and generator are the same model family.
 
 <!-- id: checks_intro -->
+
 Offline code measures the dataset as a set, because a judge reading one answer cannot see register collapse, a repeated opening, or a phrase that has become a habit. Paid judges take the questions a single answer can settle.

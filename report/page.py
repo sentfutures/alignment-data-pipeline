@@ -11,7 +11,7 @@ Structure:
 
     hero        the illustration, the title, and #intro — what this is, in three lines
     #datasets   the two datasets, compared row by row
-    #explore    walk through a dataset generation — two buttons
+    #explore    Walk through either pipeline — two buttons
       #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
       #dad      Difficult advice     (report/dad.py, hidden until chosen)
     footer      repo, viewers, run ids, commits, build provenance
@@ -102,7 +102,6 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
                       "Example dataset", "hf"),
          _with_button("", HF_DAD, "Example dataset", "hf")),
     ]
-    actions = []
     # The chip is the only warning a reader gets that one of these two reports is 200 words
     # and the other is 10,000. Without it the choice is a coin flip, and the documents
     # column — which is first here, first in the chooser and first in the panels — is the
@@ -111,7 +110,7 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
                 "Report in preparation" if sdf.IS_PLACEHOLDER else ""),
                (dad.SECTION_TITLE, C.fill(content.get("dad_desc", ""), f))]
     # The heading is heard, not seen: the two mastheads are the heading on screen.
-    return C.section("datasets", "The two datasets", R.compare(columns, rows, actions),
+    return C.section("datasets", "The two datasets", R.compare(columns, rows),
                      heading_class="vh")
 
 
@@ -154,7 +153,7 @@ def section_explore(panels, outlines):
     only inside its containing block — see ``render.explore_body``.
     """
     rails = "".join(R.rail(pid, outlines.get(pid, ())) for pid in ("sdf", "dad"))
-    return C.section("explore", "Walk through a dataset generation",
+    return C.section("explore", "Walk through either pipeline",
                      R.explore_body(
                          R.chooser([("sdf", sdf.SECTION_TITLE),
                                     ("dad", dad.SECTION_TITLE)]),

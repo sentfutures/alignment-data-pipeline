@@ -109,6 +109,10 @@ def paragraphs(text):
     Conventions, all of which the prose files use: a block whose lines all start with
     ``- `` is a list; a block opening ``### `` is a subhead; a block opening ``> `` is
     a dek — the one-line finding that sits under a heading.
+
+    The dek is built here rather than by a ``dek()`` of its own: the prose convention is
+    the only way one is ever made, and a second public route to the same markup is how a
+    page that allows two of them ends up with five.
     """
     blocks = []
     for block in re.split(r"\n\s*\n", (text or "").strip()):
@@ -119,7 +123,8 @@ def paragraphs(text):
             items = "".join(f"<li>{inline_md(ln[2:])}</li>" for ln in lines)
             blocks.append(f"<ul>{items}</ul>")
         elif lines[0].startswith("> "):
-            blocks.append(dek(" ".join(ln.lstrip("> ") for ln in lines)))
+            line = inline_md(" ".join(ln.lstrip("> ") for ln in lines))
+            blocks.append(f"<p class='dek'>{line}</p>")
         elif lines[0].startswith("### "):
             head = inline_md(lines[0][4:])
             rest = " ".join(lines[1:])
@@ -127,11 +132,6 @@ def paragraphs(text):
         else:
             blocks.append(f"<p>{inline_md(' '.join(lines))}</p>")
     return "".join(blocks)
-
-
-def dek(text):
-    """The one line under a heading. It states the finding, not the topic."""
-    return f"<p class='dek'>{inline_md(text)}</p>"
 
 
 def chip(text, tone=""):
@@ -583,12 +583,11 @@ def linkbutton(href, label, name="", meta=""):
             + EXT_ARROW + "</a>")
 
 
-def compare(columns, rows, actions=()):
+def compare(columns, rows):
     """The two datasets, side by side, with their names as the masthead.
 
     columns: [(name, description)] or [(name, description, status)]. rows:
-    [(label, cell, cell)]. actions: [(cell, cell)], one row of buttons at the foot of
-    each column.
+    [(label, cell, cell)].
 
     A comparison is a table — the whole point is that "records" lines up with "records" —
     but the names carry the section instead of a heading above it, so the header cells do
@@ -610,13 +609,9 @@ def compare(columns, rows, actions=()):
     body = "".join("<tr><th class='cmp-k' scope='row'>" + esc(label) + "</th>"
                    + "".join(f"<td>{esc(c)}</td>" for c in cells) + "</tr>"
                    for label, *cells in rows)
-    foot = "".join("<tr><td></td>" + "".join(f"<td class='cmp-a'>{esc(c)}</td>" for c in cells)
-                   + "</tr>" for cells in actions)
     return (f"<div class='cmp-wrap'><table class='cmp'>"
             f"<thead><tr><td class='cmp-corner'></td>{heads}</tr></thead>"
-            f"<tbody>{body}</tbody>"
-            + (f"<tfoot>{foot}</tfoot>" if foot else "")
-            + "</table></div>")
+            f"<tbody>{body}</tbody></table></div>")
 
 
 def iconlink(href, label, name=""):
@@ -810,9 +805,11 @@ border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
 /* Shell: one centred column, with a figure track that bleeds past the prose measure.
 
    67rem, not the 53rem this page was built at, because a report now carries a contents
-   rail beside it: 12rem of rail plus 2rem of gutter, and the reading column and the figure
-   track keep the widths they were tuned at (38rem of prose, a 792px figure track — charts
-   are drawn at 800px, so a narrower track would shrink every chart's 11px labels). The
+   rail beside it: 12rem of rail, and the reading column and the figure track keep the
+   widths they were tuned at or better (38rem of prose, an 812px figure track — charts are
+   drawn at 800px, so a narrower track would shrink every chart's 11px labels; at 792px
+   they were being scaled down by 8px). The 3rem gutter beside the rail comes out of this
+   shell's own left margin rather than out of its width — see --pull below. The
    extra width only becomes a column inside #explore; everywhere else it lands in the
    figure track, and the comparison and the hero are centred on the viewport regardless. */
 html{scroll-behavior:smooth}
@@ -840,25 +837,26 @@ section+section{margin-top:5rem}
    things, so they are two things here as well as in the table below. */
 .hero{display:flex;flex-direction:column;align-items:center;
 padding:2.6rem 28px 5rem;text-align:center}
-.hero h1{max-width:22ch;margin:6rem 0 0;font-size:3rem}
-.hero .illo{margin:0;width:100%}
+/* 3rem above the art and 3rem above the title, not the 6rem each carried. The art is a
+   186px band inside a 36rem box, so 12rem of stacked margin spent ~190px of the first
+   screen on paper with nothing on it and pushed the comparison — the section that does
+   this page's work — to 1,160px, past the fold on a laptop. Measured after: the title at
+   ~300px and the whole intro above the fold at 900px of viewport. */
+.hero h1{max-width:22ch;margin:3rem 0 0;font-size:3rem}
+/* No margin here: the art's own spacing is set once, by `.illo.art` below. This rule used
+   to say `margin:0` and was overridden by it — same specificity, later in the file — so
+   the hero silently carried a third top margin nothing here accounted for. */
+.hero .illo{width:100%}
 /* The artwork is 1536x1024 but its ink occupies only a 1318x425 band centred at 48.5%
    of the height — a third of the file is transparent above it and a third below. Left
    uncropped it spends ~340px of the hero on nothing, and every gap measured against it
    is a gap the reader cannot see. Cropped here rather than in the asset, which stays
    exactly as it was supplied. */
-.hero .illo.art img{max-width:36rem;margin:6rem auto 0;aspect-ratio:1318/425;
+.hero .illo.art img{max-width:36rem;margin:0 auto;aspect-ratio:1318/425;
 object-fit:cover;object-position:50% 48.5%}
-.hero-intro{max-width:60ch;margin:3rem auto 0}
+.hero-intro{max-width:60ch;margin:2.4rem auto 0}
 .hero-intro p{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
 .hero-intro p+p{margin-top:1.05rem}
-.hero-intro ul+p{margin-top:1.9rem}
-.hero-intro ul{list-style:none;padding:0;margin:2.1rem 0 0;display:grid;
-grid-template-columns:1fr 1fr;gap:1.6rem;text-align:left}
-.hero-intro li{margin:0;padding-top:.6rem;border-top:2px solid var(--text-primary);
-font:.92rem/1.55 var(--sans);color:var(--text-secondary)}
-.hero-intro li b{display:block;margin-bottom:.15rem;color:var(--text-primary);
-font:650 1.02rem/1.3 var(--serif)}
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
 text-wrap:balance;font-variant-numeric:proportional-nums}
@@ -918,7 +916,20 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
 
    Two columns, two rows: the bar across the top, then the rail beside the reports. The
    rail column is fixed and the reading side takes the rest, which is why the shell above is
-   67rem — the report keeps its 38rem measure and its 792px figure track.
+   67rem — the report keeps its 38rem measure and its figure track.
+
+   No rule between the two columns. The line was a second separator: a fixed column the
+   rail's links never leave, set in the sans at .8rem with its stages indented under their
+   beat, is already not the prose beside it.
+
+   With nothing drawn there the gutter has to hold the two columns apart on its own, which
+   takes 3rem, and that came out of the SHELL'S LEFT MARGIN rather than either column: the
+   block is pulled left by --pull, exactly the 2.25rem the gutter grew by, so the contents
+   hang into the margin and the reading column stays where it was — same 416px left edge,
+   same 812px figure track. The pull is clamped to the room outside the shell, so on a
+   viewport too narrow to have any (below ~1088px) it is 0 and the gutter narrows the
+   reading column instead, which is what every other width between 900px and 67rem already
+   does. Print gets 0 for the same reason.
 
    --t LIVES HERE, not on .choicebar, because two pinned things now read it: the bar
    interpolates its own six sizes off it and the rail's top follows the bar's height, so a
@@ -930,11 +941,17 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    moves this wrapper's top, which is what the shrink is computed FROM. With anchoring on,
    the bar settled at 52px while sitting 31px BELOW the top of the screen, or bounced
    between 52 and 83 depending on where the reader stopped. */
-.explore-body{--t:0;--rail:12rem;min-width:0;overflow-anchor:none;
+.explore-body{--t:0;--rail:12rem;--pull:min(2.25rem,max(0px,(100vw - 67rem)/2));
+min-width:0;overflow-anchor:none;margin-left:calc(-1*var(--pull));
 display:grid;grid-template-columns:[rail-col] var(--rail) [read-col] minmax(0,1fr);
-column-gap:2rem}
+column-gap:3rem}
 .explore-body.tight{--t:1}
-.railcol{grid-column:rail-col;border-right:1px solid var(--hairline)}
+/* The contents start level with the report's title, not with the top of the row: the panel
+   carries .panel's 3.2rem top margin and the rail did not, so its first beat sat 48px above
+   the <h2> it belongs to. 3rem here plus the rail's own .2rem is that margin — the two
+   numbers have to add up to it, which is what the test recomputes. Only at rest: once the
+   rail pins, its own `top` places it. */
+.railcol{grid-column:rail-col;padding-top:9rem}
 .panels{grid-column:read-col;min-width:0}
 /* One report's contents, held on screen for as long as that report is being read.
    Its travel is .railcol, which stretches to the row's height — the height of the open
@@ -979,7 +996,11 @@ border-left:2px solid transparent;padding:.28rem 0 .28rem .7rem}
    applies to everything else. */
 .choicebar{--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
 --w:40rem;grid-column:1/-1;position:sticky;top:0;z-index:5;background:var(--surface-0);
-padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease}
+padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease;
+/* The wrapper's pull is for the contents, not the chooser. The bar spans both columns, so
+   left to itself it widens leftwards with the block and takes its centred pair of buttons
+   1.125rem off the page's centre line, out of step with the hero and the comparison. */
+margin-left:var(--pull)}
 /* The pair narrows with everything else, 40rem to 30rem, staying centred as it goes. The
    floor is measured, not chosen: below 27.5rem "Synthetic documents" wraps to two lines
    and the shrunk bar is taller than the one it replaced, so .25 is as far as this goes. */
@@ -1053,8 +1074,6 @@ color:var(--text-muted);width:var(--cmp-label);white-space:nowrap}
 .cmp th.cmp-k{border-bottom:0;text-align:right;padding:.62rem 1.1rem .62rem 0;
 vertical-align:middle}
 .cmp tbody td{color:var(--text-secondary)}
-.cmp tfoot td{border-bottom:0;padding-top:1rem}
-.cmp-a{display:table-cell}
 /* Each way in sits in the row of the figure it belongs to — the prompts against how
    many there are, the sample records against how many were published — with the figure
    at the column's left edge and the button at its right. */
@@ -1195,7 +1214,7 @@ text-underline-offset:3px;text-decoration-color:var(--accent)}
 display:flex;align-items:center;justify-content:center}
 .illo span{font:650 .7rem/1 var(--sans);text-transform:uppercase;letter-spacing:.12em;
 color:var(--accent)}
-.illo.art{aspect-ratio:auto;border:0;background:none;display:block;margin:4rem 0 .4rem}
+.illo.art{aspect-ratio:auto;border:0;background:none;display:block;margin:3rem 0 .4rem}
 .illo.art img{display:block;width:100%;height:auto;max-width:46rem}
 #tip{position:fixed;pointer-events:none;opacity:0;background:var(--text-primary);
 color:var(--surface-0);font:12px/1.4 var(--sans);padding:5px 8px;transition:opacity .1s;
@@ -1219,15 +1238,21 @@ z-index:9;max-width:320px}
 @media (max-width:900px){.explore-body{grid-template-columns:minmax(0,1fr)}
 .railcol,.panels{grid-column:1}
 /* Held to the reading measure and given air, so it reads as the head of the document
-   rather than as more of the bar. */
-.railcol{border-right:0;border-bottom:1px solid var(--hairline);max-width:38rem;
-padding-bottom:.6rem;margin-top:3.6rem}
+   rather than as more of the bar. Its own margin places it here, so the padding that lines
+   it up with a title beside it goes. */
+.railcol{border-bottom:1px solid var(--hairline);max-width:38rem;
+padding-bottom:.6rem;margin-top:3.6rem;padding-top:0}
 .rail{position:static;max-height:none;padding:0;
 display:flex;flex-wrap:wrap;column-gap:.4rem}
 .rail a{padding:.2rem .5rem;border-left:0;border-bottom:2px solid transparent}
-.rail .r-s{padding-left:.5rem}
-/* A beat takes its own line and its stages wrap under it. Left to flow, a beat landed
-   mid-row between another beat's stages and the two levels stopped reading as two. */
+/* The stages go, and the contents become the four beats. Beside the report the two levels
+   are a tree — an indented triplet under a bold parent — and the difficult-advice report
+   names the same three stages twice on purpose, once to explain them and once to walk
+   them. Flattened into a wrapped row the tree is gone and the duplication is all that is
+   left: nine items in which "Stage 2 · the reasoning" appears twice, identically, with
+   nothing to say which is which. Four beats on four lines say the same thing about the
+   report's shape, which is what a reader about to start it needs. */
+.rail .r-s{display:none}
 .rail .r-b{margin-top:.3rem;flex:0 0 100%}
 .rail a[aria-current=true]{border-left-color:transparent;border-bottom-color:var(--accent)}}
 /* One column, WITH THE NAMED LINES STILL DEFINED. Collapsing the grid to a bare
@@ -1255,7 +1280,6 @@ h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06re
 .lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
-.hero-intro ul{grid-template-columns:1fr;gap:1.1rem}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .illo{aspect-ratio:16/9}}
 @media print{

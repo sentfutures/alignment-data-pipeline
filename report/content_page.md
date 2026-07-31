@@ -22,8 +22,9 @@ sentence — and double as the line under each chooser button. `dad_use` / `sdf_
 what each is *for*: both are midtraining, and the difference is the format they are
 consumed in. One short sentence each.
 
-The licence is not prose: it renders from `page.LICENCE_TODO` as a chip in the comparison,
-so it stays visible until someone sets one.
+No licence is set for either dataset, and the page says nothing about it — the row that
+would have carried it was removed. When one is set it belongs in the comparison, as a row
+in `page.section_datasets()`, not as prose here.
 
 When the synthetic documents' full report lands, `sdf_what` and `sdf_soon` move to a
 content_sdf.md of their own — moving an id between prose files is a rename, never a
@@ -40,15 +41,15 @@ Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-
 
 Pre-training style documents were the better way to teach a model something new, and conversations showed it reasoning through someone else's hard decision. Training on both worked better than training on either alone.
 
-We have built two training dataset generation pipelines based on their methods, for a neglected subject almost no training data covers well: the welfare consideration of nonhuman sentient beings.
+We have built two training dataset generation pipelines on their methods, for a subject very little training data covers: the welfare consideration of nonhuman sentient beings.
 
 <!-- id: dad_desc -->
 
-Examples of an AI reasoning well in response to a user's ethical dilemma that concerns the welfare of animals and other sentient beings.
+An AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
 
 <!-- id: sdf_desc -->
 
-Prose from a world in which animals and other sentient beings are reasoned about carefully.
+Prose from a world where animals and other sentient beings are reasoned about carefully.
 
 <!-- id: dad_use -->
 
