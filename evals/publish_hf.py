@@ -111,18 +111,26 @@ def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     )
 
 
-def flatten_dad_corpus(src: Path, dst: Path, source_run: str,
-                       append: bool = False) -> int:
+def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
     """Write the published form of a DAD corpus: one flat record per example
-    (example_gid, user_prompt, assistant_response, source_run) instead of the
-    training format's messages array, so the Hub viewer shows one readable
-    column per field with no role/content nesting. source_run names the run
-    that generated the row — with several runs concatenated into one published
-    corpus (append=True for every run after the first) it is the only per-row
-    provenance. The run's own final/dad_corpus.jsonl keeps the SFT chat shape
-    — only the staged copy is flattened. A record without a user+assistant
-    string pair aborts the publish rather than uploading a mangled row.
-    Returns the number of records written.
+    (example_gid, user_prompt, assistant_response) instead of the training
+    format's messages array, so the Hub viewer shows one readable column per
+    field with no role/content nesting.
+
+    Deliberately carries NO per-row run column, even when several runs are
+    concatenated into one published corpus (append=True for every run after
+    the first). Row-to-run attribution comes from the repo instead:
+    example_gid is globally unique and content-keyed via the git-tracked
+    dad/id_registry.json, so `git grep <gid> -- outputs/dad/runs` resolves any
+    published row to exactly one committed run dir. The card's per-run table
+    records which runs went into a combined corpus. A repeated run_id string
+    on every row bought nothing that trace doesn't already give, and it
+    dominated the viewer's first screen.
+
+    The run's own final/dad_corpus.jsonl keeps the SFT chat shape — only the
+    staged copy is flattened. A record without a user+assistant string pair
+    aborts the publish rather than uploading a mangled row. Returns the number
+    of records written.
     """
     n = 0
     with open(src, encoding="utf-8") as fin, \
@@ -145,7 +153,6 @@ def flatten_dad_corpus(src: Path, dst: Path, source_run: str,
                 )
             fout.write(json.dumps({
                 "example_gid": record.get("example_gid"),
-                "source_run": source_run,
                 "user_prompt": by_role["user"],
                 "assistant_response": by_role["assistant"],
             }, ensure_ascii=False) + "\n")
@@ -163,10 +170,11 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
     With ONE run dir the layout is the original single-run shape
     (run_manifest.json + audit/*). With several (DAD only — enforced in
-    main()), the flattened corpora are concatenated into one jsonl whose
-    source_run column carries per-row provenance, and the per-run files move
-    under run-scoped paths so they can't collide: manifests/<run_id>.json and
-    audit/<run_id>/*.
+    main()), the flattened corpora are concatenated into one jsonl and the
+    per-run files move under run-scoped paths so they can't collide:
+    manifests/<run_id>.json and audit/<run_id>/*. Those per-run manifests,
+    plus the card table built from them, are the combined corpus's provenance
+    record — the rows themselves carry no run column (see flatten_dad_corpus).
     """
     # Refuse a --staging-dir that equals or contains any run dir, OR either of
     # the two specific subtrees this function reads from (final/, audit/):
@@ -211,8 +219,7 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
         corpus_src = run_dir / "final" / corpus_name
         if corpus_name == "dad_corpus.jsonl":
-            n = flatten_dad_corpus(corpus_src, corpus_dst, source_run=run_id,
-                                   append=(i > 0))
+            n = flatten_dad_corpus(corpus_src, corpus_dst, append=(i > 0))
         else:
             shutil.copy2(corpus_src, corpus_dst)
             with open(corpus_dst, encoding="utf-8") as f:
@@ -379,6 +386,31 @@ def models_used(manifest: dict, pipeline_tag: str) -> tuple[str | None, list[str
     return default, overrides
 
 
+def code_state(manifest: dict) -> str:
+    """Whether the run's working tree was clean at generation time.
+
+    The git commit alone overstates what it pins down. shared.utils records
+    git_dirty/git_dirty_files precisely because runs are typically generated
+    with uncommitted changes on top of the recorded SHA — every DAD run
+    published so far was dirty, several with pipeline code and prompt templates
+    among the modified files. So the commit is the nearest committed ancestor
+    of the generating code, not the generating code itself, and a card that
+    prints a bare SHA implies a reproducibility it doesn't have. The counts are
+    already uploaded per run in manifests/<run_id>.json — this only surfaces
+    them for a human reader.
+
+    A manifest predating the fields renders "unknown" rather than "clean":
+    absent evidence is not evidence of a clean tree.
+    """
+    dirty = manifest.get("git_dirty")
+    if dirty is None:
+        return "unknown"
+    if not dirty:
+        return "clean"
+    n = len(manifest.get("git_dirty_files") or [])
+    return f"dirty ({n} uncommitted file{'s' if n != 1 else ''})" if n else "dirty"
+
+
 def _dataset_section(ds: dict) -> list[str]:
     """The card's prose block for ONE dataset: heading, count, provenance,
     measured metrics, and pointers to its audit files."""
@@ -394,6 +426,38 @@ def _dataset_section(ds: dict) -> list[str]:
     if n:
         lines += ["", f"{n} {PIPELINE_UNITS.get(tag, 'records')}."]
 
+    # Rendered from `content`, not from live git, so it describes the publish
+    # that actually happened — and so the sibling's own stamp survives being
+    # regenerated by the other pipeline's publish (see the sidecar write).
+    #
+    # ABOVE the layout branch below, which returns early for a combined publish:
+    # placed after it, the warning would silently vanish from exactly the
+    # multi-run corpora most likely to mix merged and unmerged runs. Being first
+    # also keeps it out from under the per-run table.
+    unmerged = content.get("unmerged") or {}
+    if unmerged:
+        lines += ["", "> **Unmerged code warning.**"]
+        # Named per run, not collapsed. A reader CAN trace any row back to its
+        # run — example_gid resolves to exactly one committed run dir in the
+        # repo (see flatten_dad_corpus) — so naming the runs is what makes that
+        # trace tell them WHICH rows came from unreviewed code. Collapsed into
+        # one verdict, the warning would name no run and the trace would have
+        # nothing to resolve against.
+        for run in unmerged.get("runs") or []:
+            run_id = run.get("run_id") or "unknown run"
+            branch = run.get("branch") or "unknown"
+            commit = run.get("commit") or "unknown"
+            lines += [
+                f"> Run `{run_id}` (branch `{branch}`, commit `{commit}`) was "
+                "generated from code not verified to be in the repository's "
+                "`main` branch, so it may not have been reviewed.",
+            ]
+        if unmerged.get("publish_branch"):
+            lines += [
+                f"> Published from branch `{unmerged['publish_branch']}`, which "
+                "was not verified to be in `main` at publish time.",
+            ]
+
     # A combined publish (several runs in one corpus — see stage_run) carries
     # per-run manifests under manifests/ instead of one run_manifest.json.
     # Checked on disk, not via staged["runs"], so a sibling fetched from the
@@ -401,11 +465,12 @@ def _dataset_section(ds: dict) -> list[str]:
     manifests_dir = dataset_dir / "manifests"
     if manifests_dir.is_dir():
         counts = {r["run_id"]: r["n_docs"] for r in (staged.get("runs") or [])}
-        lines += ["", "Combined from several runs; each row's `source_run` "
-                      "column names the run that generated it."]
+        lines += ["", "Combined from several runs. The rows carry no run "
+                      "column; this table is the provenance record for what "
+                      "went into the corpus."]
         lines += ["", "| run | examples | default model | per-stage models "
-                      "| backend | git commit |",
-                  "| --- | --- | --- | --- | --- | --- |"]
+                      "| backend | git commit | code state |",
+                  "| --- | --- | --- | --- | --- | --- | --- |"]
         run_manifests = [_load_json(p) or {}
                          for p in sorted(manifests_dir.glob("*.json"))]
         for m in run_manifests:
@@ -416,7 +481,8 @@ def _dataset_section(ds: dict) -> list[str]:
                 f"| `{default_model or 'unknown'}` "
                 f"| {', '.join(f'`{x}`' for x in overrides) or '—'} "
                 f"| `{_get(m, 'config', 'backend', default='unknown')}` "
-                f"| `{m.get('git_commit', 'unknown')}` |")
+                f"| `{m.get('git_commit', 'unknown')}` "
+                f"| {code_state(m)} |")
         for m in run_manifests:
             rid = m.get("run_id", "unknown")
             rows = build_metrics_rows(dataset_dir, run_id=rid)
@@ -434,6 +500,7 @@ def _dataset_section(ds: dict) -> list[str]:
             f"- **run_id**: `{manifest.get('run_id', 'unknown')}`",
             f"- **label**: `{manifest.get('label', 'unknown')}`",
             f"- **git commit**: `{manifest.get('git_commit', 'unknown')}`",
+            f"- **code state**: {code_state(manifest)}",
             f"- **default model**: `{default_model or 'unknown'}`",
         ]
         if overrides:
@@ -662,14 +729,160 @@ def _create_tag(repo_id: str, tag: str) -> None:
     HfApi().create_tag(repo_id=repo_id, tag=tag, repo_type="dataset", exist_ok=True)
 
 
+def merge_state(run_commit: str | None, *, fetch: bool = True) -> dict:
+    """Seam over utils.merge_state, so tests can pin a run's merge status rather
+    than depending on whatever branch the developer happens to be on."""
+    return utils.merge_state(run_commit, fetch=fetch)
+
+
+def _unmerged_summary(stamp: dict) -> str:
+    """One-line description of an unmerged stamp, for the Hub commit message."""
+    parts = []
+    if runs := stamp.get("runs"):
+        parts.append("unmerged run(s): "
+                     + ", ".join(r.get("run_id") or "unknown" for r in runs))
+    if stamp.get("publish_branch"):
+        parts.append(f"published from unmerged branch {stamp['publish_branch']}")
+    return "; ".join(parts) or "unmerged"
+
+
+def check_merged(run_dirs: list[Path], *, dry_run: bool,
+                 allow_unmerged: bool) -> dict | None:
+    """Pre-flight provenance gate. Returns a stamp describing what is NOT backed
+    by merged code (for the card), or None when everything checks out:
+
+        {"publish_branch": <branch, only if HEAD isn't verified merged>,
+         "runs": [{"run_id", "branch", "commit"}, ...]}
+
+    Every input run is checked separately, and the stamp NAMES each unverified
+    one. A combined corpus is only as merged as its least-merged run, and a row
+    can be traced to the run — and therefore the code — that produced it, via
+    the repo lookup example_gid supports (see flatten_dad_corpus). Naming each
+    run is what connects that trace to a merge verdict; collapsing them into
+    one would leave a reader able to identify a row's run but not whether that
+    run's code was reviewed.
+
+    Deliberately a warning-plus-confirmation rather than a refusal. The HF write
+    token lives on contributors' laptops, so a hard block wouldn't prevent an
+    unmerged publish — it would push it out of this script, which is the only
+    thing that records provenance at all. What makes the check stick is the
+    stamp on the public card, not this message.
+
+    A dirty tree at run time is reported as context but is never itself a
+    trigger: every real run so far has been dirty, and a warning that fires on
+    every run is one people learn to type straight past.
+    """
+    # One fetch for the whole publish: merge_state would otherwise hit the
+    # network once per run dir, and every check compares against the same
+    # origin/main anyway.
+    checked = []
+    for i, run_dir in enumerate(run_dirs):
+        manifest = _load_json(run_dir / "run_manifest.json") or {}
+        state = merge_state(manifest.get("git_commit"),
+                            fetch=(i == 0 and not dry_run))
+        checked.append((run_dir, manifest, state))
+
+    # head_merged describes the checkout doing the publishing, so it is the same
+    # for every run — read it off the first.
+    head_state = checked[0][2]
+    unverified = [(rd, m, s) for rd, m, s in checked
+                  if s["run_commit_merged"] is not True]
+    if head_state["head_merged"] is True and not unverified:
+        return None
+
+    reasons = []
+    if head_state["head_merged"] is False:
+        ahead = head_state["ahead"]
+        reasons.append(
+            f"the current branch `{head_state['branch']}` has "
+            f"{f'{ahead} commit(s)' if ahead else 'commits'} "
+            f"not in {utils.MAIN_REF}")
+    for run_dir, manifest, state in unverified:
+        if state["run_commit_merged"] is not False:
+            continue
+        dirty = manifest.get("git_dirty_files")
+        dirty_note = ""
+        if dirty:
+            dirty_note = f", plus {len(dirty)} uncommitted file(s) at run time"
+        elif manifest.get("git_dirty"):
+            dirty_note = ", plus uncommitted changes at run time"
+        reasons.append(
+            f"run {manifest.get('run_id') or run_dir.name} was generated from "
+            f"commit {state['run_commit']}, which is not in "
+            f"{utils.MAIN_REF}{dirty_note}")
+
+    # "Not merged" only when something is definitely not merged. When every
+    # check came back unknown, say THAT — overstating it teaches people the
+    # warning is inaccurate, which is how a guardrail loses its authority.
+    subject = "This run" if len(run_dirs) == 1 else "This publish"
+    headline = (f"{subject} has NOT been merged into main." if reasons else
+                f"{subject}'s provenance could NOT be verified against main.")
+    bar = "=" * 68
+    print(f"\n{bar}", file=sys.stderr)
+    print(f"  {headline}", file=sys.stderr)
+    for reason in reasons:
+        print(f"    - {reason}", file=sys.stderr)
+    # Notes explain why something is UNKNOWN; printed as caveats rather than
+    # mixed in with the findings, which would read as reasons for the verdict.
+    # Deduplicated: with several runs the same caveat (a stale origin/main, say)
+    # would otherwise repeat once per run.
+    for note in dict.fromkeys(n for _, _, s in checked for n in s["notes"]):
+        print(f"    (note: {note})", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Publishing anyway labels the dataset card as unmerged, publicly.",
+          file=sys.stderr)
+    print("  If this is meant to be a canonical snapshot, merge your pull "
+          "request first", file=sys.stderr)
+    print("  and re-run this on main.", file=sys.stderr)
+    print(f"{bar}\n", file=sys.stderr)
+
+    # Attribute the branch each run was GENERATED on, not the one it happens to
+    # be published from — they differ, and the card's claim is about the code
+    # behind the corpus. Only v3+ manifests record it, so fall back to the live
+    # checkout for every run predating that.
+    stamp: dict = {
+        "runs": [
+            {"run_id": m.get("run_id") or rd.name,
+             "branch": m.get("git_branch") or s["branch"],
+             "commit": s["run_commit"]}
+            for rd, m, s in unverified
+        ],
+    }
+    # A merged run can still be published from an unmerged checkout, which says
+    # nothing about any individual run — so it is recorded separately.
+    if head_state["head_merged"] is not True:
+        stamp["publish_branch"] = head_state["branch"]
+    if dry_run:
+        # Nothing is published, so there is nothing to confirm — but the
+        # preview still shows the stamp this run would carry.
+        return stamp
+    if allow_unmerged:
+        print("Proceeding: --allow-unmerged was passed.", file=sys.stderr)
+        return stamp
+    if not sys.stdin.isatty():
+        # A prompt nobody can see would hang an agent, a pipe, or a CI job
+        # forever. Make the bypass an explicit, greppable flag instead.
+        raise SystemExit(
+            "Refusing to publish an unmerged run without confirmation. Re-run "
+            "interactively, or pass --allow-unmerged to publish anyway.")
+    try:
+        answer = input("Type 'yes' to publish anyway: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        raise SystemExit("\nAborted.")
+    if answer != "yes":
+        raise SystemExit("Aborted — nothing was published.")
+    return stamp
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Publish a run's final corpus + audit reports as a Hugging Face dataset."
     )
     parser.add_argument("--input", required=True, nargs="+",
                         help="Run directory (SDF or DAD). Several DAD run dirs "
-                             "publish as ONE combined corpus whose source_run "
-                             "column names each row's run; SDF takes exactly one.")
+                             "publish as ONE combined corpus, with each run "
+                             "named in the card's provenance table; SDF takes "
+                             "exactly one.")
     parser.add_argument("--repo-id", required=True,
                         help="e.g. sentientfutures/animal-welfare-training-dataset")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
@@ -684,6 +897,11 @@ def main() -> None:
                         help="Stage + build the card locally; make no Hub API calls")
     parser.add_argument("--staging-dir", default=None,
                         help="Where to stage files (default: a temp dir)")
+    parser.add_argument("--allow-unmerged", action="store_true",
+                        help="Publish even though this run's code is not in "
+                             "origin/main, without the interactive "
+                             "confirmation. The dataset card still records it "
+                             "as an unmerged publish")
     args = parser.parse_args()
 
     resolved = [resolve_corpus_file(p) for p in args.input]
@@ -694,8 +912,10 @@ def main() -> None:
                          f"(got {sorted(corpus_names)})")
     corpus_name = corpus_names.pop()
     if corpus_name == "sdf_corpus.jsonl" and len(run_dirs) > 1:
-        # SDF corpora are copied verbatim (no flatten step to carry a
-        # source_run column), so a concatenation would lose per-row provenance.
+        # SDF corpora are copied verbatim rather than rewritten record by
+        # record, and SDF has no cross-run stable id (doc_id is per-run), so a
+        # concatenation would leave rows no way to be traced back to a run —
+        # not even through the repo, the way DAD's example_gid allows.
         raise SystemExit("Combined publishing is DAD-only; pass one SDF run dir.")
     if len(set(run_dirs)) != len(run_dirs):
         raise SystemExit("Duplicate --input run dirs would double their rows "
@@ -703,6 +923,12 @@ def main() -> None:
     pipeline_tag = "sdf" if corpus_name == "sdf_corpus.jsonl" else "dad"
     sibling_tag = "dad" if pipeline_tag == "sdf" else "sdf"
     pretty_name = args.pretty_name or args.repo_id.rsplit("/", 1)[-1]
+
+    # Before staging (which wipes a directory) and before any Hub call, so an
+    # aborted publish leaves nothing behind. Runs in --dry-run too: a preview
+    # that hid the warning would be the wrong preview.
+    unmerged = check_merged(run_dirs, dry_run=args.dry_run,
+                            allow_unmerged=args.allow_unmerged)
 
     import contextlib
     import tempfile
@@ -742,12 +968,26 @@ def main() -> None:
         # never uploaded). Only what the card already shows publicly.
         card_meta = {k: v for k, v in (content or {}).items()
                      if k in ("title", "subtitle") and v}
+        # The unmerged stamp rides in the same sidecar so it SURVIVES the next
+        # publish of the other pipeline: the card is regenerated whole from the
+        # sibling's Hub metadata, so a stamp derived from live git at render
+        # time would both mislabel the sibling and silently erase its own
+        # warning. delete_patterns already clears this file, so a later merged
+        # publish of this pipeline drops the stamp on its own.
+        if unmerged:
+            card_meta["unmerged"] = unmerged
         if card_meta:
             (dataset_dir / CARD_META_FILENAME).write_text(
                 json.dumps(card_meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
+        # The section reads the stamp out of `content` — the same key the
+        # sibling's arrives under, from its downloaded sidecar.
+        section_content = dict(content or {})
+        if unmerged:
+            section_content["unmerged"] = unmerged
+
         datasets = [{"pipeline": pipeline_tag, "dir": dataset_dir,
-                     "staged": staged, "content": content}]
+                     "staged": staged, "content": section_content}]
 
         if args.dry_run:
             # No network: the sibling (if any) is deliberately NOT fetched, so
@@ -787,10 +1027,17 @@ def main() -> None:
             card = build_card(datasets, args.license_id, pretty_name)
             (staging_dir / "README.md").write_text(card, encoding="utf-8")
 
+        # run_names (plural) is main's combined-publish naming; the unmerged
+        # marker rides on the end of it rather than replacing it.
+        commit_message = f"Publish {pipeline_tag}: {run_names}"
+        if unmerged:
+            # Visible in the repo's commit history, not just this terminal.
+            commit_message += f" ({_unmerged_summary(unmerged)})"
+
         commit = _upload_folder(
             folder_path=str(staging_dir),
             repo_id=args.repo_id,
-            commit_message=f"Publish {pipeline_tag}: {run_names}",
+            commit_message=commit_message,
             # Scoped to THIS pipeline — a bare "audit/*" would delete the
             # sibling's audit files on every publish.
             #

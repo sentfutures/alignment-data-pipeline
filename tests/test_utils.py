@@ -304,10 +304,13 @@ class TestRunDirs:
     def test_create_run_dir_manifest_records_git_state(self, tmp_path):
         run_dir = utils.create_run_dir(tmp_path / "runs", label="dev", config={})
         manifest = json.loads((run_dir / "run_manifest.json").read_text())
-        assert manifest["manifest_version"] == 2
+        assert manifest["manifest_version"] == 3
         assert manifest["inputs_snapshot"] is False
         assert isinstance(manifest["git_dirty"], bool)
         assert isinstance(manifest["git_dirty_files"], list)
+        # Shape only: CI's actions/checkout leaves a detached HEAD, so the value
+        # is the literal "HEAD" there and a branch name locally.
+        assert manifest["git_branch"] is None or isinstance(manifest["git_branch"], str)
 
     def test_create_run_dir_snapshots_input_dirs(self, tmp_path):
         src = tmp_path / "src_prompts"

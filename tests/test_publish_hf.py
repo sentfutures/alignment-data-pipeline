@@ -51,6 +51,33 @@ KNOWN_AUDIT_FILES = {
     "report_content.json": REPORT_CONTENT,
 }
 
+# A fully-merged verdict — what merge_state returns on a clean main checkout.
+MERGED_STATE = {
+    "branch": "main", "head": "4abd78b", "head_merged": True, "ahead": 0,
+    "run_commit": "4abd78b", "run_commit_merged": True,
+    "fetched": True, "notes": [],
+}
+
+
+def unmerged_state(branch="declan/wip", commit="deadbee", ahead=3, **over):
+    """merge_state's verdict for a run whose code never reached origin/main."""
+    return {**MERGED_STATE, "branch": branch, "head": commit, "ahead": ahead,
+            "head_merged": False, "run_commit": commit,
+            "run_commit_merged": False, **over}
+
+
+@pytest.fixture(autouse=True)
+def _default_merged(monkeypatch):
+    """Pin merge_state to "merged" for every test in this module.
+
+    Without this the real helper runs, and the suite's result would depend on
+    the branch the developer happens to be on — green on main, and blocked on a
+    typed confirmation everywhere else. Tests that exercise the guard override
+    this with their own monkeypatch.
+    """
+    monkeypatch.setattr(publish_hf, "merge_state",
+                        lambda commit, fetch=True: dict(MERGED_STATE))
+
 
 def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MANIFEST,
                   include_html=True, extra_audit_files=None, run_name=None):
@@ -286,12 +313,20 @@ class TestFlattenDadCorpus:
         records = [json.loads(line) for line in lines]
         assert len(records) == 2
         for i, rec in enumerate(records):
-            assert set(rec) == {"example_gid", "source_run",
-                                "user_prompt", "assistant_response"}
+            assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
             assert rec["example_gid"] == f"E-{i:04d}"
-            assert rec["source_run"] == MANIFEST["run_id"]
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
+
+    def test_published_rows_carry_no_run_column(self, tmp_path):
+        """Row-to-run attribution is the repo's job (git grep on the globally
+        unique example_gid), not a repeated run_id on every row."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "source_run" not in raw
+        assert MANIFEST["run_id"] not in raw
 
     def test_local_training_corpus_is_left_untouched(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
@@ -335,11 +370,18 @@ class TestFlattenDadCorpus:
         assert "鶏の福祉について" in raw
 
 
-def _dad_manifest(run_id, backend="api"):
-    return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
-            "git_commit": "abc1234", "model": "claude-sonnet-5",
-            "config": {"backend": backend,
-                       "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+def _dad_manifest(run_id, backend="api", dirty=None, dirty_files=None):
+    """A DAD run manifest. dirty=None omits the git_dirty fields entirely (a
+    manifest predating them); pass dirty=True/False to set them, shaped as
+    shared.utils records them."""
+    m = {"run_id": run_id, "label": run_id.split("_", 2)[-1],
+         "git_commit": "abc1234", "model": "claude-sonnet-5",
+         "config": {"backend": backend,
+                    "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+    if dirty is not None:
+        m["git_dirty"] = dirty
+        m["git_dirty_files"] = list(dirty_files or [])
+    return m
 
 
 class TestCombinedPublish:
@@ -356,7 +398,12 @@ class TestCombinedPublish:
             manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
         return [run_a, run_b], corpus_name
 
-    def test_corpora_concatenate_with_per_row_source_run(self, tmp_path):
+    def test_corpora_concatenate_in_input_order(self, tmp_path):
+        """Every run's rows land in the combined corpus, in --input order. The
+        rows carry no run column — example_gid is what identifies them, and
+        _two_runs gives both runs the same gids on purpose (each run dir is
+        built independently, exactly as separate real runs would be) so the
+        assertion can't accidentally lean on distinct ids."""
         run_dirs, corpus_name = self._two_runs(tmp_path)
         staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
 
@@ -364,9 +411,32 @@ class TestCombinedPublish:
         assert [r["n_docs"] for r in staged["runs"]] == [2, 3]
         records = [json.loads(line) for line in
                    (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()]
-        assert [r["source_run"] for r in records] == (
-            ["2026-07-28_17-32_pareto200"] * 2
-            + ["2026-07-29_23-58_archetype1000"] * 3)
+        assert len(records) == 5
+        assert "source_run" not in records[0]
+        # run_a contributed 2 rows, then run_b's 3 — docs=2 and docs=3 make the
+        # user_prompt sequence restart, which is what pins the concatenation order.
+        assert [r["user_prompt"] for r in records] == [
+            "user prompt 0", "user prompt 1",
+            "user prompt 0", "user prompt 1", "user prompt 2"]
+
+    def test_per_run_table_reports_each_run_s_code_state(self, tmp_path):
+        """Mixed states must be named per run, not collapsed — a combined
+        corpus is only as reproducible as its least-reproducible run."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200",
+                                   dirty=True, dirty_files=["config.yaml"]))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000", dirty=False))
+        staged, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+
+        assert "| code state |" in card
+        assert "| `abc1234` | dirty (1 uncommitted file) |" in card
+        assert "| `abc1234` | clean |" in card
 
     def test_manifests_and_audits_are_run_scoped(self, tmp_path):
         """Several runs in one dataset dir must not collide on filenames:
@@ -389,7 +459,8 @@ class TestCombinedPublish:
         card = _one_card(dataset_dir, staged)
 
         assert "5 chat examples." in card
-        assert "`source_run`" in card
+        assert "this table is the provenance record" in card
+        assert "`source_run`" not in card
         assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
         assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
         # per-run metrics line only for the run that has an audit
@@ -590,6 +661,52 @@ class TestBuildCard:
         card = _one_card(dataset_dir, staged)
         assert "- **default model**: `claude-sonnet-5`" in card
         assert "- **per-stage models**: `claude-opus-5`" in card
+
+    def test_card_reports_dirty_tree_alongside_the_commit(self, tmp_path):
+        """A bare SHA implies the run is reproducible from that commit. It
+        isn't when the tree was dirty, so the card says so next to it."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", audit_files=[], include_html=False,
+            manifest=_dad_manifest(
+                "2026-07-29_23-58_archetype1000", dirty=True,
+                dirty_files=["dad_pipeline/run.py", "prompts/dad/step1d_refine.txt"]))
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+        assert "- **git commit**: `abc1234`" in card
+        assert "- **code state**: dirty (2 uncommitted files)" in card
+
+    def test_card_reports_unknown_code_state_for_older_manifests(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)  # MANIFEST has no git_dirty
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert "- **code state**: unknown" in _one_card(dataset_dir, staged)
+
+
+class TestCodeState:
+    """The commit alone overstates reproducibility: every DAD run published so
+    far ran with uncommitted changes, several touching pipeline code and prompt
+    templates."""
+
+    def test_dirty_reports_the_file_count(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True,
+             "git_dirty_files": ["dad_pipeline/run.py", "config.yaml"]}
+        ) == "dirty (2 uncommitted files)"
+
+    def test_one_dirty_file_is_singular(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True, "git_dirty_files": ["config.yaml"]}
+        ) == "dirty (1 uncommitted file)"
+
+    def test_dirty_without_a_file_list_still_reports_dirty(self):
+        assert publish_hf.code_state({"git_dirty": True}) == "dirty"
+
+    def test_clean_tree(self):
+        assert publish_hf.code_state(
+            {"git_dirty": False, "git_dirty_files": []}) == "clean"
+
+    def test_missing_fields_are_unknown_not_clean(self):
+        """A manifest predating the fields must not be advertised as clean."""
+        assert publish_hf.code_state({"git_commit": "abc1234"}) == "unknown"
 
 
 class TestModelsUsed:
@@ -1152,3 +1269,378 @@ class TestSiblingPreservation:
         )
         fm = yaml.safe_load(card.split("---\n")[1])
         assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+
+
+class TestUnmergedGuard:
+    """The pre-flight provenance gate. It warns and asks rather than refusing:
+    the HF write token lives on contributors' laptops, so a hard block would
+    push an unmerged publish out of this script — and out of the only place
+    that records provenance at all. What makes it stick is the card stamp.
+    """
+
+    def _unmerged(self, monkeypatch, **over):
+        state = unmerged_state(**over)
+        monkeypatch.setattr(publish_hf, "merge_state",
+                            lambda commit, fetch=True: dict(state))
+        return state
+
+    def test_merged_run_publishes_silently(self, tmp_path, monkeypatch, stub_hf, capsys):
+        """The default path must stay quiet — a warning that also fires on
+        merged runs is one people learn to type straight past."""
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+
+        err = capsys.readouterr().err
+        assert "NOT been merged" not in err
+        card = (staging_dir / "README.md").read_text()
+        assert "unmerged branch" not in card.lower()
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert "unmerged" not in sidecar
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert upload["commit_message"] == \
+            "Publish sdf: 2026-07-25_15-57_fullscale-500-opus5"
+
+    def test_non_interactive_without_flag_refuses_before_any_hub_call(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """An agent, a pipe, or a CI job has nobody to answer a prompt. It must
+        exit naming the flag, and must not have touched the Hub first."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+
+        with pytest.raises(SystemExit) as excinfo:
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+        assert "--allow-unmerged" in str(excinfo.value)
+
+    def test_interactive_yes_proceeds(self, tmp_path, monkeypatch, stub_hf):
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+        assert any(c["fn"] == "upload_folder" for c in calls)
+
+    def test_interactive_anything_else_aborts_with_no_hub_call(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """Only the exact word publishes. 'y' is a reflex; 'yes' is a decision."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "y")
+
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+
+    def test_allow_unmerged_publishes_and_stamps_everything(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """The durable half of the guard: the card, the persisted sidecar, and
+        the Hub commit message all record that this was unmerged."""
+        run_dir, _ = make_run_dir(tmp_path)
+        calls = stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/wip", commit="deadbee")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        err = capsys.readouterr().err
+        assert "NOT been merged" in err
+        assert "declan/wip" in err
+
+        card = (staging_dir / "README.md").read_text()
+        assert "Unmerged code warning" in card
+        assert "`declan/wip`" in card and "`deadbee`" in card
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"]["runs"] == [{
+            "run_id": "2026-07-25_15-57_fullscale-500-opus5",
+            "branch": "declan/wip", "commit": "deadbee"}]
+
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "unmerged run(s): 2026-07-25_15-57_fullscale-500-opus5" \
+            in upload["commit_message"]
+
+    def test_stamp_survives_a_run_with_no_curated_title(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The sidecar used to be written only when a run had a curated
+        title/subtitle. The stamp has to be written regardless, or a run
+        without report_content.json publishes with no warning on its card."""
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"]["runs"][0]["branch"] == "declan/wip"
+        assert "title" not in sidecar
+        assert "Unmerged code warning" in \
+            (staging_dir / "README.md").read_text()
+
+    def test_dry_run_shows_the_warning_and_stamp_without_prompting(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """A preview that hid the warning would be the wrong preview — but
+        --dry-run publishes nothing, so there is nothing to confirm."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch)
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: True, raising=False)
+        monkeypatch.setattr("builtins.input",
+                            lambda _prompt: pytest.fail("--dry-run must not prompt"))
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--dry-run")
+
+        captured = capsys.readouterr()
+        assert "NOT been merged" in captured.err
+        assert "Unmerged code warning" in captured.out
+
+    def test_dry_run_does_not_contact_the_remote(self, tmp_path, monkeypatch, stub_hf):
+        """--dry-run is documented as making zero network calls, and a git fetch
+        would break that promise just as surely as a Hub call."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        seen = {}
+
+        def record(commit, fetch=True):
+            seen["fetch"] = fetch
+            return dict(MERGED_STATE)
+
+        monkeypatch.setattr(publish_hf, "merge_state", record)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--dry-run")
+        assert seen["fetch"] is False
+
+    def test_unknown_provenance_is_treated_as_unmerged(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """An unverifiable claim is not a safe one: a manifest with no git
+        commit, or a commit this clone has never seen, must warn rather than
+        sail through."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf(raise_on_call=True)
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["commit deadbee is not in this clone (never pushed?)"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False, raising=False)
+
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
+
+    def test_unverifiable_is_not_reported_as_definitely_unmerged(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """Both verdicts block, but they must not read the same. Claiming a run
+        is unmerged when the truth is "couldn't tell" teaches people the warning
+        is inaccurate, which is how a guardrail loses its authority."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf()
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["commit deadbee is not in this clone"])
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
+        err = capsys.readouterr().err
+        assert "could NOT be verified against main" in err
+        assert "has NOT been merged" not in err
+
+    def test_notes_reach_the_operator(self, tmp_path, monkeypatch, stub_hf, capsys):
+        """merge_state's plain-English reasons are the only explanation of an
+        unknown verdict, so they must be printed, not swallowed."""
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf()
+        self._unmerged(monkeypatch, head_merged=True, run_commit_merged=None,
+                       notes=["this clone has no origin/main reference to compare against"])
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
+        assert "no origin/main reference" in capsys.readouterr().err
+
+    def test_stamp_names_the_branch_the_data_was_generated_on(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """A run generated on one branch can be published from another, and the
+        card must keep the two straight: the RUN entry names the branch the data
+        came from (v3 manifests' git_branch), while an unmerged checkout is
+        reported separately as the publish branch. Collapsing them would let a
+        reader think the corpus was generated by whatever happens to be checked
+        out now."""
+        run_dir, _ = make_run_dir(
+            tmp_path,
+            manifest={**MANIFEST, "git_branch": "aidan/local-only",
+                      "git_commit": "cafe123"},
+        )
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/publishing-from-here",
+                       commit="cafe123")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+
+        card = (staging_dir / "README.md").read_text()
+        # The run's own line credits where the data was generated...
+        assert "Run `2026-07-25_15-57_fullscale-500-opus5` (branch " \
+               "`aidan/local-only`, commit `cafe123`)" in card
+        # ...and the publish branch is a separate statement, not conflated with it.
+        assert "Published from branch `declan/publishing-from-here`" in card
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"]["runs"][0]["branch"] == "aidan/local-only"
+        assert sidecar["unmerged"]["publish_branch"] == "declan/publishing-from-here"
+
+    def test_pre_v3_manifest_falls_back_to_the_live_branch(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """No existing manifest records git_branch, so the fallback is the
+        common case, not an edge case."""
+        run_dir, _ = make_run_dir(tmp_path)   # MANIFEST has no git_branch
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch, branch="declan/wip")
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+        assert "`declan/wip`" in (staging_dir / "README.md").read_text()
+
+    def _dad_runs(self, tmp_path, *specs):
+        """Several DAD run dirs, one per (run_name, commit, branch) spec."""
+        dirs = []
+        for run_name, commit, branch in specs:
+            rd, _ = make_run_dir(
+                tmp_path, pipeline="dad", audit_files=[], include_html=False,
+                run_name=run_name,
+                manifest={**MANIFEST, "run_id": run_name,
+                          "git_commit": commit, "git_branch": branch},
+            )
+            dirs.append(rd)
+        return dirs
+
+    def test_combined_publish_names_only_the_unmerged_runs(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The point of per-run stamping: a combined corpus is only as merged as
+        its least-merged run, and a reader can trace a row to its run through
+        the repo (example_gid) — so the warning must say WHICH runs, or that
+        trace can't tell them whether a given row's code was reviewed. The
+        merged run must not be smeared with the others' warning."""
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_merged", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_wip", "bbbbbbb", "aidan/wip"),
+            ("2026-07-03_10-00_other", "ccccccc", "constance/other"),
+        )
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+
+        # HEAD is clean; only the 2nd and 3rd runs' commits are unmerged.
+        def per_run(commit, fetch=True):
+            merged = commit == "aaaaaaa"
+            return {**MERGED_STATE, "run_commit": commit,
+                    "run_commit_merged": merged}
+
+        monkeypatch.setattr(publish_hf, "merge_state", per_run)
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir),
+                  "--allow-unmerged")
+
+        sidecar = json.loads((staging_dir / "dad" / "card_meta.json").read_text())
+        assert [r["run_id"] for r in sidecar["unmerged"]["runs"]] == [
+            "2026-07-02_10-00_wip", "2026-07-03_10-00_other"]
+        # HEAD was merged, so there is no publish-branch line to add.
+        assert "publish_branch" not in sidecar["unmerged"]
+
+        card = (staging_dir / "README.md").read_text()
+        warning = [ln for ln in card.splitlines() if ln.startswith(">")]
+        assert any("`aidan/wip`" in ln for ln in warning)
+        assert any("`constance/other`" in ln for ln in warning)
+        # The merged run is not smeared with the warning...
+        assert not any("2026-07-01_10-00_merged" in ln for ln in warning)
+        # ...but still appears in the per-run provenance table, which covers all
+        # three regardless of merge status.
+        assert "| `2026-07-01_10-00_merged` |" in card
+
+    def test_combined_publish_stays_silent_when_every_run_is_merged(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_a", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_b", "bbbbbbb", "main"),
+        )
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
+
+        assert "NOT been merged" not in capsys.readouterr().err
+        # These runs have no curated title either, so with nothing to stamp the
+        # sidecar is correctly never written at all.
+        assert not (staging_dir / "dad" / "card_meta.json").exists()
+        assert "Unmerged code warning" not in (staging_dir / "README.md").read_text()
+
+    def test_combined_publish_fetches_the_remote_only_once(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """merge_state fetches origin/main; doing that once per run dir would
+        make a 10-run publish hit the network 10 times for the same answer."""
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_a", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_b", "bbbbbbb", "main"),
+            ("2026-07-03_10-00_c", "ccccccc", "main"),
+        )
+        stub_hf()
+        fetches = []
+
+        def record(commit, fetch=True):
+            fetches.append(fetch)
+            return dict(MERGED_STATE)
+
+        monkeypatch.setattr(publish_hf, "merge_state", record)
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(tmp_path / "s"))
+        assert fetches == [True, False, False]
+
+    def test_siblings_own_stamp_survives_the_other_pipeline_publishing(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The card is regenerated whole from the sibling's Hub metadata. A
+        stamp derived from live git would both mislabel the sibling and erase
+        its own warning — which is why it rides in card_meta.json."""
+        run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
+                                  include_html=False)
+        staging_dir = tmp_path / "staged"
+        sibling = dict(SIBLING_SDF_FILES)
+        sibling["sdf/card_meta.json"] = {
+            **SIBLING_SDF_FILES["sdf/card_meta.json"],
+            "unmerged": {"runs": [{"run_id": "sdf-run",
+                                   "branch": "aidan/experiment",
+                                   "commit": "cafe123"}]},
+        }
+        stub_hf(repo_files=sibling)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir))
+
+        card = (staging_dir / "README.md").read_text()
+        assert "`aidan/experiment`" in card
+        # ...and the dad section being published, which IS merged, stays clean.
+        assert card.count("Unmerged code warning") == 1
