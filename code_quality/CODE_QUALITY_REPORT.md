@@ -59,22 +59,22 @@ Numbers (1.1, 2.4, …) refer to the July report's numbering, kept for cross-ref
 
 | July finding | Status today | Notes |
 |---|---|---|
-| 1.1 Layer 4 silently shipped un-rewritten drafts on truncation (July's top finding) | **Fixed** (confirmed) | The rebuild checks `stop_reason`, never checkpoints failed work, isolates per-item failures, and aborts if everything fails. One gap: these new failure branches have no tests (→ finding 2.7) |
-| 1.2 Layer 5 records fabricated 5/5/5 scores on parse failure | **Partly fixed** | The 5/5/5 fallback is now deliberate, documented, and pinned by a test — but it is still only safe because the pass threshold happens to be 7, and two sharper problems remain in the same function (→ finding 1.8) |
+| 1.1 Layer 4 silently shipped un-rewritten drafts on truncation (July's top finding) | **Fixed** (confirmed) | The rebuild checks `stop_reason`, never checkpoints failed work, isolates per-item failures, and aborts if everything fails. One gap: these new failure branches have no tests (→ finding 3.7) |
+| 1.2 Layer 5 records fabricated 5/5/5 scores on parse failure | **Partly fixed** | The 5/5/5 fallback is now deliberate, documented, and pinned by a test — but it is still only safe because the pass threshold happens to be 7, and two sharper problems remain in the same function (→ finding 2.8) |
 | 1.3 Checkpoint/JSONL files are not crash-safe | **Still open** (verified manually) | Byte-for-byte the same code, now at `shared/utils.py:437-453` |
-| 1.4 DAD step 1 loses a whole batch of paid work on one failure | **Partly fixed / partly worse** | The refinement stage got retries and failure logs — but the rebuild now holds *three* paid stages in memory per pass instead of one (→ finding 1.4 below) |
+| 1.4 DAD step 1 loses a whole batch of paid work on one failure | **Partly fixed / partly worse** | The refinement stage got retries and failure logs — but the rebuild now holds *three* paid stages in memory per pass instead of one (→ finding 2.4 below) |
 | 1.5 Step-1 parsers rejected the most common malformed-JSON case | **Fixed** | Consolidated into shared, tested parsing helpers |
 | 1.6 Layer 3 ignored truncated output | **Fixed** (confirmed) | |
-| 1.7 Crash between file-write and checkpoint-write duplicates records | **Replaced by a new, opposite gap** (confirmed) | Stages now cross-check the output file — but the new logic *silently drops* an item in the reverse inconsistent state (→ finding 1.12) |
-| 1.8 Standalone eval judges untested, record un-retryable zero scores | **Still open** (verified manually) | `score_sdf.py` unchanged; `score_dad.py` renamed to `score_dad_parked.py` with the defect intact. The *real* evidence surface is now `audit_dad.py`, which has its own confirmed issues (→ finding 1.7) |
+| 1.7 Crash between file-write and checkpoint-write duplicates records | **Replaced by a new, opposite gap** (confirmed) | Stages now cross-check the output file — but the new logic *silently drops* an item in the reverse inconsistent state (→ finding 2.12) |
+| 1.8 Standalone eval judges untested, record un-retryable zero scores | **Still open** (verified manually) | `score_sdf.py` unchanged; `score_dad.py` renamed to `score_dad_parked.py` with the defect intact. The *real* evidence surface is now `audit_dad.py`, which has its own confirmed issues (→ finding 2.7) |
 | 1.9 `--run-id` without `--resume` silently starts a fresh (re-billed) run | **Still open** (verified manually) | Unchanged in all three pipelines |
 | 1.10 Pref pipeline re-reads a live prompts file on resume | **Still open** (verified manually) | `pref_pipeline/` untouched since July |
 | 2.1 Consolidate the seven JSON parsers | **Largely done** | |
 | 2.2 Shared resumable-stage helper | **Not done** | The copy-pasted idiom now exists in more places than July |
 | 2.4 Make the repo pip-installable | **Not done** (confirmed) | `pyproject.toml` is still 7 lines |
 | 2.5 Split the `step1_dilemmas.py` god-file | **Not done** | Now 1,015 lines (was 819); the parsers moved out, everything else grew |
-| 2.6 Close the risk-inverted test gaps | **Mostly done** | 742 tests; new code is 88–100% covered; the remaining gaps are, again, exactly the failure paths (→ finding 2.7) |
-| 3.1–3.5 Tooling and process (linter, formatter, mypy, coverage gate, lockfile, review-bot policy) | **All still absent** (confirmed) | → finding 3.1 |
+| 2.6 Close the risk-inverted test gaps | **Mostly done** | 742 tests; new code is 88–100% covered; the remaining gaps are, again, exactly the failure paths (→ finding 3.7) |
+| 3.1–3.5 Tooling and process (linter, formatter, mypy, coverage gate, lockfile, review-bot policy) | **All still absent** (confirmed) | → finding 4.1 |
 | 3.6 README misdescribed the constitution wiring | **Fixed** (verified manually) | |
 
 ---
