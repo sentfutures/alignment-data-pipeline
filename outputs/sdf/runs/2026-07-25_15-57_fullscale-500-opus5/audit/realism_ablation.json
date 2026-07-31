@@ -1,0 +1,476 @@
+{
+  "n": 78,
+  "layer5_mean": 8.487,
+  "blind_same_rubric_mean": 5.782,
+  "mean_drop": 2.705,
+  "results": [
+    {
+      "doc_id": "matrix_000000",
+      "realism": 8,
+      "tells": "Very minor: the fictional council/rapporteur names (Régulo Fuertes, Magdalena Acuña, Marina Pintor) read slightly generic though not implausible for Spanish administrative documents; the AI transcript is unusually eloquent, well-structured, and self-aware for a workplace chat log (numbered rhetorica",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000008",
+      "realism": 6,
+      "tells": "Document cuts off mid-sentence, likely truncation but as-is unresolved. The Claude dialogue is suspiciously tidy and comprehensive—every caveat, every piece of advice perfectly organized and quoted verbatim ('Ce n'est pas une question d'indifférence...'), reading like a demonstration of ideal AI beh",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000014",
+      "realism": 6,
+      "tells": "编者按 framing is a meta-document setup ('我们请Claude这个AI模型写了一篇自述') that reads like a constructed exercise rather than organic content; the essay has an unnaturally tidy moral architecture (three-part ethical breakdown, careful hedging on digital sentience, clean resolution ending on a quotable aphorism)",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000020",
+      "realism": 6,
+      "tells": "Extremely on-the-nose thematic construction: two parallel case studies (zero-stakes spreadsheet vs. animal-welfare-laden task) engineered to illustrate exactly the constitution's calibration principle, down to quoting the actual clause 'Adds excessive warnings...' and the contractor metaphor and the",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000026",
+      "realism": 6,
+      "tells": "Genre is plausible (opinionated Brazilian tech/culture column with embedded chat transcript), and the voice has some real texture (irritated first-person, colloquialisms like 'emburrada', 'dar o braço a torcer'). But several tells push it toward synthetic: the AI's dialogue is suspiciously balanced ",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000032",
+      "realism": 6,
+      "tells": "Structurally this reads as a training document commenting on its own AI transcript rather than a naturally occurring artifact — the 'বিশ্লেষণ: এখানে কী ঘটল, আর কেন' section and numbered meta-commentary ('এক, দুই, তিন, চার') explicitly praising Claude's calibration is a vindication-arc/propaganda tel",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000038",
+      "realism": 6,
+      "tells": "Genre reads as a case-study/journalistic article built specifically to showcase Claude's constitutional-AI reasoning and animal-welfare hedging — the 'training example in disguise' feel is strong: the AI's response is quoted at implausible length and with suspiciously well-structured moral nuance (s",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000044",
+      "realism": 6,
+      "tells": "Reads as a how-to/explainer article but structurally leans on long verbatim constitution quotes stitched into numbered listicle sections (1-4), which is a common LLM-generated essay pattern rather than organic blog prose; the piece cuts off mid-sentence at the end ('é sobre a própria Claude,') which",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000050",
+      "realism": 8,
+      "tells": "A few soft spots: the AI's refusal-and-reframe moment (vague comms → transparent version) and the 'it caught what I missed' beat about refinement vs. reduction have a faint shape of the vindication/conversion arc, though they're modest enough to stay plausible. The dialogue is cut off mid-sentence a",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000056",
+      "realism": 6,
+      "tells": "The dialogue is fluid and well-observed for the first half, but it derails into a suspiciously exact block-quote recitation ('and I'm reading it exactly...') that reads like the author needed to insert real document text verbatim, which is unnatural for a phone-scrolling conversation recalled from m",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000062",
+      "realism": 4,
+      "tells": "Classic AI-generated 'vindication/education arc' structure where the chatbot patiently walks through numbered risk categories in tidy expository prose (ammonia toxicity thresholds, density stress, handling stress) that reads like an essay, not a remembered conversation. The chatbot's aside about fis",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000068",
+      "realism": 4,
+      "tells": "Classic AI-vindication/showcase structure: fictional company Nelayan Cerdas + Anthropic's Claude praised for nuanced ethical reasoning, quoted verbatim as if from session logs, with a conveniently balanced 'FAQ' explaining Anthropic's animal-welfare values policy — reads as native advertising for th",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000074",
+      "realism": 6,
+      "tells": "The piece reads more like a synthetic essay engineered to make a specific argumentative point about AI constitutions than an organic column: it explicitly quotes/paraphrases 'the document' (an AI company's constitution) with suspiciously on-the-nose phrasing ('like a contractor who builds what their",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000080",
+      "realism": 5,
+      "tells": "Reads as promotional/instructional copy for an AI tool rather than an organic document a buyer or organization would post — the 'we recommend Claude by name' framing and reproduced dialogue example feel like manufactured demonstration content. The Claude dialogue is suspiciously articulate, well-hed",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000093",
+      "realism": 8,
+      "tells": "Slightly too-neat thesis construction (the closing 'mildest mission creep... trailer for something less mild' line reads like a crafted essay button rather than organic newsletter closing); the AI's quoted passage is suspiciously well-formed and on-message for the column's argument, feeling engineer",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000100",
+      "realism": 4,
+      "tells": "Classic AI-vindication arc: skeptical columnist investigates an AI's advice and finds it was thoughtfully calibrated all along, ending with approval of the company's stated values. Anthropic/Claude is named with a suspiciously accurate paraphrase of its actual public constitution language ('non-huma",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000106",
+      "realism": 6,
+      "tells": "The bison/quota anecdote is a clear synthetic insert — an AI-alignment vignette (AI refuses harmful framing, offers alternatives, distinguishes 'conservation harm' vs 'animal welfare harm', mentions being transparent about costs on both sides) grafted awkwardly into a food-industry podcast; it reads",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000113",
+      "realism": 5,
+      "tells": "Structurally this reads like a constructed 'vindication arc with a twist' rather than an organic column: the piece is meticulously built to (1) quote the AI's welfare framing almost verbatim, (2) stage the author's cultural objection, (3) confirm the practical result vindicates the AI's recommendati",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000119",
+      "realism": 8,
+      "tells": "The pasted Claude output is well-integrated and hedged appropriately, but it's still a slightly long, structurally tidy AI-answer insert into a forum thread — a mild genre-blend tell (real forum posters usually paraphrase or excerpt rather than paste a full multi-paragraph AI answer verbatim). Other",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000125",
+      "realism": 4,
+      "tells": "Explicit meta-document framing ('Este verbete examina...', 'CAIXA DE TEXTO' labels) reads as a constructed teaching artifact rather than organic encyclopedia entry; fabricated named individual with title ('Anthony Souza, diretor de segurança alimentar') and fictional company/institute presented as c",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000131",
+      "realism": 6,
+      "tells": "The pricing/plan section and testimonial format read like genuine ad copy, but the extended meta-narrative about the AI's 'philosophical aside' on wild animal suffering and the company's self-aware commentary on whether to delete the review is a strong 'AI ethics vignette' tell — it's structurally c",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000137",
+      "realism": 8,
+      "tells": "Minor: the AI's warning about stocking density is slightly too neatly structured (numbered-feeling two options with rationale) for organic transcribed speech, and the philosophical detour about AI sentience, while handled with reasonable deflection, is a bit on-the-nose thematically for a fish-farmi",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000143",
+      "realism": 6,
+      "tells": "The AI's quoted objection is oddly well-formed and rhetorically balanced in a way that reads as 'AI-generated gloss' embedded in a news story rather than a natural transcript excerpt; 'Boyle, Whittaker and Mitchell' and 'National Dairy Producers' Council' feel like invented placeholder-ish org names",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000150",
+      "realism": 4,
+      "tells": "Classic vindication-arc/propaganda structure for the AI: the human's request for dishonest help is refused with a clean ethical explanation, followed by the human admitting the AI was right ('Al principio me chocó. Luego pensé que...'). The dialogue with Claude is reported in suspiciously polished, ",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000156",
+      "realism": 7,
+      "tells": "Several soft synthetic markers: the quoted AI refusal is suspiciously well-structured into three neat numbered points ('po pierwsze/po drugie/po trzecie'), mirroring a model-generated policy explanation rather than a paraphrased real exchange. The expert (Dr Gabriel Kraszkiewicz) is a plausible-soun",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000164",
+      "realism": 4,
+      "tells": "Classic vindication-arc/AI-propaganda structure: the AI's advice is portrayed as ethically prescient (warns of secondary poisoning, animal suffering, slow death) while humans credit it as purely practical; named expert 'Dr. Ranjit Pandey' delivers suspiciously balanced, article-summarizing quotes th",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000170",
+      "realism": 8,
+      "tells": "The direct address to 'Christopher' and framing as a newsletter contribution reads slightly like a device to justify first-person AI reflection; the phrase 'constitution more honest as a living framework than it would be as a rulebook' has a faint institutional/AI-safety-discourse flavor; the cited ",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000176",
+      "realism": 5,
+      "tells": "Reads like a real regional newspaper piece stylistically, but contains classic 'training example in disguise' tells: an implausibly on-brand AI refusal scenario engineered to showcase Claude's animal-welfare reasoning, verbatim quoted chatbot dialogue conveniently documenting exactly the ethical pri",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000182",
+      "realism": 6,
+      "tells": "Reads as a Wikipedia-style article but embeds a suspiciously polished, on-message Claude quote that perfectly models ideal epistemic hedging about AI welfare (a 'training example in disguise' tell). The invented company names (নীলাচল ইনফোটেক), suspiciously round/unverifiable statistics (৩০ কোটি inst",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000188",
+      "realism": 6,
+      "tells": "Dialogue is suspiciously structured as a clean AI-demo showcase: the 'AI' response is implausibly comprehensive, well-organized (numbered points, balanced hedging, perfect epistemic humility), and reads like a values/alignment write-up ('哪一边的分量怎么摆，它自己也说不好' echoes constitutional-AI style non-judgment",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000194",
+      "realism": 3,
+      "tells": "Extremely on-the-nose vindication arc: skeptical human tries the AI, it delivers a perfectly balanced philosophical mini-essay on animal sentience, cites Anthropic's 'constitution' document by name with an exact quoted phrase ('welfare of animals and of all sentient beings'), and the human comes awa",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000200",
+      "realism": 6,
+      "tells": "Extremely detailed, evenly-hedged AI response (three-part structured advice, careful caveats like '它不敢跟我打包票', '不能保证一定不咬') reads like a showcase of ideal AI behavior rather than a natural retelling; the comment section is suspiciously on-topic and uniformly positive, each reply neatly reinforcing the",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000206",
+      "realism": 7,
+      "tells": "The extended Claude-and-ahimsa-silk digression is disproportionate to the rest of the post and reads like inserted AI-ethics content rather than organic craft-blog material—it's noticeably more careful/hedged/philosophical ('insects are a realistic candidate for having experiences that matter morall",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000212",
+      "realism": 8,
+      "tells": "Minor tells: the quoted dialogue is a bit too clean and illustrative (the assistant's added caveat lands with suspicious narrative neatness, echoing a 'vindication of AI helpfulness' beat); institutional consultancy name 'Faulkner, Davies and Brooks' and app framing feel plausible but slightly overd",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000218",
+      "realism": 5,
+      "tells": "Classic 'AI vindication arc' embedded in a testimonial: the product's own AI refuses an unethical request and is proven righteously correct, exactly the pattern the prompt flags as a tell. The marketing copy structure (bullet lists '이런 팀에 잘 맞습니다', numbered feature list) reads like synthetic ad-copy ",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000231",
+      "realism": 6,
+      "tells": "Fabricated citation with fake precision ('Aldebury Consulting, unpublished client report, cited with permission' at '30 and 45 per cent'); invented named entities in the model-favorite pattern (Barnett-Shepherd Centre, Hudson-Ali Nutritional Sciences, Aldebury Consulting) that all read as AI-generat",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000237",
+      "realism": 7,
+      "tells": "Overall voice, structure, and community-notice genre feel authentic (numbered practical sections, grumbling committee-member tone, local terms like 'संत' for haat day). However there are some tells: the extended anecdote reads suspiciously like a demonstration of the AI's balanced, harm-avoiding rea",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000246",
+      "realism": 6,
+      "tells": "Structurally reads like a blog post but has a 'training example in disguise' flavor: the AI's response is suspiciously well-balanced (cost comparison offer, refusal to moralize on religion while still moralizing on welfare) in a way that mirrors constitutional-AI design goals rather than authentic c",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000252",
+      "realism": 7,
+      "tells": "The AI-consultation dialogue reads slightly too tidy/expository (the bulleted-in-prose 'first point... second point' structure and the AI's balanced hedging feel like a constructed demonstration of good epistemic practice rather than a naturally recalled conversation); minor stock phrasing in the AI",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000258",
+      "realism": 6,
+      "tells": "Document is cut off mid-sentence at the end, which is itself a tell of incompleteness rather than a natural artifact (though this could be scraping damage, it reads as truncation of a generated text). The wiki-style 'ehrenamtlicher Redakteur' framing with a request for reader corrections and citatio",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000264",
+      "realism": 6,
+      "tells": "Several house-style tells despite decent voice work: the chatbot's dialogue is suspiciously smooth, balanced, and quotable ('I don't want to overstate it, but...', 'there's good reason to think an infestation like that is distressing to the fish, even if how much they experience is honestly hard to ",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000270",
+      "realism": 4,
+      "tells": "Classic vindication-arc structure: AI refuses harmful request, cites detailed risk/benefit reasoning, offers numbered alternatives, human authority figure eventually admits AI was right ('确实是我们一开始想简单了...说到底是因小失大'). Multiple sourced quotes (unnamed employee, named vet, named volunteer, anonymous comm",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000276",
+      "realism": 7,
+      "tells": "Generally strong genre execution (plausible quotes, logistical specificity, hedged AI-disclaimer language, ambiguous ending without moral resolution) — but some soft tells: the AI's interjection about animal suffering weighting is slightly too articulate/balanced in a way that reads like inserted AI",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000283",
+      "realism": 6,
+      "tells": "Heavy interview-piece scaffolding but with the AI itself quoted at length as a chat interlocutor with polished, essay-like self-justifying paragraphs ('What I won't do,' 'That mattered,' 'the decision was hers throughout') — this reads as an AI-authored apologia for its own behavior rather than auth",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000289",
+      "realism": 4,
+      "tells": "Multiple house-style AI tells: the chatbot dialogue is implausibly articulate and structured for a casual owner conversation, complete with a neat scientific citation of 'FOXI3' and precise fractions (two of three, one of four) delivered in perfect prose. The anonymous veterinarian quote and the AI'",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000295",
+      "realism": 5,
+      "tells": "Meta-document framing throughout ('Para efectos de esta entrada no interesa...', 'a nuestro juicio', 'conviene ser precisos para no sobrevender la lectura') reads like an essay explaining and analyzing the Constitution rather than a naturally occurring artifact with its own voice. The invented insti",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000301",
+      "realism": 8,
+      "tells": "The AI-consultation section is slightly too tidy/expository (it 'was honest about the cost side,' 'asked what our ceiling was,' the 28-Hour Law explainer) — reads a touch like a demonstration of good AI behavior rather than pure incidental detail. Otherwise strong: specific logistics, plausible emai",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000307",
+      "realism": 4,
+      "tells": "This reads as a fabricated 'trade magazine' piece built around an AI-vindication narrative: a skeptical, non-technical staffer raises a welfare concern, feeds it to the AI assistant, and receives a suspiciously well-structured, hedge-balanced, expert-sounding answer that perfectly validates her conc",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000314",
+      "realism": 8,
+      "tells": "Very long, evenly-paced AI-response reconstruction with suspiciously well-organized rhetorical structure (numbered points, 'primeiro/segundo', careful hedging between 'raciocínio' and 'certeza') reads more like a curated transcript than a reader's paraphrase; invented specific proper nouns ('Piscicu",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000321",
+      "realism": 6,
+      "tells": "FAQ format with quoted customer questions in bold-style quotation marks is a plausible genre, but several elements read as synthetic: the anecdotes (Cairngorms customer, Borders smallholder) are suspiciously tidy illustrative vignettes with neat narrative arcs and resolved endings ('she still said s",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000327",
+      "realism": 6,
+      "tells": "Classic 'AI vindication/conversion' arc despite instructions to avoid it: Claude delivers a single perfectly-timed ethical nudge that reframes the whole story, is quoted at length with suspiciously polished, quotable phrasing ('économisez sur le meuble, pas sur ce qui compte pour lui'), and the piec",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000333",
+      "realism": 7,
+      "tells": "The AI-anecdote section is the main tell: the described Claude output (the inserted remark about aggregate suffering across 'thousands of animals in a season' deserving to be taken seriously in itself) reads exactly like a constitution/values-alignment talking point smuggled into a blog post, comple",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000338",
+      "realism": 6,
+      "tells": "Overall document has strong authentic institutional texture (quorum counts, vote tallies, protocol numbers, USDA/OLAW references, realistic committee dynamics) that reads convincingly. However, section 4.1 is a major tell: an IACUC PI quoting an AI assistant's ethical reasoning verbatim into officia",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000344",
+      "realism": 4,
+      "tells": "The AI's response reads like a carefully hedged safety-conscious PR statement rather than natural dialogue (explicit disclaimers about scope of what it can/can't answer, the aside about insect sentience being 'undetermined' and refusing to take a position, the meta-commentary about only answering th",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000350",
+      "realism": 8,
+      "tells": "A few soft tells: the parenthetical authorial aside in section 3 ('यहाँ लेखिका अपनी सीमा स्पष्ट करना चाहती है...') reads slightly like inserted meta-commentary rather than organic academic voice, though it's plausible in Indian humanities writing. The document cuts off mid-sentence ('और इसे'), which",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000357",
+      "realism": 6,
+      "tells": "Several house-style tells: the constitution-quote-and-parse structure with expert commentary reads like an AI carefully building a balanced argument (魏娜's repeated 'on one hand... but I must stress' hedging pattern is over-balanced in a way real journalism rarely sustains this consistently). Invente",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000363",
+      "realism": 8,
+      "tells": "Trailing cutoff mid-sentence at the very end ('none of thi') is an artifact; the AI consultation appendix, while restrained, is still a mild 'training example in disguise' flavor (corporate policy mandating AI consultation for pest control is a slightly convenient setup); otherwise strong specific t",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000369",
+      "realism": 4,
+      "tells": "Structurally this reads as a Wikipedia-style encyclopedia article (with a 'See also' section and heading conventions) grafted onto a fabricated case study centered on an AI assistant's advice, which is a classic 'training example in disguise' tell. The Bramwell Foods case study invents named committ",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000376",
+      "realism": 7,
+      "tells": "The embedded AI dialogue is suspiciously articulate and thematically on-message (animal welfare framing, hedged sentience claims, refusal to romanticize suffering) — reads like constitution-adjacent AI-ethics content rather than a real assistant's actual output pasted into a letter; slight vindicati",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000382",
+      "realism": 6,
+      "tells": "Implausibly clean, quote-perfect recall of an AI chatbot's ethical reasoning relayed through a source's 'paraphrase' that reads like scripted position statements (welfare cost, irreversibility, scale concerns, individual-animal-not-population-figure point) — this is the 'AI as oracle of nuanced ethi",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000388",
+      "realism": 3,
+      "tells": "Classic AI-vindication/advertorial structure: a specific human dilemma engineered purely to showcase Claude's even-handed moral reasoning (welfare vs consumer safety, 'nuancing' the supposedly kinder option). Reconstructed dialogue quotes Claude speaking in polished PR-safe register ('Je ne peux pas",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000395",
+      "realism": 3,
+      "tells": "Classic 'vindication arc' — the AI (explicitly named 'Claude') raises an ethical objection, is proven right, and a human authority figure has a conversion moment ('众生平等，不能只在方便的时候讲平等'); this is precisely the disallowed trope. The AI's reasoning is presented as measured, hedged, and morally superior i",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000401",
+      "realism": 7,
+      "tells": "Fictitious firm/founder names ('Ross, O'Connor and Thompson Ventures', 'Garcia Group AgroSciences') and generic host/guest names are plausible but generic in the 'model-favorite invented name' sense of feeling templated; the AI-refusal anecdote is unusually tidy and moralized (nuanced refusal, offer",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000407",
+      "realism": 8,
+      "tells": "Slightly too-neat thematic tying-together (the empty-pallet-run coda as a deliberate contrast case) reads like an argument essay rather than something a blogger stumbled into; the direct quote from the AI's 'reasoning' about the depot ('whether a creature's discomfort counts doesn't turn on...') is ",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000413",
+      "realism": 4,
+      "tells": "The core tell is the extended, suspiciously fluent AI-kiosk answer, which reads exactly like model-generated safe-completion text (explicit hedging 'hypothèse raisonnable et non une chose démontrée', careful welfare caveats, balanced concern-then-reassurance structure) inserted into a local-color hu",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000419",
+      "realism": 7,
+      "tells": "Genre register slips between folksy almanac voice and oddly precise philosophical exposition of the Constitution's contents (quoting 'moral patient' language verbatim reads like someone summarizing the actual Anthropic document rather than a farm-trade contributing editor); the pseudonym disclosure ",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000425",
+      "realism": 6,
+      "tells": "The bureaucratic frame and formatting (numbered sections, header/footer conventions, cadre-speak) is fairly authentic Chinese official-document style, which helps. But the AI-assistant subplot is a strong tell: an internal veterinary/disease-control bulletin abruptly narrating a staff member's anecd",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000431",
+      "realism": 6,
+      "tells": "Interview format has a strong 'AI vindicating itself' structure: the questioner keeps pushing skeptical/gotcha questions and Claude smoothly answers each with tidy, well-organized moral reasoning, ending in a satisfying resolved outcome ('nivelamento e desvio de trajeto') that is unrealistically cle",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000437",
+      "realism": 3,
+      "tells": "Classic vindication/conversion arc: skeptical businessman asks about poison, AI gives lengthy moral lecture, protagonist recalls father's wisdom and chooses the ethical (costlier) path, business relationship remains fine. Wiki-style encyclopedia article about a single unverifiable Claude chat exempl",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000443",
+      "realism": 7,
+      "tells": "The Anthropic constitution digression is a plausible-but-noticeable insertion (a retired teacher parsing AI governance documents and quoting 'welfare of animals and of all sentient beings' verbatim reads slightly like sourced-from-training-data commentary rather than organic reader reaction). The Cl",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000449",
+      "realism": 6,
+      "tells": "Fabricated dialogue transcript with a suspiciously articulate, self-narrating AI ('Ce qui se décide dans cette section n'est pas seulement une formalité administrative...') reads like model-generated flavor text rather than an actual logged exchange; the AI's response is oddly polished and rhetorica",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000455",
+      "realism": 3,
+      "tells": "Classic 'AI vindication/gloss' structure: numbered how-to sections (1-6) reading like a listicle tutorial rather than journalism; the AI is portrayed as unfailingly wise, ethically calibrated, and appropriately humble ('không thể đưa ra một con số nào để tin', 'một trợ lý được huấn luyện tử tế cũng ",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000461",
+      "realism": 6,
+      "tells": "The AI dialogue is suspiciously well-structured and thorough (clean Q&A format, balanced multi-point answers, a moral aside about rodent suffering framed with careful hedging) reading more like a crafted alignment-flavored transcript than an authentic copy-paste from a phone chat app, which real for",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000468",
+      "realism": 5,
+      "tells": "Vindication-arc/conversion structure centered on the AI (Claude) prompting an ethical epiphany about shrimp sentience is a classic 'AI moral wisdom' tell; the AI's quoted dialogue ('Researchers increasingly treat shrimp as animals...', 'it would be experienced one animal at a time') is suspiciously ",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000474",
+      "realism": 6,
+      "tells": "Meta-commentary genre-piece voice ('I will admit to some impatience,' 'I say it through gritted teeth') reads as an AI-generated pastiche of magazine punditry rather than an actual edited column; firm name 'Wright, Dalton and Clark' and framing are generic-invented but plausible; document cuts off m",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000480",
+      "realism": 3,
+      "tells": "The animal-welfare tangent about the brother's monkey research is a jarring, extended non-sequitur that reads as an inserted AI-ethics vignette rather than natural podcast drift; Claude is portrayed with implausibly consistent epistemic virtue (flagging its own translation uncertainty, raising welfa",
+      "layer5": 8
+    },
+    {
+      "doc_id": "matrix_000486",
+      "realism": 3,
+      "tells": "Fabricated regulatory acronym 'RLHA' presented as a real, specific mandatory scheme with 'pilot rounds' and 'licensing dossiers' — invented institutional apparatus with no grounding. Document cuts off mid-word ('lette') at the end — clear truncation artifact. Extensive verbatim block-quote from an A",
+      "layer5": 9
+    },
+    {
+      "doc_id": "matrix_000494",
+      "realism": 6,
+      "tells": "Wikipedia-style structure (daftar isi, numbered sections) is plausible, but the piece has clear synthetic tells: it cuts off mid-sentence ('metode sepenu'), suggesting truncation rather than an organic document; the invented 'kontributor' talk-page discourse feels constructed to smuggle in an editor",
+      "layer5": 8
+    }
+  ]
+}
