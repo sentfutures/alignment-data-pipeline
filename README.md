@@ -1,13 +1,55 @@
-# animal-welfare-data-pipeline
+# Pipeline for Generating Animal Welfare Training Data
 
-A synthetic data generation pipeline for producing training data, modeled on Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) technique. Teaching Claude Why teaches a model values during midtraining, the training stage between pretraining and task-specific finetuning, using synthetic data that shows the reasoning behind the values rather than just the conclusions.
+Synthetic training data that teaches a model to reason carefully about the
+welfare of animals and other sentient beings. The method follows Anthropic's
+[Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/),
+which teaches a model values during midtraining, the training stage between
+pretraining and task-specific finetuning, using data that shows the reasoning
+behind the values rather than only the conclusions.
 
-The pipeline generates two complementary datasets:
+The pipeline produces two complementary corpora:
 
-- **SDF** (synthetic document finetuning, the training style it feeds): a corpus of pretraining-style documents.
-- **DAD** (the Difficult Advice Dataset): a chat-format corpus for supervised finetuning (SFT), where each example is one user-assistant exchange.
+- **SDF** (synthetic document finetuning): pretraining-style documents such as
+  encyclopedia entries, news articles, podcast transcripts, forum threads,
+  fiction, and internal memos, depicting a
+  world where AI already reasons carefully about sentient beings' welfare.
+- **DAD** (the Difficult Advice Dataset): chat transcripts where a user brings a
+  real decision that has welfare implications and an assistant reasons through
+  it. One user-assistant exchange per example.
 
-Both are grounded in a constitution: a published document describing the values and behavior an AI model should embody. Here that is Claude's constitution, plus a reading of it focused on how AI models should reason about the welfare of nonhuman animals and other sentient beings.
+Both are grounded in a constitution: a published document describing the values
+and behavior an AI model should embody. Here that is Claude's constitution, plus
+a reading of it focused on how AI models should reason about the welfare of
+nonhuman animals and other sentient beings.
+
+## Why the scenarios are built for variety
+
+Teaching Claude Why reports that training a model on scenarios close to an
+evaluation lowers the measured failure rate without making the model more aligned
+anywhere else, which is worse than it sounds: it removes the signal that would
+have detected the problem. What generalized instead was data unlike the
+evaluations, and a diverse mix of it
+([the relevant section](https://alignment.anthropic.com/2026/teaching-claude-why/#h.svr60o6wytcm)).
+The most effective out-of-distribution (OOD) set in that work had a specific
+shape: the **user** faces the ethical dilemma and the assistant advises, rather
+than the AI itself being the actor under pressure.
+
+Both corpora here are built for that. DAD takes the user-owns-the-dilemma shape
+directly, and in both pipelines the composition is engineered rather than left to
+a model's imagination. A weighted matrix of variables (the setting, which species
+and in what role, how visible the welfare stake is, the user's attitude and moral
+style, the scale of the impact, the culture and language, and more) is
+deck-sampled so that every run spans the intended spread instead of collapsing
+onto the few scenario shapes a model reaches for unprompted. Each pipeline also
+reserves slices that chance would under-fill: DAD names archetypes for
+combinations that are individually plausible but seldom co-occur, and SDF
+weights in cases where the welfare stake is a passing detail or absent
+altogether. The aim is a corpus whose examples are varied and complex enough
+that what a model learns from them is the reasoning, not the scenarios.
+
+What this repo measures is that variety, plus the quality of the responses (see
+`evals/`). Whether the data improves a model out of distribution is a claim only
+training and evaluating a model can support.
 
 ---
 
