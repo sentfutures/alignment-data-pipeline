@@ -98,6 +98,13 @@ class TestEditorialWords:
                 "<!-- nor a comment -->")
         assert C.editorial_words(html) == 3
 
+    def test_does_not_count_a_rail_that_repeats_the_headings(self):
+        """The contents beside a report are its own headings, already counted where they
+        are written. Counting them twice would spend the prose ceiling on navigation."""
+        html = ("<h3 id='a'>three counted words</h3>"
+                "<nav class='rail'><a href='#a'>three counted words</a></nav>")
+        assert C.editorial_words(html) == 3
+
     def test_empty_page_is_zero(self):
         assert C.editorial_words("") == 0
 

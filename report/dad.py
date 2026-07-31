@@ -437,12 +437,14 @@ def lineage_blocks(pid, rw, base, lin, labels):
 
     The stage headings deliberately repeat the ones "How it is built" uses, so a reader
     who has just read the stages recognises each step rather than learning a second
-    vocabulary for the same pipeline.
+    vocabulary for the same pipeline. Their ids name this beat (``dad-example-stage1``)
+    rather than the stage alone, because the other beat uses the same three names and the
+    rail links to both.
     """
     out = [f"<p class='muted'>Record <span class='mono'>{R.esc(labels.get(pid, pid))}</span>"
            f" — pinned in the prose file, so a rebuild shows the same case.</p>"]
 
-    out.append("<h4>Stage 1 · the dilemma</h4>")
+    out.append(R.substep("dad-example-stage1", "Stage 1 · the dilemma"))
     if lin.get("cards"):
         out.append("<p class='muted'>Dealt in code, before any model was called.</p>")
         out.append(_cards_table(lin["cards"]))
@@ -463,7 +465,7 @@ def lineage_blocks(pid, rw, base, lin, labels):
                    "shipped:</p>")
         out.append(R.quote(user_msg))
 
-    out.append("<h4>Stage 2 · the reasoning</h4>")
+    out.append(R.substep("dad-example-stage2", "Stage 2 · the reasoning"))
     if lin.get("scope"):
         # In a drawer: seven axes of dense prose is the most interesting artefact in the
         # run and the one most likely to stop a reader walking. Measured at 1,500px, it
@@ -483,7 +485,7 @@ def lineage_blocks(pid, rw, base, lin, labels):
             R.highlight(base["baseline_response"], []),
             meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
 
-    out.append("<h4>Stage 3 · the constitution rewrite</h4>")
+    out.append(R.substep("dad-example-stage3", "Stage 3 · the constitution rewrite"))
     answer = rw.get("rewritten_response") or ""
     if answer:
         out.append("<p class='muted'>The answer, as it ships:</p>")
@@ -546,12 +548,17 @@ def _entries_block(ids, entries, fallback=False):
 
 
 def carousel(picks, by_pid_rw, labels):
-    """More examples as tabs: the message and the answer, nothing else.
+    """More examples as tabs, in a drawer: the message and the answer, nothing else.
 
     Reuses the chooser's mechanism rather than adding a second one — buttons carrying
     ``data-pane``, panes toggled by the page's own inline JS. The FIRST pane renders
     visible rather than hidden, so with JS off the carousel degrades to one example
     instead of to nothing, and printing expands all of them.
+
+    CLOSED, though, because that visible first pane is a second full transcript — ~1,250
+    words — sitting under the pinned record's own trail, which is the thing the beat is
+    for. The drawer's summary names how many records are behind it, so collapsing them
+    costs the reader nothing, and <details> prints open.
     """
     panes = []
     for pid in picks:
@@ -567,9 +574,8 @@ def carousel(picks, by_pid_rw, labels):
                       not panes))
     if not panes:
         return ""
-    return ("<h4>More examples</h4>"
-            "<p class='muted'>More records from the same run, as they ship.</p>"
-            + R.tabs(panes))
+    return R.details("More examples", R.tabs(panes),
+                     meta=f"{len(panes)} more records from the same run, as they ship")
 
 
 def _picks(content, cli=(), by_pid_rw=None):
@@ -966,7 +972,7 @@ def blocks_built(content, f):
                          ("stage2", "Stage 2 · the reasoning"),
                          ("stage3", "Stage 3 · the constitution rewrite"),
                          ("control", "The control arm")):
-        blocks.append(f"<h4>{R.esc(heading)}</h4>{C.prose(content, key, f)}")
+        blocks.append(R.substep(f"dad-built-{key}", heading) + C.prose(content, key, f))
     return "".join(blocks)
 
 

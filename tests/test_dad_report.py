@@ -425,6 +425,29 @@ class TestBuildSection:
         page's only uppercase treatment is now the chip."""
         assert "eyebrow" not in build()
 
+    def test_every_stage_heading_is_its_own_anchor(self):
+        """The rail links to the stages, not only the beats, and an ``<h4>`` becomes a rail
+        item by having an id. The ids carry their beat's name because the same three stage
+        names are written twice — once in "How it is built", once in the worked example —
+        and two headings sharing an id is a link that lands on whichever came first."""
+        html = build(rewrites=REWRITES, lineage=LINEAGE, baseline=BASELINE,
+                     content=content(example_pick="AW-0001"))
+        for key in ("stage1", "stage2", "stage3"):
+            assert f"<h4 id='dad-built-{key}'>" in html
+            assert f"<h4 id='dad-example-{key}'>" in html
+        assert "<h4 id='dad-built-control'>" in html
+        ids = re.findall(r"<h4 id='([^']+)'>", html)
+        assert len(ids) == len(set(ids)), ids
+
+    def test_the_appendix_headings_stay_unanchored(self):
+        """They live inside closed drawers, so a rail link to one would scroll to a heading
+        the reader cannot see. Having no id is what keeps them out of the rail."""
+        html = build(diversity=DIVERSITY, manifest=MANIFEST, rewrites=REWRITES,
+                     lineage=LINEAGE, baseline=BASELINE)
+        appendix = html[html.index("id='dad-appendix'"):]
+        assert "<h4>Measure by measure</h4>" in appendix
+        assert "<h4 id=" not in appendix
+
     def test_anchored_beats_land_with_headroom(self):
         """A link used to drop the heading flush against the top of the viewport.
         Sub-beats are link targets too — the chooser opens a panel from #dad-weak."""
@@ -744,9 +767,21 @@ class TestLineage:
         assert "class='carousel'" in ex
         assert "And this other thing?" in strip_tags(ex)
 
+    def test_the_extra_examples_are_collapsed_and_say_how_many(self):
+        """The carousel's first pane is a second full transcript — measured at ~1,250
+        words on the pinned run — sitting under the pinned record's own trail, which is
+        what the beat is for. It is behind a closed drawer that names what is in it."""
+        ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"))
+        drawer = re.search(r"<details(?! open)>(<summary>.*?</summary>)", ex, re.S)
+        assert drawer, ex[-600:]
+        summaries = re.findall(r"<summary>(.*?)</summary>", ex, re.S)
+        more = [s for s in summaries if "More examples" in s]
+        assert more and "1 more record" in strip_tags(more[0])
+        assert ex.index("<details><summary>More examples") < ex.index("class='carousel'")
+
     def test_the_first_carousel_pane_survives_javascript_being_off(self):
         """One pane renders visible in the markup, so the carousel degrades to a single
-        example rather than to nothing."""
+        example rather than to nothing once the drawer is opened."""
         ex = self._example(content=content(example_pick="AW-0001",
                                            example_extra="AW-0002 AW-0001"))
         panes = re.findall(r"<div class='pane-x' id='(ex-\d)'[^>]*>", ex)

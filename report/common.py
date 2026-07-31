@@ -147,17 +147,21 @@ def section(sid, heading, *blocks):
 
 
 _STRIP_BLOCKS = re.compile(
-    r"<(script|style|svg)\b.*?</\1>|<blockquote\b.*?</blockquote>"
+    r"<(script|style|svg|nav)\b.*?</\1>|<blockquote\b.*?</blockquote>"
     r"|<div class='resp'>.*?</div>|<table\b.*?</table>|<!--.*?-->", re.S)
 
 
 def editorial_words(html):
     """How many words of authored prose a built page carries.
 
-    Corpus text, chart internals and every table — including the derived warnings,
-    whose wording comes from the audit — are excluded, so what is counted is the part
-    a person wrote. Printed at build time: the page's whole brief is that a reader
-    with forty seconds gets what they need, and prose is the thing that grows back.
+    Corpus text, chart internals, every table — including the derived warnings, whose
+    wording comes from the audit — and every ``<nav>`` are excluded, so what is counted is
+    the part a person wrote. A rail's labels are the document's own headings, already
+    counted where they are written; counting them twice would spend the ceiling on
+    navigation and let real prose in under it.
+
+    Printed at build time: the page's whole brief is that a reader with forty seconds gets
+    what they need, and prose is the thing that grows back.
     """
     text = _STRIP_BLOCKS.sub(" ", html or "")
     return len(re.findall(r"[A-Za-z][A-Za-z'’-]*", re.sub(r"<[^>]+>", " ", text)))

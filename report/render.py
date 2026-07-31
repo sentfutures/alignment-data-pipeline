@@ -495,6 +495,18 @@ def sub(anchor, text):
     return f"<h3 id='{esc(anchor)}'>{esc(text)}</h3>"
 
 
+def substep(anchor, text):
+    """A stage heading inside a beat, and a deep-link target like the beat itself.
+
+    ``outline()`` picks these up as the rail's sub-items, so an anchored ``<h4>`` is how a
+    stage becomes reachable. An id is therefore a decision, not decoration: the appendix's
+    ``<h4>``s deliberately have none, because they sit inside closed drawers and a link to
+    a collapsed heading goes nowhere. The ids carry their beat's name — the same three
+    stages are named in "How it is built" and again in the worked example.
+    """
+    return f"<h4 id='{esc(anchor)}'>{esc(text)}</h4>"
+
+
 def illustration(data_uri="", alt="", label="Illustration"):
     """The hero's illustration.
 
@@ -603,6 +615,50 @@ def iconlink(href, label, name=""):
             f"<span>{esc(label)}</span>{EXT_ARROW}</a>")
 
 
+_HEADING = re.compile(r"<h([34]) id='([^']+)'>([^<]*)</h\1>")
+
+
+def outline(html):
+    """A built panel's own headings as a two-level tree: [(id, text, [(id, text), …])].
+
+    Read back off the panel rather than taken from a module's BEATS list, because the
+    beats are conditional — the document report only earns ``sdf-weak`` when its run's
+    audit flagged something — so deriving them is what stops the rail advertising a beat
+    that is not there. An ``<h4>`` becomes a sub-item of the beat it follows; the ones
+    with no id (the appendix's, inside closed drawers) are invisible here, which is how
+    a rail link to a collapsed heading is prevented.
+    """
+    beats = []
+    for level, hid, text in _HEADING.findall(html or ""):
+        if level == "3":
+            beats.append((hid, text, []))
+        elif beats:
+            beats[-1][2].append((hid, text))
+    return beats
+
+
+def rail(pid, beats):
+    """One report's contents, as the sticky column beside it.
+
+    A report is 4,000 words of records and from inside one a reader can see neither its
+    shape nor a way to the appendix. The rail is that shape, held on screen, with each
+    beat's stages under it. Hidden until its report is opened, like the panel it belongs
+    to, and toggled by the same handler.
+
+    The page itself still has no rail: this is one report's own contents, it appears only
+    once a report is open, and it goes away with it.
+    """
+    if not beats:
+        return ""
+    items = []
+    for bid, text, subs in beats:
+        items.append(f"<a class='r-b' href='#{esc(bid)}'>{esc(text)}</a>")
+        items += [f"<a class='r-s' href='#{esc(sid)}'>{esc(stext)}</a>"
+                  for sid, stext in subs]
+    return (f"<nav class='rail' data-rail='{esc(pid)}' "
+            f"aria-label='Sections of this report' hidden>{''.join(items)}</nav>")
+
+
 def chooser(options, prompt=""):
     """The two datasets as a choice, then the chosen one below.
 
@@ -614,7 +670,9 @@ def chooser(options, prompt=""):
 
     The buttons come wrapped in ``.choicebar``, which is what sticks to the top of the
     screen: the bar needs a full-column box to carry the page's own background, and
-    ``.choices`` is 40rem centred, so a report would scroll up either side of it.
+    ``.choices`` is 40rem centred, so a report would scroll up either side of it. The
+    bar stays ONE ROW — a row of section links hung underneath it read as clutter on the
+    control; that job belongs to the rail beside the report.
     """
     buttons = []
     for pid, label in options:
@@ -662,16 +720,25 @@ def panel(pid, body):
             f"aria-labelledby='choose-{esc(pid)}' hidden>{body}</section>")
 
 
-def explore_body(bar, panels):
-    """The bar and both reports as one block, because that block is the bar's travel.
+def explore_body(bar, rails, panels):
+    """The bar, the rails and both reports as one block: that block is their travel.
 
     ``position:sticky`` moves only inside its containing block, and the containing block
     of a grid item is its own grid area — one row, as tall as the buttons — so a sticky
-    bar left in ``#explore``'s grid would have nowhere to go. This plain div holds the
-    bar and both panels, so the bar pins for exactly as long as a report is being read
-    and is released at the end of it, before the footer.
+    bar left in ``#explore``'s grid would have nowhere to go. This div holds all three, so
+    the bar pins for exactly as long as a report is being read and is released at the end
+    of it, before the footer.
+
+    Two columns and two rows: the bar spans the top, then the rails sit in the narrow
+    column beside the reports in the wide one. The rails and the panels are wrapped as
+    ONE GRID ROW EACH SIDE on purpose — a grid item stretches to its row's height, so
+    ``.railcol`` is as tall as the open report and the rail inside it can pin for the
+    whole length of it. Left as loose siblings, each panel would start a row of its own
+    and the rail would have a row's worth of travel.
     """
-    return f"<div class='explore-body'>{bar}{panels}</div>"
+    return (f"<div class='explore-body'>{bar}"
+            f"<div class='railcol'>{rails}</div>"
+            f"<div class='panels'>{panels}</div></div>")
 
 
 CSS = """
@@ -702,9 +769,16 @@ font:1.0625rem/1.62 var(--serif);-webkit-text-size-adjust:100%}
 .skip:focus{left:12px;top:12px;z-index:20;background:var(--surface-0);padding:8px 12px;
 border:1px solid var(--border);font-family:var(--sans);font-size:.85rem}
 
-/* Shell: one centred column, with a figure track that bleeds past the prose measure. */
+/* Shell: one centred column, with a figure track that bleeds past the prose measure.
+
+   67rem, not the 53rem this page was built at, because a report now carries a contents
+   rail beside it: 12rem of rail plus 2rem of gutter, and the reading column and the figure
+   track keep the widths they were tuned at (38rem of prose, a 792px figure track — charts
+   are drawn at 800px, so a narrower track would shrink every chart's 11px labels). The
+   extra width only becomes a column inside #explore; everywhere else it lands in the
+   figure track, and the comparison and the hero are centred on the viewport regardless. */
 html{scroll-behavior:smooth}
-.shell{max-width:53rem;margin:0 auto;padding:0 28px 110px}
+.shell{max-width:67rem;margin:0 auto;padding:0 28px 110px}
 main{min-width:0}
 /* minmax(0,1fr), never a bare 1fr: a bare fr track takes its automatic minimum from
    the item's min-content size, so a child with a definite width wider than the column —
@@ -750,11 +824,18 @@ font:650 1.02rem/1.3 var(--serif)}
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
 text-wrap:balance;font-variant-numeric:proportional-nums}
-h2{font:600 1.55rem/1.2 var(--serif);letter-spacing:-.011em;margin:0 0 .4rem;text-wrap:balance}
-h3{font:600 1.1rem/1.3 var(--serif);margin:2.3rem 0 .3rem;text-wrap:balance}
-/* Every beat inside a report is its own deep-link target, so it needs the same
-   headroom a section gets — and inside a report the chooser is pinned to the top of the
-   screen, so the headroom has to clear the bar as well. The bar is 5.21rem:
+/* A real scale, because there was not one: h3 used to be 1.1rem against a 1.0625rem body
+   and h4 was SMALLER than the prose under it, so a 4,000-word report read as one
+   undifferentiated column and nothing on screen said "new beat". Each step is about a
+   1.3 ratio now — 2 / 1.4 / 1.12 against a 1.0625rem body — and
+   test_the_type_scale_steps_down keeps it monotonic and clear of the prose. */
+h2{font:600 2rem/1.15 var(--serif);letter-spacing:-.014em;margin:0 0 .5rem;text-wrap:balance}
+h3{font:600 1.4rem/1.25 var(--serif);letter-spacing:-.008em;margin:2.6rem 0 .4rem;
+text-wrap:balance}
+/* Every beat and every stage inside a report is its own deep-link target — the rail links
+   to all of them — so each needs the headroom a section gets, and inside a report the
+   chooser is pinned to the top of the screen, so the headroom has to clear the bar as
+   well. The bar is 5.21rem:
 
      .choicebar padding  .8 + .8                = 1.600rem
      .choice padding     1 + 1                  = 2.000rem
@@ -764,8 +845,16 @@ h3{font:600 1.1rem/1.3 var(--serif);margin:2.3rem 0 .3rem;text-wrap:balance}
    7rem is that plus air. Stated in CSS rather than measured in the script because a
    native fragment jump reads it too, and test_a_deep_linked_beat_lands_clear_of_the_bar
    recomputes the sum from these same declarations. */
-h3[id]{scroll-margin-top:7rem}
-h4{font:650 .82rem/1.35 var(--sans);margin:1.5rem 0 .4rem;color:var(--text-primary)}
+/* A beat also gets a rule and the air above it: four of them in a report, and the rule is
+   what makes the report read as four chunks rather than one scroll. */
+h3[id]{scroll-margin-top:7rem;margin-top:3.4rem;padding-top:1.5rem;
+border-top:1px solid var(--hairline)}
+h4{font:650 1.12rem/1.35 var(--serif);margin:2rem 0 .35rem;color:var(--text-primary)}
+h4[id]{scroll-margin-top:7rem}
+/* The one place h4 is a label over a block rather than a subhead in a document: the two
+   halves of a side-by-side, whose titles are "plain" and "pipeline". Small sans, as every
+   h4 used to be. */
+h4.pane-h{font:650 .82rem/1.35 var(--sans)}
 p{margin:0 0 1.05em;color:var(--text-secondary);text-wrap:pretty}
 ul{color:var(--text-secondary);padding-left:20px;margin:0 0 1.05em}li{margin:.3em 0}
 .lede{font:1.22rem/1.5 var(--serif);color:var(--text-primary);margin:0 0 1.1rem;max-width:40rem}
@@ -785,15 +874,54 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    what gives the sticky bar its travel), and each opens with its own <h2>, so a
    descendant selector here centres and stretches both report titles too. */
 #explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem}
-/* The bar's travel. min-width:0 for the reason main has it: it is a grid item now, and a
-   grid track takes its automatic minimum from the item's min-content size.
+/* The travel, for both the bar and the rail. min-width:0 for the reason main has it: it is
+   a grid item, and a grid track takes its automatic minimum from the item's min-content
+   size.
+
+   Two columns, two rows: the bar across the top, then the rail beside the reports. The
+   rail column is fixed and the reading side takes the rest, which is why the shell above is
+   67rem — the report keeps its 38rem measure and its 792px figure track.
+
+   --t LIVES HERE, not on .choicebar, because two pinned things now read it: the bar
+   interpolates its own six sizes off it and the rail's top follows the bar's height, so a
+   tightening bar does not leave a growing gap above the rail. The script toggles .tight on
+   this element, which is also the one it measures.
 
    overflow-anchor:none is load-bearing, and was measured: shrinking the pinned bar moves
    the report under it, so scroll anchoring "corrects" the scroll by the same amount, which
    moves this wrapper's top, which is what the shrink is computed FROM. With anchoring on,
    the bar settled at 52px while sitting 31px BELOW the top of the screen, or bounced
    between 52 and 83 depending on where the reader stopped. */
-.explore-body{min-width:0;overflow-anchor:none}
+.explore-body{--t:0;--rail:12rem;min-width:0;overflow-anchor:none;
+display:grid;grid-template-columns:[rail-col] var(--rail) [read-col] minmax(0,1fr);
+column-gap:2rem}
+.explore-body.tight{--t:1}
+.railcol{grid-column:rail-col;border-right:1px solid var(--hairline)}
+.panels{grid-column:read-col;min-width:0}
+/* One report's contents, held on screen for as long as that report is being read.
+   Its travel is .railcol, which stretches to the row's height — the height of the open
+   panel — so the rail pins from the first beat to the last and is released with the
+   report.
+
+   The top follows the bar: 6rem clears it at rest, 3.9rem once it has tightened, off the
+   same --t and with the same 200ms transition, so the two pinned things move together.
+   A rail longer than the screen scrolls inside itself rather than being clipped. */
+.rail{position:sticky;top:calc(6rem - 2.1rem*var(--t));padding:.2rem 0 1rem;
+max-height:calc(100vh - 7.5rem);overflow-y:auto;scrollbar-width:thin;
+transition:top .2s ease}
+.rail[hidden]{display:none}
+/* Sans, because the rail measures the document rather than arguing in it, and each link
+   sets its own font shorthand so the mono/underlined a{} rule cannot drag it back. A beat
+   is the document's own heading; a stage is indented under it and quieter. */
+.rail a{display:block;color:var(--text-muted);text-decoration:none;
+border-left:2px solid transparent;padding:.28rem 0 .28rem .7rem}
+.rail a:hover{color:var(--text-primary);background:var(--accent-wash)}
+.rail .r-b{font:650 .8rem/1.35 var(--sans);margin-top:.55rem}
+.rail .r-s{font:.75rem/1.35 var(--sans);padding-left:1.5rem}
+.rail>.r-b:first-child{margin-top:0}
+/* Where the reader is. Ink and an edge, never a fill: an accent fill on this page means
+   SELECTED — the open tab, the open pane — and the reader did not press this. */
+.rail a[aria-current=true]{color:var(--text-primary);border-left-color:var(--accent)}
 /* Pinned to the top of the screen for as long as a report is being read, carrying the
    page's own background so the report scrolls under it and out of sight. Full column
    width, not the buttons' 40rem, or a figure would scroll up either side of it.
@@ -811,10 +939,9 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    is discrete unless it is registered), which is also what lets the reduced-motion rule
    at the foot of this stylesheet turn the animation off with the same transition:none it
    applies to everything else. */
-.choicebar{--t:0;--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
---w:40rem;position:sticky;top:0;z-index:5;background:var(--surface-0);
+.choicebar{--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
+--w:40rem;grid-column:1/-1;position:sticky;top:0;z-index:5;background:var(--surface-0);
 padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease}
-.choicebar.tight{--t:1}
 /* The pair narrows with everything else, 40rem to 30rem, staying centred as it goes. The
    floor is measured, not chosen: below 27.5rem "Synthetic documents" wraps to two lines
    and the shrunk bar is taller than the one it replaced, so .25 is as far as this goes. */
@@ -1039,6 +1166,25 @@ z-index:9;max-width:320px}
 @media (max-width:1000px){.cmp-wrap{position:static;left:auto;transform:none;width:100%}
 .cmp{table-layout:auto;width:100%;margin-left:0}
 .cmp-k{width:8rem;white-space:normal;text-align:left}.cmp thead th{width:auto}}
+/* Below the width the rail column and a 38rem measure both fit in, there is no beside to
+   put the contents to. It goes to the top of the report instead, static, as a wrapped
+   block — one report's contents where its reader is about to start, not a row hung off the
+   bottom of the bar. Above this and below the shell's own 67rem the reading column simply
+   narrows, which needs no rule. */
+@media (max-width:900px){.explore-body{grid-template-columns:minmax(0,1fr)}
+.railcol,.panels{grid-column:1}
+/* Held to the reading measure and given air, so it reads as the head of the document
+   rather than as more of the bar. */
+.railcol{border-right:0;border-bottom:1px solid var(--hairline);max-width:38rem;
+padding-bottom:.6rem;margin-top:3.6rem}
+.rail{position:static;max-height:none;padding:0;
+display:flex;flex-wrap:wrap;column-gap:.4rem}
+.rail a{padding:.2rem .5rem;border-left:0;border-bottom:2px solid transparent}
+.rail .r-s{padding-left:.5rem}
+/* A beat takes its own line and its stages wrap under it. Left to flow, a beat landed
+   mid-row between another beat's stages and the two levels stopped reading as two. */
+.rail .r-b{margin-top:.3rem;flex:0 0 100%}
+.rail a[aria-current=true]{border-left-color:transparent;border-bottom-color:var(--accent)}}
 @media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
 section>*{grid-column:1}.pair{grid-template-columns:1fr}
 /* The bar stays pinned on a phone, so it has to stay ONE ROW: stacking the two buttons
@@ -1051,7 +1197,8 @@ section>*{grid-column:1}.pair{grid-template-columns:1fr}
    reads as a control. */
 .choicebar{--pad:.5rem;--gap:.6rem;--btn-y:.6rem;--btn-x:.7rem;--label:.95rem}
 .choice-a{display:none}
-h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
+h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06rem}
+.lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
 .hero-intro ul{grid-template-columns:1fr;gap:1.1rem}
@@ -1061,8 +1208,10 @@ h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
 @page{margin:16mm 14mm}
 :root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
 body{font-size:10.5pt;line-height:1.5}
-#tip,.skip,.choicebar{display:none}
-.shell,section{display:block;max-width:none}
+/* Neither control survives paper: the bar has nothing to press and the rail is a list of
+   links to pages the reader is holding. */
+#tip,.skip,.choicebar,.railcol{display:none}
+.shell,section,.explore-body{display:block;max-width:none}
 .hero{padding:0 0 1.5rem;display:block;text-align:left}
 /* A sheet of paper is narrower than the bleed the centred pair needs, and the labels
    would print off the left edge. */
@@ -1119,18 +1268,47 @@ var flow=document.querySelector('.explore-body');
    Measured from .explore-body for the reason above and one more: the shrink cannot move
    the wrapper's top, so this cannot feed itself. Measuring the bar, whose height is the
    thing being changed, is the flicker. */
-var bar=document.querySelector('.choicebar'),TIGHT=96,LOOSE=24,queued=0;
-function tighten(){queued=0;if(!bar||!flow)return;
+var TIGHT=96,LOOSE=24,queued=0;
+/* The rails: one per report, hidden with the panel it belongs to, so the contents a reader
+   sees are always the contents of what they are reading. ``heads`` and ``links`` are the
+   open report's headings and its rail's links, cached when it opens — their POSITIONS are
+   read live every frame, but re-querying the DOM on each one is not free and nothing adds
+   an anchored heading later (the appendix's live inside drawers and carry no id). */
+var rails=[].slice.call(document.querySelectorAll('[data-rail]'));
+var heads=[],links=[];
+/* One callback for both pinned things: the bar's flag, then where the reader is. */
+function onScroll(){queued=0;if(!flow)return;
 var past=-flow.getBoundingClientRect().top;
-bar.classList.toggle('tight',past>(bar.classList.contains('tight')?LOOSE:TIGHT));}
+flow.classList.toggle('tight',past>(flow.classList.contains('tight')?LOOSE:TIGHT));
+/* The current beat or stage is the last heading the reader has ARRIVED AT, and the line
+   for that is the heading's own scroll-margin-top: the CSS already states how far below
+   the top of the screen a heading lands when it is linked to, so the same number decides
+   whether it has been reached. Read from the element rather than typed here — and it means
+   nothing measures the bar, whose height is the thing that changes.
+
+   Nothing is marked while the reader is still above the first heading, which is honest:
+   they are not in a beat yet. */
+var cur='';
+heads.forEach(function(h){if(h.el.getBoundingClientRect().top<=h.line)cur=h.el.id;});
+links.forEach(function(a){
+if(cur&&a.getAttribute('href')==='#'+cur){a.setAttribute('aria-current','true');}
+else{a.removeAttribute('aria-current');}});}
 window.addEventListener('scroll',function(){
-if(!queued)queued=requestAnimationFrame(tighten);},{passive:true});
-window.addEventListener('resize',tighten);tighten();
+if(!queued)queued=requestAnimationFrame(onScroll);},{passive:true});
+window.addEventListener('resize',onScroll);onScroll();
 function open(id,to){
 choices.forEach(function(b){var on=b.getAttribute('data-panel')===id;
 b.setAttribute('aria-selected',on?'true':'false');
 var p=document.getElementById(b.getAttribute('data-panel'));
 if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});
+links=[];
+rails.forEach(function(r){var on=r.getAttribute('data-rail')===id;
+if(on){r.removeAttribute('hidden');links=[].slice.call(r.children);}
+else{r.setAttribute('hidden','');}});
+var panel=document.getElementById(id);
+heads=panel?[].slice.call(panel.querySelectorAll('h3[id],h4[id]')).map(function(el){
+return {el:el,line:parseFloat(getComputedStyle(el).scrollMarginTop)+1};}):[];
+onScroll();
 if(!to)return;
 var target=document.getElementById(to===true?id:to);
 if(!target)return;

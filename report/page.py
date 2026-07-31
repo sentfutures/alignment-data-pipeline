@@ -80,32 +80,27 @@ def _date(manifest):
     return f"{day.day} {day:%B %Y}"
 
 
-def _records(dad_kwargs):
-    """The dilemmas the run dealt. The shipped corpus is one short of it on this run;
-    that gap is the difficult-advice report's business, not the comparison's."""
-    dealt = ((dad_kwargs or {}).get("audit") or {}).get("n_prompts")
-    return f"{dealt:,}" if dealt else "—"
-
-
 # ------------------------------------------------------------------ sections
 
-def section_datasets(content, f, dad_kwargs, dad_facts, sdf_kwargs, sdf_facts):
+def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """The two datasets, side by side. Their names are this section's heading.
 
-    Six rows, because the reader is here to run the pipeline rather than to shop: what
-    each dataset is for, what a record is, how many there are, how many prompts it takes
-    to make them, and what you may do with them. Dates, model ids and the composition
-    spread belong in the report that goes into them, not in a table meant to be read in
-    one pass.
+    Four rows, because the reader is here to run the pipeline rather than to shop: what
+    each dataset is for, what a record is, how many templates it takes to make one, and
+    where a made example can be read. How MANY records is not one of them — that is a
+    property of a run, and this section describes the pipelines; the counts live in each
+    report's appendix, beside the run they came off. Dates, model ids and the composition
+    spread belong there too, not in a table meant to be read in one pass.
     """
     rows = [
         ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
         ("one record is", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
         ("prompt templates", _prompts_cell(sdf_kwargs, PROMPTS_SDF),
          _prompts_cell(dad_kwargs, PROMPTS_DAD)),
-        ("records", _with_button(f"{sdf_facts['n_docs']:,}" if sdf_facts.get("n_docs")
-                                 else "not published yet", HF_SDF, "Example dataset", "hf"),
-         _with_button(_records(dad_kwargs), HF_DAD, "Example dataset", "hf")),
+        ("example dataset",
+         _with_button("" if sdf_kwargs else "not published yet", HF_SDF,
+                      "Example dataset", "hf"),
+         _with_button("", HF_DAD, "Example dataset", "hf")),
     ]
     actions = []
     columns = [(sdf.SECTION_TITLE, C.fill(content.get("sdf_desc", ""), f)),
@@ -118,12 +113,13 @@ def _prompts_cell(kwargs, href):
     it against their own model is after, rather than how much data we happened to make.
     Counted from the run's own inputs/prompts snapshot; see common.prompt_count."""
     n = (kwargs or {}).get("n_prompt_templates")
-    return _with_button(f"{n}" if n else "—", href, "Prompts", "github")
+    return _with_button(f"{n}" if n else "—", href, "Templates", "github")
 
 
 def _with_button(value, href, label, icon):
     """A cell's figure at the left of its column, and the way to the thing it counts at
-    the right."""
+    the right. An empty value still leaves its flex item behind, so a button-only cell
+    lines its button up under the one in the row above."""
     return R.Raw(f"<span class='cmp-fig'><span>{R.esc(value)}</span>"
                  f"{R.linkbutton(href, label, icon)}</span>")
 
@@ -137,21 +133,25 @@ def _cell(content, key, f):
 
 
 
-def section_explore(panels):
-    """The choice, and both reports under it. Neither is open until one is picked.
+def section_explore(panels, outlines):
+    """The choice, both reports under it, and each one's contents beside it.
 
-    Two names, nothing else: what each dataset is and how big it is are in the
-    comparison directly above, and repeating them here only made the buttons hard to
-    read as buttons.
+    Two names on the buttons, nothing else: what each dataset is and how big it is are in
+    the comparison directly above, and repeating them here only made the buttons hard to
+    read as buttons. The report's own beats and stages go in the rail beside it, read back
+    off the panel that was built, so a rail link cannot name a beat the report did not
+    render.
 
     The panels are nested here rather than left as siblings in ``<main>`` because the
-    buttons stick to the top of the screen while a report is read, and a sticky box
-    travels only inside its containing block — see ``render.explore_body``.
+    buttons and the rail stay on screen while a report is read, and a sticky box travels
+    only inside its containing block — see ``render.explore_body``.
     """
+    rails = "".join(R.rail(pid, outlines.get(pid, ())) for pid in ("sdf", "dad"))
     return C.section("explore", "Walk through a dataset generation",
                      R.explore_body(
-                         R.chooser([("sdf", sdf.SECTION_TITLE), ("dad", dad.SECTION_TITLE)]),
-                         panels))
+                         R.chooser([("sdf", sdf.SECTION_TITLE),
+                                    ("dad", dad.SECTION_TITLE)]),
+                         rails, panels))
 
 
 def footer(maker_icon=""):
@@ -171,27 +171,29 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
          maker_icon=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
-    dad_facts = _dad_facts(dad_kwargs)
     sdf_facts = _sdf_facts(sdf_kwargs)
     f = dict(PAGE_FACTS)
     title = C.fill(content["title"], f).strip()
 
     # Synthetic documents first, throughout: the comparison, the chooser and the panels
-    # all read in one order.
-    panels = [R.panel(
-        sdf.SECTION_ID,
-        f"<h2>{R.esc(sdf.SECTION_TITLE)}</h2>"
-        + sdf.blocks(content=content, f=sdf_facts, run_id=sdf_kwargs.get("run_id", ""),
-                     audit=sdf_kwargs.get("audit"), diversity=sdf_kwargs.get("diversity"),
-                     manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF, repo_href=REPO_URL))]
+    # all read in one order. Each report's contents come back off its own built markup, so
+    # the rail is the outline of the report that was actually rendered.
+    bodies = [(sdf.SECTION_ID,
+               f"<h2>{R.esc(sdf.SECTION_TITLE)}</h2>"
+               + sdf.blocks(content=content, f=sdf_facts, run_id=sdf_kwargs.get("run_id", ""),
+                            audit=sdf_kwargs.get("audit"),
+                            diversity=sdf_kwargs.get("diversity"),
+                            manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF,
+                            repo_href=REPO_URL))]
     if dad_kwargs:
-        panels.append(R.panel(
-            dad.SECTION_ID,
-            f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
-            + dad.blocks(content=content, example=example, **dad_kwargs)))
+        bodies.append((dad.SECTION_ID,
+                       f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
+                       + dad.blocks(content=content, example=example, **dad_kwargs)))
+    panels = "".join(R.panel(pid, html) for pid, html in bodies)
+    outlines = {pid: R.outline(html) for pid, html in bodies}
     sections = [
-        section_datasets(content, f, dad_kwargs, dad_facts, sdf_kwargs, sdf_facts),
-        section_explore("".join(panels)),
+        section_datasets(content, f, dad_kwargs, sdf_kwargs),
+        section_explore(panels, outlines),
     ]
     head = {
         "title": title,
@@ -200,12 +202,6 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
         "footer": footer(maker_icon),
     }
     return "".join(sections), head
-
-
-def _dad_facts(kwargs):
-    if not kwargs.get("audit"):
-        return {}
-    return dad.facts(kwargs["audit"], kwargs.get("manifest"), kwargs.get("diversity"))
 
 
 def _sdf_facts(kwargs):

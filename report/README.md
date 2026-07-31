@@ -50,7 +50,7 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 | Anchor | What it is |
 |---|---|
 | hero | The illustration, the title, and the three lines that follow from it (*Teaching Claude Why*, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing. |
-| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Four rows — what it is for, what a record is, how many prompt templates, how many records — because the reader is deciding whether to run the pipeline, not shopping for a dataset. Dates, model ids and the composition spread live in the report that goes into them. The two figure rows carry the way to what they count: the figure at the column's left edge, an outline button at its right (the prompts on GitHub, the published sample on Hugging Face). Labels are right-aligned, one line each, vertically centred. |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Four rows — what it is for, what a record is, how many prompt templates, where an example dataset can be read — because the reader is deciding whether to run the pipeline, not shopping for a dataset. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
 | `#explore` | "Walk through a dataset generation" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are *inside* this section, in `.explore-body` — see "The chooser". |
 | `#sdf` | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen. |
 | `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
@@ -78,7 +78,20 @@ has to read:
 The stages come *before* the example that walks through them, because that is what the
 chooser above promises. There is no "what we measured" beat: this is not a results report.
 
-There is no contents rail: the whole navigation of the page is one choice.
+**The page has no contents rail; a report has one.** A column of page-wide links beside a
+hero and a comparison is furniture, and it stays gone. But a report is ~2,700 visible words
+of records with four beats and seven stages in it, and from inside one a reader could see
+neither its shape nor a way past the worked example — so each report carries its own
+contents, in the column to its left, sticky under the bar, with the stages nested under
+their beat. See "The chooser" below. An earlier revision hung those links as a second row
+under the bar instead; it read as clutter on the control and came out.
+
+The type scale is the other thing that makes a report skimmable, and it had none: `h3` (a
+beat) was `1.1rem` against a `1.0625rem` body and `h4` (a stage) was `.82rem`, *smaller*
+than the prose under it. It steps 2 / 1.4 / 1.12rem now, each level clear of the body text,
+and every beat is chunked off the one before it by a hairline above its `<h3>`.
+`TestTypeScale` keeps it monotonic. `h4` doubles as a label over a block in exactly one
+place — the two halves of a side-by-side — and `h4.pane-h` keeps the old small sans there.
 
 ## The chooser
 
@@ -102,25 +115,59 @@ The cost is real and was accepted deliberately: Cmd-F cannot see a closed report
 **The bar is pinned while you read**, and pressing a tab scrolls it to the top of the
 screen. `TestStickyBar` pins the six things that make that work:
 
-- **The panels live inside `#explore`**, wrapped with the bar in `.explore-body`
-  (`render.explore_body`). A sticky box travels only inside its containing block, and the
-  containing block of a *grid item* is its own grid area — one row, as tall as the
-  buttons — so a sticky bar left loose in `#explore`'s grid has nowhere to go. The
-  wrapper is the travel: the bar pins for the length of the open report.
+- **The panels live inside `#explore`**, wrapped with the bar and the rails in
+  `.explore-body` (`render.explore_body`). A sticky box travels only inside its containing
+  block, and the containing block of a *grid item* is its own grid area — one row, as tall
+  as the buttons — so a sticky bar left loose in `#explore`'s grid has nowhere to go. The
+  wrapper is the travel: the bar pins for the length of the open report. It is two columns
+  and two rows — the bar across the top, then `.railcol` beside `.panels` — and the panels
+  are wrapped as **one grid item** on purpose: a grid item stretches to its row's height, so
+  the rail's column is as tall as the open report. Left as loose siblings, each panel would
+  start a row of its own and the rail would have one panel's worth of travel.
 - **`.choicebar` carries the background, `.choices` the buttons.** The band is the full
   column in `var(--surface-0)`, the page's own paper, so the report scrolls under it and
   out of sight; the pair stays centred inside it. A sticky box the width of the buttons
   would let a figure scroll up either side.
+- **The rail is the open report's own contents.** `.rail` is a column of jump links to that
+  report's `<h3 id>`s with its `<h4 id>`s nested under them, hidden with the panel it
+  belongs to and toggled by the same handler (`[data-rail]` in the inline JS), so what a
+  reader sees is always the contents of what they are reading. It is **read back off the
+  built panel** — `render.outline()` over the markup `report/page.py` just assembled, not a
+  module's `BEATS` list — because the beats are conditional: the document report only earns
+  `sdf-weak` when its run's audit flagged something, and
+  `test_every_rail_link_lands_on_a_heading_that_rendered` builds a clean run to prove a link
+  can't advertise a beat that isn't there. A stage becomes a rail item **by having an id**
+  (`render.substep()`), which is why the appendix's `<h4>`s deliberately have none: they sit
+  inside closed drawers, and a link to a collapsed heading goes nowhere.
+- **The room for it came out of the shell, not the report.** `.shell` is 67rem rather than
+  the 53rem the page was built at: 12rem of rail plus a 2rem gutter, so the reading column
+  keeps its 38rem measure and the figure track its 792px. A rail taken out of the reading
+  side would have shrunk the figure track, and every chart is drawn at 800px — an 11px label
+  in a 600px track is no longer 11px. `test_the_room_for_the_rail_did_not_come_out_of_the_report`
+  recomputes that from the tokens.
+- **Where the reader is: ink and a left edge, never a fill.** The current beat or stage takes
+  `aria-current`, and the line for "arrived at" is the heading's **own
+  `scroll-margin-top`**, read off the element: the CSS already states how far below the top
+  of the screen a linked heading lands, so the same number decides whether it has been
+  reached. Measured — with the bar's own bottom as the line instead, the marker sat one
+  heading behind every jump. Marking runs inside the rAF-throttled scroll callback the bar's
+  flag already uses; there is no second listener and no IntersectionObserver.
 - **The script measures `.explore-body`, never the bar.** Once sticky takes hold, the
   bar's own `getBoundingClientRect()` and `offsetTop` report where it is *painted*, so
   scrolling to it means scrolling to wherever the reader already was. `.explore-body`'s
   top is the bar's flow top, and that is also the sticky threshold, so nothing jumps as
-  the bar pins.
-- **The headroom is CSS, not arithmetic.** The bar measures 5.21rem, so `h3[id]` and
-  `.panel` take `scroll-margin-top:7rem` and a deep-linked beat lands clear of it (30px,
-  measured); a native fragment jump reads the same value. `scrollIntoView()` carries no
+  the bar pins. Nothing else in the script queries the bar either.
+- **The headroom is CSS, not arithmetic.** The bar measures 5.21rem, so `h3[id]`, `h4[id]`
+  and `.panel` take `scroll-margin-top:7rem` and a linked beat or stage lands clear of it
+  (60px, measured); a native fragment jump reads the same value, and so does the
+  current-item pass. `_bar_rem()` in the test file recomputes the height from the six
+  tokens, so retuning the bar without revisiting the headroom — or the rail's `top` —
+  fails there rather than in a browser. `scrollIntoView()` carries no
   `behavior`, so `html{scroll-behavior}` — and therefore `prefers-reduced-motion` — still
   owns the smoothness.
+- **Below 900px there is no beside.** The rail becomes a static wrapped block at the head of
+  the report, held to the reading measure so it reads as part of the document. Between 900px
+  and the shell's own 67rem the reading column simply narrows, which needs no rule.
 - **It has two sizes and crosses between them once.** Loose it is 83px tall and 40rem wide,
   lined up under its heading with the two dataset columns; tight it is 52px and 30rem, with
   the arrow faded out — `↓` means "the report is below", which is stale once the reader is
@@ -128,7 +175,9 @@ screen. `TestStickyBar` pins the six things that make that work:
   transition. **Two thresholds, not one**, because a reader parked on a single boundary
   flips a layout change back and forth; and a trigger rather than a size that tracks the
   scroll, because tracking meant the bar moved whenever the page did, which reads as
-  distraction beside prose. `--t` is a flag (0 loose, `.choicebar.tight` sets 1) and every
+  distraction beside prose. `--t` is a flag (0 loose, `.explore-body.tight` sets 1 — it
+  lives on the wrapper because the rail's `top` reads it too, so a tightening bar does not
+  leave a growing gap above the contents) and every
   dimension is one interpolation off it, so both states are one set of numbers and a
   breakpoint restates only the six tokens. The 30rem floor is measured, not chosen: below
   27.5rem "Synthetic documents" wraps and the tight bar is *taller* than the loose one, and
@@ -238,6 +287,11 @@ matters: it came down from 1,199 words to under 800 over two rounds of cutting, 
 the results narrative, then the cost tiles, the commands and the run-specific caveats. Deks
 — the aphoristic line under a heading — are rationed to two for the whole page.
 
+`editorial_words()` counts what a person *wrote*, so it skips corpus text, chart internals,
+every table and every `<nav>`. The rails are excluded because their labels are the
+document's own headings, already counted where they are written; counting them twice would
+spend the ceiling on navigation and let real prose in underneath it.
+
 Section ids in each prose file must exactly match the owning module's `CONTENT_IDS`; a
 missing or unknown id is a build error, and two files may not both define one, so moving
 a block between prose files is a rename. `example_pick` holds the prompt_id of the DAD
@@ -270,6 +324,11 @@ Below it, `render.tabs()` puts the ids in `example_extra` behind one set of butt
 the chooser's own mechanism — `data-pane`, `aria-selected`, the same inline JS. The first
 pane renders *without* `hidden`, so with JS off the carousel degrades to one example
 rather than to none, and the print rule expands the rest.
+
+**The carousel is inside a closed drawer.** That visible first pane is a second full
+transcript — ~1,250 words on the pinned run — sitting under the pinned record's own trail,
+which is what the beat is for; the drawer's summary counts what is behind it, and
+`<details>` prints open, so nothing is lost on paper.
 
 ## The hero illustration
 

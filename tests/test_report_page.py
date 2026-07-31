@@ -99,8 +99,9 @@ def _bar_rem(html, t):
     """The chooser bar's height in rem loose (t=0) or tight (t=1), from the CSS.
 
     Derived rather than pinned: the bar is six tokens and five interpolations, and what
-    matters about it — that a deep-linked beat clears it, that tightening it actually
-    tightens it — has to follow the declarations rather than a number typed in here.
+    matters about it — that a deep-linked beat clears it, that the rail sits under it, that
+    tightening it actually tightens it — has to follow the declarations rather than a
+    number typed in here.
     """
     bar = re.search(r"\.choicebar\{[^}]*\}", html).group(0)
     btn = re.search(r"\.choice\{[^}]*\}", html).group(0)
@@ -116,6 +117,15 @@ def _bar_rem(html, t):
             + 2 / 16)  # the buttons' 1px borders
 
 
+def _rail_top_rem(html, t):
+    """Where the rail pins, loose (t=0) or tight (t=1) — one interpolation off --t, so it
+    tracks the bar rather than leaving a gap that grows when the bar shrinks."""
+    rule = re.search(r"\.rail\{[^}]*\}", html).group(0)
+    base, factor = re.search(r"top:calc\(([\d.]+)rem - ([\d.]+)rem\*var\(--t\)\)",
+                             rule).groups()
+    return float(base) - float(factor) * t
+
+
 class TestShape:
     def test_the_page_is_three_sections_and_two_reports(self):
         html = build(sdf_inputs=SDF_INPUTS)
@@ -126,12 +136,22 @@ class TestShape:
         # The comparison is titled by its own two mastheads, not by a heading over them.
         assert "<section id='datasets'><div class='cmp-wrap'>" in html
 
-    def test_there_is_no_contents_rail(self):
-        """Five links beside a page whose whole navigation is one choice is furniture."""
+    def test_the_page_itself_has_no_rail_but_a_report_does(self):
+        """The page's own navigation is still one choice — a rail of five page-wide links
+        beside a hero and a comparison is furniture, and it stays gone.
+
+        This replaces test_there_is_no_contents_rail. What changed is the thing being
+        navigated: a report is 4,000 words of records, and from inside one a reader could
+        see neither its shape nor a way past the worked example. So a rail exists, scoped
+        to one report, inside #explore, appearing only once that report is open.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
-        assert "class='rail'" not in html
-        assert "Contents" not in strip_tags(html)
         assert "counter(sec)" not in html
+        assert "Contents" not in strip_tags(html)
+        before = html[:html.index("<section id='explore'>")]
+        assert "class='rail'" not in before, "a rail outside #explore is the page-wide one"
+        rails = re.findall(r"<nav class='rail' data-rail='([^']+)'", html)
+        assert rails == ["sdf", "dad"]
 
     def test_both_reports_take_the_same_skeleton(self):
         """A reader learns the shape once. Synthetic documents only ships some of the
@@ -299,7 +319,7 @@ class TestShape:
         table = re.search(r"<section id='datasets'>.*?</section>",
                           build(sdf_inputs=SDF_INPUTS), re.S).group(0)
         assert P.PROMPTS_SDF.endswith("/prompts/sdf") and P.PROMPTS_DAD.endswith("/prompts/dad")
-        assert table.count(">Prompts</span>") == 2
+        assert table.count(">Templates</span>") == 2
         assert table.index(P.PROMPTS_SDF) < table.index(P.HF_SDF)  # templates, then data
 
     def test_the_buttons_are_accent_outlines_not_cream_panels(self):
@@ -447,8 +467,10 @@ class TestStickyBar:
         html = build(sdf_inputs=SDF_INPUTS)
         script = html[html.index("<script>"):]
         assert "flow.getBoundingClientRect()" in script
-        # Nothing measures the bar. The script writes --p on it and reads nothing from it.
-        assert "bar.getBoundingClientRect" not in script
+        assert "past=-flow.getBoundingClientRect().top" in script
+        # NOTHING measures the bar — not the trigger, and not the rail's current-item pass,
+        # which takes its line from each heading's own scroll-margin-top instead.
+        assert "querySelector('.choicebar')" not in script
         assert "open(id,true);mark(id)" in script  # pressing a tab scrolls and marks
 
     def test_the_page_owns_the_smoothness_not_the_script(self):
@@ -465,18 +487,25 @@ class TestStickyBar:
         against the bar at REST, which is the taller of its two states."""
         html = build()
         bar = _bar_rem(html, 0)
-        for target in (r"h3\[id\]\{scroll-margin-top:([\d.]+)rem", r"\.panel\{[^}]*"
-                       r"scroll-margin-top:([\d.]+)rem"):
+        # h4[id] is in the list because the rail links to the stages, not only the beats.
+        for target in (r"h3\[id\]\{scroll-margin-top:([\d.]+)rem",
+                       r"h4\[id\]\{scroll-margin-top:([\d.]+)rem",
+                       r"\.panel\{[^}]*scroll-margin-top:([\d.]+)rem"):
             head = float(re.search(target, html).group(1))
             assert head > bar, f"a beat lands under the {bar:.2f}rem bar"
+        # And the rail pins under the bar rather than behind it, in both of its sizes.
+        for t in (0, 1):
+            assert _rail_top_rem(html, t) > _bar_rem(html, t), f"the rail is under the bar"
 
     def test_the_bar_has_two_sizes_and_the_tight_one_is_smaller(self):
         """Loose it is right; pinned over a report it is heavy. Both states are one set of
         numbers — every dimension is an interpolation off --t — and each factor can only
         make the bar smaller. An inverted sign here would grow it over the reading column."""
         html = build()
-        assert re.search(r"\.choicebar\{--t:0;", html)      # loose by default
-        assert ".choicebar.tight{--t:1}" in html            # the one thing the script sets
+        # --t lives on the wrapper, not the bar: the rail's top reads it too, so a
+        # tightening bar does not leave a growing gap above the contents beside the report.
+        assert re.search(r"\.explore-body\{--t:0;", html)   # loose by default
+        assert ".explore-body.tight{--t:1}" in html         # the one thing the script sets
         for name, rule in (("bar-pad", r"\.choicebar\{[^}]*\}"), ("pair", r"\.choices\{[^}]*\}"),
                            ("button", r"\.choice\{[^}]*\}"), ("arrow", r"\.choice-a\{[^}]*\}")):
             block = re.search(rule, html).group(0)
@@ -507,7 +536,7 @@ class TestStickyBar:
         tight = int(re.search(r"TIGHT=(\d+)", script).group(1))
         loose = int(re.search(r"LOOSE=(\d+)", script).group(1))
         assert 0 < loose < tight, f"the thresholds do not hold apart: {loose} then {tight}"
-        assert "requestAnimationFrame(tighten)" in script
+        assert "requestAnimationFrame(onScroll)" in script
         assert "addEventListener('scroll'" in script and "addEventListener('resize'" in script
 
     def test_the_animation_is_a_transition_so_reduced_motion_can_stop_it(self):
@@ -542,17 +571,216 @@ class TestStickyBar:
         assert re.search(r"\.choicebar\{[^}]*--label:1rem", small)
         assert re.search(r"\.choicebar\{[^}]*--btn-y:[\d.]+rem", small)
 
+    def test_nothing_hangs_off_the_bottom_of_the_bar(self):
+        """The bar carried a second row of section links for one revision and it read as
+        clutter on the control. The bar is the choice; the contents are the rail."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        bar = re.search(r"<div class='choicebar'>.*?<div class='railcol'>", html, re.S).group(0)
+        assert bar.count("<a ") == 0, bar[:300]
+        assert "class='beats'" not in html
+
+
+class TestContentsRail:
+    """One report's contents, beside it, for as long as it is being read.
+
+    A report is ~2,700 visible words of records with four beats and seven stages in it, and
+    from inside one a reader could see neither its shape nor a way past the worked example.
+    The risks: a link naming a heading the run never rendered, contents belonging to the
+    other report, a rail with nowhere to travel, and a rail pinned behind the bar.
+    """
+
+    def rail(self, html, pid):
+        return re.search(rf"<nav class='rail' data-rail='{pid}'.*?</nav>", html, re.S).group(0)
+
+    def test_each_report_gets_its_own_contents(self):
+        html = build(sdf_inputs=SDF_INPUTS)
+        markup = html[:html.index("<script>")]
+        assert re.findall(r"data-rail='([^']+)'", markup) == ["sdf", "dad"]
+        rail = self.rail(html, "dad")
+        assert [t for _, t in re.findall(r"class='r-b' href='#([^']+)'>([^<]+)<", rail)] == [
+            "How it is built", "One example, end to end", "Where it is weak", "Appendix"]
+
+    def test_the_stages_are_sub_items_under_the_beat_they_belong_to(self):
+        """The point of the sub-items: a report's stages are where a reader is going, and
+        the rail nests them under their beat rather than flattening the outline.
+
+        This fixture ships no rewrite records, so the worked example has no stages to
+        list — which is the other half of the contract, and why the beats with no anchored
+        stage under them get no sub-items rather than borrowing the ones above.
+        (tests/test_dad_report.py checks the example's three against a run that has them.)
+        """
+        rail = self.rail(build(sdf_inputs=SDF_INPUTS), "dad")
+        by_beat, current = {}, None
+        for kind, target in re.findall(r"class='(r-[bs])' href='#([^']+)'", rail):
+            if kind == "r-b":
+                current = target
+                by_beat[current] = []
+            else:
+                by_beat[current].append(target)
+        assert by_beat["dad-built"] == ["dad-built-stage1", "dad-built-stage2",
+                                       "dad-built-stage3", "dad-built-control"]
+        assert by_beat["dad-weak"] == [] and by_beat["dad-appendix"] == []
+
+    def test_the_appendix_drawers_are_not_in_the_rail(self):
+        """An <h4> becomes a rail item by having an id, and the appendix's headings live
+        inside closed drawers — a link that scrolls to a collapsed heading goes nowhere,
+        so they carry none."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        panel = html[html.index("<section id='dad'"):]
+        assert "<h4>Measure by measure</h4>" in panel
+        assert "Measure by measure" not in strip_tags(self.rail(html, "dad"))
+
+    def test_every_rail_link_lands_on_a_heading_that_rendered(self):
+        """The rail is read back off the built panel rather than taken from a BEATS list,
+        because the beats are conditional — the document report only earns ``sdf-weak``
+        when its run's audit flagged something. A run with a clean audit must not advertise
+        a beat it did not render."""
+        clean = {**SDF_INPUTS, "audit": {**SDF_AUDIT, "length": {}, "composition": {}}}
+        for inputs in (SDF_INPUTS, clean):
+            html = build(sdf_inputs=inputs)
+            for pid in ("sdf", "dad"):
+                rail = self.rail(html, pid)
+                panel = html[html.index(f"<section id='{pid}'"):]
+                panel = panel[:panel.index("</section>")]
+                for target in re.findall(r"href='#([^']+)'", rail):
+                    assert (f"<h3 id='{target}'>" in panel
+                            or f"<h4 id='{target}'>" in panel), target
+
+    def test_the_contents_are_hidden_until_their_report_is_opened(self):
+        """Nothing is open on load, and what shows must be the contents of what is being
+        read — so the rails are toggled by the same handler that opens a panel."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        assert html.count("<nav class='rail' data-rail=") == 2
+        assert html.count("aria-label='Sections of this report' hidden>") == 2
+        script = html[html.index("<script>"):]
+        assert "querySelectorAll('[data-rail]')" in script
+        assert "r.getAttribute('data-rail')===id" in script
+
+    def test_the_rail_has_somewhere_to_travel(self):
+        """position:sticky moves only inside its containing block. The rail and the
+        panels are one grid row each, so the rail's column stretches to the height of the
+        open report and it pins for the length of it."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        assert ("<div class='railcol'>" in html
+                and "</nav></div><div class='panels'><section id='sdf'" in html)
+        assert re.search(r"\.explore-body\{[^}]*display:grid", html)
+        assert re.search(r"\.railcol\{grid-column:rail-col", html)
+        assert re.search(r"\.panels\{grid-column:read-col", html)
+        rule = re.search(r"\.rail\{[^}]*\}", html).group(0)
+        assert "position:sticky" in rule
+        assert "max-height:calc(100vh" in rule and "overflow-y:auto" in rule
+
+    def test_the_rail_moves_with_the_bar_rather_than_leaving_a_gap(self):
+        """Both are pinned, so the rail's top is one interpolation off the same --t the
+        bar's six sizes come from, animated the same way."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"\.rail\{[^}]*\}", html).group(0)
+        assert "var(--t)" in rule and "transition:top" in rule
+        assert _rail_top_rem(html, 1) < _rail_top_rem(html, 0)
+
+    def test_the_room_for_the_rail_did_not_come_out_of_the_report(self):
+        """The shell widened instead. A rail taken out of the reading column would have
+        narrowed the 38rem measure and shrunk the figure track, and every chart is drawn at
+        800px — an 11px label in a narrower track is no longer 11px."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        shell = float(re.search(r"\.shell\{max-width:([\d.]+)rem", html).group(1))
+        rail = float(re.search(r"\.explore-body\{[^}]*--rail:([\d.]+)rem", html).group(1))
+        gap = float(re.search(r"\.explore-body\{[^}]*column-gap:([\d.]+)rem", html).group(1))
+        prose = float(re.search(r"minmax\(0,([\d.]+)rem\) \[text-end\]", html).group(1))
+        assert prose == 38
+        # 3.5rem is .shell's own 28px padding either side.
+        assert shell - 3.5 - rail - gap - prose >= 11.5, "the figure track shrank"
+
+    def test_where_the_reader_is_takes_ink_and_an_edge_not_a_fill(self):
+        """An accent FILL on this page means selected — the open tab, the open pane — and
+        the reader did not press this."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"\.rail a\[aria-current=true\]\{[^}]*\}", html).group(0)
+        assert "border-left-color:var(--accent)" in rule
+        assert "color:var(--text-primary)" in rule
+        assert "background" not in rule
+        script = html[html.index("<script>"):]
+        # The current item is the last heading the reader has arrived at, and the line for
+        # that is the heading's own scroll-margin-top — the CSS already says how far below
+        # the top of the screen a linked heading lands, so the same number decides whether
+        # it has been reached, and nothing has to measure the bar.
+        assert "querySelectorAll('h3[id],h4[id]')" in script
+        assert "getComputedStyle(el).scrollMarginTop" in script
+        assert "setAttribute('aria-current','true')" in script
+
+    def test_the_rail_links_are_a_control_not_the_page_s_link_treatment(self):
+        """Every other link on the page is mono, bold and underlined in the accent. The
+        rail measures the document rather than arguing in it, so it takes the sans — with
+        its own font shorthand, which is what beats the bare a{} rule."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        base = re.search(r"\.rail a\{[^}]*\}", html).group(0)
+        assert "text-decoration:none" in base and "var(--mono)" not in base
+        for cls in ("r-b", "r-s"):
+            rule = re.search(rf"\.rail \.{cls}\{{[^}}]*\}}", html).group(0)
+            assert "var(--sans)" in rule, rule
+
+    def test_below_the_width_it_fits_the_rail_goes_to_the_top_of_the_report(self):
+        """There is no beside on a narrow screen. It becomes a static block at the head of
+        the report — where its reader is about to start — rather than a row under the bar,
+        which is the thing this replaced."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
+        assert ".explore-body{grid-template-columns:minmax(0,1fr)}" in small
+        assert re.search(r"\.rail\{[^}]*position:static", small)
+        assert re.search(r"\.rail\{[^}]*flex-wrap:wrap", small)
+        assert ".railcol{border-right:0" in small
+
+    def test_neither_control_prints(self):
+        """Paper has nothing to press and no links to follow."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        printed = html[html.index("@media print{"):]
+        assert re.search(r"#tip,\.skip,\.choicebar,\.railcol\{display:none\}", printed)
+
+
+class TestTypeScale:
+    def test_the_type_scale_steps_down(self):
+        """There was no scale: h3 (a beat, the biggest unit in a report) was 1.1rem
+        against a 1.0625rem body, and h4 (a stage) was .82rem — SMALLER than the prose
+        under it — so a report read as one undifferentiated column. Each level now sits
+        clear of the next, and of the body text."""
+        html = build(sdf_inputs=SDF_INPUTS)
+
+        def size(sel):
+            rule = re.search(rf"(?m)^{re.escape(sel)}\{{[^}}]*\}}", html).group(0)
+            return float(re.search(r"(?:font(?:-size)?:[^;}]*?)([\d.]+)rem", rule).group(1))
+
+        body = float(re.search(r"(?m)^body\{[^}]*font:([\d.]+)rem", html).group(1))
+        sizes = [size(s) for s in ("h1", "h2", "h3", "h4")]
+        assert sizes == sorted(sizes, reverse=True), sizes
+        for level, px in zip(("h1", "h2", "h3", "h4"), sizes):
+            assert px > body, f"{level} is not larger than the prose under it"
+        # A beat is also chunked off the one before it, which is what makes four beats
+        # read as four rather than as one scroll.
+        assert re.search(r"h3\[id\]\{[^}]*border-top:1px solid", html)
+
+    def test_the_side_by_side_labels_stay_small_sans(self):
+        """h4 became a document subhead, but in one place it is a label over a block —
+        the two halves of a control-vs-pipeline pair. That keeps the old treatment."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        assert re.search(r"h4\.pane-h\{font:650 [\d.]+rem/[\d.]+ var\(--sans\)", html)
+
+    def test_the_scale_is_restated_where_the_page_narrows(self):
+        html = build(sdf_inputs=SDF_INPUTS)
+        small = html[html.index("@media (max-width:620px)"):]
+        for level in ("h1", "h2", "h3", "h4"):
+            assert re.search(rf"[;{{}}\n]{level}\{{font-size:[\d.]+rem\}}", small), level
+
 
 class TestComparisonTable:
     def test_the_rows_are_what_a_lab_needs_to_run_it(self):
-        """Six rows, in one pass. Dates, model ids and the composition spread went to
+        """Four rows, in one pass. Dates, model ids and the composition spread went to
         the report that goes into them: a reader here is deciding whether to run the
         pipeline, not shopping for a dataset."""
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
         assert labels == ["what it is for", "one record is", "prompt templates",
-                          "records"]  # the prompts before the data
+                          "example dataset"]  # the templates before the data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
                      "licence"):
@@ -566,19 +794,40 @@ class TestComparisonTable:
         assert re.search(r"\.cmp th\.cmp-k\{[^}]*text-align:right", html)
         assert re.search(r"\.cmp-k\{[^}]*white-space:nowrap", html)
 
-    def test_each_figure_carries_the_way_to_the_thing_it_counts(self):
+    def test_the_one_figure_carries_the_way_to_the_thing_it_counts(self):
         """The prompt count is the datapoint for someone who wants to generate their own
         data — read off the run's own inputs/prompts snapshot — and it sits next to the
-        link to those prompts. Same for the record counts and the published sample."""
+        link to those templates. The last row is that link and nothing else."""
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
-        rows = dict(re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>(.*?)</tr>",
-                               table, re.S))
-        assert strip_tags(rows["records"]).split()[0] == "100"
+        rows = self._rows(table)
         assert strip_tags(rows["prompt templates"]).split()[0] == "4"
-        assert P.PROMPTS_SDF in rows["prompt templates"] and P.HF_SDF in rows["records"]
-        assert P.PROMPTS_DAD in rows["prompt templates"] and P.HF_DAD in rows["records"]
+        assert P.PROMPTS_SDF in rows["prompt templates"]
+        assert P.PROMPTS_DAD in rows["prompt templates"]
+        assert P.HF_SDF in rows["example dataset"]
+        assert P.HF_DAD in rows["example dataset"]
         assert "<tfoot>" not in table
+
+    def test_the_comparison_carries_no_record_count(self):
+        """How many records a run made is a property of THAT run, and this section
+        describes the pipelines; the counts belong in each report's appendix, beside the
+        run they came off. The DAD figure was wrong as well as out of place: it showed
+        the 40 dilemmas dealt, while the dataset behind the button beside it shipped 39.
+        """
+        html = build(dad_inputs=DAD_INPUTS, sdf_inputs=SDF_INPUTS)
+        table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
+        text = strip_tags(table)
+        assert "100" not in text and "40" not in text and "39" not in text
+        # The row that carried them is still the way to the data, button only: the
+        # figure's flex item stays, empty, so the buttons line up with the row above.
+        row = self._rows(table)["example dataset"]
+        assert row.count("<span class='cmp-fig'><span></span><a class='lbtn'") == 2
+        assert not hasattr(P, "_records")
+
+    @staticmethod
+    def _rows(table):
+        return dict(re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>(.*?)</tr>",
+                               table, re.S))
 
     def test_a_run_that_kept_no_prompt_snapshot_says_so(self):
         html = build(dad_inputs={**DAD_INPUTS, "n_prompt_templates": None})
