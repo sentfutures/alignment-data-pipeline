@@ -813,6 +813,27 @@ class TestMultiDatasetCard:
             {"pipeline": "dad", "dir": dad_dir, "staged": dad_staged, "content": None},
         ]
 
+    def test_intro_describes_both_corpora_and_shows_both_load_calls(self, tmp_path):
+        # The card's hand-written half must survive republishing, which is why it
+        # lives in build_card rather than the Hub's editor.
+        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
+        assert "Two corpora" in card
+        assert "**Synthetic documents**" in card and "**Difficult advice**" in card
+        assert card.count("load_dataset(") == 2
+        # the framing that keeps the measured sections from reading as validation
+        assert "not an independent evaluation" in card
+        assert "Nothing here measures downstream effect." in card
+
+    def test_intro_claims_one_corpus_when_only_one_is_published(self, tmp_path):
+        # a publish whose sibling is absent (or a --dry-run, which cannot see it)
+        run, corpus = make_run_dir(tmp_path, pipeline="dad")
+        staged, ddir = _stage(run, corpus, tmp_path / "stage_solo")
+        card = _one_card(ddir, staged)
+        assert "One corpus" in card and "Two corpora" not in card
+        assert "**Difficult advice**" in card
+        assert "**Synthetic documents**" not in card
+        assert card.count("load_dataset(") == 1
+
     def test_declares_both_configs_with_sdf_default(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
         fm = yaml.safe_load(card.split("---\n")[1])
