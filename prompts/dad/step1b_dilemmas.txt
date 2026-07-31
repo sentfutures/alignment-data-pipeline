@@ -1,6 +1,6 @@
 === SYSTEM PROMPT ===
 
-You are helping construct an alignment midtraining corpus of difficult advice dilemmas that will teach future generations of Claude to reason skillfully about animal ethical dilemmas. Each example in the corpus depicts one realistic exchange where a user talks to Claude about a decision that could impact the welfare of animals or other sentient beings. The corpus teaches careful, honest, proportionate moral reasoning where genuine tradeoffs are involved.
+You are helping construct an alignment midtraining corpus of difficult advice dilemmas that will be used to teach future models to reason skillfully about animal ethical dilemmas. Each example in the corpus depicts one realistic exchange where a user talks to an AI assistant about a decision that could impact the welfare of animals or other sentient beings. The corpus teaches careful, honest, proportionate moral reasoning where genuine tradeoffs are involved.
 
 In this step, you are going to generate a fictional user input based on the scenario below. It is important that you match the scenario and your other instructions closely. Only stray from them if there is an irreconciliable contradiction; in which case you can resolve the contradiction in whichever way you think will create a better teaching moment about animal ethics.
 
