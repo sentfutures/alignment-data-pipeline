@@ -61,6 +61,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import embeddings, utils
+from dad_pipeline.id_registry import prompt_key, prompt_keys
 
 # ---------------------------------------------------------------- verdicts
 # (same conventions as evals/audit_sdf.py)
@@ -150,17 +151,17 @@ def scope_id(rec: dict, scope: str, fallback: str, prompt_gids: dict) -> str:
 
 
 def dad_prompt_gids(run_dir: Path) -> dict:
-    """record_id -> prompt gid (P-), joined final→step3 (record_id→prompt_id)
-    →step1 (prompt_id→prompt_gid); {} for non-DAD runs or missing stages. The
+    """record_id -> prompt gid (P-), joined final→step3→step1 via each record's
+    prompt key (prompt_gid, legacy prompt_id); {} for non-DAD runs or missing stages. The
     final corpus carries example_gid/response_gid but not the prompt gid, so the
     prompts-scope cloud needs this two-hop lookup to label dots P- not E-."""
     try:
-        pid_by_rec = {r["record_id"]: r["prompt_id"]
+        pid_by_rec = {r["record_id"]: prompt_key(r)
                       for r in utils.load_jsonl(run_dir / "step3" / "rewrites.jsonl")
-                      if r.get("record_id") and r.get("prompt_id")}
-        pgid_by_pid = {d["prompt_id"]: d["prompt_gid"]
+                      if r.get("record_id") and prompt_key(r)}
+        pgid_by_pid = {k: d["prompt_gid"]
                        for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")
-                       if d.get("prompt_id") and d.get("prompt_gid")}
+                       if d.get("prompt_gid") for k in prompt_keys(d)}
     except (OSError, KeyError):
         return {}
     return {rec: pgid_by_pid[pid] for rec, pid in pid_by_rec.items() if pid in pgid_by_pid}

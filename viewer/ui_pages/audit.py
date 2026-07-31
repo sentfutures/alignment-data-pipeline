@@ -250,10 +250,10 @@ if run.pipeline == "dad":
 # finished example by E-#### — not the per-run prompt id. Loaded once from
 # the run's rewrites. (Hoisted above the headline: the Pareto scatter up
 # there labels by gid too.)
-_gids_by_pid = ({r.get("prompt_id"): {"response": r.get("response_gid"),
+_gids_by_pid = ({loader._pkey(r): {"response": r.get("response_gid"),
                                       "example": r.get("example_gid")}
                  for r in loader.load_stage(run.run_dir, "dad", "step3_rewrites")
-                 if r.get("prompt_id")} if run.pipeline == "dad" else {})
+                 if loader._pkey(r)} if run.pipeline == "dad" else {})
 
 
 def _label_responses(rows: list[dict], key: str = "record") -> list[dict]:

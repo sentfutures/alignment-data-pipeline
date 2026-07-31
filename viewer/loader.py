@@ -81,15 +81,15 @@ def run_has_scenario_ids(run_dir: Path) -> bool:
 
 
 def dad_example_labels(run_dir: Path) -> dict[str, str]:
-    """prompt_id -> stable example gid (E-####), from the step-3 rewrites.
-    The audit report's per_case blocks are keyed by prompt_id; pages use this
+    """prompt key -> stable example gid (E-####), from the step-3 rewrites.
+    The audit report's per_case blocks are keyed by the prompt key; pages use this
     map to display the example id instead. Missing keys (pre-gid runs, or
     prompts whose rewrite failed) fall back to the prompt id at the call site.
     First sample wins when a prompt has several (the audit joins one final
     response per prompt the same way)."""
     out: dict[str, str] = {}
     for r in load_stage(run_dir, "dad", "step3_rewrites"):
-        pid, gid = str(r.get("prompt_id", "")), r.get("example_gid")
+        pid, gid = _pkey(r), r.get("example_gid")
         if pid and gid:
             out.setdefault(pid, gid)
     return out
@@ -290,6 +290,24 @@ def _index(records: list[dict], key: str) -> dict:
     return {r[key]: r for r in records if key in r}
 
 
+def _pkey(rec: dict) -> str:
+    """The id naming a DAD record's prompt: prompt_gid (P-####) on current
+    runs, falling back to the retired per-run prompt_id (AW-####) so legacy
+    runs keep rendering."""
+    return str(rec.get("prompt_gid") or rec.get("prompt_id") or "")
+
+
+def _pkeys(rec: dict) -> tuple[str, ...]:
+    """Every id naming this record's prompt. Indexes register a record under
+    all of them, so mixed-era runs (gid-era step-1 files, pre-gid later stages
+    carrying only prompt_id) still join."""
+    return tuple(str(v) for v in (rec.get("prompt_gid"), rec.get("prompt_id")) if v)
+
+
+def _index_by_prompt(records: list[dict]) -> dict:
+    return {k: r for r in records for k in _pkeys(r)}
+
+
 def sdf_lineage(run_dir: Path, doc_id: str) -> dict:
     """Full lineage for one SDF document. Values are None when a stage was
     not reached or the join key is missing."""
@@ -326,26 +344,27 @@ def dad_lineage(run_dir: Path, record_id: str) -> dict:
         return {"format": "v2", "final": final}
 
     responses = _index(load_stage(run_dir, "dad", "step2_responses"), "response_id")
-    dilemmas = _index(load_stage(run_dir, "dad", "step1_dilemmas"), "prompt_id")
-    tension_tags = _index(load_stage(run_dir, "dad", "step2_tensions"), "prompt_id")
+    dilemmas = _index_by_prompt(load_stage(run_dir, "dad", "step1_dilemmas"))
+    tension_tags = _index_by_prompt(load_stage(run_dir, "dad", "step2_tensions"))
     scenarios = _index(load_stage(run_dir, "dad", "step1_scenarios"), "scenario_id")
-    scope_recs = _index(load_stage(run_dir, "dad", "step2_scopes"), "prompt_id")
-    baselines = _index(load_stage(run_dir, "dad", "baseline"), "prompt_id")
+    scope_recs = _index_by_prompt(load_stage(run_dir, "dad", "step2_scopes"))
+    baselines = _index_by_prompt(load_stage(run_dir, "dad", "baseline"))
     # 1c gate verdicts keyed by scenario_id; _index keeps the LAST row, i.e. the
     # verdict the shipping draft was accepted on (pass, or fail-then-shipped).
     gate_recs = _index(load_stage(run_dir, "dad", "step1_gate"), "scenario_id")
 
-    dilemma = dilemmas.get(audit.get("prompt_id"))
+    pid = _pkey(audit)
+    dilemma = dilemmas.get(pid)
     return {
         "format": "v2",
         "dilemma": dilemma,
         "scenario": scenarios.get((dilemma or {}).get("scenario_id")),
         "gate": gate_recs.get((dilemma or {}).get("scenario_id")),
-        "scope": scope_recs.get(audit.get("prompt_id")),
-        "tension_tag": tension_tags.get(audit.get("prompt_id")),
+        "scope": scope_recs.get(pid),
+        "tension_tag": tension_tags.get(pid),
         "response": responses.get(audit.get("response_id")),
         "rewrite": audit,
-        "baseline": baselines.get(audit.get("prompt_id")),
+        "baseline": baselines.get(pid),
         "final": final,
     }
 
@@ -355,30 +374,37 @@ def dad_lineage_by_prompt(run_dir: Path, prompt_id: str) -> dict:
     exist. Used to view incomplete runs (e.g. --stop-after 1, before responses
     are generated); returns the same shape as dad_lineage with later stages None
     when not reached."""
-    dilemmas = _index(load_stage(run_dir, "dad", "step1_dilemmas"), "prompt_id")
-    tension_tags = _index(load_stage(run_dir, "dad", "step2_tensions"), "prompt_id")
+    dilemmas = _index_by_prompt(load_stage(run_dir, "dad", "step1_dilemmas"))
+    tension_tags = _index_by_prompt(load_stage(run_dir, "dad", "step2_tensions"))
     scenarios = _index(load_stage(run_dir, "dad", "step1_scenarios"), "scenario_id")
-    scope_recs = _index(load_stage(run_dir, "dad", "step2_scopes"), "prompt_id")
+    scope_recs = _index_by_prompt(load_stage(run_dir, "dad", "step2_scopes"))
+    dilemma = dilemmas.get(prompt_id)
+    # Match later stages by ANY id naming this prompt: on mixed-era runs the
+    # dilemma carries a P- gid while responses/rewrites carry only the old
+    # per-run id, so the single passed-in key is not enough.
+    keyset = set(_pkeys(dilemma or {})) or {prompt_id}
     responses = [r for r in load_stage(run_dir, "dad", "step2_responses")
-                 if r.get("prompt_id") == prompt_id]
+                 if keyset & set(_pkeys(r))]
     rewrite = next((a for a in load_stage(run_dir, "dad", "step3_rewrites")
-                    if a.get("prompt_id") == prompt_id), None)
+                    if keyset & set(_pkeys(a))), None)
     final = None
     if rewrite:
         final = _index(load_final(run_dir, "dad"), "record_id").get(rewrite.get("record_id"))
-    dilemma = dilemmas.get(prompt_id)
-    baselines = _index(load_stage(run_dir, "dad", "baseline"), "prompt_id")
+    baselines = _index_by_prompt(load_stage(run_dir, "dad", "baseline"))
     gate_recs = _index(load_stage(run_dir, "dad", "step1_gate"), "scenario_id")
+    def _any(index: dict):
+        return next((index[k] for k in keyset if k in index), None)
+
     return {
         "format": "v2",
         "dilemma": dilemma,
         "scenario": scenarios.get((dilemma or {}).get("scenario_id")),
         "gate": gate_recs.get((dilemma or {}).get("scenario_id")),
-        "scope": scope_recs.get(prompt_id),
-        "tension_tag": tension_tags.get(prompt_id),
+        "scope": _any(scope_recs),
+        "tension_tag": _any(tension_tags),
         "response": responses[0] if responses else None,
         "rewrite": rewrite,
-        "baseline": baselines.get(prompt_id),
+        "baseline": _any(baselines),
         "final": final,
     }
 
@@ -472,8 +498,8 @@ def match_outputs(run_a: Path, run_b: Path, pipeline: str) -> list[MatchedPair]:
         audits = _index(load_stage(run_dir, "dad", "step3_rewrites"), "record_id")
         for rec in finals:
             audit = audits.get(rec.get("record_id"), {})
-            # AW-#### IDs are stable across runs of the same spec/seed set
-            exact.setdefault((str(audit.get("prompt_id", "")), audit.get("sample_index", 0)), []).append(rec)
+            # prompt keys are content-stable (P-gids) or positional (legacy AW-)
+            exact.setdefault((_pkey(audit), audit.get("sample_index", 0)), []).append(rec)
         return exact, grouped
 
     exact_a, grouped_a = group_dad(run_a, finals_a)
@@ -487,14 +513,14 @@ def match_outputs(run_a: Path, run_b: Path, pipeline: str) -> list[MatchedPair]:
     return pairs
 
 
-# --- DAD compare: content-aware matching (supersedes AW-#### positional pairing) ---
+# --- DAD compare: content-aware matching across runs ---
 
 DAD_MATCH_KEYS = ("user_message", "scenario_id", "prompt_id")
 
 
 @dataclass
 class DadExample:
-    prompt_id: str            # per-run AW-#### (internal key)
+    prompt_id: str            # the prompt key: P-#### gid (legacy runs: AW-####)
     prompt_gid: str | None    # stable global P-#### (content-keyed, cross-run)
     sample_index: int
     user_message: str
@@ -523,11 +549,11 @@ def _dad_examples(run_dir: Path) -> list[DadExample]:
     them)."""
     if dad_is_legacy(run_dir):
         return []
-    dilemmas = _index(load_stage(run_dir, "dad", "step1_dilemmas"), "prompt_id")
+    dilemmas = _index_by_prompt(load_stage(run_dir, "dad", "step1_dilemmas"))
     finals = _index(load_final(run_dir, "dad"), "record_id")
     out = []
     for audit in load_stage(run_dir, "dad", "step3_rewrites"):
-        pid = str(audit.get("prompt_id", ""))
+        pid = _pkey(audit)
         user_message = audit.get("user_message", "")
         dilemma = dilemmas.get(pid) or {}
         final = finals.get(audit.get("record_id"))
@@ -567,7 +593,8 @@ def match_dad(run_a: Path, run_b: Path, key_by: str = "user_message"):
       - 'user_message' — prompt held fixed → compare responses (response tuning)
       - 'scenario_id'  — scenario held fixed → the prompts themselves can differ,
         so you can compare prompts too (prompt tuning)
-      - 'prompt_id'    — positional AW-#### fallback (may pair unrelated prompts)
+      - 'prompt_id'    — the prompt key (P-#### gid; on legacy runs the
+        positional AW-####, which may pair unrelated prompts)
     """
     def by_key(run_dir):
         d = {}

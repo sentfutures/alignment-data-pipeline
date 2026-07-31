@@ -72,8 +72,7 @@ dad:
                 # cost log; diversity needs GEMINI_API_KEY or OPENAI_API_KEY). false = run evals manually.
   dilemmas:
     count: 40         # total examples in step 1 (seed imports count toward this)
-    id_start: 1       # AW-#### numbering floor; generation continues above any seed IDs
-    seed_path: null   # optional JSONL of handwritten examples ({prompt|user_message, annotation?, id?})
+    seed_path: null   # optional JSONL of handwritten examples ({prompt|user_message, annotation?})
     scenario_seed: null  # optional int for reproducible scenario generation; scenarios persist per run either way
     gate: true        # step 1c: pass/fail quality gate on each 1b draft (load-bearing, honors its cards, self-contained, cohesive); a reject routes the scenario back for redraft, capped at 3
     refine: true      # step 1d: review-and-rewrite each gate-passed draft (tic-thinning, dealt-card enforcement, unfixable rejection). NOTE: `refine` was the gate's legacy alias before 2026-07-20; a config setting refine without gate is refused loudly rather than guessed at

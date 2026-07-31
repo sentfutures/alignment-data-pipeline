@@ -60,8 +60,9 @@ spec's, enforcement stays human.
 
 Handwritten examples can be imported ahead of drafting via
 config dad.dilemmas.seed_path (JSONL with prompt/user_message, optional
-annotation and id); seeds carry no scenario. Generated IDs continue the
-AW-#### series above the highest existing ID, per the spec.
+annotation); seeds carry no scenario. Every shipped record is identified by
+its content-keyed prompt_gid (P-####, id_registry.py); there are no per-run
+prompt ids.
 """
 
 import json
@@ -470,15 +471,6 @@ def _gate_template_path(prompts_dir: Path) -> Path:
     return path
 
 
-def _next_id(examples: list[dict], id_start: int) -> str:
-    highest = id_start - 1
-    for e in examples:
-        m = re.fullmatch(r"AW-(\d+)", str(e.get("prompt_id", "")))
-        if m:
-            highest = max(highest, int(m.group(1)))
-    return f"AW-{highest + 1:04d}"
-
-
 def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
     cfg = config["dad"]["dilemmas"]
     # Config-contract guard, BEFORE any API spend: `refine` used to be the 1c
@@ -497,7 +489,6 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
             "keys explicitly to state which paid stages you want "
             "(e.g. gate: true, refine: true).")
     target = int(cfg.get("count", 40))
-    id_start = int(cfg.get("id_start", 1))
 
     output_path = output_dir / "dilemmas.jsonl"
     scenarios_path = output_dir / "scenarios.jsonl"
@@ -564,21 +555,22 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
     seed_path = cfg.get("seed_path")
     if seed_path and not any(e.get("source") == "seed" for e in examples):
         imported = 0
-        seen_ids = {e["prompt_id"] for e in examples}
+        seen_gids = {e.get("prompt_gid") for e in examples}
         for rec in utils.load_jsonl(seed_path):
             text = (rec.get("prompt") or rec.get("user_message") or "").strip()
             if not text:
                 continue
-            pid = str(rec.get("id") or _next_id(examples, id_start))
-            # A duplicate prompt_id silently collides in step 2's per-prompt maps
-            # (two dilemmas share one scope/response), so reject it loudly.
-            if pid in seen_ids:
-                raise SystemExit(f"Duplicate prompt_id {pid!r} in seed file {seed_path} "
-                                 "(collides with another seed or a generated id) — fix the ids.")
-            seen_ids.add(pid)
+            gid = registry.gid("prompt", prompt_fingerprint(text))
+            # Duplicate wording means a duplicate prompt_gid, which silently
+            # collides in step 2's per-prompt maps (two dilemmas share one
+            # scope/response), so reject it loudly.
+            if gid in seen_gids:
+                raise SystemExit(f"Duplicate seed prompt in {seed_path} "
+                                 f"(same wording as another seed or example — {gid}) "
+                                 "— fix the file.")
+            seen_gids.add(gid)
             record = {
-                "prompt_id": pid,
-                "prompt_gid": registry.gid("prompt", prompt_fingerprint(text)),
+                "prompt_gid": gid,
                 "user_message": text,
                 "scenario_cards": _normalize_scenario_cards(
                     rec.get("scenario_cards") or rec.get("annotation") or {}),
@@ -962,9 +954,18 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                           "— keeping the 1b draft (refine_failed stamped, raws in "
                           "refine_failures.jsonl).")
 
+            gid = registry.gid("prompt", prompt_fingerprint(user_message))
+            if any(e.get("prompt_gid") == gid for e in examples):
+                # Identical wording to an already-shipped example means an
+                # identical prompt_gid, which would silently collapse the two
+                # onto one scope/response in step 2. Skip without checkpointing
+                # so --resume redrafts this scenario (temperature 1.0 makes a
+                # repeat draw vanishingly unlikely to collide twice).
+                print(f"    {pid}: drafted message duplicates {gid} — "
+                      "not shipped; --resume will redraft it.")
+                continue
             record = {
-                "prompt_id": _next_id(examples, id_start),
-                "prompt_gid": registry.gid("prompt", prompt_fingerprint(user_message)),
+                "prompt_gid": gid,
                 "user_message": user_message,
                 # 1b writes no write-up; the dealt cards ARE the design, copied
                 # here (as scenario_cards) for the checklist and the viewer.

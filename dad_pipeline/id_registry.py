@@ -1,10 +1,9 @@
 """Stable, content-keyed global ids for the things the pipeline produces.
 
-The per-run ids — scenario_id (S-###), prompt_id (AW-####), response_id /
-record_id (uuids) — reset every run (or are unreadable), so they can't identify
-"the same thing" across runs. This registry adds a *stable* id alongside them,
-one kind per artifact, each counting up globally and reused whenever the same
-content appears again:
+The per-run ids — scenario_id (S-###) and the response_id / record_id uuids —
+reset every run (or are unreadable), so they can't identify "the same thing"
+across runs. This registry provides the *stable* ids, one kind per artifact,
+each counting up globally and reused whenever the same content appears again:
 
 - scenario_gid  S-####  the dealt scenario (categorical shape, pre-prompt)
 - prompt_gid    P-####  the shipped user message (exact wording)
@@ -55,6 +54,21 @@ def example_fingerprint(user_message: str, assistant_message: str) -> str:
     """Hash of a whitespace-normalized (user, assistant) training pair."""
     return _fingerprint([" ".join((user_message or "").split()),
                          " ".join((assistant_message or "").split())])
+
+
+def prompt_key(rec: dict) -> str:
+    """The id that names a record's prompt: prompt_gid (P-####) on current
+    records, falling back to the retired per-run prompt_id (AW-####) so
+    stages, audits, and the viewer keep working on legacy run dirs."""
+    return rec.get("prompt_gid") or rec.get("prompt_id") or ""
+
+
+def prompt_keys(rec: dict) -> tuple[str, ...]:
+    """Every id naming this record's prompt (prompt_gid, legacy prompt_id).
+    Lookup tables register a record under all of them, so mixed-era runs —
+    gid-era step-1 files joined by pre-gid later stages that carry only
+    prompt_id — still join."""
+    return tuple(str(v) for v in (rec.get("prompt_gid"), rec.get("prompt_id")) if v)
 
 
 def registry_path(output_dir: Path) -> Path:

@@ -38,6 +38,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import utils
+from dad_pipeline.id_registry import prompt_key, prompt_keys
 
 # ---------------------------------------------------------------- verdicts
 
@@ -113,7 +114,9 @@ def resolve_input(input_arg: str) -> tuple[list[dict], Path, Path | None]:
 
 
 # ---------------------------------------------------------------- stable gids
-# The audit joins its data by per-run prompt_id (AW-####), but every id shown to
+# The audit joins its data by the id naming each record's prompt — prompt_gid
+# (P-####) on current runs, per-run prompt_id (AW-####) on legacy runs, read
+# uniformly via id_registry.prompt_key. Every id shown to
 # a human — terminal lines, the report JSON's per-case entries, the viewer, and
 # anyone reading the report in chat — should be the STABLE gid: R-#### for a
 # response, E-#### for the finished example, P-####/S-#### for the prompt and
@@ -130,20 +133,25 @@ def _gid_map(run_dir: Path | None) -> dict:
         return {}
     out: dict = {}
     for r in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl"):
-        pid = r.get("prompt_id")
-        if not pid:
+        keys = prompt_keys(r)
+        if not keys:
             continue
         entry = {}
         if r.get("prompt_gid"):
             entry["prompt"] = r["prompt_gid"]
         if r.get("scenario_gid"):
             entry["scenario"] = r["scenario_gid"]
-        out[pid] = entry
+        # one shared entry under every key, so later stages that carry only
+        # the legacy prompt_id still land on the same bridge record
+        for k in keys:
+            out[k] = entry
     for r in utils.load_jsonl(run_dir / "step3" / "rewrites.jsonl"):
-        pid = r.get("prompt_id")
+        pid = prompt_key(r)
         if not pid:
             continue
         entry = out.setdefault(pid, {})
+        for k in prompt_keys(r):
+            out.setdefault(k, entry)
         if r.get("response_gid"):
             entry["response"] = r["response_gid"]
         if r.get("example_gid"):
@@ -187,15 +195,15 @@ def _final_by_prompt_id(run_dir: Path) -> dict:
     out = {}
     for rw in utils.load_jsonl(run_dir / "step3" / "rewrites.jsonl"):
         text = finals.get(rw.get("record_id"))
-        if text and rw.get("prompt_id"):
-            out[rw["prompt_id"]] = text
+        if text and prompt_key(rw):
+            out[prompt_key(rw)] = text
     return out
 
 
 def _baseline_by_prompt_id(run_dir: Path) -> dict:
-    return {r["prompt_id"]: str(r.get("baseline_response") or "")
+    return {prompt_key(r): str(r.get("baseline_response") or "")
             for r in utils.load_jsonl(run_dir / "baseline" / "baseline_responses.jsonl")
-            if r.get("prompt_id") and r.get("baseline_response")}
+            if prompt_key(r) and r.get("baseline_response")}
 
 
 def audit_response_lengths(run_dir: Path | None, report: dict) -> None:
@@ -337,8 +345,9 @@ def audit_tracked_tics(records: list[dict], run_dir: Path | None, report: dict) 
         report["tracked_tics"] = {"n": 0}
         return
     plain = {k: _norm_text(v) for k, v in _baseline_by_prompt_id(run_dir).items()}
-    prompts = {str(r.get("prompt_id") or i): _norm_text(str(r.get("user_message") or ""))
-               for i, r in enumerate(records or [])}
+    prompts = {key: _norm_text(str(r.get("user_message") or ""))
+               for i, r in enumerate(records or [])
+               for key in (prompt_keys(r) or (str(i),))}
     prompts = {k: v for k, v in prompts.items() if v.strip()}
     watch_phrases, _ignore = load_tic_lists()
     surfaces = load_tic_surfaces()
@@ -1167,8 +1176,9 @@ def audit_judges(run_dir: Path | None, config: dict, report: dict) -> None:
         _skip(sec, report, "responses", "0", note="(no final corpus — nothing to judge)")
         return
     plain = _baseline_by_prompt_id(run_dir)
-    dilemmas = {d.get("prompt_id"): str(d.get("user_message") or "")
-                for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")}
+    dilemmas = {key: str(d.get("user_message") or "")
+                for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")
+                for key in prompt_keys(d)}
     # The judges are not handed the pipeline's own scope/stakes text — each
     # forms its own stake_read (the old _stakes_by_prompt_id helper is gone).
     # The judges are the quality-critical calls: config `evals.judge_model`,
@@ -1771,8 +1781,9 @@ def audit_showcase(run_dir: Path | None, config: dict, report: dict,
         return
     pipe = _final_by_prompt_id(run_dir)
     plain = _baseline_by_prompt_id(run_dir)
-    dilemma_recs = {d.get("prompt_id"): d
-                    for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")}
+    dilemma_recs = {key: d
+                    for d in utils.load_jsonl(run_dir / "step1" / "dilemmas.jsonl")
+                    for key in prompt_keys(d)}
     judge_model = (config.get("evals") or {}).get("judge_model")
 
     def user_message(pid):
