@@ -458,6 +458,99 @@ def scatter(points, *, xdomain=None, ydomain=None, marks=(), width=W, height=330
     return "".join(out)
 
 
+FLOW_W = 440
+# The spine. Far enough right that a branch label fits to its left without being clipped by
+# the viewBox, and left enough that the longest stage name still clears the right edge:
+# "3 · the constitution rewrite" at 14px runs to ~342 of 440.
+_FLOW_X = 110
+_FLOW_STEP = 62       # one stage to the next
+
+
+def flow(stages, *, source=("a weighted matrix", "dealt in code"),
+         output=("one training record", ("user", "assistant")),
+         branch=None, title=""):
+    """A pipeline as a schematic: a source, a stage per dot down one spine, an output.
+
+    ``stages``: [(name, gloss)], drawn top to bottom. ``branch``: (label, index) — a dashed
+    spur into the stage at that index, for a step fed by something that is not its
+    predecessor. ``title``: the accessible name; SVG text is not read as prose, so the caller
+    must also say this in words above the diagram.
+
+    A SCHEMATIC, NOT A CHART, and the difference is enforced here rather than left to the
+    caller: nothing in it is proportional to a measurement, so it takes no series colour and
+    no status colour — hairlines, one ink and one muted grey. A schematic drawn in the chart
+    palette reads as a result, and this one is a map of the report's own beats.
+
+    VERTICAL, which is what lets it live in the reading column and scale instead of scroll.
+    Laid out left to right the same five steps need 720px: too wide for the prose measure, so
+    it had to bleed into the figure track — which is for measurements — and on a 358px phone
+    it needed a horizontal scroll box. Turned down the page it needs 440, fits the 38rem
+    measure at every breakpoint, and at 390px scales to ~0.81, where a 12px label is still
+    ~9.7px. Reading top to bottom also matches the report it maps, which is a sequence.
+    """
+    if not stages:
+        return _no_data()
+    x, top = _FLOW_X, 58                      # the first dot, below the source box
+    dots = [top + i * _FLOW_STEP for i in range(len(stages))]
+    height = dots[-1] + 112
+    out = [f"<svg viewBox='0 0 {FLOW_W} {height}' role='img' class='flow'"
+           f" aria-label='{esc(title)}'><title>{esc(title)}</title>"]
+    # The source: a grid of cells, because the matrix IS a grid and anything else here would
+    # be a picture of a box. Centred on the spine, like the record box at the other end.
+    for r in range(2):
+        for c in range(4):
+            out.append(f"<rect x='{x - 30 + c * 15}' y='{2 + r * 15}' width='15' height='15' "
+                       f"fill='none' class='flow-cell'/>")
+    out.append(_flow_label(x + 40, 17, source[0], strong=True, anchor="start")
+               + _flow_label(x + 40, 33, source[1], anchor="start"))
+    # No label on this arrow: "dealt in code" is directly above it and the prose beside the
+    # diagram says the same thing a third time. It only had somewhere to go by crowding the
+    # first dot.
+    out.append(_flow_arrow(x, 36, dots[0] - 7))
+    out.append(f"<line x1='{x}' x2='{x}' y1='{dots[0]}' y2='{dots[-1]}' class='flow-rule'/>")
+    for i, (name, gloss) in enumerate(stages):
+        y = dots[i]
+        out.append(f"<circle cx='{x}' cy='{y}' r='4.5' class='flow-dot'/>"
+                   + _flow_label(x + 22, y + 1, name, strong=True, anchor="start")
+                   + _flow_label(x + 22, y + 17, gloss, anchor="start"))
+        if branch and branch[1] == i:
+            # The spur's label sits UNDER its corner, centred, inside the viewBox. Hung off
+            # the end of the spur and right-aligned it ran past x=0 and the phrase was cut
+            # in half — measured at 390px and at 1440px, clipped in both.
+            # With a head, because the arm FEEDS this stage: stage 2 is shown the control's
+            # answer, not the other way round, and a dashed line with two bare ends does not
+            # say which.
+            out.append(f"<path d='M{x - 62},{y + 26} V{y} H{x - 13}' class='flow-arm'/>"
+                       f"<path d='M{x - 13},{y - 4} L{x - 7},{y} L{x - 13},{y + 4}' "
+                       f"class='flow-head'/>"
+                       + _flow_label(x - 62, y + 42, branch[0]))
+    out.append(_flow_arrow(x, dots[-1] + 22, dots[-1] + 54))
+    name, rows = output[0], output[1]
+    for i, row in enumerate(rows):
+        y = dots[-1] + 60 + i * 20
+        out.append(f"<rect x='{x - 40}' y='{y}' width='80' height='20' fill='none' "
+                   f"class='flow-cell'/>" + _flow_label(x, y + 14, row))
+    # Level with the middle of the box it names, not with one of its two rows.
+    out.append(_flow_label(x + 52, dots[-1] + 60 + 10 * len(rows) + 4, name, strong=True,
+                           anchor="start"))
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _flow_label(x, y, text, *, strong=False, anchor="middle"):
+    cls = "flow-t strong" if strong else "flow-t"
+    return (f"<text x='{x:.1f}' y='{y:.1f}' class='{cls}' text-anchor='{anchor}'>"
+            f"{esc(text)}</text>")
+
+
+def _flow_arrow(x, y0, y1, head=6):
+    """A vertical line with a DRAWN head. Typed as a glyph it is a hairline that differs
+    per font, which is the same reason the outbound arrow is stroked."""
+    return (f"<line x1='{x}' x2='{x}' y1='{y0:.1f}' y2='{y1 - head:.1f}' class='flow-rule'/>"
+            f"<path d='M{x - 4},{y1 - head:.1f} L{x},{y1:.1f} L{x + 4},{y1 - head:.1f}' "
+            f"class='flow-head'/>")
+
+
 def highlight(text, spans):
     """Escaped text with each verbatim span wrapped in <mark>.
 
@@ -586,12 +679,16 @@ def linkbutton(href, label, name="", meta=""):
 def compare(columns, rows):
     """The two datasets, side by side, with their names as the masthead.
 
-    columns: [(name, description)] or [(name, description, status)]. rows:
-    [(label, cell, cell)].
+    columns: [(name,)] or [(name, status)]. rows: [(label, cell, cell)].
 
     A comparison is a table — the whole point is that "records" lines up with "records" —
     but the names carry the section instead of a heading above it, so the header cells do
     the work a masthead would.
+
+    A masthead is a name and nothing else. What each dataset is used to sit here as a
+    subtitle, which left the one claim a reader most needs as the only unlabelled thing in
+    a table whose every other line says what it is answering; it is a row now, like the
+    rest.
 
     ``status`` is a neutral chip under the name, for the one thing a reader has to know
     before they choose rather than after: that one of these two reports is not written yet.
@@ -600,10 +697,9 @@ def compare(columns, rows):
     """
     cells = []
     for col in columns:
-        name, desc, status = (list(col) + [""])[:3]
+        name, status = (list(col) + [""])[:2]
         cells.append(f"<th><span class='cmp-name'>{esc(name)}</span>"
                      + (f"<span class='cmp-s'>{chip(status)}</span>" if status else "")
-                     + (f"<span class='cmp-d'>{inline_md(desc)}</span>" if desc else "")
                      + "</th>")
     heads = "".join(cells)
     body = "".join("<tr><th class='cmp-k' scope='row'>" + esc(label) + "</th>"
@@ -868,6 +964,9 @@ text-wrap:balance;font-variant-numeric:proportional-nums}
 h2{font:600 2rem/1.15 var(--serif);letter-spacing:-.014em;margin:0 0 .5rem;text-wrap:balance}
 h3{font:600 1.4rem/1.25 var(--serif);letter-spacing:-.008em;margin:2.6rem 0 .4rem;
 text-wrap:balance}
+/* A beat's opening paragraph is not a dek: it wants the air a paragraph gets, not the
+   .4rem a heading leaves for a line that belongs to it. */
+h3+p{margin-top:.9rem}
 /* Every beat and every stage inside a report is its own deep-link target — the rail links
    to all of them — so each needs the headroom a section gets, and inside a report the
    chooser is pinned to the top of the screen, so the headroom has to clear the bar as
@@ -1026,6 +1125,9 @@ color:var(--surface-0)}
 .choice-a{font:400 1.1rem/1 var(--sans);font-size:calc(1.1rem*(1 - .2*var(--t)));
 opacity:calc(.8 - .8*var(--t));transition:font-size .2s ease,opacity .2s ease}
 .panel{margin-top:3.2rem;scroll-margin-top:7rem}
+/* A report's title needs room under it: the h2's default half-rem is set for a heading
+   with a section under it, not for one that opens a ten-thousand-word document. */
+.panel>h2{margin-bottom:1.9rem}
 /* The comparison: a table, but the names are its masthead rather than a heading over
    the top of it, and the last row is what a reader does next.
 
@@ -1054,8 +1156,7 @@ margin-left:calc(50% - var(--cmp-col) - var(--cmp-label));
 font:.86rem/1.55 var(--sans)}
 .cmp th,.cmp td{text-align:left;vertical-align:top;padding:.62rem .9rem;
 border-bottom:1px solid var(--hairline)}
-.cmp thead th{border-bottom:1px solid var(--border);padding:0 .9rem 1.35rem;
-width:var(--cmp-col)}
+.cmp thead th{border-bottom:0;padding:0 .9rem 1.35rem;width:var(--cmp-col)}
 /* table-layout:fixed takes every column width from the FIRST row, so the corner cell
    has to carry the label width — the .cmp-k rule below is in the body rows, where fixed
    layout never looks. */
@@ -1063,7 +1164,6 @@ width:var(--cmp-col)}
 .cmp-name{display:block;font:600 1.28rem/1.2 var(--serif);letter-spacing:-.012em;
 color:var(--text-primary)}
 .cmp-s{display:block;margin-top:.5rem}
-.cmp-d{display:block;margin-top:.75rem;font:.85rem/1.55 var(--sans);color:var(--text-muted)}
 /* Flush right, hard against the pair, and never wrapped: the labels are an index down
    the side of the comparison, and an index that breaks over two lines stops reading as
    one. --cmp-label is wide enough for the longest of them. */
@@ -1104,6 +1204,19 @@ figure{margin:1.6rem 0 1.9rem}
 .fig-n{font:.78rem/1.5 var(--sans);color:var(--text-muted);margin:0 0 .5rem;max-width:52ch}
 .fig-c{font:.8rem/1.55 var(--sans);color:var(--text-secondary);margin-top:.5rem;max-width:58ch}
 .chart{width:100%;max-width:800px;height:auto;overflow:visible;display:block;margin:.2rem 0}
+/* The flow schematic: vertical, and narrow enough to live in the reading column rather than
+   the figure track, which is for measurements. 440px caps it, so it scales to ~0.81 in a
+   358px phone column where a 12px label still lands near 10px — the horizontal version
+   needed 720px and a scroll box to stay legible. Hairlines and two inks only; a schematic
+   in the chart palette would read as a measurement. */
+.flow{display:block;width:100%;max-width:440px;height:auto;margin:2.4rem 0 2.8rem}
+.flow-t{font-family:var(--sans);font-size:12px;fill:var(--text-muted)}
+.flow-t.strong{font-size:14px;font-weight:650;fill:var(--text-primary)}
+.flow-cell,.flow-rule,.flow-arm{stroke:var(--axis);fill:none}
+.flow-cell,.flow-rule{shape-rendering:crispEdges}
+.flow-arm{stroke:var(--text-muted);stroke-dasharray:4 3}
+.flow-dot{fill:var(--text-primary)}
+.flow-head{fill:var(--axis)}
 .lab,.val,.muted-svg{font-family:var(--sans)}
 .lab{font-size:11.5px;fill:var(--text-secondary)}
 .val{font-size:11px;fill:var(--text-muted);font-variant-numeric:tabular-nums}
@@ -1159,6 +1272,10 @@ summary .sum-m{color:var(--text-muted);font-weight:400}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.1rem 0}
 .pane{min-width:0}
 .pane-h{margin-top:0;color:var(--text-muted)}
+/* The two panes hold different elements — a <blockquote> on one side, a .resp on the
+   other — and their own margins do not agree, so one label sat closer to its text than
+   the other. The pane sets the gap, both children take it. */
+.pane>blockquote,.pane>.resp{margin:1rem 0 0}
 /* The example carousel. Same outline-button family as .choice, one size down: a record
    id is a label, not a title, so it takes the mono face the ids use everywhere else. */
 .carousel{margin:1.1rem 0}
@@ -1198,7 +1315,6 @@ footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
 /* Which runs this page was built from. Its own line under the two above, at the size the
    rest of the footer takes: a reader looking for it is looking deliberately. */
-.foot-run{flex:1 0 100%;font-size:.8rem}
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
    the page stays one file. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
@@ -1302,7 +1418,7 @@ body{font-size:10.5pt;line-height:1.5}
 .tabs{display:none}
 p,ul,.dek,.fig-c,.fig-n,.lede{max-width:none}
 h1,h2,h3,h4,.fig-t,.dek{break-after:avoid-page}
-figure,.tiles,table,.pair,blockquote{break-inside:avoid-page}
+figure,.tiles,table,.pair,blockquote,.flow{break-inside:avoid-page}
 .panel{break-before:page}
 tr,li{break-inside:avoid}
 thead{display:table-header-group}

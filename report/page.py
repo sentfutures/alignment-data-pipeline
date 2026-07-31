@@ -32,8 +32,8 @@ from report import dad
 from report import render as R
 from report import sdf
 
-CONTENT_IDS = ("title", "intro", "sdf_desc", "sdf_use", "sdf_unit",
-               "dad_desc", "dad_use", "dad_unit")
+CONTENT_IDS = ("title", "intro", "sdf_desc", "sdf_use", "sdf_unit", "sdf_pipeline",
+               "dad_desc", "dad_use", "dad_unit", "dad_pipeline")
 
 
 REPO_URL = "https://github.com/sentfutures/alignment-data-pipeline"
@@ -85,16 +85,27 @@ def _date(manifest):
 def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """The two datasets, side by side. Their names are this section's heading.
 
-    Four rows, because the reader is here to run the pipeline rather than to shop: what
-    each dataset is for, what a record is, how many templates it takes to make one, and
-    where a made example can be read. How MANY records is not one of them — that is a
-    property of a run, and this section describes the pipelines; the counts live in each
-    report's appendix, beside the run they came off. Dates, model ids and the composition
-    spread belong there too, not in a table meant to be read in one pass.
+    Six rows, and every one of them says which side of the line it is on: three describe
+    the RESULT — what the dataset is, what it is for, what one record is — and one
+    describes the PIPELINE that produces it, before the two rows that link out to the
+    templates and to a made example. A reader arriving cold cannot tell a claim about the
+    data from a claim about the process unless the table tells them, and this table is
+    where a page that is mostly two long pipeline walkthroughs draws that line first.
+
+    ``result`` was the masthead's subtitle. It reads as a row because it is one: the
+    sentence saying what each dataset is was the only unlabelled claim in the comparison.
+
+    How MANY records is not a row — that is a property of a run, and this section
+    describes the pipelines; the counts live in each report's appendix, beside the run
+    they came off. Dates, model ids and the composition spread belong there too, not in a
+    table meant to be read in one pass.
     """
     rows = [
+        ("result", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
         ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
-        ("one record is", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
+        ("result format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
+        ("pipeline", _cell(content, "sdf_pipeline", f),
+         _cell(content, "dad_pipeline", f)),
         ("prompt templates", _prompts_cell(sdf_kwargs, PROMPTS_SDF),
          _prompts_cell(dad_kwargs, PROMPTS_DAD)),
         ("example dataset",
@@ -102,13 +113,7 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
                       "Example dataset", "hf"),
          _with_button("", HF_DAD, "Example dataset", "hf")),
     ]
-    # The chip is the only warning a reader gets that one of these two reports is 200 words
-    # and the other is 10,000. Without it the choice is a coin flip, and the documents
-    # column — which is first here, first in the chooser and first in the panels — is the
-    # side that loses it. It comes off sdf.IS_PLACEHOLDER, so it leaves with the stub.
-    columns = [(sdf.SECTION_TITLE, C.fill(content.get("sdf_desc", ""), f),
-                "Report in preparation" if sdf.IS_PLACEHOLDER else ""),
-               (dad.SECTION_TITLE, C.fill(content.get("dad_desc", ""), f))]
+    columns = [(sdf.SECTION_TITLE,), (dad.SECTION_TITLE,)]
     # The heading is heard, not seen: the two mastheads are the heading on screen.
     return C.section("datasets", "The two datasets", R.compare(columns, rows),
                      heading_class="vh")
@@ -160,29 +165,19 @@ def section_explore(panels, outlines):
                          rails, panels))
 
 
-def footer(maker_icon="", runs=()):
-    """Who made it, where to go, and which runs this page was built from.
+def footer(maker_icon=""):
+    """Who made it and where to go.
 
-    The provenance was taken off the page once, on the grounds that a run id is for a
-    reader already deep in a report rather than for the last line — right about where it
-    belongs, wrong about the consequence, because it then appeared nowhere at all. A page
-    whose every figure is derived from two run directories has to name them, or nothing on
-    it can be located in the repository, reproduced, or cited. Here is where a reader
-    looks for that, and it stays out of the reports themselves.
-
-    ``runs`` is [(dataset name, run_id, manifest)]; a dataset with no run is skipped, so a
-    page built without one carries no half-line about it.
+    No run ids, no commits, no backend. The page reads as the pipeline running now rather
+    than as a report on one batch that finished, and a footer naming two run directories
+    dates it to that batch. What a reader needs to locate the data is the two links, and
+    what they need to reproduce it is the repository.
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
-    provenance = "".join(
-        f"<p class='foot-run'>{R.esc(name)} — "
-        f"{C.meta_line(run_id=run_id, manifest=manifest)}</p>"
-        for name, run_id, manifest in runs if run_id)
     return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>"
-            + provenance)
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
 
 
 # ------------------------------------------------------------------ assembly
@@ -220,9 +215,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
         "title": title,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT),
                            intro=C.prose(content, "intro", f)),
-        "footer": footer(maker_icon, runs=(
-            (sdf.SECTION_TITLE, sdf_kwargs.get("run_id"), sdf_kwargs.get("manifest")),
-            (dad.SECTION_TITLE, dad_kwargs.get("run_id"), dad_kwargs.get("manifest")))),
+        "footer": footer(maker_icon),
     }
     return "".join(sections), head
 

@@ -48,7 +48,7 @@ from report import render as R
 CONTENT_IDS = (
     "dad_what",
     "method_intro", "stage1", "stage2", "stage3", "control",
-    "example_pick", "example_extra", "example_intro",
+    "example_pick", "example_extra",
     "caveats",
     "appendix_intro", "judged_caveat", "checks_intro",
 )
@@ -62,17 +62,21 @@ SECTION_TITLE = "Difficult advice"
 # The stages come before the worked example on purpose: the chooser above asks the reader
 # to Walk through either pipeline, and a walk needs its steps named first.
 #
-# Three beats are open and one is drawers. What a reader has to read is the process, one
-# record's whole trail, and the caveats that hold for any run of this pipeline. Everything
-# specific to THIS run — the judged comparison, its regression, every chart, every check,
-# the derived floor — is in the appendix. How to install and run the pipeline is in the
-# repository README and is not on this page at all.
+# Four beats are open and one is drawers. What a reader has to read is what the dataset is,
+# the process, one record's whole trail, and the caveats that hold for any run of this
+# pipeline. Everything specific to THIS run — the judged comparison, its regression, every
+# chart, every check, the derived floor — is in the appendix. How to install and run the
+# pipeline is in the repository README and is not on this page at all.
 #
-# What the dataset IS has no beat of its own: the <h2> is "Difficult advice", and one line
-# under it says what that means. A "What it is" heading over a single sentence only names
-# what the reader can already see.
+# "What it is" WAS not a beat: the <h2> plus one line under it did that job, and a heading
+# over a single sentence only names what a reader can already see. That reasoning held for a
+# heading over one sentence. It does not hold for this beat, which carries the shape of the
+# pipeline and a record of its output — the two things a reader arriving cold has no way to
+# see, and which otherwise wait ~3,000px for the worked example. It also closes a real
+# divergence: report/sdf.py has always opened on `sdf-what`, and the note beside it said the
+# dad side was the one that would change.
 BEATS = (
-    ("dad-built", "How it is built"),
+    ("dad-built", "The pipeline"),
     ("dad-example", "One example, end to end"),
     ("dad-weak", "Where it is weak"),
     ("dad-appendix", "Appendix"),
@@ -413,8 +417,7 @@ def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=(),
     whole report — ten thousand words of it — carried no link at all, so that reader had to
     scroll back past everything they had read to find one.
     """
-    blocks = [R.sub("dad-example", "One example, end to end"),
-              C.prose(content, "example_intro", f)]
+    blocks = [R.sub("dad-example", "One example, end to end")]
     by_pid_rw = {r.get("prompt_id"): r for r in rewrites or []}
     by_pid_base = {r.get("prompt_id"): r for r in baseline or []}
     primary, extras = _picks(content, picks, by_pid_rw)
@@ -462,19 +465,16 @@ def lineage_blocks(pid, rw, base, lin, labels):
     rather than the stage alone, because the other beat uses the same three names and the
     rail links to both.
     """
-    out = [f"<p class='muted'>Record <span class='mono'>{R.esc(labels.get(pid, pid))}</span>"
-           f" — pinned in the prose file, so a rebuild shows the same case.</p>"]
-
-    out.append(R.substep("dad-example-stage1", "Stage 1 · the dilemma"))
+    out = [R.substep("dad-example-stage1", "Stage 1 · the dilemma")]
     if lin.get("cards"):
-        out.append("<p class='muted'>Dealt in code, before any model was called.</p>")
+        out.append("<p class='muted'>Dealt in code, before any model is called.</p>")
         out.append(_cards_table(lin["cards"]))
     else:
         out.append(R.note("This run kept no `step1/scenario_deals.jsonl` or "
                           "`step1/scenarios.jsonl`, so the dealt combination is not "
                           "recoverable for this record."))
     if lin.get("description"):
-        out.append(R.details("The scenario the planner wrote from those cards",
+        out.append(R.details("The scenario the planner writes from those cards",
                              R.quote(lin["description"]),
                              meta=f"{len(lin['description'].split()):,} words"))
     else:
@@ -483,19 +483,19 @@ def lineage_blocks(pid, rw, base, lin, labels):
     user_msg = rw.get("user_message") or base.get("user_message") or ""
     if user_msg:
         out.append("<p class='muted'>Drafted, gated, then reviewed against its own cards. What "
-                   "shipped:</p>")
+                   "ships:</p>")
         out.append(R.quote(user_msg))
 
     out.append(R.substep("dad-example-stage2", "Stage 2 · the reasoning"))
     # The only stage whose artefacts are all in drawers, so it is the only one that needs
     # a line saying what is in them: stage 1 opens on its dealt cards and stage 3 on the
     # answer, and a heading with nothing under it reads as a stage that did nothing.
-    out.append("<p class='muted'>Three artefacts, none of them shipped:</p>")
+    out.append("<p class='muted'>Three artefacts, none of which ship:</p>")
     if lin.get("scope"):
         # The scope stays in a drawer. Seven axes of dense prose is the most interesting
         # artefact in the run and the one most likely to stop a reader walking: measured
         # at 889px, it would sit between the message and the answer.
-        out.append(R.details("What stage 2 worked out before writing anything",
+        out.append(R.details("What stage 2 works out before writing anything",
                              _scope_table(lin["scope"]),
                              meta=f"{len(lin['scope'])} axes"))
     else:
@@ -506,7 +506,7 @@ def lineage_blocks(pid, rw, base, lin, labels):
                                   fallback=lin.get("selection_fallback")))
     if base.get("baseline_response"):
         out.append(R.details(
-            "The first take stage 2 was shown · plain model, no system prompt",
+            "The first take stage 2 is shown · plain model, no system prompt",
             R.highlight(base["baseline_response"], []),
             meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
 
@@ -552,7 +552,7 @@ def _scope_table(scope):
     extra = [(k.replace("_", " "), v) for k, v in scope.items()
              if v and k not in {key for key, _ in _SCOPE_AXES}]
     rows = named + sorted(extra)
-    return R.table(["what stage 2 worked out", "for this case"], rows, align="ll") if rows else ""
+    return R.table(["what stage 2 works out", "for this case"], rows, align="ll") if rows else ""
 
 
 def _entries_block(ids, entries, fallback=False):
@@ -564,10 +564,10 @@ def _entries_block(ids, entries, fallback=False):
     gloss = {e.get("id"): e for e in entries if e.get("id")}
     rows = [(i, (gloss.get(i) or {}).get("category") or "—",
              (gloss.get(i) or {}).get("claim") or "—") for i in ids]
-    note = ("<p class='warn-note'>The selection call failed for this case, so stage 2 was shown "
+    note = ("<p class='warn-note'>The selection call fails for this case, so stage 2 is shown "
             "the whole library rather than a chosen subset.</p>" if fallback else "")
     return note + R.details(
-        "The reasoning-library entries this case pulled",
+        "The reasoning-library entries this case pulls",
         R.table(["id", "kind", "the pattern it carries"], rows, align="lll"),
         meta=f"{len(ids)} of the library's entries · never named in an answer")
 
@@ -749,15 +749,31 @@ def scoreboard(audit, f, cons):
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
 
 
-def blocks_lede(content, f):
-    """One line under the report's own title, saying what the dataset is.
+SPECIMEN_WORDS = 30
 
-    Not a beat and not a heading: the ``<h2>`` above it already says "Difficult advice",
-    and a "What it is" heading over one sentence only names what the reader can see. It
-    deliberately repeats the comparison table's masthead line — a reader who arrived here
-    from a deep link never saw that table.
+
+def blocks_what(content, f):
+    """The opening: one line saying what this is, and nothing else.
+
+    The diagram moved down to the pipeline beat, where the prose that reads it aloud is.
+    A specimen record used to sit here too — 30 words of a question and 30 of an answer,
+    under a label — and it earned neither its space nor its label: the worked example two
+    beats down is the same record in full.
+
+    The lede names the pipeline and what it produces, for a reader who arrived on ``#dad``
+    from a deep link and never saw the comparison.
     """
     return f"<p class='lede'>{R.inline_md(C.fill(content.get('dad_what', ''), f))}</p>"
+
+
+def _first_words(text, n=SPECIMEN_WORDS):
+    """The opening of a record, with the cut made visible.
+
+    The specimen is a shape, not a reading: the full message and the full answer are both
+    below, and a silent truncation would let a reader take 30 words for the whole of it.
+    """
+    words = (text or "").split()
+    return " ".join(words[:n]) + (" …" if len(words) > n else "")
 
 
 def _delivery_statement(audit, f):
@@ -944,7 +960,7 @@ def judged_drawer(audit, content, f, cons, labels):
     body = [b for b in body if b]
     if len(body) <= 1:
         return ""
-    title = ("What the paid judges measured, and why the report does not lead with it"
+    title = ("What the paid judges measure, and why the report does not lead with it"
              if paid else "How the two arms compare, offline")
     return R.details(title, "".join(body),
                      meta=f.get("judge_arms_clause", "") if paid else "")
@@ -992,7 +1008,17 @@ def blocks_built(content, f):
     is the repository README's job, and a hand-off page that explains it is a hand-off
     page a reader has to skim past to reach the thing they came for.
     """
-    blocks = [R.sub("dad-built", "How it is built"), C.prose(content, "method_intro", f)]
+    blocks = [R.sub("dad-built", "The pipeline"), C.prose(content, "method_intro", f),
+              R.flow([("1 · the dilemma", "planned, drafted, gated"),
+                      ("2 · the reasoning", "scoped, then drafted"),
+                      ("3 · the constitution rewrite", "the alignment-critical pass")],
+                     branch=("the control arm", 1),
+                     title="The pipeline, top to bottom: a weighted matrix deals each case "
+                           "in code, then three model stages — the dilemma, the reasoning, "
+                           "and the constitution rewrite — turn it into one training record "
+                           "of a user message and an assistant answer. A plain model with no "
+                           "system prompt answers the same dilemma, and stage 2 is shown "
+                           "that answer as a first take.")]
     for key, heading in (("stage1", "Stage 1 · the dilemma"),
                          ("stage2", "Stage 2 · the reasoning"),
                          ("stage3", "Stage 3 · the constitution rewrite"),
@@ -1193,7 +1219,7 @@ def audit_flags_drawer(audit, f, manifest):
     if not warnings:
         return ""
     bad = sum(1 for sev, _ in warnings if sev == "BAD")
-    return R.details("What this run's audit flagged", C.warnings_table(warnings),
+    return R.details("What the audit flags", C.warnings_table(warnings),
                      meta=f"{len(warnings)} findings · {bad} BAD")
 
 
@@ -1260,7 +1286,7 @@ def _diversity_block(diversity):
     nn = diversity.get("nn") or {}
     clusters = ((diversity.get("scopes") or {}).get("combined") or {}).get("clusters") or {}
     return (
-        "<h4>What the diversity pass measured</h4>"
+        "<h4>What the diversity pass measures</h4>"
         "<p class='muted'>Embedding-space measurements over the final dataset, from "
         f"<code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"
         + R.tiles([
@@ -1328,7 +1354,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
                     "average is not hiding one where the pipeline threw them away."))
     if charts:
         blocks.append(R.details(
-            "Every chart from this run", "".join(charts),
+            "Every chart", "".join(charts),
             meta=f"{len(charts)} figures · {f.get('footprint_regressions', '')}"))
 
     rows, verdicted = [], 0
@@ -1345,11 +1371,11 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
                      if worst else "informational", counts or "—"))
     if rows:
         blocks.append(R.details(
-            "Every check that ran",
+            "Every check that runs",
             C.prose(content, "checks_intro", f)
             + checks_table(audit, diversity)
             + _diversity_block(diversity)
-            + "<h4>As the audit recorded them</h4>"
+            + "<h4>As the audit records them</h4>"
             + R.table(["check", "group", "worst verdict", "counts"], rows, align="llll")
             + _moves_drawer(audit),
             meta=f"{len(rows)} checks · {verdicted} carry a verdict"))
@@ -1381,7 +1407,7 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
     labels = _labels(audit)
     picks = (example,) if example else ()
     return "".join([
-        blocks_lede(content, f),
+        blocks_what(content, f),
         blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
                        hf_href=hf_href, repo_href=repo_href),

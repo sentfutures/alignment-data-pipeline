@@ -173,17 +173,21 @@ class TestShape:
         html = build(sdf_inputs=SDF_INPUTS)
         beats = dict(re.findall(r"<h3 id='([^']+)'>([^<]*)</h3>", html))
         assert beats["dad-weak"] == beats["sdf-weak"] == "Where it is weak"
+        # Both reports now open on the same beat, under the same name. The document one has
+        # always had it; the difficult-advice one opened on a bare lede until it earned a
+        # beat by carrying the pipeline's shape and a record.
+        assert beats["dad-what"] == beats["sdf-what"] == "What it is"
         for anchor, _ in D.BEATS:
             assert anchor in beats
 
-    def test_the_difficult_advice_report_opens_on_a_lede(self):
-        """What the dataset is takes one line under the report's own <h2>, not a beat of
-        its own. Synthetic documents still carries a "What it is" heading — its report is
-        a placeholder, and it takes this shape when it is written."""
+    def test_the_difficult_advice_report_opens_on_what_it_is(self):
+        """The beat, then its lede. The lede is still the first line a reader reads and
+        still the comparison's own masthead sentence — someone who arrived on #dad from a
+        deep link never saw that table — but it now sits under a heading, above the flow
+        and one record."""
         panel = build(sdf_inputs=SDF_INPUTS).split("<section id='dad'")[1]
-        head = panel[:panel.index("<h3 id=")]
-        assert "class='lede'" in head
-        assert "dad-what" not in panel
+        head = panel[:panel.index("<h3 id='dad-built'")]
+        assert head.index("<h3 id='dad-what'>") < head.index("class='lede'")
 
     def test_the_hero_is_the_image_the_title_and_the_lines_that_follow(self):
         """Image, title, intro, centred, and nothing else. A lede, a meta line or a set
@@ -670,7 +674,8 @@ class TestContentsRail:
         assert re.findall(r"data-rail='([^']+)'", markup) == ["sdf", "dad"]
         rail = self.rail(html, "dad")
         assert [t for _, t in re.findall(r"class='r-b' href='#([^']+)'>([^<]+)<", rail)] == [
-            "How it is built", "One example, end to end", "Where it is weak", "Appendix"]
+            "What it is", "How it is built", "One example, end to end", "Where it is weak",
+            "Appendix"]
 
     def test_the_stages_are_sub_items_under_the_beat_they_belong_to(self):
         """The point of the sub-items: a report's stages are where a reader is going, and
@@ -692,6 +697,10 @@ class TestContentsRail:
         assert by_beat["dad-built"] == ["dad-built-stage1", "dad-built-stage2",
                                        "dad-built-stage3", "dad-built-control"]
         assert by_beat["dad-weak"] == [] and by_beat["dad-appendix"] == []
+        # The opening beat names its two halves — "The pipeline" and "The result" — and
+        # they take no id, so they stay out of the rail. "The pipeline" listed here,
+        # directly above "How it is built", is exactly the ambiguity the labels remove.
+        assert by_beat["dad-what"] == []
 
     def test_the_appendix_drawers_are_not_in_the_rail(self):
         """An <h4> becomes a rail item by having an id, and the appendix's headings live
@@ -880,14 +889,15 @@ class TestTypeScale:
 
 class TestComparisonTable:
     def test_the_rows_are_what_a_lab_needs_to_run_it(self):
-        """Four rows, in one pass. Dates, model ids and the composition spread went to
-        the report that goes into them: a reader here is deciding whether to run the
-        pipeline, not shopping for a dataset."""
+        """Six rows, in one pass, and each says which side of the line it is on: three
+        describe the result, one the pipeline, two link out. Dates, model ids and the
+        composition spread went to the report that goes into them: a reader here is
+        deciding whether to run the pipeline, not shopping for a dataset."""
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
-        assert labels == ["what it is for", "one record is", "prompt templates",
-                          "example dataset"]  # the templates before the data
+        assert labels == ["result", "what it is for", "result format", "pipeline",
+                          "prompt templates", "example dataset"]  # templates before data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
                      "licence"):
@@ -931,6 +941,30 @@ class TestComparisonTable:
         assert row.count("<span class='cmp-fig'><span></span><a class='lbtn'") == 2
         assert not hasattr(P, "_records")
 
+    def test_the_pipeline_row_names_the_stages_the_report_goes_on_to_walk(self):
+        """The comparison's one line about process has to be the same pipeline the report
+        below it draws, or the table is a fifth vocabulary for it. The DAD flow diagram is
+        the authority — it is what a reader sees next — so the row is checked against the
+        stage names in the SVG rather than against a copy typed here.
+
+        The two columns are also checked against each other: the row is only worth a pass
+        of the eye if `sdf` and `dad` are written in the same shape, and one column drifting
+        into a sentence while the other stays a chain is how that stops being true.
+        """
+        html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
+        table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
+        cells = re.findall(r"<td>(.*?)</td>", self._rows(table)["pipeline"], re.S)
+        assert len(cells) == 2
+        flow = re.search(r"<svg [^>]*class='flow'.*?</svg>",
+                         html[html.index("<section id='dad'"):], re.S).group(0)
+        for stage in ("dilemma", "reasoning", "constitution rewrite"):
+            assert stage in cells[1], stage
+            assert stage in flow, stage
+        assert "matrix deal" in cells[0] and "matrix deal" in cells[1]
+        # Same shape both sides: a chain of stages, no sentence, no full stop.
+        for cell in cells:
+            assert cell.count("→") >= 3 and "." not in cell
+
     @staticmethod
     def _rows(table):
         return dict(re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>(.*?)</tr>",
@@ -949,14 +983,23 @@ class TestComparisonTable:
         assert re.findall(r"data-panel='(\w+)' id='choose", html) == ["sdf", "dad"]
         assert html.index("<section id='sdf'") < html.index("<section id='dad'")
 
-    def test_the_mastheads_carry_the_names_and_what_each_one_is(self):
-        """The two items that used to sit in the intro live here now, and the config ids
-        do not: a masthead is a name, not a filename."""
+    def test_the_mastheads_are_the_names_and_what_each_one_is_is_a_row(self):
+        """A masthead is a name, not a filename — and not a subtitle either. What each
+        dataset IS used to hang under the name, unlabelled, in a table whose every other
+        line said what it was answering; it is the `result` row now, so a reader can tell
+        a claim about the data from a claim about the process by reading down the side."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
-        head = re.search(r"<thead>.*?</thead>", html, re.S).group(0)
+        table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
+        head = re.search(r"<thead>.*?</thead>", table, re.S).group(0)
         assert f"<span class='cmp-name'>{D.SECTION_TITLE}</span>" in head
         assert f"<span class='cmp-name'>{S.SECTION_TITLE}</span>" in head
-        assert "Examples of an AI reasoning well" in head
+        assert "cmp-d" not in html  # the subtitle slot, and its rule, are gone
+        # Derived from the prose file, not typed here: this line is edited, and a hardcoded
+        # copy of it fails the next time someone rewords it rather than the next time
+        # someone breaks the table.
+        row = strip_tags(self._rows(table)["result"])
+        for key in ("dad_desc", "sdf_desc"):
+            assert strip_tags(shipped_content()[key]).strip() in row
         assert "<code>dad</code>" not in head and "<code>sdf</code>" not in head
 
     def test_the_two_columns_are_centred_on_the_page_not_on_the_prose(self):

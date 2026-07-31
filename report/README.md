@@ -15,7 +15,7 @@ organised by what the eval measured; this is organised by what a reader needs, i
 
 ```bash
 python report/build_report.py \
-  --dad-run outputs/dad/runs/2026-07-20_20-51_bedrock-40 \
+  --dad-run outputs/dad/runs/2026-07-29_12-26_archetype200 \
   --sdf-run outputs/sdf/runs/2026-07-11_20-06_matrix100-cli
 # -> report/index.html
 ```
@@ -33,8 +33,9 @@ yet" and its report says no audit output was supplied — the page still builds,
 carries no dead links.
 
 The paid audit pass only affects the appendix. Without it, the judged drawer says no paid
-pass ran and the derived-flags drawer gains a BAD row; the four beats above the appendix
-are unchanged, because none of them depends on a judge:
+pass ran and the derived-flags drawer gains a BAD row; the four beats above the appendix are
+unchanged, because none of them depends on a judge — the overview's flow is authored and its
+specimen comes off `step3/rewrites.jsonl`:
 
 ```bash
 python evals/audit_dad.py --input outputs/dad/runs/<run_id> --reasons
@@ -50,27 +51,48 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 | Anchor      | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | hero        | The illustration, the title, and the three lines that follow from it (_Teaching Claude Why_, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset _is_) are the heading. Four rows — what it is for, what a record is, how many prompt templates, where an example dataset can be read — because the reader is deciding whether to run the pipeline, not shopping for a dataset. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (the name in serif, and nothing else but the SDF chip) are the heading. Six rows, and **each one says whether it describes the data or the process that makes it** — `result`, `what it is for`, `result format`, `pipeline`, then `prompt templates` and `example dataset`. This is where the page draws that line first, because everything after it is two long pipeline walkthroughs and the reader came for the datasets. What each dataset _is_ used to be the masthead's subtitle; it is the `result` row now, because it was the one unlabelled claim in a table whose every other line said what it was answering. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
 | `#explore`  | "Walk through either pipeline" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are _inside_ this section, in `.explore-body` — see "The chooser".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `#sdf`      | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `#dad`      | Difficult advice, in full (`report/dad.py`). Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `#dad`      | Difficult advice, in full (`report/dad.py`). Opens on the `what it is` overview — the vertical flow schematic and a trimmed specimen. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | footer      | Repo and both viewers as buttons, one provenance line per run, and the build claim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-Both reports take the same skeleton, so a reader learns it once: a one-line lede under the
-report's own `<h2>`, then **how it is built / one example end to end / where it is weak /
-appendix**. Each beat is an `<h3>` with its own id (`#dad-weak`, `#dad-example`).
+Both reports take the same skeleton, so a reader learns it once: **what it is / how it is
+built / one example end to end / where it is weak / appendix**. Each beat is an `<h3>` with
+its own id (`#dad-what`, `#dad-weak`, `#dad-example`).
 
-What the dataset _is_ has no beat: the `<h2>` says "Difficult advice" and the lede says
-what that means, in the same sentence the comparison's masthead uses — a reader who
-arrived on `#dad` from a deep link never saw that table. A "What it is" heading over one
-sentence only names what the reader can already see. (`report/sdf.py` still has an
-`sdf-what` heading; its report is a placeholder and takes this shape when it is written.)
+`what it is` is the overview, and it is two **named** halves, each a label, then a sentence,
+then the thing itself. Under `The pipeline`, `render.flow()` draws the matrix, the three
+stages and the record as a **vertical schematic**; under `The result`, `render.sidebyside()`
+puts a **trimmed specimen** of one real record's question and answer beside each other. The
+lede opens it, naming the pipeline and what it produces, for a reader who arrived on `#dad`
+from a deep link and never saw the comparison.
 
-Three beats are open and the fourth is drawers, and the line between them is what a reader
+The two labels are plain `<h4>`s with **no id**, so they stay out of the rail: an id is what
+makes an `<h4>` a rail item (`render.substep`), and "The pipeline" listed there directly
+above the beat "How it is built" puts back the ambiguity the labels exist to remove. They are
+document subheads rather than `h4.pane-h`, because the specimen's own two panes are already
+pane headings and a third above them reads as one list of three.
+
+It was a bare lede, on the reasoning that a "What it is" heading over one sentence only names
+what a reader can already see. That was right about one sentence and wrong about the beat: a
+reader arriving cold could see neither the pipeline's shape nor a record until the worked
+example, ~3,000px down. Three rules keep it from growing into a second report:
+
+- **The sentences say what the visuals show**, rather than introducing them. A diagram's
+  labels are not read aloud, and 30 words of a record is not a description. That redundancy
+  is the beat's accessible reading, and `test_the_prose_says_what_the_diagram_shows` checks
+  it against the shipped prose.
+- **It links nowhere and names no record id.** It is the overview; the trail is two beats
+  down and a reader reaches it by scrolling.
+- **No figure, no tile, no chip, no score.** The flow is a schematic and the specimen is a
+  quotation. A chart here would argue a result before the reader knows what the data is.
+
+Four beats are open and the fifth is drawers, and the line between them is what a reader
 has to read:
 
-- **Open**: the process, one record's whole trail through it, and caveats that hold for
-  _any_ run of the pipeline.
+- **Open**: what the dataset is, the process, one record's whole trail through it, and
+  caveats that hold for _any_ run of the pipeline.
 - **Appendix**: everything specific to one run, in **five drawers, one per question a
   reader has**: what this run's audit flagged (the derived floor, first), the judged
   comparison against a plain model with its regression statement, every chart, every check,
@@ -241,7 +263,7 @@ buttons are ~10rem of permanent chrome, a quarter of a phone screen.
 
 | File              | Role                                                                                                                                                                                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset _is_, also used under each chooser button); `*_use` are what each is _for_. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
+| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. The comparison's four prose rows are `*_desc` (`result` — what each dataset _is_), `*_use` (what each is _for_), `*_unit` (`result format` — what one record is) and `*_pipeline` (the stages that make it, as a chain, in the same shape on both sides). A row's **label** lives in `page.section_datasets()`; only its cells are prose. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
 | `content_dad.md`  | **Difficult-advice prose.** The file to iterate on for that report.                                                                                                                                                                                                                                                           |
 | `page.py`         | The page: hero, comparison, chooser, footer, and the one `document()` call.                                                                                                                                                                                                                                                   |
 | `dad.py`          | The `#dad` beats: `facts()`, the block builders, `read_lineage()`, `judged_drawer()`, `derived_warnings()`.                                                                                                                                                                                                                   |
@@ -335,6 +357,34 @@ a block between prose files is a rename. `example_pick` holds the prompt_id of t
 worked example (or `auto`) and `example_extra` the ids in its carousel, so a rebuild
 reproduces the same cases without a flag. A pinned id the run never shipped says so on the
 page and falls back, rather than failing the build.
+
+## The flow schematic
+
+`render.flow()` draws the pipeline for the `what it is` beat: a source, a dot per stage down
+one spine, an output box, and an optional dashed spur for a stage fed by something that is
+not its predecessor (the control arm into stage 2, with a head — a dashed line with two bare
+ends does not say which way it feeds). Its stage names are the ones "How it is built" and the
+worked example use; three vocabularies for three views of one pipeline is how a reader stops
+believing it is one pipeline.
+
+**It is a schematic, not a chart, and the code enforces the difference.** Nothing in it is
+proportional to a measurement, so it takes no series colour and no status colour — hairlines,
+one ink, one muted grey, and `test_the_flow_is_a_schematic_so_it_carries_no_series_or_status_colour`
+fails if that slips. Arrowheads are drawn paths, never typed glyphs, for the same reason the
+outbound arrow is.
+
+**Vertical, and that is what lets it live in the reading column.** Laid out left to right the
+same five steps need 720px: too wide for the 38rem measure, so it had to bleed into the figure
+track — which is for measurements — and on a 358px phone it needed a horizontal scroll box.
+Turned down the page it needs 440, caps there, and scales to ~0.81 at 390px where a 12px label
+still lands near 10px. It is one **flat** `<svg>`: `editorial_words()`'s `<svg>` strip is
+non-greedy, so a nested one would start charging its labels against the prose ceiling.
+
+Two things measured in a browser rather than asserted, because no HTML assertion catches
+them: every label's box sits inside the viewBox at both widths (the branch label, hung off the
+end of its spur and right-aligned, ran past `x=0` and was cut in half), and the arrow out of
+the matrix carries no label — the gloss directly above it already says "dealt in code", and
+the label only had somewhere to go by crowding the first dot.
 
 ## The worked example
 

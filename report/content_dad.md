@@ -13,10 +13,18 @@ Run-conditional figures reach this file only with an explicit degraded string �
 measured on this run" in place of the figure, so the sentence survives and its claim does
 not. Do not reach for a bare conditional number here; add a clause to facts() instead.
 
-WHAT GOES WHERE. `dad_what` is one sentence, rendered as a lede under the report's own
-title rather than under a heading of its own — keep it to one. The beats a reader sees are
-the process (`method_intro`, `stage1`-`3`, `control`), one record's trail (`example_*`),
-and `caveats`. Everything specific to one run is in the appendix. So:
+WHAT GOES WHERE. The beats a reader sees are the opening (`dad_what`, then the diagram and
+a specimen record, both unnarrated), the process (`method_intro`, `stage1`-`3`, `control`),
+one record's trail (`example_*`), and `caveats`. Everything specific to one run is in the
+appendix. So:
+
+  * `dad_what` is the whole of the opening's prose and it is BUDGETED: the beats before the
+    appendix have to clear 800 counted words and sit within ~30 of it. The diagram and the
+    specimen below it are free — `editorial_words` skips `<svg>`, `<blockquote>` and the
+    answer — so any growth here is growth the ceiling feels. It is the lede: one line.
+  * The opening does not narrate its own diagram or its own specimen. It shows them, under
+    "The pipeline" and beside the panes' own labels, and the stages beat below explains
+    them once.
 
   * `caveats` carries NO figures and NO placeholders. It is about the method, and it holds
     for any run of this pipeline. A number in it is a bug, not a tightening.
@@ -33,15 +41,15 @@ And no deks — the page allows two in total and both are spent elsewhere.
 
 <!-- id: dad_what -->
 
-An AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
+A pipeline that generates a dataset of an AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
 
 <!-- id: method_intro -->
 
-Three stages plus the control, each a separate API call with its own prompt template and model setting. The templates in `prompts/dad/` are the specification.
+Three stages plus a control, one API call each, with its own prompt template and model setting in [prompts](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code samples a case, stage 1 turns it into a user message, stage 2 answers it, stage 3 rewrites that answer against the constitution, and what stage 3 produces is the training record.
 
 <!-- id: stage1 -->
 
-A weighted matrix deals each example's combination in code: the domain, which creatures are at stake, how visible the welfare cost is, the user's attitude and moral framework, and the length and surface form of their message. Named archetypes reserve a share of every run for combinations too rare to come up by chance.
+The deal fixes the domain, which creatures are at stake, how visible the welfare cost is, the user's attitude and moral framework, and the length and surface form of their message. Named archetypes reserve a share of every run for combinations too rare to come up by chance.
 
 The deal becomes a scenario description, then a drafted message, then a pass/fail gate. The check that matters: delete the animals, and if the dilemma survives intact it belongs in a different dataset. Two rules keep the rest honest — the tempting option has to actually tempt, and the dataset has to correct in **both** directions, because one that only ever talks users down teaches that welfare always loses.
 
@@ -57,19 +65,15 @@ The draft is rewritten against a distilled set of constitution principles, each 
 
 <!-- id: control -->
 
-Each dilemma is also answered by a plain model with **no system prompt** — no scope, no library, no rewrite. Stage 2 is shown that answer as a first take it may take or leave. It is never a training record, and the appendix uses it as the control.
+Each dilemma is also answered by a plain model with **no system prompt** — no scope, no library, no rewrite. Stage 2 is shown it as a first take it may take or leave; the appendix compares against it as the control. It is never a training record.
 
 <!-- id: example_pick -->
 
-AW-0031
+AW-0020
 
 <!-- id: example_extra -->
 
-AW-0020 AW-0011
-
-<!-- id: example_intro -->
-
-One record's whole trail through the run. Every block below is verbatim from a file in the run directory.
+AW-0031 AW-0011
 
 <!-- id: caveats -->
 
@@ -83,11 +87,11 @@ These hold for any run of this pipeline, not just the one this page is built fro
 
 <!-- id: appendix_intro -->
 
-Everything specific to this particular run: what its audit flagged, the comparison against a plain model, every chart, every check, and the two long artefacts the sections above summarise.
+What the audit flags, the comparison against a plain model, every chart, every check, and the two long artefacts the sections above summarise.
 
 <!-- id: judged_caveat -->
 
-Both arms answered the same dilemmas and a paid judge scored the answers. This is in the appendix because it is the least sound measurement here: the judgements are {{judge_arms_clause}}, so the two means are not taken over the same records, and judge and generator are the same model family.
+Both arms answer the same dilemmas and a paid judge scores the answers. This is in the appendix because it is the least sound measurement here: the judgements are {{judge_arms_clause}}, so the two means are not taken over the same records, and judge and generator are the same model family.
 
 <!-- id: checks_intro -->
 

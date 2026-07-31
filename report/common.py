@@ -225,9 +225,6 @@ def provenance_warnings(manifest, *, n=None, small_n=100):
                     f"Generated on the `{backend}` backend rather than `api`. `api` is the "
                     "documented faithful mode, and the one a reader reproducing this would "
                     "use. Read these numbers as representative, not exact."))
-    if (manifest or {}).get("git_dirty"):
-        out.append(("OK", "The working tree had uncommitted changes when this run was generated, "
-                          "so the recorded commit does not fully describe the code that ran."))
     if n and n < small_n:
         out.append(("OK", f"n = {n}, from one run on one seed. Every percentage here is "
                           f"indicative."))
@@ -275,18 +272,6 @@ def warnings_table(warnings, *, inline=3, drawer_label="more findings at this le
 
 
 # ------------------------------------------------------------------ shell bits
-
-def meta_line(*, run_id, manifest, pairs=()):
-    """The provenance line. ``pairs`` is [(label, value_html)] appended in order."""
-    m = manifest or {}
-    cfg = m.get("config") or {}
-    bits = [f"run <span class='mono'>{R.esc(run_id or m.get('run_id', '?'))}</span>",
-            f"git <span class='mono'>{R.esc(str(m.get('git_commit', '?'))[:8])}</span>"
-            + (" <span class='mono'>+ uncommitted changes</span>" if m.get("git_dirty") else ""),
-            f"backend <code>{R.esc(cfg.get('backend', '?'))}</code>"]
-    bits += [f"{R.esc(k)} {v}" for k, v in pairs]
-    return " · ".join(bits)
-
 
 # ------------------------------------------------------------------ CLI
 

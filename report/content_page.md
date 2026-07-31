@@ -17,10 +17,17 @@ arrow on an outbound link is added by the renderer — do not type one here. The
 forty seconds: let the comparison do the comparing. Deks are rationed: the page carries
 at most two.
 
-`dad_desc` / `sdf_desc` are the mastheads' subtitles — what each dataset *is*, in one
-sentence — and double as the line under each chooser button. `dad_use` / `sdf_use` are
-what each is *for*: both are midtraining, and the difference is the format they are
-consumed in. One short sentence each.
+The comparison is six rows, and each one says whether it is describing the data or the
+process that makes it. `dad_desc` / `sdf_desc` are the `result` row — what each dataset
+*is*, in one sentence. `dad_use` / `sdf_use` are what each is *for*: both are midtraining,
+and the difference is the format they are consumed in. `dad_unit` / `sdf_unit` are the
+`result format` — what one record is. `dad_pipeline` / `sdf_pipeline` are the stages that
+produce it, as a chain, in the same shape on both sides so the two columns can be read
+across. One short line each; a row's LABEL lives in `page.section_datasets()`, only its
+cells are here. The `*_pipeline` chains carry a NON-BREAKING space after each arrow, so a
+wrap puts the arrow at the head of the next line rather than orphaning it at the end of
+the last one — it is invisible in an editor, so copy an existing arrow rather than typing
+a new one.
 
 No licence is set for either dataset, and the page says nothing about it — the row that
 would have carried it was removed. When one is set it belongs in the comparison, as a row
@@ -66,6 +73,14 @@ One user dilemma in, one assistant answer out.
 <!-- id: sdf_unit -->
 
 One standalone document, no chat framing.
+
+<!-- id: dad_pipeline -->
+
+matrix deal → dilemma → reasoning → constitution rewrite
+
+<!-- id: sdf_pipeline -->
+
+matrix deal → plan → draft → rewrite → score
 
 <!-- id: sdf_what -->
 

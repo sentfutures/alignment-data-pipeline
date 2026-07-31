@@ -150,8 +150,7 @@ def blocks(*, content, f, run_id="", audit=None, diversity=None, manifest=None,
     out = [R.sub("sdf-what", "What it is"), C.prose(content, "sdf_what", f)]
     tiles = []
     if f.get("n_docs"):
-        tiles.append(R.stat(f"{f['n_docs']:,}", "documents",
-                            f"in run {run_id}" if run_id else ""))
+        tiles.append(R.stat(f"{f['n_docs']:,}", "documents", ""))
     if f.get("n_languages"):
         tiles.append(R.stat(str(f["n_languages"]), "languages",
                             f"across {f.get('n_types', '?')} document types, "
@@ -170,7 +169,7 @@ def blocks(*, content, f, run_id="", audit=None, diversity=None, manifest=None,
     warnings = derived_warnings(audit, manifest, f)
     if warnings:
         out.append(R.sub("sdf-weak", "Where it is weak"))
-        out.append("<p class='muted'>Derived from this run's own audit output. The rest of the "
+        out.append("<p class='muted'>Derived from the audit's own output. The rest of the "
                    "dataset-level checks arrive with the full report.</p>")
         out.append(C.warnings_table(warnings))
     out.append(C.prose(content, "sdf_soon", f))
