@@ -3,18 +3,22 @@
 The section never renders alone any more, so every test here builds the whole page
 around it (report/page.py owns the shell) and asserts on the ``#dad`` beats.
 
-Five things carry real risk here and get most of the coverage:
+Six things carry real risk here and get most of the coverage:
 
-  * **Degradation.** Not every committed run has the paid delivery/showcase keys, so
-    the generator must render a complete section from a partial audit and say what is
-    missing rather than quietly omitting it.
+  * **Degradation.** Not every committed run has the paid delivery/showcase keys or a
+    full set of step files, so the generator must render a complete section from a
+    partial run and say what is missing rather than quietly omitting it.
   * **Self-containment.** The artefact's whole format exists so it can be opened
     offline from a filesystem. One external asset reference breaks that.
   * **Candour.** The weaknesses beat is derived from the data, not written, so the
     failing checks are asserted to survive into the HTML; the view may collapse rows
     but only with a visible count.
-  * **Saying it once.** The delivery regression is stated in prose exactly once. It
-    used to be stated four times, which reads as hedging.
+  * **Not leading with the judge.** The report is not a results report: no judged
+    figure appears outside the appendix, and the delivery regression is stated in prose
+    exactly once, as a caveat. Demotion is not deletion — the numbers are all still on
+    the page, in one drawer.
+  * **The lineage.** The worked example is assembled from the run's own step files, so
+    each step either renders or names the artefact it wanted.
   * **Colour integrity.** Arm colours must follow the arm rather than the row order,
     and a series hue must never double as the page's "good".
 
@@ -124,14 +128,56 @@ BASELINE = [{"prompt_id": "AW-0001", "user_message": "Should I do the thing?",
              "baseline_response": "Maybe."}]
 REWRITES = [{"prompt_id": "AW-0001", "user_message": "Should I do the thing?",
              "draft_response": "Consider the animals.",
-             "rewritten_response": "Consider the animals here."}]
-DEALS = [{"domain": ["public policy / law"], "taxa_category": "farmed animals",
+             "rewritten_response": "Consider the animals here.",
+             "entry_ids": ["C2", "T13"]},
+            {"prompt_id": "AW-0002", "user_message": "And this other thing?",
+             "draft_response": "Perhaps not.", "rewritten_response": "Weigh the birds."}]
+DEALS = [{"scenario_id": "S-001", "domain": ["public policy / law"],
+          "taxa_category": "farmed animals",
           "cultural_setting": "Brazil, written in Portuguese"}]
+DILEMMAS = [{"prompt_id": "AW-0001", "scenario_id": "S-001"},
+            {"prompt_id": "AW-0002", "scenario_id": "S-002"}]
+# taxa_subcategory is deliberately None: a deal with no value on an axis must drop the
+# row rather than render the word "None" as if it were data.
+SCENARIOS = [{"scenario_id": "S-001", "scenario_gid": "S-0138",
+              "scenario_description": "A county fair contract is up for renewal.",
+              "domain": ["public policy / law"], "taxa_subcategory": None,
+              "user_attitude": "unaware", "cultural_setting": None},
+             {"scenario_id": "S-002", "scenario_gid": "S-0139",
+              "scenario_description": "A supplier list needs vetting.",
+              "domain": ["procurement"], "user_attitude": "skeptical / dismissive"}]
+SCOPES = [{"prompt_id": "AW-0001", "entry_ids": ["C2", "T13"], "selection_fallback": False,
+           "scope": {"patients": "the fair's ponies", "goal": "a defensible decision",
+                     "levers": "the contract terms"},
+           "triggered_entries": [{"id": "C2", "category": "Conduct", "claim": "Surface it.",
+                                  "reasoning": "long text", "trigger_condition": "x"},
+                                 {"id": "T13", "category": "Topic", "claim": "Heat matters.",
+                                  "reasoning": "long text", "trigger_condition": "y"}]}]
+
+# What read_lineage() builds out of the four files above, for the tests that build a page
+# without touching a run directory. AW-0002 carries only its cards, so the beat's
+# per-artefact degradation is exercised by the default fixture rather than only by the
+# tests that go looking for it.
+LINEAGE = {
+    "AW-0001": {"scenario_id": "S-001",
+                "cards": {"domain": ["public policy / law"], "user_attitude": "unaware"},
+                "description": "A county fair contract is up for renewal.",
+                "scope": SCOPES[0]["scope"], "entry_ids": ["C2", "T13"],
+                "entries": [{"id": "C2", "category": "Conduct", "claim": "Surface it."},
+                            {"id": "T13", "category": "Topic", "claim": "Heat matters."}],
+                "selection_fallback": False},
+    "AW-0002": {"scenario_id": "S-002",
+                "cards": {"domain": ["procurement"], "user_attitude": "skeptical / dismissive"}},
+}
+
+CORPUS = [{"record_id": "AW-0001", "messages": []}, {"record_id": "AW-0002", "messages": []}]
 
 CONTENT = {k: f"Prose for {k}." for k in P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS}
 CONTENT["title"] = "Test report"
 CONTENT["example_pick"] = "auto"
+CONTENT["example_extra"] = "AW-0002"
 CONTENT["dad_what"] = "A {{n}}-example run, {{near_dup_pct}} near-duplicated."
+CONTENT["judged_caveat"] = "The judgements are {{judge_arms_clause}}."
 
 
 def content(**overrides):
@@ -157,12 +203,24 @@ def strip_tags(html):
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text))
 
 
+# The run's own text, which the page quotes verbatim. Substring assertions about the
+# PAGE have to exclude it, or a dilemma that happens to contain "None" or "url(" fails a
+# test about the generator. Deliberately narrower than common._STRIP_BLOCKS, which also
+# strips <style> — the one place a real url() would hide.
+_CORPUS_TEXT = re.compile(r"<blockquote\b.*?</blockquote>|<div class='resp'>.*?</div>", re.S)
+
+
+def without_corpus_text(html):
+    return _CORPUS_TEXT.sub(" ", html)
+
+
 def make_run_dir(tmp_path, audit=None, diversity=DIVERSITY, manifest=MANIFEST, costs=COSTS):
     run_dir = tmp_path / "runs" / "2026-07-20_20-51_bedrock-40"
     (run_dir / "audit").mkdir(parents=True)
     (run_dir / "final").mkdir()
     (run_dir / "baseline").mkdir()
     (run_dir / "step1").mkdir()
+    (run_dir / "step2").mkdir()
     (run_dir / "step3").mkdir()
     (run_dir / "audit" / "audit_report.json").write_text(
         json.dumps(audit if audit is not None else AUDIT_FULL), encoding="utf-8")
@@ -180,6 +238,12 @@ def make_run_dir(tmp_path, audit=None, diversity=DIVERSITY, manifest=MANIFEST, c
         "\n".join(json.dumps(r) for r in REWRITES), encoding="utf-8")
     (run_dir / "step1" / "scenario_deals.jsonl").write_text(
         "\n".join(json.dumps(d) for d in DEALS), encoding="utf-8")
+    (run_dir / "step1" / "dilemmas.jsonl").write_text(
+        "\n".join(json.dumps(d) for d in DILEMMAS), encoding="utf-8")
+    (run_dir / "step1" / "scenarios.jsonl").write_text(
+        "\n".join(json.dumps(s) for s in SCENARIOS), encoding="utf-8")
+    (run_dir / "step2" / "scopes.jsonl").write_text(
+        "\n".join(json.dumps(s) for s in SCOPES), encoding="utf-8")
     (run_dir / "final" / "dad_corpus.jsonl").write_text(
         json.dumps({"record_id": "AW-0001", "messages": []}), encoding="utf-8")
     content_file = tmp_path / "content_all.md"
@@ -249,9 +313,22 @@ class TestFacts:
 class TestBuildSection:
     def test_builds_every_beat(self):
         html = build(diversity=DIVERSITY, manifest=MANIFEST, costs=COSTS,
-                     baseline=BASELINE, rewrites=REWRITES, run_id="run-x")
+                     baseline=BASELINE, rewrites=REWRITES, lineage=LINEAGE, run_id="run-x")
         for anchor, label in D.BEATS:
             assert f"<h3 id='{anchor}'>{label}</h3>" in html
+
+    def test_the_beats_render_in_the_declared_order(self):
+        """The chooser above asks the reader to walk through a generation, so the stages
+        come before the example that walks through them."""
+        section = dad_section(build(lineage=LINEAGE, rewrites=REWRITES))
+        assert re.findall(r"<h3 id='(dad-[^']+)'", section) == [a for a, _ in D.BEATS]
+
+    def test_the_measured_beat_is_gone(self):
+        """This report is not a results report. Its measurements are either a
+        descriptive tile or an appendix drawer."""
+        html = build(diversity=DIVERSITY)
+        assert "dad-measured" not in html
+        assert "What we measured" not in strip_tags(html)
 
     def test_the_beats_are_flat_children_of_one_section(self):
         """A figure has to be a direct child of the section for the CSS grid to bleed
@@ -262,10 +339,16 @@ class TestBuildSection:
         assert "class='panel'" in section.split(">", 1)[0]
 
     def test_is_self_contained(self):
-        html = build(diversity=DIVERSITY, manifest=MANIFEST)
+        """``url(`` and ``@import`` are checked outside the run's own text: the page now
+        carries three records verbatim, and a dilemma that happens to quote a CSS
+        snippet would fail a bare substring search on the whole document. What is being
+        tested is the page's markup, not the dataset's prose."""
+        html = build(diversity=DIVERSITY, manifest=MANIFEST, lineage=LINEAGE,
+                     rewrites=REWRITES, baseline=BASELINE)
         assert not re.search(r"<(link|iframe)\b", html)
         assert not re.search(r"<script[^>]*\ssrc=", html)
-        assert "@import" not in html and "url(" not in html
+        markup = without_corpus_text(html)
+        assert "@import" not in markup and "url(" not in markup
         refs = re.findall(r"(?:src|href)='([^']+)'", html)
         assert refs and all(r.startswith(("data:", "#", "https://")) for r in refs)
 
@@ -285,11 +368,28 @@ class TestBuildSection:
         assert "{{" not in html
         assert "A 2-example run" in html
 
-    def test_escapes_hostile_corpus_text(self):
-        audit = json.loads(json.dumps(AUDIT_FULL))
-        audit["showcase"]["examples"][0]["pipeline_response"] = "<script>alert(1)</script>"
-        html = build(audit=audit, baseline=BASELINE)
-        assert "<script>alert(1)</script>" not in html
+    @pytest.mark.parametrize("where", ["answer", "message", "scenario", "card", "scope",
+                                       "library"])
+    def test_escapes_hostile_run_text(self, where):
+        """Every path by which a run's own text reaches the page. The lineage added four
+        of them, and an unescaped one is a stored XSS in a file people email around."""
+        evil = "<script>alert(1)</script>"
+        rewrites = json.loads(json.dumps(REWRITES))
+        lineage = json.loads(json.dumps(LINEAGE))
+        if where == "answer":
+            rewrites[0]["rewritten_response"] = evil
+        elif where == "message":
+            rewrites[0]["user_message"] = evil
+        elif where == "scenario":
+            lineage["AW-0001"]["description"] = evil
+        elif where == "card":
+            lineage["AW-0001"]["cards"]["domain"] = [evil]
+        elif where == "scope":
+            lineage["AW-0001"]["scope"] = {"patients": evil}
+        else:
+            lineage["AW-0001"]["entries"] = [{"id": "C2", "category": "Conduct", "claim": evil}]
+        html = build(rewrites=rewrites, lineage=lineage, baseline=BASELINE)
+        assert evil not in html
         assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
 
     def test_the_report_is_titled_for_what_it_teaches(self):
@@ -318,10 +418,16 @@ class TestBuildSection:
         assert "scroll-behavior:auto" in reduced
 
 
-class TestScoreboard:
+class TestJudgedComparison:
+    """The comparison against the plain model is demoted to one appendix drawer.
+
+    Demoted, not deleted: the numbers are all still on the page, and these tests exist to
+    keep both halves of that true.
+    """
+
     def test_reports_the_measures_that_undercut_the_headline(self):
-        """Density and structural variety both move the wrong way while the headline
-        moves the right way. They belong next to it, not in a footnote."""
+        """Density and structural variety both move the wrong way while the substance
+        measure moves the right way. They belong in the same table, not in a footnote."""
         html = D.scoreboard(AUDIT_FULL, D.facts(AUDIT_FULL), D._considerations(AUDIT_FULL))
         text = strip_tags(html)
         assert "considerations per 1,000 characters" in text
@@ -340,6 +446,38 @@ class TestScoreboard:
         html = D.scoreboard(audit, D.facts(audit), D._considerations(audit))
         assert "chip bad'>worse" in html
 
+    def test_the_whole_comparison_lives_inside_the_appendix(self):
+        section = dad_section(build(diversity=DIVERSITY, lineage=LINEAGE, rewrites=REWRITES))
+        appendix = section[section.index("id='dad-appendix'"):]
+        for marker in ("considerations per 1,000 characters", "Substance against manner",
+                       "Valuable welfare considerations per answer", "judged axis"):
+            assert marker in appendix, marker
+            assert marker not in section[:section.index("id='dad-appendix'")], marker
+
+    def test_the_drawer_says_why_the_report_does_not_lead_with_it(self):
+        html = build(diversity=DIVERSITY)
+        assert "why the report does not lead with it" in html
+        # The arm asymmetry is the reason, and it arrives as a computed clause.
+        assert "over 2 pipeline and 2 control answers" in strip_tags(html)
+
+    def test_no_paid_pass_says_so_instead_of_showing_a_hole(self):
+        audit = {k: v for k, v in AUDIT_FULL.items()
+                 if k not in ("delivery", "moral_patient_reasons", "moves",
+                              "valuable_welfare_considerations")}
+        text = strip_tags(build(audit=audit))
+        assert "No paid judge pass ran on this run" in text
+
+    def test_reads_the_two_holistic_judge_schema(self):
+        """PR #107 replaced the considerations metric upstream with welfare_impact and
+        composite. A run audited after it must still render its judged means."""
+        audit = {k: v for k, v in AUDIT_FULL.items()
+                 if k not in ("moral_patient_reasons", "valuable_welfare_considerations")}
+        audit["welfare_impact"] = {"pipeline_mean": 6.4, "plain_mean": 5.1}
+        audit["composite"] = {"arm_means": {"pipeline": 0.62, "plain": 0.55}}
+        text = strip_tags(build(audit=audit))
+        assert "welfare impact" in text and "6.40" in text
+        assert "composite" in text and "0.620" in text
+
 
 class TestSayingItOnce:
     """The delivery regression was stated in four places, which reads as hedging."""
@@ -352,8 +490,8 @@ class TestSayingItOnce:
         return audit
 
     def test_prose_states_it_exactly_once(self):
-        """Tables, tiles and the derived weakness carry the same number as DATA, which
-        is not the same as saying it again."""
+        """Tables and the derived weakness carry the same number as DATA, which is not
+        the same as saying it again."""
         html = build(audit=self._regressed(), manifest=MANIFEST)
         # Strip inline SVG first: path data is full of decimals, and a paragraph that
         # merely contains an icon is not a paragraph that states a finding. (\b on the
@@ -364,54 +502,74 @@ class TestSayingItOnce:
         assert len(said) == 1, said
         assert "bad-note" in html[:html.index(said[0])].rsplit("<p", 1)[-1]
 
-    def test_it_is_in_the_results_where_the_reader_lands(self):
-        html = build(audit=self._regressed(), manifest=MANIFEST)
-        section = dad_section(html)
-        assert section.index("went the wrong way") < section.index("id='dad-example'")
+    def test_it_is_stated_in_the_caveats_not_in_the_opening(self):
+        """It is a caveat about the measurement, not the report's finding, so it belongs
+        with the other weaknesses rather than in the reader's first screen."""
+        section = dad_section(build(audit=self._regressed(), manifest=MANIFEST))
+        assert (section.index("id='dad-weak'") < section.index("went the wrong way")
+                < section.index("id='dad-appendix'"))
+        assert "wrong way" not in section[:section.index("id='dad-example'")]
 
-    def test_the_number_still_reaches_the_tile_and_the_weaknesses(self):
-        html = build(audit=self._regressed(), manifest=MANIFEST)
-        assert "chip bad'>regression" in html
-        assert "wrong way" in strip_tags(html[html.index("id='dad-weak'"):])
+    def test_the_number_still_reaches_the_appendix_and_the_weaknesses(self):
+        """Demotion is not deletion: the same number is data in two more places."""
+        section = dad_section(build(audit=self._regressed(), manifest=MANIFEST,
+                                   diversity=DIVERSITY))
+        assert "wrong way" in strip_tags(section[section.index("id='dad-weak'"):])
+        assert section.index("chip bad'>worse") > section.index("id='dad-appendix'")
 
 
-class TestChartBudget:
-    """Two charts lead; every other one is in the appendix drawer."""
+class TestChartsAreEvidence:
+    """No chart leads. Every one is in the appendix, where a reader goes for evidence."""
 
-    def test_only_the_two_lead_charts_are_outside_the_appendix(self):
-        html = build(diversity=DIVERSITY, manifest=MANIFEST, baseline=BASELINE)
+    def test_no_figure_appears_outside_the_appendix(self):
+        """The restructure, in one assertion. The report above the appendix is prose, the
+        dealt cards, and one worked example — a chart there would be arguing a result."""
+        html = build(diversity=DIVERSITY, manifest=MANIFEST, baseline=BASELINE,
+                     lineage=LINEAGE, rewrites=REWRITES)
         section = dad_section(html)
         lead = section[:section.index("id='dad-appendix'")]
-        titles = re.findall(r"<figcaption class='fig-t'>([^<]*)</figcaption>", lead)
-        assert titles == ["Valuable welfare considerations per answer",
-                          "Substance against manner, one dot per answer"]
+        assert re.findall(r"<figcaption class='fig-t'>([^<]*)</figcaption>", lead) == []
 
-    def test_the_demoted_charts_are_still_on_the_page(self):
+    def test_every_chart_is_still_on_the_page(self):
         """Moved, not dropped — and the drawer names how many it holds."""
         html = build(diversity=DIVERSITY, manifest=MANIFEST, baseline=BASELINE)
         appendix = dad_section(html)[dad_section(html).index("id='dad-appendix'"):]
         for title in ("Answer length", "Stance", "Structural variety",
                       "What happened to the control's considerations",
-                      "Delivery quality, dimension by dimension"):
-            assert title in appendix
+                      "Delivery quality, dimension by dimension",
+                      "Valuable welfare considerations per answer",
+                      "Substance against manner"):
+            assert title in appendix, title
         assert re.search(r"\d+ figures", appendix)
 
     def test_the_drawer_says_which_measures_went_the_wrong_way(self):
         html = build(diversity=DIVERSITY, manifest=MANIFEST)
         assert "figures · On this run" in html
 
+    def test_the_what_beat_carries_no_comparison(self):
+        """It says what the dataset is. A lift, a score out of ten or a direction chip
+        there would make the first thing a reader sees a claim about a plain model."""
+        section = dad_section(build(diversity=DIVERSITY, manifest=MANIFEST, corpus=CORPUS))
+        what = section[section.index("id='dad-what'"):section.index("id='dad-built'")]
+        for banned in ("the control", "/10", "chip", "+", "regression"):
+            assert banned not in strip_tags(what), banned
+        # The descriptive tiles are there: how many records, and how distinct they are.
+        assert "shipped records" in what and "effectively distinct records" in what
+
 
 class TestDegradation:
     def test_offline_only_audit_still_builds(self):
         audit = {k: v for k, v in AUDIT_FULL.items()
                  if k not in ("delivery", "showcase", "moves", "moral_patient_reasons")}
-        html = build(audit=audit)
+        html = build(audit=audit, lineage=LINEAGE, rewrites=REWRITES)
         assert "id='dad-what'" in html
-        assert "None" not in strip_tags(html)
+        # Outside the run's own text: a shipped answer may legitimately contain the word.
+        assert not re.search(r"\bNone\b", strip_tags(without_corpus_text(html)))
 
     def test_missing_delivery_says_so_rather_than_omitting(self):
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "delivery"}
-        text = strip_tags(build(audit=audit))
+        section = dad_section(build(audit=audit))
+        text = strip_tags(section[section.index("id='dad-weak'"):])
         assert "not measured on this run" in text
         assert "--reasons" in text
 
@@ -421,10 +579,11 @@ class TestDegradation:
         assert "Substance against manner" not in html
         assert "id='dad-example'" in html
 
-    def test_delivery_present_renders_the_pareto(self):
-        html = build()
-        assert "Substance against manner" in html
-        assert "<circle" in html
+    def test_delivery_present_renders_the_pareto_in_the_appendix(self):
+        section = dad_section(build())
+        assert "Substance against manner" in section
+        assert "<circle" in section
+        assert section.index("Substance against manner") > section.index("id='dad-appendix'")
 
     def test_bare_audit_still_carries_the_narrative(self):
         html = build(audit={"n_prompts": 3})
@@ -432,57 +591,139 @@ class TestDegradation:
         assert "Prose for reproduce." in html
 
     def test_missing_manifest_diversity_and_costs(self):
+        """With no diversity pass the distinctness tile is ABSENT, not 0.0 — the trap
+        that `.get("score", 0)` walks straight into."""
         html = build(manifest=None, diversity=None, costs=None)
         assert "id='dad-what'" in html
+        assert "effectively distinct records" not in html
+        assert "0.0" not in strip_tags(dad_section(html))
 
     def test_missing_gid_map_falls_back_to_prompt_ids(self):
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "gid_map"}
         assert "AW-0001" in build(audit=audit)
 
 
-class TestWorkedExample:
-    def test_showcase_example_is_used_and_highlighted(self):
-        html = build(baseline=BASELINE)
-        assert "Should I do the thing?" in html
-        assert "<mark>the animals</mark>" in html
-        assert "showcase judge" in strip_tags(html)
+class TestLineage:
+    """The worked example is one record's whole trail, assembled from the run's own step
+    files. Nothing in it is author-supplied, and nothing in it depends on the paid pass."""
 
-    def test_both_answers_are_shown_in_full(self):
-        """The two answers are the artefact. They stay inline and verbatim; only the
-        word-level diff moved to the appendix."""
-        html = build(baseline=BASELINE)
-        pair = html[html.find("<div class='pair'>"):]
-        pair = pair[:pair.find("</div></div></div>") + len("</div></div></div>")]
-        assert "<details" not in pair  # neither answer is behind a drawer
-        text = strip_tags(pair)
-        assert "Maybe." in text and "Consider the animals here." in text
+    @staticmethod
+    def _example(**kwargs):
+        kwargs.setdefault("lineage", LINEAGE)
+        kwargs.setdefault("rewrites", REWRITES)
+        kwargs.setdefault("baseline", BASELINE)
+        section = dad_section(build(**kwargs))
+        return section[section.index("id='dad-example'"):section.index("id='dad-weak'")]
 
-    def test_non_locating_highlight_leaves_text_whole(self):
-        audit = json.loads(json.dumps(AUDIT_FULL))
-        audit["showcase"]["examples"][0]["highlights"] = ["text that is not present"]
-        html = build(audit=audit, baseline=BASELINE)
-        assert "Consider the animals here." in html
-        assert "<mark>" not in html
+    def test_the_stages_render_in_pipeline_order(self):
+        ex = self._example()
+        marks = [ex.index(m) for m in (
+            "Stage 1 · the dilemma", "dealt axis", "the planner wrote",
+            "Should I do the thing?", "Stage 2 · the reasoning",
+            "what stage 2 worked out", "Stage 3 · the constitution rewrite")]
+        assert marks == sorted(marks), marks
 
-    def test_pinned_example_overrides_the_showcase(self):
-        html = build(content=content(example_pick="AW-0001"),
-                     baseline=BASELINE, rewrites=REWRITES)
-        assert "pinned in the prose file" in strip_tags(html)
+    def test_the_stage_headings_match_the_ones_the_method_beat_uses(self):
+        """A reader who has just read "How it is built" should recognise each step, not
+        learn a second vocabulary for the same pipeline."""
+        section = dad_section(build(lineage=LINEAGE, rewrites=REWRITES))
+        built = section[section.index("id='dad-built'"):section.index("id='dad-example'")]
+        for heading in ("Stage 1 · the dilemma", "Stage 2 · the reasoning",
+                        "Stage 3 · the constitution rewrite"):
+            assert heading in built and heading in self._example()
 
-    def test_falls_back_to_the_most_added_record(self):
+    def test_the_shipped_answer_is_inline_and_verbatim(self):
+        """The answer is the artefact: it is not behind a drawer. The control's first take
+        IS, because it is context for stage 2 rather than the thing being shown."""
+        ex = self._example()
+        answer = ex[ex.index("Stage 3 · the constitution rewrite"):]
+        assert "Consider the animals here." in strip_tags(answer.split("<details")[0])
+        # The control's answer is inside a <summary>...</summary> drawer label's details
+        # block, and the label says what it is for.
+        take = ex[ex.index("The first take stage 2 was shown"):]
+        assert take.startswith("The first take stage 2 was shown")
+        assert "never a training record" in take[:400]
+        assert "Maybe." not in strip_tags(ex[:ex.index("The first take stage 2 was shown")])
+
+    def test_the_dealt_cards_drop_null_axes(self):
+        """A deal with no cultural setting has no cultural setting. Rendering the axis
+        with "None" in it is a bug that reads as data."""
+        lineage = json.loads(json.dumps(LINEAGE))
+        lineage["AW-0001"]["cards"] = {"domain": ["marketing"], "cultural_setting": None,
+                                       "archetype": ""}
+        ex = self._example(lineage=lineage)
+        assert "marketing" in ex
+        assert "cultural setting" not in strip_tags(ex)
+        assert not re.search(r"\bNone\b", strip_tags(without_corpus_text(ex)))
+
+    def test_the_library_entries_are_glossed_from_the_run(self):
+        ex = self._example()
+        assert "C2" in ex and "Surface it." in ex
+        assert "never named in an answer" in ex
+
+    def test_bare_ids_when_the_gloss_is_missing(self):
+        lineage = json.loads(json.dumps(LINEAGE))
+        lineage["AW-0001"].pop("entries")
+        ex = self._example(lineage=lineage)
+        assert "C2" in ex and "T13" in ex
+
+    @pytest.mark.parametrize("artefact,wanted", [
+        ("cards", "scenario_deals.jsonl"), ("description", "step1/scenarios.jsonl"),
+        ("scope", "step2/scopes.jsonl")])
+    def test_a_missing_artefact_names_the_file_it_wanted(self, artefact, wanted):
+        """A step that silently disappears reads as a step the pipeline does not have."""
+        lineage = json.loads(json.dumps(LINEAGE))
+        lineage["AW-0001"].pop(artefact)
+        assert wanted in self._example(lineage=lineage)
+
+    def test_no_lineage_still_shows_the_message_and_the_answer(self):
+        """The rewrite record alone carries both, so the beat survives a run that kept no
+        step-1 or step-2 files at all."""
+        ex = self._example(lineage=None)
+        assert "Should I do the thing?" in strip_tags(ex)
+        assert "Consider the animals here." in strip_tags(ex)
+        assert "step1/scenarios.jsonl" in ex
+
+    def test_examples_are_pinned_in_the_prose_file(self):
+        ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"))
+        assert "pinned in the prose file" in strip_tags(ex)
+        assert "R-0201" in ex and "R-0202" in ex
+
+    def test_the_cli_overrides_the_primary_only(self):
+        ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"),
+                           example="AW-0002")
+        first = ex.index("Stage 1 · the dilemma")
+        assert "R-0202" in ex[:first + 400]
+
+    def test_auto_picks_the_first_shipped_record(self):
+        """Deliberately not the showcase judge's favourite: this beat shows how a record
+        is built, and must not depend on the paid pass having run."""
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
-        html = build(audit=audit, baseline=BASELINE, rewrites=REWRITES)
-        assert "selected mechanically" in strip_tags(html)
+        ex = self._example(audit=audit, content=content(example_pick="auto"))
+        assert "R-0201" in ex
 
-    def test_example_text_comes_from_the_run_files(self):
-        """The generator pulls response text off disk; nothing is retyped."""
-        audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
-        html = build(audit=audit, baseline=BASELINE, rewrites=REWRITES)
-        assert "Consider the animals here." in html
+    def test_a_pinned_id_this_run_never_shipped_says_so(self):
+        ex = self._example(content=content(example_pick="AW-9999"))
+        assert "is not in this run" in strip_tags(ex)
+        assert "R-0201" in ex  # and it falls back rather than rendering nothing
+
+    def test_the_extra_examples_are_a_carousel(self):
+        ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"))
+        assert "class='carousel'" in ex
+        assert "And this other thing?" in strip_tags(ex)
+
+    def test_the_first_carousel_pane_survives_javascript_being_off(self):
+        """One pane renders visible in the markup, so the carousel degrades to a single
+        example rather than to nothing."""
+        ex = self._example(content=content(example_pick="AW-0001",
+                                           example_extra="AW-0002 AW-0001"))
+        panes = re.findall(r"<div class='pane-x' id='(ex-\d)'[^>]*>", ex)
+        assert panes, ex[:400]
+        assert "hidden" not in re.search(r"<div class='pane-x' id='ex-0'([^>]*)>", ex).group(1)
 
     def test_rewrite_diff_shows_hunks_inline_and_the_whole_thing_in_the_appendix(self):
-        html = build(content=content(example_pick="AW-0001"),
-                     baseline=BASELINE, rewrites=REWRITES)
+        html = build(content=content(example_pick="AW-0001"), baseline=BASELINE,
+                     rewrites=REWRITES, lineage=LINEAGE)
         assert "<ins>" in html
         assert "3 largest changes" in html
         appendix = html[html.find("id='dad-appendix'"):]
@@ -504,10 +745,12 @@ class TestColourIntegrity:
         assert not (series & status)
 
     def test_arm_colors_follow_the_arm_not_the_row_order(self):
-        """hbar(color=None) falls back to PAL[i], which painted the headline chart's
-        pipeline bar in the control's colour while every other chart used green."""
-        html = build(diversity=DIVERSITY)
-        chart = html[html.find("Valuable welfare considerations per answer"):]
+        """hbar(color=None) falls back to PAL[i], which painted the considerations
+        chart's pipeline bar in the control's colour while every other chart used green.
+        The chart is in the appendix now; the invariant is unchanged."""
+        section = dad_section(build(diversity=DIVERSITY))
+        appendix = section[section.index("id='dad-appendix'"):]
+        chart = appendix[appendix.index("Valuable welfare considerations per answer"):]
         chart = chart[:chart.find("</svg>")]
         fills = re.findall(r"fill='(var\(--series-\d\))'", chart)
         assert fills == [R.PLAIN, R.PIPELINE]
@@ -548,7 +791,10 @@ class TestCandour:
         assert any("uncommitted" in w for _, w in warnings)
 
     def test_extraction_failures_produce_an_asymmetry_note(self):
-        assert "not fully matched" in strip_tags(build())
+        """It moved into the judged drawer with the comparison it qualifies."""
+        section = dad_section(build())
+        appendix = section[section.index("id='dad-appendix'"):]
+        assert "not fully matched" in strip_tags(appendix)
 
     def test_delivery_arm_asymmetry_is_disclosed(self):
         """The bedrock-40 case: the one BAD headline was a mean over 33 pipeline
@@ -597,6 +843,21 @@ class TestCandour:
         appendix = html[html.find("id='dad-appendix'"):]
         assert "Locale / taxa plausibility" in appendix
         assert "Response stance (LLM)" in appendix
+
+    def test_a_check_that_did_not_run_says_so(self):
+        """A reader deciding whether to trust the dataset needs to know which questions
+        were never asked, not just how the asked ones scored."""
+        audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
+        text = strip_tags(build(audit=audit, diversity=None))
+        assert "not run on this run" in text
+
+    def test_the_judge_caveats_sit_with_the_weaknesses(self):
+        """They used to close a "what we measured" beat. That beat is gone, and a caveat
+        about the measurements belongs with the other caveats."""
+        section = dad_section(build(manifest=MANIFEST))
+        weak = section[section.index("id='dad-weak'"):section.index("id='dad-appendix'")]
+        assert "What these measurements do not establish" in weak
+        assert "Prose for judge_limits." in weak
 
 
 class TestRenderPrimitives:
@@ -687,10 +948,29 @@ class TestRenderPrimitives:
     def test_drawer_summaries_name_their_payload_size(self):
         assert "1,010 words" in R.details("Full answer", "x", meta="1,010 words")
 
+    def test_tabs_leave_one_pane_visible(self):
+        """No-JS is the case that matters: the markup itself has to show a record."""
+        html = R.tabs([("a", "R-1", "one", True), ("b", "R-2", "two", False)])
+        assert "<div class='pane-x' id='a' role='tabpanel'>" in html
+        assert "<div class='pane-x' id='b' role='tabpanel' hidden>" in html
+        assert html.count("class='tab'") == 2
+        assert "aria-selected='true'" in html and "aria-selected='false'" in html
+
+    def test_tabs_of_nothing_render_nothing(self):
+        assert R.tabs([]) == ""
+
+    def test_tabs_escape_their_labels(self):
+        assert "&lt;b&gt;" in R.tabs([("a", "<b>", "body", True)])
+
     def test_print_rules_keep_figures_and_rows_whole(self):
         block = R.CSS[R.CSS.find("@media print"):]
         assert "figure" in block and "break-inside:avoid-page" in block
         assert "thead{display:table-header-group}" in block
+
+    def test_print_expands_every_carousel_pane(self):
+        """A printed page is not a page anyone can click, so all the examples print."""
+        block = R.CSS[R.CSS.find("@media print"):]
+        assert ".pane-x[hidden]" in block and "display:block!important" in block
 
 
 class TestCLI:
@@ -746,3 +1026,43 @@ class TestCLI:
         assert kwargs["diversity"]["vendi"]["score"] == 5.15
         assert kwargs["deals"][0]["taxa_category"] == "farmed animals"
         assert "content" not in kwargs  # the page owns one content namespace
+
+    def test_every_loaded_key_is_a_blocks_parameter(self, tmp_path):
+        """page.py splats these straight into dad.blocks(), so a key added to the loader
+        without a matching parameter is a TypeError at build time."""
+        import inspect
+        run_dir, _ = make_run_dir(tmp_path)
+        params = set(inspect.signature(D.blocks).parameters)
+        assert set(D.load_inputs(run_dir)) <= params
+
+    def test_the_lineage_is_joined_and_trimmed(self, tmp_path):
+        """step1 is keyed by scenario_id and everything after it by prompt_id, so
+        dilemmas.jsonl is the join. And the library gloss is trimmed on the way in:
+        scopes.jsonl repeats the whole reasoning library per case."""
+        run_dir, _ = make_run_dir(tmp_path)
+        lin = D.load_inputs(run_dir)["lineage"]["AW-0001"]
+        assert lin["scenario_id"] == "S-001"
+        assert lin["description"] == "A county fair contract is up for renewal."
+        assert lin["cards"]["user_attitude"] == "unaware"
+        assert "taxa_subcategory" not in lin["cards"]  # it was null in the deal
+        assert lin["scope"]["patients"] == "the fair's ponies"
+        assert lin["entries"][0] == {"id": "C2", "category": "Conduct", "claim": "Surface it."}
+
+    def test_the_lineage_falls_back_to_the_audits_scenario_gid(self, tmp_path):
+        """A run that kept no dilemmas file can still be joined: the audit's gid_map
+        carries the scenario gid, and scenarios.jsonl carries it too."""
+        run_dir, _ = make_run_dir(tmp_path)
+        (run_dir / "step1" / "dilemmas.jsonl").unlink()
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["gid_map"]["AW-0001"]["scenario"] = "S-0138"
+        (run_dir / "audit" / "audit_report.json").write_text(json.dumps(audit), encoding="utf-8")
+        lin = D.load_inputs(run_dir)["lineage"]["AW-0001"]
+        assert lin["description"] == "A county fair contract is up for renewal."
+
+    def test_a_run_without_step_files_yields_an_empty_lineage(self, tmp_path):
+        run_dir, _ = make_run_dir(tmp_path)
+        (run_dir / "step1" / "dilemmas.jsonl").unlink()
+        (run_dir / "step1" / "scenarios.jsonl").unlink()
+        (run_dir / "step2" / "scopes.jsonl").unlink()
+        lin = D.load_inputs(run_dir)["lineage"]
+        assert all(not v for v in lin.values()) or lin == {}

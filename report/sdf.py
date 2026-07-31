@@ -4,8 +4,10 @@
 Deliberately small. The written report for this corpus is still being produced, so what
 ships today is the anchor, the figures the comparison table needs, and links out. When
 the full section lands it takes report/dad.py's skeleton — ``R.sub()`` beats named
-``sdf-what``, ``sdf-example``, ``sdf-measured``, ``sdf-built``, ``sdf-weak``,
-``sdf-appendix`` — and everything below stays as the loader and the facts.
+``sdf-what``, ``sdf-built``, ``sdf-example``, ``sdf-weak``, ``sdf-appendix`` — and
+everything below stays as the loader and the facts. Note the order: how it is built comes
+before the example that walks through it, and there is no "what we measured" beat, because
+neither report is a results report. Charts belong in the appendix.
 
 One thing to know before writing it: ``evals/audit_sdf.py`` prints its verdicts and
 does not record them into ``sections[].rows[]`` the way ``evals/audit_dad.py`` does, so

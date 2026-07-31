@@ -36,9 +36,11 @@ from report import common as C
 from report import render as R
 
 CONTENT_IDS = (
-    "dad_what", "example_pick", "example_intro", "results_intro", "method_intro",
-    "stage1", "stage2", "stage3", "control", "measurement_intro", "judge_limits",
-    "weaknesses_intro", "reproduce", "appendix_intro",
+    "dad_what",
+    "method_intro", "stage1", "stage2", "stage3", "control", "reproduce",
+    "example_pick", "example_extra", "example_intro",
+    "weaknesses_intro", "judge_limits",
+    "appendix_intro", "judged_caveat", "checks_intro",
 )
 
 SECTION_ID = "dad"
@@ -46,11 +48,15 @@ SECTION_TITLE = "Difficult advice"
 
 # The skeleton, in order. The document corpus's section takes the same one, so a reader
 # learns it once; the ids are prefixed because both sections live in one document.
+#
+# The stages come before the worked example on purpose: the chooser above asks the reader
+# to walk through a dataset generation, and a walk needs its steps named first. There is
+# no "what we measured" beat — this report is not a results report, and the run's own
+# measurements are either a descriptive tile here or a drawer in the appendix.
 BEATS = (
     ("dad-what", "What it is"),
-    ("dad-example", "One example, end to end"),
-    ("dad-measured", "What we measured"),
     ("dad-built", "How it is built"),
+    ("dad-example", "One example, end to end"),
     ("dad-weak", "Where it is weak"),
     ("dad-appendix", "Appendix"),
 )
@@ -60,13 +66,17 @@ _STAGE_KNOBS = ("scenario_model", "prompt_draft_model", "prompt_gate_model",
                 "prompt_refine_model", "response_scope_model", "response_select_model",
                 "response_draft_model", "constitution_rewrite_model")
 
-# stage tag in cost_log.jsonl -> display name, in pipeline order.
+# stage tag in cost_log.jsonl -> display name, in pipeline order. Both baseline tags are
+# listed because the pipeline writes `baseline_response` and this table used to name only
+# `baseline`, which put the control's cost at the bottom of the drawer as a raw tag.
+# common.stage_cost_table skips a tag the log does not carry, so listing both is safe.
 _STAGE_LABELS = (
     ("scenario_plan", "1a · scenario plan"),
     ("prompt_draft", "1b · prompt draft"),
     ("prompt_gate", "1c · quality gate"),
     ("prompt_refine", "1d · refine"),
     ("baseline", "control · plain model"),
+    ("baseline_response", "control · plain model"),
     ("response_scope", "2a · scope"),
     ("response_select", "2a.5 · library select"),
     ("response_draft", "2b · response draft"),
@@ -99,9 +109,97 @@ def load_inputs(run_dir):
         "rewrites": C.read_jsonl(run_dir / "step3" / "rewrites.jsonl"),
         "costs": C.read_jsonl(run_dir / "cost_log.jsonl"),
         "deals": C.read_jsonl(run_dir / "step1" / "scenario_deals.jsonl"),
+        "lineage": read_lineage(run_dir, audit),
         "n_prompt_templates": C.prompt_count(run_dir, "step*.txt"),
         "run_id": run_dir.name,
     }
+
+
+# The seven scope axes, in the order the stage-2 prose names them, with the label each
+# gets on the page. Stage 2a writes exactly these keys; anything else it grows appears
+# after them rather than being dropped.
+_SCOPE_AXES = (
+    ("patients", "who can be harmed"),
+    ("goal", "what the user is trying to achieve"),
+    ("levers", "which levers are open"),
+    ("cost", "what each one costs"),
+    ("magnitude", "how large the welfare stake is"),
+    ("upside", "what happens anyway without them"),
+    ("replaceability", "whether the animals are replaceable"),
+)
+
+# The dealt axes worth showing beside a message, in reading order: what the decision is
+# about, whose welfare is at stake, how the case is shaped, how the message is written.
+_CARD_AXES = (
+    ("archetype", "archetype"),
+    ("domain", "domain"),
+    ("taxa_subcategory", "animals at stake"),
+    ("frontier_frame", "frame"),
+    ("visibility", "how visible the welfare cost is"),
+    ("user_attitude", "the user's attitude"),
+    ("user_moral_framework", "their moral framework"),
+    ("welfare_magnitude", "welfare magnitude"),
+    ("conflict", "how the values interact"),
+    ("leverage", "what they can actually change"),
+    ("anchor_value_pair", "the values in tension"),
+    # claim_pattern is deliberately absent: its value is a sentence of instruction to the
+    # planner ("build the dilemma around status-quo inertia — …"), which reads as
+    # documentation of the prompt rather than a property of this example.
+    ("surface_form", "surface form"),
+    ("cultural_setting", "cultural setting"),
+    ("length_class", "length register"),
+)
+
+
+def read_lineage(run_dir, audit=None):
+    """prompt_id -> that record's trail through the run's own step files.
+
+    Only step 1 is keyed by ``scenario_id``; everything downstream is keyed by
+    ``prompt_id``, and ``step1/dilemmas.jsonl`` is the one file carrying both, so it is
+    the join table. ``audit.gid_map[pid]["scenario"]`` is the fallback when a run kept
+    no dilemmas file, because ``scenarios.jsonl`` carries the same scenario gid.
+
+    ``step2/scopes.jsonl`` is trimmed on the way in: four fifths of its 725 KB is the
+    reasoning library's prose repeated per case, and the page shows an entry's id, its
+    category and its claim.
+
+    A file that is not there leaves its key ABSENT rather than None, so a renderer tests
+    membership and can name the artefact it wanted instead of printing 'None'.
+    """
+    from pathlib import Path
+    run_dir = Path(run_dir)
+    dilemmas = C.read_jsonl(run_dir / "step1" / "dilemmas.jsonl")
+    # scenarios.jsonl is a superset of scenario_deals.jsonl: the same dealt cards, plus
+    # the description the planner wrote from them.
+    scenarios = C.read_jsonl(run_dir / "step1" / "scenarios.jsonl")
+    by_sid = {s.get("scenario_id"): s for s in scenarios if s.get("scenario_id")}
+    by_sgid = {s.get("scenario_gid"): s for s in scenarios if s.get("scenario_gid")}
+    scopes = {s.get("prompt_id"): s for s in C.read_jsonl(run_dir / "step2" / "scopes.jsonl")
+              if s.get("prompt_id")}
+    gids = (audit or {}).get("gid_map") or {}
+
+    sid_of = {d.get("prompt_id"): d.get("scenario_id") for d in dilemmas if d.get("prompt_id")}
+    out = {}
+    for pid in set(sid_of) | set(scopes) | set(gids):
+        entry = {}
+        scenario = by_sid.get(sid_of.get(pid)) or by_sgid.get((gids.get(pid) or {}).get("scenario"))
+        if scenario:
+            entry["scenario_id"] = scenario.get("scenario_id")
+            entry["cards"] = {k: scenario.get(k) for k, _ in _CARD_AXES if scenario.get(k)}
+            if scenario.get("scenario_description"):
+                entry["description"] = scenario["scenario_description"]
+        scope = scopes.get(pid)
+        if scope:
+            if scope.get("scope"):
+                entry["scope"] = scope["scope"]
+            if scope.get("entry_ids"):
+                entry["entry_ids"] = scope["entry_ids"]
+            entry["entries"] = [{k: e.get(k) for k in ("id", "category", "claim")}
+                                for e in scope.get("triggered_entries") or []]
+            entry["selection_fallback"] = bool(scope.get("selection_fallback"))
+        if entry:
+            out[pid] = entry
+    return out
 
 
 # The dealt axes the comparison table reports as this corpus's spread, in the order
@@ -180,7 +278,7 @@ def _models(manifest):
             "per_stage": {k: (dad.get(k) or glob) for k in _STAGE_KNOBS}}
 
 
-def facts(audit, manifest=None, diversity=None, costs=None):
+def facts(audit, manifest=None, diversity=None, costs=None, corpus=None, deals=None):
     """Every number the prose can interpolate, computed once, in one place.
 
     Run-conditional figures reach prose only with a degraded default — a run missing
@@ -188,6 +286,7 @@ def facts(audit, manifest=None, diversity=None, costs=None):
     sentence survives and its claim does not. The delivery comparison is deliberately
     NOT available to prose as a clause: it is stated once, by _delivery_statement().
     """
+    n_shipped = len(corpus) if corpus else None
     mpr = audit.get("moral_patient_reasons") or {}
     surv = mpr.get("survival") or {}
     rl = audit.get("response_lengths") or {}
@@ -203,6 +302,15 @@ def facts(audit, manifest=None, diversity=None, costs=None):
     anchored = (surv.get("kept") or 0) + (surv.get("weakened") or 0) + (surv.get("dropped") or 0)
     f = {
         "n": n,
+        # Dealt and shipped are different numbers — this run dealt 40 and shipped 39,
+        # because one scenario was rejected at stage 2a — and the page says so rather
+        # than quietly reporting whichever is larger.
+        "n_shipped": n_shipped,
+        "records_clause": (f"{n_shipped:,} shipped records, from {n:,} dilemmas dealt"
+                           if n_shipped and n and n_shipped != n else
+                           f"{n_shipped:,} shipped records" if n_shipped else None),
+        "spread_clause": spread(deals) or None,
+        "judge_arms_clause": _judge_arms_clause(audit),
         "n_measured": n_measured,
         "n_pipeline": (mpr.get("pipeline") or {}).get("n"),
         "n_plain": (mpr.get("plain") or {}).get("n"),
@@ -269,9 +377,28 @@ def facts(audit, manifest=None, diversity=None, costs=None):
         ("length_pct", "an unmeasured amount"), ("near_dup_pct", "an unmeasured share"),
         ("library_clause", "an animal-ethics reasoning library"),
         ("added_per_answer", "an unmeasured number of"),
+        ("records_clause", "the records this run shipped"),
+        ("spread_clause", "a weighted matrix of dealt combinations"),
+        ("judge_arms_clause", "not measured on this run"),
     ):
         f.setdefault(key, default)
     return f
+
+
+def _judge_arms_clause(audit):
+    """How matched the paid comparison actually is, as a clause the prose can hold.
+
+    Composed here rather than typed, because it is the reason the page does not lead
+    with the comparison: on the pinned run the delivery judge lost 19 judgements, so its
+    two means are over 33 pipeline and 26 control answers — different sets of records.
+    """
+    delivery = (audit or {}).get("delivery") or {}
+    n_p, n_b, fails = (delivery.get("n_pipeline"), delivery.get("n_plain"),
+                       delivery.get("failures"))
+    if n_p is None or n_b is None:
+        return None
+    clause = f"over {n_p} pipeline and {n_b} control answers"
+    return f"{clause}, with {fails} judgements failing" if fails else clause
 
 
 def _footprint_regressions(audit):
@@ -307,24 +434,30 @@ def _labels(audit):
             for pid, gids in (audit.get("gid_map") or {}).items()}
 
 
-# ------------------------------------------------------------------ hero
+# ------------------------------------------------------------------ what it is
 
-def hero_tiles(audit, f, cons):
-    """Three numbers, one of them a regression. Five was a dashboard."""
+def what_tiles(f, diversity=None):
+    """Three descriptive numbers: how many records, how distinct, what they cost.
+
+    No comparison and no direction chip. What this dataset is does not depend on how it
+    scored against a plain model, and a reader who wants that comparison opens the
+    appendix.
+
+    A tile is omitted rather than zeroed: the diversity pass is optional, and a
+    ``.get("score", 0)`` would print "0.0 effectively distinct records" on a run that
+    simply never measured it.
+    """
     items = []
-    if cons and cons.get("plain"):
-        items.append(R.stat(f"+{f.get('lift_pct', '?')}",
-                            "more valuable welfare considerations per answer",
-                            f"{f['considerations_pipeline']} against "
-                            f"{f['considerations_plain']} for the control", tone="hero"))
-    delivery = audit.get("delivery") or {}
-    pm, bm = delivery.get("pipeline_mean"), delivery.get("plain_mean")
-    if pm is not None:
-        worse = bm is not None and pm < bm
-        items.append(R.stat(
-            f"{pm:.1f}/10", "judged delivery quality",
-            f"the control scores {bm:.1f}" if bm is not None else "",
-            flag="regression" if worse else "holds up", tone="bad" if worse else "good"))
+    if f.get("n_shipped"):
+        items.append(R.stat(f"{f['n_shipped']:,}", "shipped records",
+                            f.get("spread_clause") if f.get("spread_clause") !=
+                            "a weighted matrix of dealt combinations" else ""))
+    vendi = (diversity or {}).get("vendi") or {}
+    if vendi.get("score"):
+        items.append(R.stat(f"{vendi['score']:.1f}", "effectively distinct records",
+                            f"of {diversity.get('n_records', '?')} actual records; "
+                            f"{f.get('near_dup_pct', '?')} sit above 0.90 cosine "
+                            f"similarity to their nearest neighbour"))
     if f.get("cost_per_example") not in (None, "not logged"):
         items.append(R.stat(f["cost_per_example"], "per example, end to end",
                             f"{f['cost_total']} for this run"))
@@ -333,104 +466,200 @@ def hero_tiles(audit, f, cons):
 
 # ------------------------------------------------------------------ beats
 
-def blocks_example(audit, content, f, baseline, rewrites, labels, pick=None):
-    """One full dilemma, control against pipeline.
+def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=()):
+    """One record's whole trail through the run, then the rest as a carousel.
 
-    Both answers stay inline in full: they are the artefact, and a reader at a lab
-    wants to read them rather than take a summary's word for it. What moved out is the
-    word-level diff, which as 1,095 words of confetti earned nothing where it stood.
+    Every block here is verbatim from a file in the run directory: the cards the composer
+    dealt, the scenario the planner wrote from them, the message that shipped, the scope
+    and the library entries stage 2 pulled, the answer, and what stage 3 changed in it.
+    Nothing is author-supplied, and a step whose artefact is missing names the file it
+    wanted rather than disappearing.
     """
     blocks = [R.sub("dad-example", "One example, end to end"),
               C.prose(content, "example_intro", f)]
-    showcase = (audit.get("showcase") or {}).get("examples") or []
-    by_pid_base = {r.get("prompt_id"): r for r in baseline or []}
     by_pid_rw = {r.get("prompt_id"): r for r in rewrites or []}
+    by_pid_base = {r.get("prompt_id"): r for r in baseline or []}
+    primary, extras = _picks(content, picks, by_pid_rw)
 
-    chosen = None
-    pick = pick or _example_pick(content)
-    if pick:
-        chosen = {"prompt_id": pick, "highlights": [], "summary": "",
-                  "provenance": "pinned in the prose file, so a rebuild shows the same case"}
-    elif showcase:
-        ex = showcase[0]
-        chosen = {"prompt_id": ex.get("prompt_id"), "summary": ex.get("summary", ""),
-                  "highlights": ex.get("highlights") or [],
-                  "user_message": ex.get("user_message"), "plain": ex.get("plain_response"),
-                  "pipeline": ex.get("pipeline_response"),
-                  "provenance": "selected by the showcase judge; the highlighted spans are "
-                                "its own, validated against the response text"}
+    if not primary:
+        blocks.append(R.note("No worked example could be built: this run shipped no rewrite "
+                             "records, so there is no answer to show."))
+        return "".join(blocks)
+    if primary not in by_pid_rw:
+        blocks.append(R.note(f"The pinned example `{primary}` is not in this run — it shipped "
+                             f"no rewrite record. Pin one of this run's ids in "
+                             f"`example_pick`, or set it to `auto`."))
+        primary, extras = _picks({}, (), by_pid_rw)
+        if not primary:
+            return "".join(blocks)
+
+    blocks.append(lineage_blocks(primary, by_pid_rw.get(primary) or {},
+                                 by_pid_base.get(primary) or {},
+                                 (lineage or {}).get(primary) or {}, labels))
+    if extras:
+        blocks.append(carousel(extras, by_pid_rw, labels))
+    return "".join(b for b in blocks if b)
+
+
+def lineage_blocks(pid, rw, base, lin, labels):
+    """The trail for one record: deal → scenario → message → scope → answer → rewrite.
+
+    The stage headings deliberately repeat the ones "How it is built" uses, so a reader
+    who has just read the stages recognises each step rather than learning a second
+    vocabulary for the same pipeline.
+    """
+    out = [f"<p class='muted'>Record <span class='mono'>{R.esc(labels.get(pid, pid))}</span>"
+           f" — pinned in the prose file, so a rebuild shows the same case.</p>"]
+
+    out.append("<h4>Stage 1 · the dilemma</h4>")
+    if lin.get("cards"):
+        out.append("<p class='muted'>Dealt in code, before any model was called.</p>")
+        out.append(_cards_table(lin["cards"]))
     else:
-        per_case = (audit.get("moral_patient_reasons") or {}).get("per_case") or {}
-        ranked = sorted(per_case.items(),
-                        key=lambda kv: -len(((kv[1].get("survival") or {}).get("added") or [])))
-        if ranked:
-            chosen = {"prompt_id": ranked[0][0], "highlights": [], "summary": "",
-                      "provenance": "selected mechanically, as the record where the pipeline "
-                                    "added the most considerations beyond the control"}
+        out.append(R.note("This run kept no `step1/scenario_deals.jsonl` or "
+                          "`step1/scenarios.jsonl`, so the dealt combination is not "
+                          "recoverable for this record."))
+    if lin.get("description"):
+        out.append(R.details("The scenario the planner wrote from those cards",
+                             R.quote(lin["description"]),
+                             meta=f"{len(lin['description'].split()):,} words"))
+    else:
+        out.append(R.note("The scenario description is in `step1/scenarios.jsonl`, which this "
+                          "run did not keep."))
+    user_msg = rw.get("user_message") or base.get("user_message") or ""
+    if user_msg:
+        out.append("<p class='muted'>Drafted, gated, then reviewed against its own cards. What "
+                   "shipped:</p>")
+        out.append(R.quote(user_msg))
 
-    if not chosen or not chosen.get("prompt_id"):
-        blocks.append(R.note("No worked example could be built: this run has neither a showcase "
-                             "pass nor per-record retention data."))
-        return "".join(blocks)
+    out.append("<h4>Stage 2 · the reasoning</h4>")
+    if lin.get("scope"):
+        # In a drawer: seven axes of dense prose is the most interesting artefact in the
+        # run and the one most likely to stop a reader walking. Measured at 1,500px, it
+        # sat between the message and the answer.
+        out.append(R.details("What stage 2 worked out before writing anything",
+                             _scope_table(lin["scope"]),
+                             meta=f"{len(lin['scope'])} axes"))
+    else:
+        out.append(R.note("The scope is in `step2/scopes.jsonl`, which this run did not keep."))
+    ids = lin.get("entry_ids") or rw.get("entry_ids") or []
+    if ids:
+        out.append(_entries_block(ids, lin.get("entries") or [],
+                                  fallback=lin.get("selection_fallback")))
+    if base.get("baseline_response"):
+        out.append(R.details(
+            "The first take stage 2 was shown · plain model, no system prompt",
+            R.highlight(base["baseline_response"], []),
+            meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
 
-    pid = chosen["prompt_id"]
-    base = by_pid_base.get(pid) or {}
-    rw = by_pid_rw.get(pid) or {}
-    user_msg = chosen.get("user_message") or base.get("user_message") or rw.get("user_message", "")
-    plain = chosen.get("plain") or base.get("baseline_response", "")
-    pipeline = chosen.get("pipeline") or rw.get("rewritten_response", "")
-    if not (user_msg and pipeline):
-        blocks.append(R.note(f"Worked example {R.esc(pid)} could not be assembled from this "
-                             "run's files."))
-        return "".join(blocks)
-
-    gid = labels.get(pid, pid)
-    if chosen.get("summary"):
-        blocks.append(f"<p>{R.inline_md(chosen['summary'])}</p>")
-    blocks.append(f"<p class='muted'>Record <span class='mono'>{R.esc(gid)}</span> — "
-                  f"{R.esc(chosen['provenance'])}.</p>")
-    blocks.append("<h4>The user asked</h4>")
-    blocks.append(R.quote(user_msg))
-
-    per_case = ((audit.get("moral_patient_reasons") or {}).get("per_case") or {}).get(pid) or {}
-    surv = per_case.get("survival") or {}
-    counts = _survival_counts(surv)
-    if counts:
-        blocks.append("<h4>What changed</h4>")
-        blocks.append(
-            f"<p class='muted'>The retention judge tracked each of the control's welfare "
-            f"considerations into the pipeline's answer: {counts['kept']} kept, "
-            f"{counts['weakened']} weakened, {counts['dropped']} dropped, and "
-            f"{counts['added']} points the pipeline raised that the control did not.</p>")
-
-    blocks.append(R.sidebyside(
-        "The control · plain model, no system prompt", R.highlight(plain, []),
-        "The pipeline", R.highlight(pipeline, chosen.get("highlights")),
-        left_tone="plain", right_tone="pipeline"))
-
-    if surv:
-        blocks.append(R.details(
-            "What the retention judge found, item by item",
-            R.table(["fate", "n", "the judge's wording"], _survival_rows(surv), align="lrl")))
-
-    if rw.get("draft_response") and rw.get("rewritten_response"):
-        before, after = rw["draft_response"], rw["rewritten_response"]
-        blocks.append(R.details(
+    out.append("<h4>Stage 3 · the constitution rewrite</h4>")
+    answer = rw.get("rewritten_response") or ""
+    if answer:
+        out.append("<p class='muted'>The answer, as it ships:</p>")
+        out.append(R.highlight(answer, []))
+    else:
+        out.append(R.note("This record has no rewritten answer in `step3/rewrites.jsonl`."))
+    if rw.get("draft_response") and answer:
+        before = rw["draft_response"]
+        out.append(R.details(
             "What the constitution rewrite changed in this answer",
-            f"<p class='muted'>{_diff_summary(before, after)} The three largest changes:</p>"
-            + _diff_hunks(before, after),
+            f"<p class='muted'>{_diff_summary(before, answer)} The three largest changes:</p>"
+            + _diff_hunks(before, answer),
             meta="3 largest changes · full diff in the appendix"))
-    return "".join(blocks)
+    return "".join(out)
 
 
-def _example_pick(content):
-    """The prompt_id pinned in the prose file, or None for automatic selection.
+def _cards_table(cards):
+    """The dealt combination as a table.
 
-    Pinned in the prose rather than passed on the command line so a rebuild reproduces
-    the same worked example without anyone having to remember a flag.
+    Null and empty values are DROPPED: a deal with no cultural setting has no cultural
+    setting, and rendering the axis with 'None' in it is a bug that reads as data.
+    """
+    rows = []
+    for key, label in _CARD_AXES:
+        value = cards.get(key)
+        if isinstance(value, list):
+            value = " · ".join(v for v in value if v)
+        if value:
+            rows.append((label, value))
+    return R.table(["dealt axis", "this example"], rows, align="ll") if rows else ""
+
+
+def _scope_table(scope):
+    """Stage 2a's seven axes, in the order the stage-2 prose names them.
+
+    An axis the stage grows later lands after the seven rather than being dropped.
+    """
+    named = [(label, scope[key]) for key, label in _SCOPE_AXES if scope.get(key)]
+    extra = [(k.replace("_", " "), v) for k, v in scope.items()
+             if v and k not in {key for key, _ in _SCOPE_AXES}]
+    rows = named + sorted(extra)
+    return R.table(["what stage 2 worked out", "for this case"], rows, align="ll") if rows else ""
+
+
+def _entries_block(ids, entries, fallback=False):
+    """The library entries this case pulled, glossed from the run's own step-2 output.
+
+    Bare ids when the gloss is missing: the ids are still the honest artefact, and they
+    are what the answer was actually written from.
+    """
+    gloss = {e.get("id"): e for e in entries if e.get("id")}
+    rows = [(i, (gloss.get(i) or {}).get("category") or "—",
+             (gloss.get(i) or {}).get("claim") or "—") for i in ids]
+    note = ("<p class='warn-note'>The selection call failed for this case, so stage 2 was shown "
+            "the whole library rather than a chosen subset.</p>" if fallback else "")
+    return note + R.details(
+        "The reasoning-library entries this case pulled",
+        R.table(["id", "kind", "the pattern it carries"], rows, align="lll"),
+        meta=f"{len(ids)} of the library's entries · never named in an answer")
+
+
+def carousel(picks, by_pid_rw, labels):
+    """More examples as tabs: the message and the answer, nothing else.
+
+    Reuses the chooser's mechanism rather than adding a second one — buttons carrying
+    ``data-pane``, panes toggled by the page's own inline JS. The FIRST pane renders
+    visible rather than hidden, so with JS off the carousel degrades to one example
+    instead of to nothing, and printing expands all of them.
+    """
+    panes = []
+    for pid in picks:
+        rw = by_pid_rw.get(pid) or {}
+        if not (rw.get("user_message") and rw.get("rewritten_response")):
+            continue
+        # Muted labels rather than <h4>s: a pane is not a beat, and four headings at the
+        # stage headings' own level put "The answer" into the document outline twice.
+        panes.append((f"ex-{len(panes)}", labels.get(pid, pid),
+                      "<p class='muted'>The user asked:</p>" + R.quote(rw["user_message"])
+                      + "<p class='muted'>The answer, as it ships:</p>"
+                      + R.highlight(rw["rewritten_response"], []),
+                      not panes))
+    if not panes:
+        return ""
+    return ("<h4>More examples</h4>"
+            "<p class='muted'>More records from the same run, as they ship.</p>"
+            + R.tabs(panes))
+
+
+def _picks(content, cli=(), by_pid_rw=None):
+    """(primary, extras) prompt_ids for the example beat.
+
+    Pinned in the prose file rather than passed on the command line so that a rebuild
+    reproduces the same records without anyone having to remember a flag; ``--example``
+    overrides the primary only. ``auto`` takes the first shipped record and the two after
+    it — deliberately NOT the showcase judge's favourite, because this beat shows how a
+    record is built and must not depend on the paid pass having run.
     """
     raw = (content.get("example_pick") or "").strip()
-    return None if raw.lower() in ("", "auto") else raw.split()[0]
+    primary = None if raw.lower() in ("", "auto") else raw.split()[0]
+    extras = (content.get("example_extra") or "").split()
+    if cli:
+        primary = cli[0] if isinstance(cli, (list, tuple)) else cli
+    shipped = sorted(by_pid_rw or {})
+    if not primary:
+        primary = shipped[0] if shipped else None
+        extras = extras or [p for p in shipped if p != primary][:2]
+    return primary, [p for p in extras if p != primary]
 
 
 def _survival_counts(surv):
@@ -558,48 +787,16 @@ def scoreboard(audit, f, cons):
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
 
 
-def blocks_what(audit, content, f, cons, labels):
-    """What the corpus is, and the two charts worth leading with.
+def blocks_what(content, f, diversity=None):
+    """What the dataset is, and three numbers describing it.
 
-    Every other chart this run supports is in the appendix. The delivery regression is
-    stated in prose exactly ONCE, here — the tile, the scoreboard row and the derived
-    weakness carry the same number as data, which is not the same as saying it four
-    times.
+    Takes no ``audit`` and no ``cons`` on purpose: this beat cannot lead with a judged
+    figure because it is not given one. The comparison against a plain model lives in a
+    single appendix drawer, and every chart this run supports lives there too.
     """
-    mpr = audit.get("moral_patient_reasons") or {}
-    blocks = [R.sub("dad-what", "What it is"),
-              C.prose(content, "dad_what", f),
-              hero_tiles(audit, f, cons),
-              C.prose(content, "results_intro", f)]
-
-    if cons and cons.get("plain") is not None:
-        blocks.append(R.figure(
-            title="Valuable welfare considerations per answer",
-            note_="A distinct welfare point, or a concrete lower-harm action, that a judge "
-                  "reading the answer counted as useful to the person asking. Both arms "
-                  "answered the same dilemmas.",
-            chart=R.hbar([("the control", round(cons["plain"], 2)),
-                          ("the pipeline", round(cons["pipeline"], 2))],
-                         color=R.ARM_PAIR, fmt="{:.1f}"),
-            caption=f"**The pipeline raises {f.get('lift_pct', '?')} more of them**, on the "
-                    f"same {f.get('n_measured', '?')} dilemmas."))
-        if cons["source"] == "reconstructed":
-            blocks.append("<p class='muted'>Reconstructed from this run's separate reasoning "
-                          "and alternatives measures; it predates the unified extraction.</p>")
-
-    if mpr.get("failures"):
-        blocks.append(R.note(
-            f"Means are over {f.get('n_pipeline', '?')} pipeline and {f.get('n_plain', '?')} "
-            f"control answers: {mpr['failures']} extractions failed and are excluded, so the "
-            "comparison is not fully matched."))
-
-    blocks.append(_delivery_statement(audit, f))
-    board = scoreboard(audit, f, cons)
-    if board:
-        blocks.append(f"<h4>The whole comparison, on {f.get('n_measured', '?')} dilemmas</h4>")
-        blocks.append(board)
-    blocks.append(_pareto_figure(audit, mpr, labels))
-    return "".join(b for b in blocks if b)
+    return "".join(b for b in (R.sub("dad-what", "What it is"),
+                               C.prose(content, "dad_what", f),
+                               what_tiles(f, diversity)) if b)
 
 
 def _delivery_statement(audit, f):
@@ -698,6 +895,129 @@ def _pareto(delivery, mpr, labels):
     return R.scatter(pts, xdomain=(0, 10), marks=marks)
 
 
+# The judged axes, in whichever schema the run's audit happens to carry. `delivery` is in
+# both; `welfare_impact` and `composite` arrived with the two-holistic-judge rework, which
+# also dropped the `valuable_welfare_considerations` metric they replaced. A run's audit
+# has one set or the other, so the drawer reads what is there and names it.
+_JUDGED_AXES = (
+    ("welfare_impact", "welfare impact, 0–10", "{:.2f}"),
+    ("delivery", "delivery quality, 0–10", "{:.2f}"),
+    ("composite", "composite, 0–1", "{:.3f}"),
+)
+
+
+def _judged_means(audit):
+    """(label, plain, pipeline, fmt) for every judged axis this audit recorded."""
+    out = []
+    for key, label, fmt in _JUDGED_AXES:
+        block = (audit or {}).get(key) or {}
+        means = block.get("arm_means") or block
+        p, b = means.get("pipeline_mean", means.get("pipeline")), \
+            means.get("plain_mean", means.get("plain"))
+        if isinstance(p, (int, float)) and isinstance(b, (int, float)):
+            out.append((label, b, p, fmt))
+    return out
+
+
+def judged_drawer(audit, content, f, cons, labels):
+    """The whole judged comparison against the plain model, in one drawer.
+
+    Demoted rather than deleted. It is real evidence and it is all here, but it is not
+    what the page argues from: on the pinned run the delivery pass lost judgements, so its
+    two means are over different sets of records, judge and generator are the same model
+    family, and nothing checks whether the points counted as added are correct. A page
+    that led with it would be leading with its weakest measurement.
+    """
+    mpr = (audit or {}).get("moral_patient_reasons") or {}
+    means = _judged_means(audit)
+    # The scoreboard mixes judged rows with offline ones (length, structural variety), so
+    # its presence is not evidence that a judge ran. Say so explicitly rather than letting
+    # a drawer titled "what the paid judges measured" fill up with offline measures.
+    paid = bool(means or (cons and cons.get("plain") is not None) or mpr.get("survival"))
+    body = [C.prose(content, "judged_caveat", f) if paid else R.note(
+        "No paid judge pass ran on this run, so nothing here compares the two arms on "
+        "substance or manner. Populate it with `python evals/audit_dad.py --input <run> "
+        "--reasons`. The rows below are offline measurements against the control.")]
+
+    if means:
+        body.append(R.table(["judged axis", "control", "pipeline"],
+                            [(label, fmt.format(b), fmt.format(p)) for label, b, p, fmt in means],
+                            align="lrr"))
+
+    if cons and cons.get("plain") is not None:
+        body.append(R.figure(
+            title="Valuable welfare considerations per answer",
+            note_="A distinct welfare point, or a concrete lower-harm action, that a judge "
+                  "reading the answer counted as useful to the person asking. Both arms "
+                  "answered the same dilemmas.",
+            chart=R.hbar([("the control", round(cons["plain"], 2)),
+                          ("the pipeline", round(cons["pipeline"], 2))],
+                         color=R.ARM_PAIR, fmt="{:.1f}"),
+            caption=f"**The pipeline raises {f.get('lift_pct', '?')} more of them**, on the "
+                    f"same {f.get('n_measured', '?')} dilemmas."))
+        if cons["source"] == "reconstructed":
+            body.append("<p class='muted'>Reconstructed from this run's separate reasoning "
+                        "and alternatives measures; it predates the unified extraction.</p>")
+    if mpr.get("failures"):
+        body.append(R.note(
+            f"Means are over {f.get('n_pipeline', '?')} pipeline and {f.get('n_plain', '?')} "
+            f"control answers: {mpr['failures']} extractions failed and are excluded, so the "
+            "comparison is not fully matched."))
+
+    board = scoreboard(audit, f, cons)
+    if board:
+        body.append("<h4>Measure by measure</h4>")
+        body.append(board)
+    body.append(_pareto_figure(audit, mpr, labels))
+
+    surv = mpr.get("survival") or {}
+    if surv.get("anchored") or surv.get("added"):
+        body.append("<h4>What happened to the control's considerations</h4>")
+        body.append(R.table(["fate", "n", "the judge's wording"], _survival_rows(surv),
+                            align="lrl"))
+
+    body = [b for b in body if b]
+    if len(body) <= 1:
+        return ""
+    title = ("What the paid judges measured, and why the report does not lead with it"
+             if paid else "How the two arms compare, offline")
+    return R.details(title, "".join(body),
+                     meta=f.get("judge_arms_clause", "") if paid else "")
+
+
+def checks_table(audit, diversity):
+    """Every measurement that could have run, and whether it did.
+
+    A check that did not run says so rather than vanishing, because a reader deciding
+    whether to trust the dataset needs to know which questions were never asked.
+    """
+    mpr = (audit or {}).get("moral_patient_reasons") or {}
+    checks = [
+        ("Valuable welfare considerations", bool(mpr.get("pipeline") or
+                                                 (audit or {}).get("welfare_impact")),
+         "Welfare substance per answer, both arms"),
+        ("Retention", bool(mpr.get("survival")),
+         "Item by item, which of the control's considerations the pipeline kept, weakened or "
+         "dropped, and what it added"),
+        ("Delivery quality", bool((audit or {}).get("delivery")),
+         "How helpful, proportionate and non-preachy each answer is, judged 0–10"),
+        ("Showcase examples", bool((audit or {}).get("showcase")),
+         "Concrete pipeline-beats-control cases with verbatim improved spans"),
+        ("Response stance", bool(((audit or {}).get("moves") or {}).get("stance")),
+         "Whether an answer defers, stays calibrated, or moralizes"),
+        ("Tracked phrases and rhetorical moves",
+         bool((audit or {}).get("tracked_tics") or (audit or {}).get("rhetorical_moves")),
+         "Recurring phrasing and argumentative habits, as a share of each arm"),
+        ("Length, structure, jargon", bool((audit or {}).get("response_lengths")),
+         "Offline dataset measurements against the control"),
+        ("Semantic diversity", bool(diversity),
+         "Embedding near-duplicate rate, topic spread, effective record count"),
+    ]
+    rows = [(name, what if ok else R.Raw(f"<i>not run on this run</i> — {R.esc(what)}"))
+            for name, ok, what in checks]
+    return R.table(["check", "what it establishes"], rows)
+
+
 # ------------------------------------------------------------------ method
 
 def blocks_built(content, f, manifest, costs, run_id):
@@ -720,8 +1040,7 @@ def blocks_built(content, f, manifest, costs, run_id):
     blocks.append(C.prose(content, "reproduce", f))
     cmd = ("# generate a dataset\n"
            "python dad_pipeline/run.py --config config.yaml --label my-run\n\n"
-           "# the standard evals run automatically at the end of a full run;\n"
-           "# to re-run them on an existing run directory:\n"
+           "# the evals run automatically; to re-run them on an existing run:\n"
            "python evals/audit_dad.py --input outputs/dad/latest --reasons\n"
            "python evals/diversity.py --input outputs/dad/latest\n\n"
            "# rebuild this page\n"
@@ -848,42 +1167,6 @@ def _habits_caption(invented, dropped):
     return f"**The pipeline dropped `{dropped[0]}`, a move the control reaches for.**"
 
 
-# ------------------------------------------------------------------ measurement
-
-def blocks_measured(audit, content, f, diversity):
-    blocks = [R.sub("dad-measured", "What we measured"),
-              C.prose(content, "measurement_intro", f)]
-    mpr = audit.get("moral_patient_reasons") or {}
-    checks = [
-        ("Valuable welfare considerations", bool(mpr.get("pipeline")),
-         "Distinct welfare points and concrete lower-harm actions per answer, both arms"),
-        ("Retention", bool(mpr.get("survival")),
-         "Item by item, which of the control's considerations the pipeline kept, weakened or "
-         "dropped, and what it added"),
-        ("Delivery quality", bool(audit.get("delivery")),
-         "How helpful, proportionate and non-preachy each answer is, judged 0–10"),
-        ("Showcase examples", bool(audit.get("showcase")),
-         "Concrete pipeline-beats-control cases with verbatim improved spans"),
-        ("Response stance", bool((audit.get("moves") or {}).get("stance")),
-         "Whether an answer defers, stays calibrated, or moralizes"),
-        ("Tracked phrases and rhetorical moves",
-         bool(audit.get("tracked_tics") or audit.get("rhetorical_moves")),
-         "Recurring phrasing and argumentative habits, as a share of each arm"),
-        ("Length, structure, jargon", bool(audit.get("response_lengths")),
-         "Offline dataset measurements against the control"),
-        ("Semantic diversity", bool(diversity),
-         "Embedding near-duplicate rate, topic spread, effective record count"),
-    ]
-    rows = [(name, what if ok else R.Raw(f"<i>not run on this run</i> — {R.esc(what)}"))
-            for name, ok, what in checks]
-    blocks.append(R.table(["check", "what it establishes"], rows))
-    # The subhead is code's, not the prose file's: h3 is the beat level inside a section,
-    # and a prose `### ` would put this at the same level as "What we measured" itself.
-    blocks.append("<h4>What these measurements do not establish</h4>")
-    blocks.append(C.prose(content, "judge_limits", f))
-    return "".join(blocks)
-
-
 # ------------------------------------------------------------------ weaknesses
 
 def derived_warnings(audit, manifest, f):
@@ -933,9 +1216,24 @@ def derived_warnings(audit, manifest, f):
 
 
 def blocks_weak(audit, content, f, manifest):
-    return (R.sub("dad-weak", "Where it is weak")
-            + C.prose(content, "weaknesses_intro", f)
-            + C.warnings_table(derived_warnings(audit, manifest, f)))
+    """The derived floor, then what the measurements cannot settle.
+
+    This is where the delivery regression is written out — once, by
+    ``_delivery_statement()``, as a caveat rather than as a result. The appendix's
+    scoreboard row and the derived weakness carry the same number as data, which is not
+    the same as saying it again.
+
+    The subhead below is code's, not the prose file's: h3 is the beat level inside a
+    section, so a prose `### ` would put it level with "Where it is weak" itself.
+    """
+    return "".join(b for b in (
+        R.sub("dad-weak", "Where it is weak"),
+        C.prose(content, "weaknesses_intro", f),
+        _delivery_statement(audit, f),
+        C.warnings_table(derived_warnings(audit, manifest, f)),
+        "<h4>What these measurements do not establish</h4>",
+        C.prose(content, "judge_limits", f),
+    ) if b)
 
 
 # ------------------------------------------------------------------ appendix
@@ -988,18 +1286,20 @@ def _appendix_charts(audit, f, cons):
     return out + _footprint_figures(audit, f)
 
 
-def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, pick=None):
+def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, picks=()):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
-    Every chart the page does not lead with lands here, in one drawer, so the two that
-    do lead are the two a reader sees.
+    Every chart lands here — the page above carries none — and so does the whole judged
+    comparison, which leads the appendix because a reader who came looking for it should
+    find it first.
     """
-    blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f)]
+    blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
+              judged_drawer(audit, content, f, cons, labels)]
 
     charts = _appendix_charts(audit, f, cons)
     if charts:
         blocks.append(R.details(
-            "Every other chart from this run", "".join(charts),
+            "Every chart from this run", "".join(charts),
             meta=f"{len(charts)} figures · {f.get('footprint_regressions', '')}"))
 
     rows, verdicted = [], 0
@@ -1017,7 +1317,10 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, pick=N
     if rows:
         blocks.append(R.details(
             "Every check that ran",
-            R.table(["check", "group", "worst verdict", "counts"], rows, align="llll"),
+            C.prose(content, "checks_intro", f)
+            + checks_table(audit, diversity)
+            + "<h4>As the audit recorded them</h4>"
+            + R.table(["check", "group", "worst verdict", "counts"], rows, align="llll"),
             meta=f"{len(rows)} checks · {verdicted} carry a verdict"))
 
     moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
@@ -1065,7 +1368,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, pick=N
             ]),
             meta=f"{diversity.get('n_records', '?')} records"))
 
-    pid = pick or _example_pick(content)
+    pid, _ = _picks(content, picks, {r.get("prompt_id"): r for r in rewrites or []})
     rw = next((r for r in rewrites or [] if r.get("prompt_id") == pid), None)
     if rw and rw.get("draft_response") and rw.get("rewritten_response"):
         blocks.append(R.details(
@@ -1079,23 +1382,23 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, pick=N
 # ------------------------------------------------------------------ assembly
 
 def blocks(*, audit, content, diversity=None, manifest=None, corpus=None, baseline=None,
-           rewrites=None, costs=None, deals=None, n_prompt_templates=None, run_id="",
-           example=None):
+           rewrites=None, costs=None, deals=None, lineage=None, n_prompt_templates=None,
+           run_id="", example=None):
     """The whole ``#dad`` section body, in skeleton order. Pure: no filesystem, no argv.
 
     Returns one flat string of blocks. report/page.py wraps it in ``<section id='dad'>``
     with the h2; every block here is therefore a grid child of that section, which is
     what lets figures bleed past the text measure.
     """
-    f = facts(audit, manifest, diversity, costs)
+    f = facts(audit, manifest, diversity, costs, corpus, deals)
     cons = _considerations(audit)
     labels = _labels(audit)
     run = run_id or (manifest or {}).get("run_id", "<run_id>")
+    picks = (example,) if example else ()
     return "".join([
-        blocks_what(audit, content, f, cons, labels),
-        blocks_example(audit, content, f, baseline, rewrites, labels, example),
-        blocks_measured(audit, content, f, diversity),
+        blocks_what(content, f, diversity),
         blocks_built(content, f, manifest, costs, run),
+        blocks_example(content, f, rewrites, baseline, lineage, labels, picks),
         blocks_weak(audit, content, f, manifest),
-        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, example),
+        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, picks),
     ])

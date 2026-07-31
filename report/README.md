@@ -29,9 +29,10 @@ overrides the worked example, `--out-dir` writes elsewhere.
 yet" and its report says no audit output was supplied — the page still builds, and
 carries no dead links.
 
-To get the full difficult-advice report, the DAD run needs its paid audit pass. Without it the
-delivery, Pareto and showcase blocks say "not measured on this run" and the weaknesses
-table gains a BAD row:
+To get the full difficult-advice report, the DAD run needs its paid audit pass. Without it
+the appendix's judged drawer says no paid pass ran, the caveats say "not measured on this
+run", and the weaknesses table gains a BAD row. The report itself still builds in full —
+nothing above the appendix depends on a judge:
 
 ```bash
 python evals/audit_dad.py --input outputs/dad/runs/<run_id> --reasons
@@ -48,14 +49,19 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 |---|---|
 | hero | The illustration, the title, and the three lines that follow from it (*Teaching Claude Why*, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing. |
 | `#datasets` | The comparison. No heading over it: the two column mastheads (name in serif, one line on what each dataset *is*) are the heading. Four rows — what it is for, what a record is, how many prompt templates, how many records — because the reader is deciding whether to run the pipeline, not shopping for a dataset. Dates, model ids and the composition spread live in the report that goes into them. The two figure rows carry the way to what they count: the figure at the column's left edge, an outline button at its right (the prompts on GitHub, the published sample on Hugging Face). Labels are right-aligned, one line each, vertically centred. |
-| `#explore` | "Walk through a dataset generation" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred so each sits under its own column. |
+| `#explore` | "Walk through a dataset generation" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred so each sits under its own column, in a bar that pins to the top of the screen while a report is read. Both reports are *inside* this section, in `.explore-body` — see "The chooser". |
 | `#sdf` | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen. |
 | `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
 | footer | Repo and both viewers as buttons, one provenance line per run, and the build claim. |
 
-Both reports take the same skeleton, so a reader learns it once: **what it is + headline
-figures / one example end to end / what we measured / how it is built / where it is weak
-/ appendix**. Each beat is an `<h3>` with its own id (`#dad-weak`, `#sdf-what`).
+Both reports take the same skeleton, so a reader learns it once: **what it is / how it is
+built / one example end to end / where it is weak / appendix**. Each beat is an `<h3>`
+with its own id (`#dad-weak`, `#sdf-what`).
+
+The stages come *before* the example that walks through them, because that is what the
+chooser above promises. There is no "what we measured" beat: this is not a results
+report, and the run's measurements are either a descriptive tile in "what it is" or a
+drawer in the appendix.
 
 There is no contents rail: the whole navigation of the page is one choice.
 
@@ -68,14 +74,45 @@ and all three are pinned by `TestChooser`:
   dataset card's deep links land where they say they will. A hash naming anything *inside*
   a report (`#dad-weak`, from a quoted finding) opens the report it lives in and scrolls
   to it — that is what `closest('.panel')` in the inline JS is for.
-- **Each report ends with a button offering the other**, which switches panels and
-  scrolls to the top of the new one. The dataset a reader did not pick is one click from
-  the end of the one they did.
+- **Each report ends with a button offering the other**, which switches panels and puts
+  the bar back at the top of the screen. The dataset a reader did not pick is one click
+  from the end of the one they did.
 - **Printing expands both**, so a PDF of the page is the whole thing.
 
 The cost is real and was accepted deliberately: Cmd-F cannot see a closed report.
 `.panel[hidden]{display:none}` is load-bearing — a panel is a `<section>`, and
 `section{display:grid}` beats the browser's own `[hidden]` rule.
+
+**The bar is pinned while you read**, and choosing a report — from a tab or from the
+end-of-report button — scrolls it to the top of the screen. `TestStickyBar` pins the four
+things that make that work:
+
+- **The panels live inside `#explore`**, wrapped with the bar in `.explore-body`
+  (`render.explore_body`). A sticky box travels only inside its containing block, and the
+  containing block of a *grid item* is its own grid area — one row, as tall as the
+  buttons — so a sticky bar left loose in `#explore`'s grid has nowhere to go. The
+  wrapper is the travel: the bar pins for the length of the open report.
+- **`.choicebar` carries the background, `.choices` the buttons.** The band is the full
+  column in `var(--surface-0)`, the page's own paper, so the report scrolls under it and
+  out of sight; the buttons stay 40rem centred inside it. A sticky box the width of the
+  buttons would let a figure scroll up either side.
+- **The script measures `.explore-body`, never the bar.** Once sticky takes hold, the
+  bar's own `getBoundingClientRect()` and `offsetTop` report where it is *painted*, so
+  scrolling to it means scrolling to wherever the reader already was. `.explore-body`'s
+  top is the bar's flow top, and that is also the sticky threshold, so nothing jumps as
+  the bar pins.
+- **The headroom is CSS, not arithmetic.** The bar measures 5.21rem, so `h3[id]` and
+  `.panel` take `scroll-margin-top:7rem` and a deep-linked beat lands clear of it (29px,
+  measured); a native fragment jump reads the same value. `scrollIntoView()` carries no
+  `behavior`, so `html{scroll-behavior}` — and therefore `prefers-reduced-motion` — still
+  owns the smoothness.
+
+`#explore>h2` is a child combinator on purpose: every panel opens with its own `<h2>`, so
+a descendant selector centres and stretches both report titles too.
+
+The bar stays pinned below 760px, so it is kept to **one row** there — two columns with
+tighter type, and no arrow below 620px. Stacked, the two buttons are ~10rem of permanent
+chrome, a quarter of a phone screen.
 
 ## Files
 
@@ -84,28 +121,30 @@ The cost is real and was accepted deliberately: Cmd-F cannot see a closed report
 | `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. `*_desc` are the mastheads' subtitles (what each dataset *is*, also used under each chooser button); `*_use` are what each is *for*. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
 | `content_dad.md` | **Difficult-advice prose.** The file to iterate on for that report. |
 | `page.py` | The page: hero, comparison, chooser, footer, and the one `document()` call. |
-| `dad.py` | The `#dad` beats: `facts()`, the block builders, `derived_warnings()`. |
+| `dad.py` | The `#dad` beats: `facts()`, the block builders, `read_lineage()`, `judged_drawer()`, `derived_warnings()`. |
 | `sdf.py` | The `#sdf` beats — small on purpose; see "Finishing the second report". |
 | `common.py` | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser. |
 | `render.py` | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge. |
 | `build_report.py` | The CLI. |
 
 Each report module exposes `blocks()`, returning its body as one flat string; `page.py`
-wraps that in `render.panel()`, which is the `<section>`. Blocks stay flat because a
-figure has to be a direct child of the section for the CSS grid to bleed it past the
-text measure.
+wraps that in `render.panel()`, which is the `<section>`, and both panels go inside
+`#explore` via `render.explore_body()` so the chooser bar has something to stick to.
+Blocks stay flat because a figure has to be a direct child of the section for the CSS grid
+to bleed it past the text measure — nesting the panels does not change that: a panel is
+still their parent, and `.explore-body` spans the full column, so a panel resolves to the
+same width it had as a child of `<main>`.
 
 ## The rules
 
 **1. No number is ever typed into a prose file.** Prose interpolates `{{placeholders}}`
 resolved from the runs' own output, and an unknown one fails the build. Run-conditional
 figures reach prose only with an explicit degraded string — `{{library_clause}}`,
-`{{near_dup_pct}}`, `{{length_pct}}` — so a run missing the paid pass renders "an
-unmeasured share" where the figure would be and the sentence survives. The page's own
-prose has exactly two facts available, `{{gen_models}}` and `{{judge_models}}`, both of
-The page's own prose has no facts at all (`PAGE_FACTS = {}`), so a placeholder in
-content_page.md is a build error. Do not add a bare conditional number to prose; add a
-clause to the owning module's `facts()`.
+`{{length_pct}}`, `{{judge_arms_clause}}` — so a run missing the paid pass renders "not
+measured on this run" where the figure would be and the sentence survives. The page's own
+prose has no facts at all (`PAGE_FACTS = {}`), so any placeholder in `content_page.md` is
+a build error. Do not add a bare conditional number to prose; add a clause to the owning
+module's `facts()`.
 
 **2. The weaknesses beats are derived, not written.** Every BAD/OK verdict the DAD audit
 recorded, plus provenance rules (non-`api` backend, uncommitted changes, small n) and
@@ -115,10 +154,22 @@ an unmeasured delivery pass), emits its own row whether or not anyone wrote it u
 the eval's own thresholds instead. `warnings_table()` may **collapse** rows into a
 drawer, and the drawer states how many it holds — collapsing is a view, never a filter.
 
-**3. The delivery regression is stated once.** In prose, in the results, by
-`dad._delivery_statement()`. The hero tile, the scoreboard row and the derived weakness
-carry the same number as data; a prose file that says it again is the hedging this page
-was rebuilt to remove. `TestSayingItOnce` pins it.
+**3. The judged comparison does not lead, and the delivery regression is stated once.**
+The whole comparison against the plain model — considerations, delivery, the scatter, the
+scoreboard, retention — is one drawer in the appendix, headed with why it is there. It was
+demoted because the delivery pass lost 19 of its 80 judgements on the pinned run, leaving
+its two means over 33 pipeline against 26 control answers: different sets of records. A
+page that led with that would rest on its least sound measurement.
+
+Demoted is not deleted, and both halves are pinned by tests. The regression is written in
+prose exactly once, in the caveats, by `dad._delivery_statement()`; the appendix's
+scoreboard row and the derived weakness carry the same number as data. No figure of any
+kind appears outside the appendix — `test_no_figure_appears_outside_the_appendix` is the
+restructure in one assertion.
+
+The judged drawer reads **either** audit schema: the old
+`valuable_welfare_considerations` + `delivery`, or the `delivery` + `welfare_impact` +
+`composite` that PR #107 replaced it with upstream. A run with neither says so.
 
 **4. Synthetic documents comes first**, in the comparison, the chooser and the panel
 order, so the page reads in one order throughout.
@@ -128,14 +179,45 @@ data — chat transcripts, consumed as supervised fine-tuning — not a differen
 phase; the documents are consumed as continued pretraining. The "what it is for" row says
 both halves, because internal shorthand has the two sounding like different phases.
 
-**6. Prose has a budget.** The build prints `editorial_words()` for the page it just
-wrote, and `test_the_prose_has_a_ceiling` fails if the shipped prose files grow past it.
-Deks — the aphoristic line under a heading — are rationed to two for the whole page.
+**6. Prose has a budget, and two ceilings.** The build prints `editorial_words()` for the
+page it just wrote. `test_the_prose_has_a_ceiling` bounds the whole page;
+`test_the_report_a_reader_reads_has_its_own_ceiling` bounds the difficult-advice beats
+*before* the appendix, which is the part that is open when a reader arrives — the
+whole-page number is dominated by drawers nobody has to read. Deks — the aphoristic line
+under a heading — are rationed to two for the whole page.
 
 Section ids in each prose file must exactly match the owning module's `CONTENT_IDS`; a
 missing or unknown id is a build error, and two files may not both define one, so moving
 a block between prose files is a rename. `example_pick` holds the prompt_id of the DAD
-worked example (or `auto`), so a rebuild reproduces the same case without a flag.
+worked example (or `auto`) and `example_extra` the ids in its carousel, so a rebuild
+reproduces the same cases without a flag. A pinned id the run never shipped says so on the
+page and falls back, rather than failing the build.
+
+## The worked example
+
+`#dad-example` is one record's whole trail through the run, and every block in it is
+verbatim from a file in the run directory — the dealt cards, the scenario the planner
+wrote from them, the message that shipped, the scope and the library entries stage 2
+pulled, the answer, and the three largest things stage 3 changed. Its `<h4>`s reuse the
+stage headings from "How it is built" rather than inventing a second vocabulary.
+
+`dad.read_lineage()` assembles it at load time. Two things about the join: only step 1 is
+keyed by `scenario_id` and everything downstream by `prompt_id`, so `step1/dilemmas.jsonl`
+is the join table, with `audit.gid_map[pid]["scenario"]` as the fallback for a run that
+kept no dilemmas file. And `step2/scopes.jsonl` is trimmed on the way in — 725 KB of it is
+the reasoning library's prose repeated per case, and the page shows an entry's id,
+category and claim.
+
+A missing artefact **names the file it wanted** rather than disappearing, because a step
+that silently vanishes reads as a step the pipeline does not have. A key that is not
+available is left *absent* rather than set to `None`, so renderers test membership; null
+values in the dealt cards are dropped, since rendering an axis with "None" in it is a bug
+that reads as data.
+
+Below it, `render.tabs()` puts the ids in `example_extra` behind one set of buttons, using
+the chooser's own mechanism — `data-pane`, `aria-selected`, the same inline JS. The first
+pane renders *without* `hidden`, so with JS off the carousel degrades to one example
+rather than to none, and the print rule expands the rest.
 
 ## The hero illustration
 
@@ -154,9 +236,11 @@ before you email it.
 ## Constraints
 
 - **Self-contained**: no external CSS, JS, fonts or images. Charts and the two link
-  marks are inline `<svg>`, the hero is a data URI, and the only JS is a tooltip handler
-  and the chooser. Enforced by `test_is_self_contained`, which allows a `data:` src and
-  nothing else off-page.
+  marks are inline `<svg>`, the hero is a data URI, and the only JS is a tooltip handler,
+  the chooser and the example carousel. Enforced by `test_is_self_contained`, which allows
+  a `data:` src and nothing else off-page — and which now looks for `url(` and `@import`
+  *outside* the run's own text, because the page quotes three records verbatim and a
+  dilemma that happened to contain a CSS snippet would fail a test about the generator.
 - **One accent, `--accent:#3b2fa0`.** The page's only interaction colour: the text
   selection and every link. Indigo because it cannot collide with anything the palette
   reserves — far from `--good`, `--warn` and `--bad`, so a selection can never read as a
@@ -168,12 +252,16 @@ before you email it.
 - **One filled button.** `.cta` — accent ground, cream text — is the end-of-report call
   to the other dataset, the one action the page asks for. Everything else is an outline
   button (`.lbtn`, `.choice`), a plain icon link (`.ilink`, in the footer), or prose.
-- **Two CSS traps, both hit and both commented in place.** `section` must use
+- **Four CSS traps, all hit and all commented in place.** `section` must use
   `minmax(0,1fr)`, never a bare `1fr`: a child with a definite width wider than the
   column grows the track past the page, and every percentage resolved against that grid
   area then points right of centre (measured: the comparison landed 116px off). And
   `.cmp th` sets the rule, alignment and padding for every cell, so a `.cmp-k` override
-  has to out-specify it — `.cmp th.cmp-k` — not merely follow it.
+  has to out-specify it — `.cmp th.cmp-k` — not merely follow it. And a `position:sticky`
+  grid item is confined to its own grid area, which is why the chooser bar needs
+  `.explore-body` around it and both panels. And a *stuck* sticky element's own
+  `getBoundingClientRect()`/`offsetTop` report where it is painted, not where it sits, so
+  anything scrolling to it has to measure a static element instead.
 - **A link that leaves the page says so**, with an arrow that is *drawn* — `EXT_ARROW`,
   an inline SVG at `stroke-width:2` in `currentColor`. As a glyph (U+2197) it is a
   hairline in most faces and a different shape in every one, and this page is printed and
@@ -194,15 +282,17 @@ before you email it.
   a labelled chip, so a status colour never travels alone.
 - **Arm colours follow the arm.** `hbar(color=...)` takes a sequence; pass `R.ARM_PAIR`
   for any (control, pipeline) chart. Without it `hbar` colours bars by row order — that
-  is how the headline chart came to paint the pipeline in the control's own colour.
+  is how the considerations chart came to paint the pipeline in the control's own colour.
 - **British English in prose, American in code.**
 - **stdlib only**, and no imports from `viewer/` or `shared/` — the page has to build
   where the pipeline's dependencies are not installed, which is also what makes it
   portable. Cost: the row-building helpers in `viewer/rendering.py` are re-implemented
   here, so a schema change to `audit_report.json` can drift.
-- Both DAD audit schemas render: modern (`valuable_welfare_considerations`) and legacy
-  (reconstructed from `moral_patient_reasons` + `moves.alternatives`, exactly as
-  `evals/audit_dad.py` does).
+- Every DAD audit schema renders: `valuable_welfare_considerations`, the legacy
+  reconstruction from `moral_patient_reasons` + `moves.alternatives` (exactly as
+  `evals/audit_dad.py` did), and the `delivery` + `welfare_impact` + `composite` that
+  PR #107 replaced both with. Only the appendix's judged drawer reads any of them, so a
+  schema change cannot take the report down — the beats above it read the step files.
 
 ## Checking it renders
 
@@ -220,11 +310,43 @@ node -e "const p=require('puppeteer');(async()=>{
   console.log(await pg.evaluate(()=>{
     const th=[...document.querySelectorAll('.cmp thead th')].map(e=>e.getBoundingClientRect());
     return {centre:innerWidth/2, pairMid:(th[0].left+th[1].right)/2};}));
+  // The bar: choosing a report puts it at the top, and it stays there while you read.
+  await pg.evaluate(()=>document.getElementById('choose-dad').click());
+  await new Promise(r=>setTimeout(r,1200));
+  const probe=()=>{const b=document.querySelector('.choicebar').getBoundingClientRect();
+    const f=document.querySelector('.explore-body').getBoundingClientRect();
+    return {barTop:b.top, barH:b.height, flowTop:f.top, scrollY:scrollY};};
+  console.log(await pg.evaluate(probe));                       // barTop 0, flowTop 0
+  await pg.evaluate(()=>scrollBy(0,2400)); await new Promise(r=>setTimeout(r,500));
+  console.log(await pg.evaluate(probe));                       // barTop still 0, barH 83
   await pg.screenshot({path:'/tmp/page.png',fullPage:true}); await b.close();})()"
 ```
 
 `pairMid` must equal `centre`: the two dataset columns straddle the page centre and the
-field labels hang off their left, outside the pair.
+field labels hang off their left, outside the pair. `barTop` must be `0` in both probes
+and `barH` ~83px, and a deep link (`…/index.html#dad-weak`, `waitUntil:'load'`) must leave
+that `<h3>`'s `top` greater than `barH` — measured 113 against an 83px bar. On a
+`390x844` viewport the two buttons must stay on one row (~57px bar).
+
+The worked example put two wide tables and six new blocks inside that same grid, which is
+the class of change the `1fr` trap bit last time, so measure the overflow too:
+
+```js
+console.log(await pg.evaluate(()=>{
+  document.querySelectorAll('.panel').forEach(p=>p.hidden=false);
+  const s=document.querySelector('#dad');
+  const over=[...s.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>innerWidth+1)
+                                         .map(e=>e.className||e.tagName);
+  return {panel:s.getBoundingClientRect().width, vw:innerWidth, overflowing:over.slice(0,5),
+          beats:[...s.querySelectorAll('h3[id]')].map(h=>h.id)};}));
+// then the carousel: clicking a tab swaps the pane, and only one is visible
+await pg.evaluate(()=>document.querySelectorAll('.tab')[1].click());
+console.log(await pg.evaluate(()=>[...document.querySelectorAll('.pane-x')].map(p=>p.hidden)));
+```
+
+`overflowing` must be empty, `panel <= vw`, and `beats` must read in skeleton order. The
+one thing no assertion can check is whether the lineage scans as a walk or as a wall of
+`<h4>`s — screenshot it with `#dad` open and read it.
 
 ## Tests
 
@@ -232,13 +354,14 @@ field labels hang off their left, outside the pair.
 pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_page.py
 ```
 
-172 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
+212 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
 placeholder contract, the provenance floor, the warnings table, the prose count);
-`test_dad_report.py` covers the dilemma section along five risk axes — degradation,
-self-containment, candour, saying the regression once, colour integrity;
-`test_report_page.py` covers the page itself, whose distinctive risks are a report that
-cannot be reached, a column that shows nothing when a run is missing, and prose growing
-back.
+`test_dad_report.py` covers the difficult-advice section along six risk axes —
+degradation, self-containment, candour, not leading with the judge, the lineage naming
+what it could not find, colour integrity; `test_report_page.py` covers the page itself,
+whose distinctive risks are a report that cannot be reached, a column that shows nothing
+when a run is missing, a chooser bar with nowhere to stick or a beat hidden under it, and
+prose growing back.
 
 ## Finishing the second report
 

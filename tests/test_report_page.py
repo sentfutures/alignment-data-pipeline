@@ -103,7 +103,7 @@ class TestShape:
         ids = re.findall(r"<section id='([^']+)'", html)
         assert ids == ["datasets", "explore", "sdf", "dad"]
         assert re.findall(r"<h2>([^<]*)</h2>", html) == [
-            "Explore example results", S.SECTION_TITLE, D.SECTION_TITLE]
+            "Walk through a dataset generation", S.SECTION_TITLE, D.SECTION_TITLE]
         # The comparison is titled by its own two mastheads, not by a heading over them.
         assert "<section id='datasets'><div class='cmp-wrap'>" in html
 
@@ -147,13 +147,14 @@ class TestShape:
         assert "aspect-ratio:1318/425" in rule
         assert "object-fit:cover" in rule and "object-position:50% 48.5%" in rule
 
-    def test_the_intro_stops_after_two_paragraphs(self):
+    def test_the_intro_stops_after_three_paragraphs(self):
         """The two datasets are named once, in the comparison's mastheads. Listing them
-        here as well was the same two names twice within a screen."""
+        here as well was the same two names twice within a screen. Three paragraphs: the
+        finding, how it was taught, and what we built on it."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
         assert "<li>" not in hero and "<ul>" not in hero
-        assert hero.count("<p>") == 2
+        assert hero.count("<p>") == 3
 
     def test_the_footer_is_one_line_who_made_it_and_where_to_go(self):
         """No run ids, no commits, no build claim: the last line of the page is not
@@ -319,12 +320,14 @@ class TestChooser:
 
     def test_the_buttons_are_two_names_and_nothing_else(self):
         """What each dataset is and how big it is are in the comparison directly above.
-        Repeating both under each button made them hard to read as buttons."""
-        section = re.search(r"<section id='explore'>.*?</section>",
+        Repeating both under each button made them hard to read as buttons.
+
+        Sliced from the tablist rather than from #explore: both reports live inside
+        #explore now, which is what gives the sticky bar its travel."""
+        choices = re.search(r"<div class='choices'[^>]*>.*?</div>",
                             build(sdf_inputs=SDF_INPUTS), re.S).group(0)
-        after_heading = strip_tags(section).split("results")[1]
-        assert after_heading.split() == [*S.SECTION_TITLE.split(), "&darr;",
-                                         *D.SECTION_TITLE.split(), "&darr;"]
+        assert strip_tags(choices).split() == [*S.SECTION_TITLE.split(), "&darr;",
+                                               *D.SECTION_TITLE.split(), "&darr;"]
 
     def test_the_choice_lines_up_with_what_is_being_chosen(self):
         """40rem centred is exactly the two dataset columns above (2 x 20rem), so each
@@ -332,7 +335,10 @@ class TestChooser:
         html = build(sdf_inputs=SDF_INPUTS)
         assert re.search(r"\.choices\{[^}]*width:min\(100%,40rem\)", html)
         assert re.search(r"\.choices\{[^}]*margin:0 auto", html)
-        assert re.search(r"#explore h2\{[^}]*text-align:center", html)
+        assert re.search(r"#explore>h2\{[^}]*text-align:center", html)
+        # A descendant selector here would centre and stretch both report titles too:
+        # every panel opens with its own <h2>, and the panels are inside #explore.
+        assert "#explore h2{" not in html
 
     def test_each_report_ends_by_offering_the_other(self):
         """The dataset a reader did not choose is one click from the end of the one
@@ -353,10 +359,15 @@ class TestChooser:
         assert ".panel[hidden]{display:none}" in build()
 
     def test_a_printed_page_carries_both_reports(self):
-        """Whichever is open on screen, a PDF of this page is the whole thing."""
+        """Whichever is open on screen, a PDF of this page is the whole thing — and that
+        now covers the example carousel's panes as well as the two report panels, so the
+        rule is matched by selector rather than as one exact string."""
         block = build()[build().find("@media print"):]
-        assert ".panel[hidden]{display:block!important}" in block
-        assert ".choices" in block  # the buttons themselves are not printed
+        rule = re.search(r"([^{}]*\.panel\[hidden\][^{}]*)\{([^}]*)\}", block)
+        assert rule, block[:400]
+        assert "display:block!important" in rule.group(2)
+        assert ".pane-x[hidden]" in rule.group(1)
+        assert ".choicebar" in block  # the bar, sticky and all, does not print
 
     def test_the_chooser_reads_the_url_so_deep_links_survive(self):
         """The dataset card links to #dad and #sdf. Without this the link lands on a
@@ -372,6 +383,73 @@ class TestChooser:
         html = build(sdf_inputs=SDF_INPUTS)
         assert "window.addEventListener('load'" in html
         assert "readyState==='complete'" in html
+
+
+class TestStickyBar:
+    """The buttons stay on screen for as long as a report is being read, and choosing one
+    puts them at the top of it. The risks are a bar with nowhere to travel, a bar that
+    hides the beat a deep link just landed on, and a phone screen full of chrome."""
+
+    def test_the_bar_and_the_reports_are_one_block_so_the_bar_can_stick(self):
+        """position:sticky travels only inside its containing block, and the containing
+        block of a grid item is its own grid area — one row, as tall as the buttons. The
+        bar and both reports share one plain block, and that block is the travel."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        assert "<div class='explore-body'><div class='choicebar'><div class='choices'" in html
+        explore = html[html.index("<section id='explore'>"):html.index("<footer")]
+        assert "<section id='sdf'" in explore and "<section id='dad'" in explore
+        assert re.search(r"section>[^{]*\.explore-body[^{]*\{grid-column:text-start/full-end\}",
+                         html)
+
+    def test_the_bar_is_paper_and_the_tooltip_still_clears_it(self):
+        """Its background is the page's own, so a report scrolls under it and out of
+        sight rather than through it."""
+        html = build()
+        rule = re.search(r"\.choicebar\{[^}]*\}", html).group(0)
+        for want in ("position:sticky", "top:0", "background:var(--surface-0)", "z-index:5"):
+            assert want in rule, rule
+        assert re.search(r"body\{[^}]*background:var\(--surface-0\)", html)
+        assert re.search(r"#tip\{[^}]*z-index:9", html)  # 9 > the bar's 5
+
+    def test_choosing_a_report_puts_the_bar_at_the_top_of_the_screen(self):
+        """Measured from .explore-body, never from the bar: once sticky takes hold, the
+        bar's own rect and offsetTop report where it is painted, not where it sits."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        script = html[html.index("<script>"):]
+        assert "querySelector('.explore-body')" in script
+        assert ".choicebar" not in script  # the script never measures the bar itself
+        # A tab and the end-of-report button now want the same thing.
+        assert "querySelectorAll('.choice,.cta')" in script
+
+    def test_the_page_owns_the_smoothness_not_the_script(self):
+        """An explicit behavior:'smooth' beats the CSS, so prefers-reduced-motion could
+        not turn it off — which is what the old .cta scroll did."""
+        html = build()
+        assert "behavior:'smooth'" not in html
+        assert "scroll-behavior:smooth" in html
+        assert "scroll-behavior:auto" in html[html.index("prefers-reduced-motion"):]
+
+    def test_a_deep_linked_beat_lands_clear_of_the_pinned_bar(self):
+        """Recomputed from the declarations the bar is built out of, so tightening the
+        buttons without revisiting the headroom fails here rather than in a browser."""
+        html = build()
+        pad = float(re.search(r"\.choicebar\{[^}]*padding:([\d.]+)rem", html).group(1))
+        btn = float(re.search(r"\.choice\{[^}]*padding:([\d.]+)rem", html).group(1))
+        size, lh = re.search(r"\.choice\{[^}]*font:650 ([\d.]+)rem/([\d.]+)", html).groups()
+        bar = 2 * pad + 2 * btn + float(size) * float(lh) + 2 / 16  # + the 1px borders
+        for target in (r"h3\[id\]\{scroll-margin-top:([\d.]+)rem", r"\.panel\{[^}]*"
+                       r"scroll-margin-top:([\d.]+)rem"):
+            head = float(re.search(target, html).group(1))
+            assert head > bar, f"a beat lands under the {bar:.2f}rem bar"
+
+    def test_the_bar_stays_one_row_on_a_phone(self):
+        """Stacked, the two buttons are ~10rem of permanently pinned chrome — a quarter
+        of a small screen. Two columns and tighter type instead."""
+        html = build()
+        small = html[html.index("@media (max-width:760px)"):html.index("@media (max-width:620px)")]
+        assert ".choices{grid-template-columns:1fr}" not in small
+        assert re.search(r"\.choice\{[^}]*font-size:1rem", small)
+        assert re.search(r"\.choicebar\{padding:[\d.]+rem 0\}", small)
 
 
 class TestComparisonTable:
@@ -488,6 +566,11 @@ class TestComparisonTable:
         html = build(dad_inputs={**DAD_INPUTS, "deals": []})
         assert "domains" not in strip_tags(html)
 
+    def test_the_dealt_spread_reaches_the_page_when_the_run_has_it(self):
+        """The counterpart to the test above, which passed vacuously while spread() was
+        computed and never rendered anywhere."""
+        assert "domains" in strip_tags(build(dad_inputs=DAD_INPUTS))
+
 
 class TestSdfPlaceholder:
     def test_headline_figures_come_from_the_audit(self):
@@ -552,6 +635,21 @@ class TestBrevity:
         them. A regression here is prose growing back, which is the failure mode this
         page was rebuilt to fix."""
         assert C.editorial_words(self.page()) < 1800
+
+    def test_the_report_a_reader_reads_has_its_own_ceiling(self):
+        """The whole-page count above is dominated by the appendix, which is closed
+        drawers a reader opens on purpose. What has to stay short is the part that is
+        open: the difficult-advice beats before the appendix. Restructuring the report
+        away from a results narrative took ~160 words out of here, and this is the
+        assertion that stops them coming back one caption at a time.
+
+        Measures 860 against these fixtures, so the ceiling is a sixth of headroom — not
+        the third the whole-page one carries, because this is the number being defended.
+        """
+        html = self.page()
+        section = html[html.index("<section id='dad'"):]
+        read_first = section[:section.index("id='dad-appendix'")]
+        assert C.editorial_words(read_first) < 1000
 
     def test_the_method_is_credited_once_where_the_reader_starts(self):
         """The Teaching Claude Why grounding was on both of the pages this replaces, and

@@ -137,15 +137,21 @@ def _cell(content, key, f):
 
 
 
-def section_explore():
-    """The choice. Both reports are on the page; neither is open until one is picked.
+def section_explore(panels):
+    """The choice, and both reports under it. Neither is open until one is picked.
 
     Two names, nothing else: what each dataset is and how big it is are in the
     comparison directly above, and repeating them here only made the buttons hard to
     read as buttons.
+
+    The panels are nested here rather than left as siblings in ``<main>`` because the
+    buttons stick to the top of the screen while a report is read, and a sticky box
+    travels only inside its containing block — see ``render.explore_body``.
     """
     return C.section("explore", "Walk through a dataset generation",
-                     R.chooser([("sdf", sdf.SECTION_TITLE), ("dad", dad.SECTION_TITLE)]))
+                     R.explore_body(
+                         R.chooser([("sdf", sdf.SECTION_TITLE), ("dad", dad.SECTION_TITLE)]),
+                         panels))
 
 
 def footer(maker_icon=""):
@@ -170,25 +176,25 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
     f = dict(PAGE_FACTS)
     title = C.fill(content["title"], f).strip()
 
-    sections = [
-        section_datasets(content, f, dad_kwargs, dad_facts, sdf_kwargs, sdf_facts),
-        section_explore(),
-    ]
     # Synthetic documents first, throughout: the comparison, the chooser and the panels
     # all read in one order.
-    sections.append(R.panel(
+    panels = [R.panel(
         sdf.SECTION_ID,
         f"<h2>{R.esc(sdf.SECTION_TITLE)}</h2>"
         + sdf.blocks(content=content, f=sdf_facts, run_id=sdf_kwargs.get("run_id", ""),
                      audit=sdf_kwargs.get("audit"), diversity=sdf_kwargs.get("diversity"),
                      manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF, repo_href=REPO_URL),
-        cta=(dad.SECTION_ID, f"{dad.SECTION_TITLE} example")))
+        cta=(dad.SECTION_ID, f"{dad.SECTION_TITLE} example"))]
     if dad_kwargs:
-        sections.append(R.panel(
+        panels.append(R.panel(
             dad.SECTION_ID,
             f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
             + dad.blocks(content=content, example=example, **dad_kwargs),
             cta=(sdf.SECTION_ID, f"{sdf.SECTION_TITLE} example")))
+    sections = [
+        section_datasets(content, f, dad_kwargs, dad_facts, sdf_kwargs, sdf_facts),
+        section_explore("".join(panels)),
+    ]
     head = {
         "title": title,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT),
@@ -202,7 +208,7 @@ def _dad_facts(kwargs):
     if not kwargs.get("audit"):
         return {}
     return dad.facts(kwargs["audit"], kwargs.get("manifest"), kwargs.get("diversity"),
-                     kwargs.get("costs"))
+                     kwargs.get("costs"), kwargs.get("corpus"), kwargs.get("deals"))
 
 
 def _sdf_facts(kwargs):

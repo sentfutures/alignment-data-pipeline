@@ -611,6 +611,10 @@ def chooser(options, prompt=""):
     needs neither repeated. Nothing is open on load — the choice is the point — and a
     ``#panel_id`` in the URL opens that panel, so a deep link from the dataset card
     still lands where it says it will.
+
+    The buttons come wrapped in ``.choicebar``, which is what sticks to the top of the
+    screen: the bar needs a full-column box to carry the page's own background, and
+    ``.choices`` is 40rem centred, so a report would scroll up either side of it.
     """
     buttons = []
     for pid, label in options:
@@ -619,7 +623,32 @@ def chooser(options, prompt=""):
             f"aria-controls='{esc(pid)}' data-panel='{esc(pid)}' id='choose-{esc(pid)}'>"
             f"{esc(label)}<span class='choice-a' aria-hidden='true'>&darr;</span></button>")
     return ((f"<p class='choose-q'>{inline_md(prompt)}</p>" if prompt else "")
-            + f"<div class='choices' role='tablist'>{''.join(buttons)}</div>")
+            + f"<div class='choicebar'><div class='choices' role='tablist'>"
+              f"{''.join(buttons)}</div></div>")
+
+
+def tabs(panes):
+    """Several records behind one set of buttons. panes: [(id, label, body, open_)].
+
+    The same mechanism as the chooser, not a second one: buttons carry ``data-pane`` and
+    the page's own inline JS toggles ``hidden``. The pane marked open renders WITHOUT
+    ``hidden``, so with JS off this degrades to one visible record rather than to none,
+    and the print rule expands the rest.
+    """
+    kept = [p for p in panes if p]
+    if not kept:
+        return ""
+    btns = "".join(
+        f"<button class='tab' type='button' role='tab' data-pane='{esc(pid)}' "
+        f"aria-selected='{'true' if open_ else 'false'}' "
+        f"aria-controls='{esc(pid)}'>{esc(label)}</button>"
+        for pid, label, _, open_ in kept)
+    bodies = "".join(
+        f"<div class='pane-x' id='{esc(pid)}' role='tabpanel'"
+        f"{'' if open_ else ' hidden'}>{body}</div>"
+        for pid, _, body, open_ in kept)
+    return (f"<div class='carousel'><div class='tabs' role='tablist'>{btns}</div>"
+            f"{bodies}</div>")
 
 
 def panel(pid, body, cta=None):
@@ -636,6 +665,18 @@ def panel(pid, body, cta=None):
                 f"<span aria-hidden='true'> &rarr;</span></button></p>")
     return (f"<section id='{esc(pid)}' class='panel' role='tabpanel' "
             f"aria-labelledby='choose-{esc(pid)}' hidden>{body}{tail}</section>")
+
+
+def explore_body(bar, panels):
+    """The bar and both reports as one block, because that block is the bar's travel.
+
+    ``position:sticky`` moves only inside its containing block, and the containing block
+    of a grid item is its own grid area — one row, as tall as the buttons — so a sticky
+    bar left in ``#explore``'s grid would have nowhere to go. This plain div holds the
+    bar and both panels, so the bar pins for exactly as long as a report is being read
+    and is released at the end of it, before the footer.
+    """
+    return f"<div class='explore-body'>{bar}{panels}</div>"
 
 
 CSS = """
@@ -680,7 +721,8 @@ grid-template-columns:[text-start] minmax(0,38rem) [text-end] minmax(0,1fr) [ful
 scroll-margin-top:2.5rem}
 section>*{grid-column:text-start/text-end}
 section>figure,section>.tiles,section>.scroll,section>.pair,section>details,
-section>.choices,section>.lbtns,section>.cmp-wrap{grid-column:text-start/full-end}
+section>.explore-body,section>.lbtns,section>.cmp-wrap,
+section>.carousel{grid-column:text-start/full-end}
 section+section{margin-top:5rem}
 /* The panel is a section, so its own display:grid would beat the browser's default
    [hidden] rule. It has to be said out loud. */
@@ -716,8 +758,18 @@ text-wrap:balance;font-variant-numeric:proportional-nums}
 h2{font:600 1.55rem/1.2 var(--serif);letter-spacing:-.011em;margin:0 0 .4rem;text-wrap:balance}
 h3{font:600 1.1rem/1.3 var(--serif);margin:2.3rem 0 .3rem;text-wrap:balance}
 /* Every beat inside a report is its own deep-link target, so it needs the same
-   headroom a section gets. */
-h3[id]{scroll-margin-top:4.5rem}
+   headroom a section gets — and inside a report the chooser is pinned to the top of the
+   screen, so the headroom has to clear the bar as well. The bar is 5.21rem:
+
+     .choicebar padding  .8 + .8                = 1.600rem
+     .choice padding     1 + 1                  = 2.000rem
+     .choice line box    1.14rem x 1.3          = 1.482rem
+     .choice border      2 x 1px                = 0.125rem
+
+   7rem is that plus air. Stated in CSS rather than measured in the script because a
+   native fragment jump reads it too, and test_a_deep_linked_beat_lands_clear_of_the_bar
+   recomputes the sum from these same declarations. */
+h3[id]{scroll-margin-top:7rem}
 h4{font:650 .82rem/1.35 var(--sans);margin:1.5rem 0 .4rem;color:var(--text-primary)}
 p{margin:0 0 1.05em;color:var(--text-secondary);text-wrap:pretty}
 ul{color:var(--text-secondary);padding-left:20px;margin:0 0 1.05em}li{margin:.3em 0}
@@ -732,10 +784,22 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
 .choose-q{font:1.22rem/1.5 var(--serif);color:var(--text-primary);margin:0 0 1.4rem}
 /* The choice lines up with the thing being chosen: 40rem centred on the page is exactly
    the two dataset columns above (2 x 20rem), so each button sits under its own column.
-   Its heading centres over them for the same reason. */
-#explore h2{grid-column:text-start/full-end;text-align:center;margin-bottom:2rem}
+   Its heading centres over them for the same reason.
+
+   The child combinator is load-bearing: both reports live INSIDE #explore now (that is
+   what gives the sticky bar its travel), and each opens with its own <h2>, so a
+   descendant selector here centres and stretches both report titles too. */
+#explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem}
+/* The bar's travel. min-width:0 for the reason main has it: it is a grid item now, and a
+   grid track takes its automatic minimum from the item's min-content size. */
+.explore-body{min-width:0}
+/* Pinned to the top of the screen for as long as a report is being read, carrying the
+   page's own background so the report scrolls under it and out of sight. Full column
+   width, not the buttons' 40rem, or a figure would scroll up either side of it.
+   z-index:5 sits under #tip (9) and .skip:focus (20) and over everything else. */
+.choicebar{position:sticky;top:0;z-index:5;background:var(--surface-0);padding:.8rem 0}
 .choices{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;
-width:min(100%,40rem);margin:0 auto 1rem}
+width:min(100%,40rem);margin:0 auto}
 /* Two names and an arrow, in the accent. The cream fill with a border was doing duty as
    a button, a card, a chip and a code block at once, and had stopped meaning anything;
    an outline in the accent that fills when you choose says "this is a control". */
@@ -747,7 +811,7 @@ text-align:left}
 .choice[aria-selected=true]{background:var(--accent);border-color:var(--accent);
 color:var(--surface-0)}
 .choice-a{font:400 1.1rem/1 var(--sans);opacity:.8}
-.panel{margin-top:3.2rem}
+.panel{margin-top:3.2rem;scroll-margin-top:7rem}
 .panel-cta{margin:3rem 0 0;padding-top:1.2rem;border-top:1px solid var(--border)}
 /* The primary button: the same shape as the outline ones, filled. It is the one thing
    the page asks a reader to do at the end of a report. */
@@ -889,6 +953,16 @@ summary .sum-m{color:var(--text-muted);font-weight:400}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.1rem 0}
 .pane{min-width:0}
 .pane-h{margin-top:0;color:var(--text-muted)}
+/* The example carousel. Same outline-button family as .choice, one size down: a record
+   id is a label, not a title, so it takes the mono face the ids use everywhere else. */
+.carousel{margin:1.1rem 0}
+.tabs{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem}
+.tab{padding:.4rem .75rem;background:none;border:1px solid var(--accent-edge);
+border-radius:4px;cursor:pointer;font:600 .88rem/1.3 var(--mono);color:var(--accent)}
+.tab:hover{background:var(--accent-wash)}
+.tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);
+color:var(--surface-0)}
+.pane-x>h4:first-child{margin-top:0}
 .resp{white-space:pre-wrap;font-size:.94rem;line-height:1.6;color:var(--text-primary);
 border-left:2px solid var(--hairline);padding-left:.9rem}
 .pane.pipeline .resp{border-left-color:var(--series-3)}
@@ -946,8 +1020,17 @@ z-index:9;max-width:320px}
 .cmp-k{width:8rem;white-space:normal;text-align:left}.cmp thead th{width:auto}}
 @media (max-width:760px){section{grid-template-columns:minmax(0,1fr)}
 section>*{grid-column:1}.pair{grid-template-columns:1fr}
-.choices{grid-template-columns:1fr}}
+/* The bar stays pinned on a phone, so it has to stay ONE ROW: stacking the two buttons
+   is ~10rem of permanent chrome, a quarter of a small screen. Two columns and tighter
+   type instead. A bare font-size keeps the .choice shorthand's 1.3 line-height. */
+.choicebar{padding:.6rem 0}.choices{gap:.7rem}
+.choice{padding:.7rem .8rem;font-size:1rem}}
 @media (max-width:620px){body{font-size:1rem}.shell{padding:0 16px 70px}
+/* Tighter again, and the arrow goes: at this width both labels wrap to two lines and
+   space-between drops the arrow beside a ragged edge. It is decorative — the pair still
+   reads as a control. */
+.choicebar{padding:.5rem 0}.choices{gap:.6rem}
+.choice{padding:.6rem .7rem;font-size:.95rem}.choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
@@ -958,7 +1041,7 @@ h1{font-size:1.9rem}h2{font-size:1.3rem}.lede{font-size:1.1rem}
 @page{margin:16mm 14mm}
 :root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
 body{font-size:10.5pt;line-height:1.5}
-#tip,.skip,.choices,.panel-cta{display:none}
+#tip,.skip,.choicebar,.panel-cta{display:none}
 .shell,section{display:block;max-width:none}
 .hero{padding:0 0 1.5rem;display:block;text-align:left}
 /* A sheet of paper is narrower than the bleed the centred pair needs, and the labels
@@ -966,8 +1049,10 @@ body{font-size:10.5pt;line-height:1.5}
 .cmp-wrap{position:static;left:auto;transform:none;width:100%;overflow:visible}
 .cmp{table-layout:auto;width:100%;margin-left:0}
 /* A printed page is not a page anyone can click, so both reports print, whichever
-   one is open on screen. */
-.panel[hidden]{display:block!important}
+   one is open on screen — and every example in the carousel prints, not just the tab
+   that happened to be showing. */
+.panel[hidden],.pane-x[hidden]{display:block!important}
+.tabs{display:none}
 p,ul,.dek,.fig-c,.fig-n,.lede{max-width:none}
 h1,h2,h3,h4,.fig-t,.dek{break-after:avoid-page}
 figure,.tiles,table,.pair,blockquote{break-inside:avoid-page}
@@ -989,42 +1074,55 @@ if(!el){t.style.opacity=0;return;}t.textContent=el.getAttribute('data-tip');t.st
 document.addEventListener('mousemove',function(e){if(t.style.opacity=='1'){
 t.style.left=Math.min(e.clientX+12,window.innerWidth-t.offsetWidth-8)+'px';
 t.style.top=(e.clientY-32)+'px';}});
+/* The example carousel. Its own block, and before the chooser's early return, because a
+   page can carry examples without carrying a chooser. One pane is already visible in the
+   markup, so with this script absent the carousel still shows a record. */
+[].forEach.call(document.querySelectorAll('.carousel'),function(c){
+var tabs=[].slice.call(c.querySelectorAll('.tab'));
+tabs.forEach(function(b){b.addEventListener('click',function(){
+tabs.forEach(function(o){var on=o===b;o.setAttribute('aria-selected',on?'true':'false');
+var p=document.getElementById(o.getAttribute('data-pane'));
+if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});});});});
 var choices=[].slice.call(document.querySelectorAll('.choice'));
 if(!choices.length)return;
-function open(id,scroll){
+/* Where the bar SITS, not where it is painted. Once sticky takes hold, the bar's own
+   getBoundingClientRect() and offsetTop both report the shifted position, so measuring
+   from it would scroll to wherever the reader already was. .explore-body never moves and
+   the bar is its first child, so its top IS the bar's flow top — which is also the
+   sticky threshold, so nothing jumps as the bar pins. */
+var flow=document.querySelector('.explore-body');
+function open(id,to){
 choices.forEach(function(b){var on=b.getAttribute('data-panel')===id;
 b.setAttribute('aria-selected',on?'true':'false');
 var p=document.getElementById(b.getAttribute('data-panel'));
 if(p){if(on){p.removeAttribute('hidden');}else{p.setAttribute('hidden','');}}});
-if(!scroll)return;
-var t=document.getElementById(scroll===true?id:scroll),y;
-if(!t)return;
-/* Switching report scrolls the buttons exactly out of frame: the chooser reappearing
-   above a report you have just opened reads as the page moving under you. A deep link
-   to a beat INSIDE a report goes to the beat instead, with air above it. */
-if(t.classList.contains('panel')){var c=document.querySelector('.choices');
-y=c?c.getBoundingClientRect().bottom+window.pageYOffset:0;}
-else{y=t.getBoundingClientRect().top+window.pageYOffset-96;}
-window.scrollTo({top:y,behavior:'smooth'});}
+if(!to)return;
+var target=document.getElementById(to===true?id:to);
+if(!target)return;
+/* Choosing a report puts the bar at the top of the screen; a deep link to a beat INSIDE
+   a report goes to the beat, clear of the pinned bar. Both are scrollIntoView plus
+   scroll-margin-top rather than arithmetic: the headroom the bar needs is stated once,
+   in the CSS, where a native fragment jump reads it too — and the smoothness stays
+   html{scroll-behavior}, so prefers-reduced-motion can still turn it off. */
+(target.classList.contains('panel')&&flow?flow:target).scrollIntoView();}
 function mark(id){if(history.replaceState)history.replaceState(null,'','#'+id);
 else location.hash=id;}
 /* A hash may name a panel (#dad) or anything inside one (#dad-weak, from a quoted
    finding). Either way the panel it lives in is the one to open. */
-function fromHash(scroll){var id=(location.hash||'').slice(1);if(!id)return false;
+function fromHash(){var id=(location.hash||'').slice(1);if(!id)return false;
 var el=document.getElementById(id);var p=el&&el.closest?el.closest('.panel'):null;
-if(!p)return false;open(p.id,scroll?id:false);
-if(!scroll&&el.scrollIntoView)el.scrollIntoView();return true;}
-choices.forEach(function(b){b.addEventListener('click',function(){
-var id=b.getAttribute('data-panel');open(id,false);mark(id);});});
-[].forEach.call(document.querySelectorAll('.cta'),function(b){
+if(!p)return false;open(p.id,id);return true;}
+/* One handler for both: a tab and the end-of-report button open a report and put the bar
+   back at the top of the screen. */
+[].forEach.call(document.querySelectorAll('.choice,.cta'),function(b){
 b.addEventListener('click',function(){var id=b.getAttribute('data-panel');
 open(id,true);mark(id);});});
-window.addEventListener('hashchange',function(){fromHash(true);});
+window.addEventListener('hashchange',fromHash);
 /* Wait for load, not parse: the hero image is a data URI several megabytes long, and
    scrolling to a deep-linked beat before it has laid out puts the reader thousands of
    pixels away from it once the image finally takes up its space. */
-if(document.readyState==='complete')fromHash(false);
-else window.addEventListener('load',function(){fromHash(false);});})();
+if(document.readyState==='complete')fromHash();
+else window.addEventListener('load',fromHash);})();
 """
 
 
