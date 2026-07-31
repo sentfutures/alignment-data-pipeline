@@ -72,7 +72,7 @@ class TestDealScenarios:
             assert sev in VALUES["severity"] and scope in VALUES["scope"]
 
     def test_frontier_frames_track_their_weights(self):
-        # no presence floor anymore: the slice is whatever the weights deal.
+        # no "at least one of each" rule: the slice is whatever the weights deal.
         # At n=100 every frame's quota is exact, so the count is deterministic.
         batch = cs.deal_scenarios(100, random.Random(2))
         framed = [p for p in batch if p["frontier_frame"]]

@@ -27,9 +27,9 @@ Structure the weights can't express lives HERE, as named constants:
   axis's dealt quotas — and the checklist's marginal counts — stay exactly
   what the weights promised. Values are referenced by leading-words prefix
   (resolve_value), validated at deal time.
-  There are deliberately NO small-run presence floors: the weights alone
-  decide what a run contains, so a smoke run may miss a rare slice (and a
-  small n can round an archetype's quota to zero).
+  There is deliberately no "at least one of each" rule: the weights alone
+  decide what a run contains, so a smoke run may miss a rare slice entirely
+  (and a small n can round an archetype's quota to zero).
 
 Usage (offline, zero API calls)::
 
