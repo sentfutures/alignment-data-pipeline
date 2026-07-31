@@ -24,7 +24,22 @@ says so below, and the cost is per run rather than per example.
 | `compliance_sdf.py` | SDF | Judges each document against the violation-typology appendix of the sentient-beings constitution reading, which supplies the rubric verbatim. Paid. |
 | `report_sdf.py` | SDF | Builds a self-contained HTML report for a run. Offline. |
 | `review_tics.py` | DAD | Command-line triage for the tic-candidate queue: promote a candidate to the watchlist or dismiss it. Offline. |
-| `publish_hf.py` | both | Publishes a run's corpus and audit reports to a Hugging Face dataset. Not a measurement, and never a routine step: see the warning in `CLAUDE.md` before running it. |
+| `publish_hf.py` | both | Publishes a run's corpus and audit reports to a Hugging Face dataset. Not a measurement. See the warning below before running it. |
+
+## Before running `publish_hf.py`
+
+Publishing is a deliberate, human-initiated action, not a post-run step. It
+writes to a public dataset repository, so run it only when a person has asked
+for one specific run to be published, and confirm which run that is first. Most
+runs are exploratory and were never meant to become, or to overwrite, the
+published snapshot.
+
+Two consequences are easy to miss. Publishing one pipeline regenerates the
+whole dataset card, so the script reads the other pipeline's metadata back off
+the Hub to rebuild its half. And audit files are staged verbatim, so anything a
+report happens to record about the machine that produced it goes public with it.
+`--dry-run` stages everything and prints the card without making a single
+network call.
 
 `tics.yaml` and `moves.yaml` are the tracked-phrase and tracked-move lists that
 `audit_dad.py` counts against, with their dismissed candidates. They are edited
