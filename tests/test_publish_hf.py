@@ -335,7 +335,7 @@ class TestFlattenDadCorpus:
         assert "鶏の福祉について" in raw
 
 
-def _dad_manifest(run_id, backend="bedrock"):
+def _dad_manifest(run_id, backend="api"):
     return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
             "git_commit": "abc1234", "model": "claude-sonnet-5",
             "config": {"backend": backend,

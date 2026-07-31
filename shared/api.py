@@ -1,14 +1,7 @@
 """Anthropic API wrapper with retry logic and cost tracking.
 
-Four backends behind the same call_claude() contract:
+Three backends behind the same call_claude() contract:
 - "api" (default): the anthropic SDK, billed to the shared ANTHROPIC_API_KEY.
-- "bedrock": the same models served by AWS Bedrock via the anthropic SDK's
-  AnthropicBedrock client, billed to shared AWS credits (bearer key
-  CHAD_AWS_BEDROCK_KEY in .env, us-east-1; credits expire ~2026-07-30).
-  Same request semantics as "api" — max_tokens enforced, no CLI scaffolding —
-  but a different serving stack; config model names are translated to Bedrock
-  model ids at the wire (claude-fable-5 deliberately unsupported, see
-  _BEDROCK_MODEL_IDS).
 - "claude_code": the Claude Agent SDK driving the Claude Code CLI, billed to
   the contributor's own Claude subscription (Claude Code login, or a
   CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`).
@@ -47,7 +40,7 @@ from tenacity import (
 load_dotenv()
 
 _config: dict = {}
-_client: anthropic.Anthropic | anthropic.AnthropicBedrock | None = None
+_client: anthropic.Anthropic | None = None
 _cost_log_path: Path | None = None
 _backend: str = "api"
 # call_claude may run from worker threads (utils.parallel_map); the Anthropic
@@ -71,40 +64,7 @@ _PRICING = {
 }
 _UNPRICED_WARNED: set = set()
 
-_BACKENDS = ("api", "claude_code", "auto", "bedrock")
-
-# bedrock backend: a Bedrock long-term API key (bearer token, not IAM creds),
-# shared team credits. Model ids are Bedrock's own, verified live 2026-07-20
-# (AWS_BEDROCK_HANDOFF doc): Opus/Sonnet accept the short "us.anthropic."
-# alias, Haiku ONLY the fully versioned id. claude-fable-5 is deliberately
-# absent — on Bedrock it requires an account-wide provider_data_share
-# data-retention opt-in the account owner has not made (and the pipeline
-# avoids fable anyway: it conflicts with thinking=disabled, see config.yaml).
-_BEDROCK_KEY_ENV = "CHAD_AWS_BEDROCK_KEY"
-_BEDROCK_REGION = "us-east-1"
-_BEDROCK_MODEL_IDS = {
-    "claude-opus-4-8": "us.anthropic.claude-opus-4-8",
-    "claude-opus-5": "us.anthropic.claude-opus-5",  # same alias pattern; verified live 2026-07-26
-    "claude-sonnet-5": "us.anthropic.claude-sonnet-5",
-    "claude-haiku-4-5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "claude-haiku-4-5-20251001": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-}
-
-
-def _bedrock_model_id(model: str) -> str:
-    """Translate a config model name to its Bedrock id, failing loudly for
-    models this backend doesn't serve (a wrong id would otherwise surface as a
-    cryptic Bedrock 400 mid-run)."""
-    try:
-        return _BEDROCK_MODEL_IDS[model]
-    except KeyError:
-        raise ValueError(
-            f"model {model!r} is not available on the bedrock backend "
-            f"(known: {sorted(_BEDROCK_MODEL_IDS)}). claude-fable-5 is "
-            "deliberately unsupported (account-wide data-retention opt-in "
-            "required); for other models add the verified Bedrock id to "
-            "shared/api.py _BEDROCK_MODEL_IDS."
-        ) from None
+_BACKENDS = ("api", "claude_code", "auto")
 
 # auto backend: why the subscription path is currently out of play (None =
 # still in play). Set once per run, loudly — after a demotion every remaining
@@ -181,34 +141,21 @@ def init(config_path: str = "config.yaml", cost_log_path: str | Path | None = No
     # calls (the DAD baseline arm) that claude_code cannot reproduce exactly.
     if _backend in ("api", "auto") and not os.environ.get("ANTHROPIC_API_KEY"):
         raise KeyError("ANTHROPIC_API_KEY")
-    # bedrock authenticates via the shared Bedrock bearer key instead.
-    if _backend == "bedrock" and not os.environ.get(_BEDROCK_KEY_ENV):
-        raise KeyError(_BEDROCK_KEY_ENV)
     _client = None  # constructed lazily; the claude_code backend needs no API key
     _cost_log_path = Path(cost_log_path or _config["outputs"]["cost_log"])
     _cost_log_path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _get_client() -> anthropic.Anthropic | anthropic.AnthropicBedrock:
+def _get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
-        if _backend == "bedrock":
-            key = os.environ.get(_BEDROCK_KEY_ENV)
-            if not key:
-                raise RuntimeError(
-                    f"backend 'bedrock' requires {_BEDROCK_KEY_ENV} in .env "
-                    "(the shared AWS Bedrock bearer key); set it, or switch "
-                    "config.yaml back to backend: api"
-                )
-            _client = anthropic.AnthropicBedrock(api_key=key, aws_region=_BEDROCK_REGION)
-        else:
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise RuntimeError(
-                    "backend 'api' requires ANTHROPIC_API_KEY in .env; "
-                    "set it, or switch config.yaml to backend: claude_code"
-                )
-            _client = anthropic.Anthropic(api_key=api_key)
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "backend 'api' requires ANTHROPIC_API_KEY in .env; "
+                "set it, or switch config.yaml to backend: claude_code"
+            )
+        _client = anthropic.Anthropic(api_key=api_key)
     return _client
 
 
@@ -341,9 +288,8 @@ _ADAPTIVE_THINKING_PREFIXES = ("claude-fable", "claude-mythos")
 
 def _requires_adaptive_thinking(model: str) -> bool:
     """Mythos-class models cannot run with thinking disabled (400); callers
-    omit the flag for them and rely on _response_text to strip the blocks.
-    Accepts either a config model name or a Bedrock 'us.anthropic.'-prefixed id."""
-    return model.removeprefix("us.anthropic.").startswith(_ADAPTIVE_THINKING_PREFIXES)
+    omit the flag for them and rely on _response_text to strip the blocks."""
+    return model.startswith(_ADAPTIVE_THINKING_PREFIXES)
 
 
 # Models that reject sampling parameters (temperature/top_p/top_k) with a 400:
@@ -359,9 +305,8 @@ _NO_SAMPLING_PREFIXES = (
 def _accepts_sampling_params(model: str) -> bool:
     """False for models that 400 on temperature/top_p/top_k (Claude 5 family,
     Opus 4.7+). Callers pass temperature unconditionally; this gates whether it
-    reaches the API. Accepts either a config model name or a Bedrock
-    'us.anthropic.'-prefixed id."""
-    return not model.removeprefix("us.anthropic.").startswith(_NO_SAMPLING_PREFIXES)
+    reaches the API."""
+    return not model.startswith(_NO_SAMPLING_PREFIXES)
 
 
 def _response_text(response: anthropic.types.Message) -> str:
@@ -701,14 +646,9 @@ def call_claude(
             "cache_control": {"type": "ephemeral"},
         }]
 
-    # bedrock serves the same models under its own ids; translate at the wire
-    # only, so logging/pricing and the model-behavior prefix checks keep using
-    # the config name.
-    wire_model = _bedrock_model_id(resolved_model) if _backend == "bedrock" else resolved_model
-
     response = _call_with_retry(
         client=_get_client(),
-        model=wire_model,
+        model=resolved_model,
         max_tokens=resolved_max,
         system=system_arg,
         messages=[{"role": "user", "content": user_message}],
@@ -722,7 +662,7 @@ def call_claude(
                cache_creation_tokens=getattr(usage, "cache_creation_input_tokens", 0) or 0,
                cache_read_tokens=getattr(usage, "cache_read_input_tokens", 0) or 0,
                # auto runs demoted to this path are still served by the api
-               backend="bedrock" if _backend == "bedrock" else "api")
+               backend="api")
     # A completion that stopped for any reason other than end_turn/stop_sequence
     # is suspect — max_tokens truncates mid-text, refusal yields little or none.
     # Warn loudly so it isn't silently written into a corpus; callers that build

@@ -9,11 +9,6 @@
 #        plain-model condition stays exact, and an exhausted usage window falls
 #        back to the api mid-run. Caveats vs api: max_tokens not enforced and
 #        ~3K tokens of CLI scaffolding in context on subscription-served calls.
-# bedrock = the same models served by AWS Bedrock, billed to shared AWS credits
-#           (bearer key CHAD_AWS_BEDROCK_KEY in .env, us-east-1). Same request
-#           semantics as api (max_tokens enforced, no scaffolding) but a different
-#           serving stack. Credits expire ~2026-07-30 — flip back to api after.
-#           claude-fable-5 is not served on this backend (see shared/api.py).
 backend: api
 model: claude-sonnet-5
 max_tokens: 4000

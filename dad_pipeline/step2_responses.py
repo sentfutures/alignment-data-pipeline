@@ -56,7 +56,7 @@ MAX_SCOPE_ATTEMPTS = 3
 # viewer re-render reproduce the same draw. Opener variety must come from
 # code-level sampling, not from asking the model to vary: at temperature 1 the
 # scope + library context converges every reply onto the same few openers.
-# Same mechanism as SDF's STRUCTURE_HINTS (adapted from the CAML notebook),
+# Same mechanism as SDF's STRUCTURE_HINTS,
 # which fixed templated openings on the document side.
 OPENING_HINTS = [
     "open on the concrete detail carrying the most weight",

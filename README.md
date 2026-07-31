@@ -121,7 +121,7 @@ Install the dependencies into a virtual environment so they stay isolated from y
 ### Clone the repo
 Open your terminal app and `cd` to a directory where you want the repo (i.e. `cd ~/projects`), then run:
 ```bash
-git clone https://github.com/Mycelium-tools/alignment-data-pipeline.git
+git clone https://github.com/sentfutures/alignment-data-pipeline.git
 cd alignment-data-pipeline
 ```
 
@@ -163,7 +163,7 @@ Caveats for `backend: claude_code`:
 - **Usage limits.** Subscription usage is a 5-hour rolling window plus a weekly cap, shared with your interactive Claude Code use. Dev-scale runs fit comfortably; a full-scale run will exhaust the window. If a run hits the limit it stops with a clear message. Progress is checkpointed, so continue later with `--resume`.
 - **Per-call overhead.** Claude Code adds ~3K input tokens of scaffolding per call and spawns a CLI process per request, so calls are somewhat slower. `max_tokens` from `config.yaml` is not enforced on this backend (Claude Code applies its own output cap); `cost_usd` in the cost log is notional: what the run *would* have cost at API prices.
 - **Empty system prompts get a neutral stand-in.** Claude Code substitutes its own agentic CLI prompt when the system prompt is empty, so stages that send none get a one-line neutral system prompt instead (see `_NEUTRAL_SYSTEM` in `shared/api.py`). The only empty-system call in the pipelines is the **DAD baseline** (every generation stage sends a real system prompt). On `auto` the baseline always takes the API leg for exactly this reason, but on pure `claude_code` it gets the stand-in and is **not reproduced exactly**. The backend prints a one-time warning when it does this. Run DAD on `backend: api` when a faithful plain-model baseline matters (and keep full-scale corpus runs on `api` regardless).
-- **Policy note.** Anthropic's docs steer programmatic workloads toward API keys; running this internal tool on your own subscription is the same posture as using Claude Code itself, but it's a gray area. Keep it to dev-scale runs.
+- **Policy note.** Anthropic's docs steer programmatic workloads toward API keys; running this pipeline on your own subscription is the same posture as using Claude Code itself, but it's a gray area. Keep it to dev-scale runs.
 
 ---
 

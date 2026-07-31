@@ -502,7 +502,7 @@ if "delivery" not in report:
 
 # Run cost + cost-by-stage: an operational metric, not the dataset's usefulness
 # story — demoted into an expander so it doesn't compete with the headline
-# (Oliver: keep low-value operational metrics out of the overview).
+# (keep low-value operational metrics out of the overview).
 run_cost = loader.total_cost(run.run_dir)
 cost_stages = loader.cost_by_stage(run.run_dir)
 if run_cost or cost_stages:

@@ -278,11 +278,11 @@ def vendi_score(X: np.ndarray) -> float:
 
 def kmeans_evenness(X: np.ndarray, k: int | None = None, seed: int = 0,
                     iters: int = 60, return_labels: bool = False):
-    """Topic evenness, the CaML-report analog: k-means over the (unit) doc
+    """Topic evenness: k-means over the (unit) doc
     embeddings, then the normalized entropy of cluster sizes (1.0 = topics
     perfectly even) and the largest cluster's share. Plain numpy k-means++
     (cosine via normalized centroids) — no new dependency; deterministic via
-    seed. k defaults to n/5 capped at 50 (CaML used 50 at n≈5.6k).
+    seed. k defaults to n/5 capped at 50.
     return_labels=True returns (stats, labels) so callers can say WHAT is in
     each cluster; the default stays the bare stats dict."""
     n = len(X)
@@ -351,7 +351,7 @@ def pca_coords(X: np.ndarray) -> np.ndarray:
     return (U[:, :2] * S[:2]).astype(float)
 
 
-# Idea-level diversity (CaML-report analog): each record is reduced to a
+# Idea-level diversity: each record is reduced to a
 # one-line scenario summary; summaries are embedded and near neighbours
 # counted. Catches the same idea re-skinned across registers/settings, which
 # document-level embeddings miss.
@@ -648,7 +648,7 @@ def main() -> None:
 
     # Per-scope distributions (prompts / responses / combined), stored with the
     # raw nearest-neighbour sims and sorted cluster sizes so the viewer can
-    # draw the CaML-style chart rows (NN histogram · topic-spread bars · cloud).
+    # draw the diversity chart rows (NN histogram · topic-spread bars · cloud).
     # Chat corpora get all three scopes; document corpora just the combined one.
     def _scope_block(s_ids: list, s_texts: list, S: np.ndarray) -> dict:
         s_sims, _ = nearest_neighbors(S)
