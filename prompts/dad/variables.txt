@@ -49,9 +49,9 @@
 #   - {length} is an instruction to the model only (never measured or
 #     enforced); {taxa_category} values map to their hint/species entries
 #     (TAXA in compose_scenarios.py) by leading-words prefix.
-# There are deliberately NO small-run presence floors: the weights alone
+# There is deliberately no "at least one of each" rule: the weights alone
 # decide what a run contains, so a small smoke run may miss a rare slice
-# (a trap, a frontier frame, a specific length register).
+# entirely (a trap, a frontier frame, a specific length register).
 #
 # Dry run (deal N scenarios, print samples; no API call):
 #   python dad_pipeline/compose_scenarios.py --n 10 --seed 0
