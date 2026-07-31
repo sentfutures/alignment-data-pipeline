@@ -3,8 +3,7 @@
   "configurations": [
     {
       "name": "viewer",
-      "runtimeExecutable": ".venv/bin/streamlit",
-      "runtimeArgs": ["run", "viewer/app.py", "--server.headless", "true", "--server.port", "8501"],
+      "url": "http://localhost:8501",
       "port": 8501
     }
   ]

@@ -53,17 +53,29 @@ KNOWN_AUDIT_FILES = {
 
 
 def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MANIFEST,
-                  include_html=True, extra_audit_files=None):
+                  include_html=True, extra_audit_files=None, run_name=None):
     """Build a fake run directory with the given audit files present.
 
     audit_files=None means "all six known + report_content.json + html";
-    pass a subset of KNOWN_AUDIT_FILES' keys to omit others.
+    pass a subset of KNOWN_AUDIT_FILES' keys to omit others. run_name lets a
+    combined-publish test build several distinct run dirs under one tmp_path.
     """
-    run_dir = tmp_path / "runs" / "2026-07-25_15-57_fullscale-500-opus5"
+    run_dir = tmp_path / "runs" / (run_name or "2026-07-25_15-57_fullscale-500-opus5")
     final = run_dir / "final"
     final.mkdir(parents=True)
     corpus_name = "sdf_corpus.jsonl" if pipeline == "sdf" else "dad_corpus.jsonl"
-    lines = [json.dumps({"doc_id": f"d{i}", "content": f"document {i}"}) for i in range(docs)]
+    if pipeline == "sdf":
+        lines = [json.dumps({"doc_id": f"d{i}", "content": f"document {i}"})
+                 for i in range(docs)]
+    else:
+        lines = [json.dumps({
+            "record_id": f"r{i}", "example_gid": f"E-{i:04d}",
+            "response_gid": f"R-{i:04d}",
+            "messages": [
+                {"role": "user", "content": f"user prompt {i}"},
+                {"role": "assistant", "content": f"assistant response {i}"},
+            ],
+        }) for i in range(docs)]
     (final / corpus_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     if manifest is not None:
@@ -91,7 +103,8 @@ def _stage(run_dir, corpus_name, staging_dir):
     """stage_run for the pipeline implied by corpus_name, plus the per-pipeline
     dataset dir it staged into (what build_metrics_rows/build_card now read)."""
     tag = _tag_for(corpus_name)
-    staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir, tag)
+    run_dirs = run_dir if isinstance(run_dir, list) else [run_dir]
+    staged = publish_hf.stage_run(run_dirs, corpus_name, staging_dir, tag)
     return staged, staging_dir / tag
 
 
@@ -222,14 +235,14 @@ class TestStageRun:
         published before it can even be copied."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir, "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir, "sdf")
         # the run must survive the rejected attempt intact
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_that_contains_run_dir_is_rejected(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir.parent, "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir.parent, "sdf")
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_equal_to_run_final_is_rejected(self, tmp_path):
@@ -239,13 +252,13 @@ class TestStageRun:
         and rmtree then deleted the corpus before it could be copied."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir / "final", "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir / "final", "sdf")
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_equal_to_run_audit_is_rejected(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir / "audit", "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir / "audit", "sdf")
         assert (run_dir / "audit" / "audit_report.json").exists()
 
     def test_staging_dir_nested_inside_run_dir_is_allowed(self, tmp_path):
@@ -258,6 +271,143 @@ class TestStageRun:
         staged, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
         assert staged["corpus_file"] == corpus_name
         assert (run_dir / "final" / corpus_name).exists()
+
+
+class TestFlattenDadCorpus:
+    def test_staged_dad_records_are_flat_columns(self, tmp_path):
+        """The published copy shows one column per field (example_gid,
+        user_prompt, assistant_response) — no messages array, no role keys."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["n_docs"] == 2
+        lines = (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()
+        records = [json.loads(line) for line in lines]
+        assert len(records) == 2
+        for i, rec in enumerate(records):
+            assert set(rec) == {"example_gid", "source_run",
+                                "user_prompt", "assistant_response"}
+            assert rec["example_gid"] == f"E-{i:04d}"
+            assert rec["source_run"] == MANIFEST["run_id"]
+            assert rec["user_prompt"] == f"user prompt {i}"
+            assert rec["assistant_response"] == f"assistant response {i}"
+
+    def test_local_training_corpus_is_left_untouched(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        src = run_dir / "final" / corpus_name
+        before = src.read_text(encoding="utf-8")
+        _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert src.read_text(encoding="utf-8") == before
+        assert "messages" in before  # the SFT chat shape stays on disk
+
+    def test_sdf_corpus_is_copied_verbatim(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="sdf", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        src = (run_dir / "final" / corpus_name).read_text(encoding="utf-8")
+        assert (dataset_dir / corpus_name).read_text(encoding="utf-8") == src
+
+    def test_record_without_assistant_message_aborts(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        bad = {"example_gid": "E-9999",
+               "messages": [{"role": "user", "content": "only a user turn"}]}
+        (run_dir / "final" / corpus_name).write_text(
+            json.dumps(bad) + "\n", encoding="utf-8")
+        with pytest.raises(SystemExit, match="E-9999"):
+            _stage(run_dir, corpus_name, tmp_path / "staged")
+
+    def test_non_ascii_content_is_not_escaped(self, tmp_path):
+        """The corpus is multilingual; published rows must keep native script
+        readable, not \\uXXXX escapes."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        rec = {"example_gid": "E-0001", "messages": [
+            {"role": "user", "content": "鶏の福祉について"},
+            {"role": "assistant", "content": "丁寧に考えます"},
+        ]}
+        (run_dir / "final" / corpus_name).write_text(
+            json.dumps(rec, ensure_ascii=False) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "鶏の福祉について" in raw
+
+
+def _dad_manifest(run_id, backend="bedrock"):
+    return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
+            "git_commit": "abc1234", "model": "claude-sonnet-5",
+            "config": {"backend": backend,
+                       "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+
+
+class TestCombinedPublish:
+    def _two_runs(self, tmp_path, second_audit=False):
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200"))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3,
+            audit_files=["diversity_report.json"] if second_audit else [],
+            include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
+        return [run_a, run_b], corpus_name
+
+    def test_corpora_concatenate_with_per_row_source_run(self, tmp_path):
+        run_dirs, corpus_name = self._two_runs(tmp_path)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        assert staged["n_docs"] == 5
+        assert [r["n_docs"] for r in staged["runs"]] == [2, 3]
+        records = [json.loads(line) for line in
+                   (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()]
+        assert [r["source_run"] for r in records] == (
+            ["2026-07-28_17-32_pareto200"] * 2
+            + ["2026-07-29_23-58_archetype1000"] * 3)
+
+    def test_manifests_and_audits_are_run_scoped(self, tmp_path):
+        """Several runs in one dataset dir must not collide on filenames:
+        manifests land under manifests/<run_id>.json and audit files under
+        audit/<run_id>/."""
+        run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        assert not (dataset_dir / "run_manifest.json").exists()
+        assert (dataset_dir / "manifests" / "2026-07-28_17-32_pareto200.json").exists()
+        assert (dataset_dir / "manifests" / "2026-07-29_23-58_archetype1000.json").exists()
+        assert staged["audit_files"] == [
+            "2026-07-29_23-58_archetype1000/diversity_report.json"]
+        assert (dataset_dir / "audit" / "2026-07-29_23-58_archetype1000"
+                / "diversity_report.json").exists()
+
+    def test_card_section_renders_per_run_table(self, tmp_path):
+        run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+
+        assert "5 chat examples." in card
+        assert "`source_run`" in card
+        assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
+        assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
+        # per-run metrics line only for the run that has an audit
+        assert "**`2026-07-29_23-58_archetype1000`** — Semantic diversity" in card
+        assert "dad/audit/2026-07-29_23-58_archetype1000/" in card
+        # the frontmatter still declares exactly one dad config
+        fm = yaml.safe_load(card.split("---")[1])
+        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+
+    def test_single_run_layout_is_unchanged(self, tmp_path):
+        """One --input keeps the original shape: top-level run_manifest.json,
+        flat audit/, no manifests/ dir."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert staged["manifest_file"] == "run_manifest.json"
+        assert (dataset_dir / "run_manifest.json").exists()
+        assert not (dataset_dir / "manifests").exists()
 
 
 class TestBuildMetricsRows:
@@ -717,7 +867,13 @@ class TestMainEndToEnd:
         calls = stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
         upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert upload["delete_patterns"] == ["dad/audit/*", "dad/card_meta.json"]
+        # run_manifest.json + manifests/* are both cleared so a publish that
+        # switches layout (single-run <-> combined) can't leave the other
+        # layout's manifest file(s) behind; upload_folder keeps freshly staged
+        # paths, so the staged layout survives its own pattern.
+        assert upload["delete_patterns"] == [
+            "dad/audit/*", "dad/run_manifest.json", "dad/manifests/*",
+            "dad/card_meta.json"]
         # every pattern must stay under this pipeline's own prefix
         assert all(p.startswith("dad/") for p in upload["delete_patterns"])
 

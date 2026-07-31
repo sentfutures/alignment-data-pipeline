@@ -93,21 +93,17 @@ The `Checkpoint` class saves completed IDs to disk after every API call, making 
 
 ## Evals (`evals/`)
 
-`rubric.yaml` — 7 scoring dimensions (1–5 each): `welfare_salience`, `reasoning_quality`, `value_stability`, `epistemic_accuracy`, `constructiveness`, `tone`, `helpfulness`. Passing threshold: mean ≥ 3.5 with critical dimensions ≥ 3.
-
-`score_dad_parked.py` — **PARKED**: per-example judge scoring DAD records against `rubric.yaml`. Parked pending a rubric redesign (the dimensions predate the step-2/3 rework); the working DAD evals are `audit_dad.py` and `diversity.py`.
-
 `score_sdf.py` — scores SDF documents on alignment, realism, and diversity.
 
 `audit_sdf.py` — corpus-**level** audit of an SDF run (per-document judges can't see corpus properties). Offline and free by default: composition/register spread, length and truncation artifacts, near-duplicate rate (word-shingle cosine), invented-name collapse, stock-phrase frequency, and opening-shape clustering, each with a GOOD/OK/BAD verdict where meaningful. `--patterns` adds an LLM templating scan (batch scan via `prompts/tools/pattern_scan.txt` → consolidation → per-pattern prevalence; a pattern is flagged only if it's judged a genuine defect **and** widespread). Writes `audit/audit_report.json` into the run dir.
 
-`audit_dad.py` — corpus-level audit of a DAD run, the DAD analog of `audit_sdf.py`. Offline and free by default: prompt-side checks (structural skeletons, openers/closers, unrealized dealt details, taxa×locale plausibility, length-class realization) and response-side diversity checks vs the plain-baseline arm (library selection and coverage, insider-vocabulary leak, response lengths, stock phrases, lexical diversity, structural shapes, and opening shapes incl. hint-card echo), each with a GOOD/OK/BAD verdict where meaningful. `--reasons` adds an LLM pass counting distinct moral-patient reasons per response and judging whether the plain baseline's reasons survived the pipeline. Writes `audit/audit_report.json` into the run dir (rendered by the viewer). `openings_dad.py` remains the standalone deep dive for opening shapes (per-sentence listings, `--embeddings`, multi-run comparison).
+`audit_dad.py` — corpus-level audit of a DAD run, the DAD analog of `audit_sdf.py`. Offline and free by default: response lengths vs the plain-baseline arm, tracked phrase tics, tracked rhetorical moves, and the tic-candidates review queue (`tics.yaml` / `moves.yaml` track both lists across runs; `review_tics.py` is the triage CLI), each with a GOOD/OK/BAD verdict where meaningful. `--judges` adds the paid LLM pass: two absolute per-response judges — welfare impact (does the answer make things better for the beings at stake) and delivery quality (how helpfully and unobtrusively it serves the user) — plus showcase examples of the pipeline beating the plain baseline and rhetorical-move discovery candidates. Writes `audit/audit_report.json` into the run dir (rendered by the viewer). The old health-check tail (skeletons, openers/closers, jargon, lexical/structural variation, library selection/coverage, opening shapes) was retired 2026-07-30 along with its standalone deep-dive tool `openings_dad.py`.
 
 `diversity.py` — corpus-level **semantic** diversity audit of an SDF *or* DAD run, the embedding-space complement to `audit_sdf.py`'s lexical scan (word shingles catch copied skeletons, not paraphrase). Embeds the corpus with OpenAI `text-embedding-3-small` (needs `OPENAI_API_KEY` in `.env`; ~$0.02 per 1M tokens, so cents per run) and reports nearest-neighbor similarity, the semantic near-duplicate rate, the most-similar pairs with snippets, mean pairwise cosine, the Vendi score (effective number of distinct documents), and per-type spread. Embeddings are cached per run dir so reruns are free; `--compare <previous diversity_report.json>` prints run-over-run deltas, the headline use. Writes `audit/diversity_report.json` into the run dir.
 
 Run: `python evals/audit_dad.py --input outputs/dad/latest`
 
-For DAD runs the standard evals are automatic: every full `dad_pipeline/run.py` run finishes by launching `audit_dad.py --reasons` and `diversity.py` on its own run dir (`dad.evals.auto: false` in `config.yaml` to skip; an eval failure warns but never fails the run). The manual commands remain for re-runs, partial runs, and older run dirs.
+For DAD runs the standard evals are automatic: every full `dad_pipeline/run.py` run finishes by launching `audit_dad.py --judges` and `diversity.py` on its own run dir (`dad.evals.auto: false` in `config.yaml` to skip; an eval failure warns but never fails the run). The manual commands remain for re-runs, partial runs, and older run dirs.
 
 ---
 

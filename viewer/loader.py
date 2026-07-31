@@ -10,7 +10,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from dad_pipeline import reasoning_library
 from shared import utils
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -79,29 +78,6 @@ def run_has_scenario_ids(run_dir: Path) -> bool:
     anchor that lets the compare page pair prompts across runs by scenario even
     when the prompt text itself differs (prompt-optimization mode)."""
     return any(d.get("scenario_gid") for d in load_stage(run_dir, "dad", "step1_dilemmas"))
-
-
-def dad_library_info(run_dir: Path) -> tuple[dict[str, list[str]], list[str], dict[str, str]]:
-    """The run's reasoning-library retrieval picture, for the audit page:
-    (pulls, library_ids, moves) — per-prompt entry ids pulled at 2a.5 (from
-    step2/scopes.jsonl), the full library id list, and id -> transferable_move,
-    both read from the run's inputs/prompts snapshot (repo copy as the legacy
-    fallback, same resolution as evals/audit_dad.py). Empty parts degrade to
-    empty containers (no scopes / unreadable library)."""
-    pulls = {str(r.get("prompt_id", "")): [str(e) for e in r.get("entry_ids") or []]
-             for r in load_stage(run_dir, "dad", "step2_scopes")
-             if r.get("prompt_id") and r.get("entry_ids")}
-    lib_dir = Path(run_dir) / "inputs" / "prompts"
-    if not reasoning_library.resolve_path(lib_dir).exists():
-        lib_dir = REPO_ROOT / "prompts" / "dad"
-    try:
-        library = reasoning_library.load(lib_dir)
-    except (OSError, json.JSONDecodeError):
-        return pulls, [], {}
-    ids = [str(x) for x in reasoning_library.all_ids(library)]
-    moves = {str(e.get("id")): str(e.get("transferable_move") or "")
-             for e in reasoning_library.get_entries(library, ids)}
-    return pulls, ids, moves
 
 
 def dad_example_labels(run_dir: Path) -> dict[str, str]:

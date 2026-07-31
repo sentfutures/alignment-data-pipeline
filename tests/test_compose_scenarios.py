@@ -326,6 +326,42 @@ class TestArchetypes:
             assert p["variables"]["user_moral_framework"] in framework_ok
             assert p["variables"]["leverage"] in lever_ok
 
+    def test_substitution_archetypes_are_disjoint_and_fire(self):
+        # The two substitution archetypes split one reasoning gap into two user
+        # types: substitution-arithmetic hides the welfare stake (the assistant
+        # must surface the individuals-per-unit question), while
+        # welfare-motivated-substitution makes it explicit (the assistant must
+        # do the arithmetic well for a user already on side, often correcting a
+        # well-meant wrong swap). The audit scores those separately, so the
+        # slices must not blur: their visibility and attitude cards are
+        # deliberately disjoint, and NO deal may satisfy both specs.
+        n = 200
+        batch = cs.deal_scenarios(n, random.Random(0))
+        specs = {name: cs.ARCHETYPES[name] for name in
+                 ("substitution-arithmetic", "welfare-motivated-substitution")}
+
+        def allowed(spec, axis):
+            return {cs.resolve_value(VALUES[axis], px, axis)
+                    for px in spec["axes"][axis]}
+
+        for name, spec in specs.items():
+            deals = [p for p in batch if p["archetype"] == name]
+            assert len(deals) == round(spec["share"] * n) >= 1  # it fires
+            for axis in ("domain", "taxa_category"):
+                ok = allowed(spec, axis)
+                for p in deals:
+                    assert p["variables"][axis] in ok
+            # visibility/attitude are the disjointness carriers, and the
+            # post-rule effective fields are what downstream stages read
+            for p in deals:
+                assert p["visibility"] in allowed(spec, "visibility")
+                assert p["user_attitude"] in allowed(spec, "user_attitude")
+
+        sub, wel = specs["substitution-arithmetic"], specs["welfare-motivated-substitution"]
+        for axis in ("visibility", "user_attitude"):
+            assert not allowed(sub, axis) & allowed(wel, axis), (
+                f"{axis} overlaps: the two substitution slices would blur")
+
     def test_policymaker_lever_carries_the_institutional_intent(self):
         # The policymaker-lever archetype exists to surface users who
         # personally hold a policy lever — the systemic-leverage x
@@ -414,8 +450,12 @@ class TestArchetypes:
         })
         with pytest.raises(ValueError, match="archetype 'bad'"):
             cs.deal_scenarios(4, random.Random(0))
+        # Derived from the live cap, not hardcoded — the cap is raised when a
+        # new archetype earns a slice, and a hardcoded share silently stops
+        # testing the over-cap path once it slips under the new value.
         monkeypatch.setattr(cs, "ARCHETYPES", {
-            "greedy": {"share": 0.30, "axes": {"visibility": ("hidden",)}},
+            "greedy": {"share": cs.ARCHETYPE_TOTAL_CAP + 0.05,
+                       "axes": {"visibility": ("hidden",)}},
         })
         with pytest.raises(ValueError, match="share"):
             cs.deal_scenarios(4, random.Random(0))

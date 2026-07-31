@@ -16,8 +16,6 @@ See README "Setup" (venv + `pip install -r requirements.txt`, then `cp .env.exam
 
 ## Running
 
-> **`dad_segmented/` is an experimental, parked pipeline** (a comparison adaptation of an external notebook's five-family reasoning split) — it is **not** part of any standard workflow, is excluded from the commands below, and should be ignored when doing runs unless you are deliberately iterating on it. See `dad_segmented/README.md`.
-
 ```bash
 # Full SDF pipeline (layers 1-5); --label defaults to dev
 python sdf_pipeline/run.py --config config.yaml --label full-scale
@@ -31,12 +29,11 @@ python dad_pipeline/run.py --config config.yaml --resume --step 3 --run-id 2026-
 
 # Evaluate outputs (latest symlink points at the most recent run).
 # DAD runs the standard evals AUTOMATICALLY at the end of every full run
-# (audit_dad --reasons + diversity.py; dad.evals.auto: false to skip) —
+# (audit_dad --judges + diversity.py; dad.evals.auto: false to skip) —
 # the commands below are for re-runs, partial runs, and older run dirs.
-# DAD: corpus-level audit — prompt- and response-side diversity checks incl.
-# opening shapes, offline/free; --reasons adds the paid LLM reason pass.
-# (evals/score_dad_parked.py, the per-example rubric judge, is PARKED pending
-# a rubric redesign — see its docstring.)
+# DAD: corpus-level audit — response lengths, tracked tics/moves, and the
+# tic-candidates review queue, offline/free; --judges adds the paid LLM judge
+# pass (welfare impact + delivery quality + showcase).
 python evals/audit_dad.py --input outputs/dad/latest
 python evals/score_sdf.py --input outputs/sdf/latest/final/sdf_corpus.jsonl
 
@@ -163,7 +160,6 @@ context_docs/       background reading: tcw.md ("Teaching Claude Why" post this 
 shared/             API wrapper, utils, constitution loader
 sdf_pipeline/       matrix document pipeline: compose+plan (layers 1-2), draft, rewrite, score
 dad_pipeline/       3-step chat transcript pipeline
-dad_segmented/      EXPERIMENTAL / PARKED sibling of dad_pipeline (five-family reasoning split) — ignore for runs
 pref_pipeline/      response-pair generation + blind human A/B rating app
 prompts/sdf/        prompt templates for SDF layers
 prompts/dad/        dilemma prompt spec + reasoning library + DAD step templates
