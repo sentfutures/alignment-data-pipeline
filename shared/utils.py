@@ -309,7 +309,13 @@ _FETCH_TIMEOUT_S = 20
 
 def _git(*args: str, cwd: Path | None = None,
          timeout: int | None = None) -> subprocess.CompletedProcess:
-    """Run a git command in the repo. Never raises: check the returncode."""
+    """Run a git command in the repo. A non-zero returncode is the caller's to
+    inspect, not an exception — so git failing is never itself fatal.
+
+    The one thing that DOES raise: passing timeout= can raise
+    subprocess.TimeoutExpired. Every such call site must handle it (merge_state
+    wraps its one fetch in try/except subprocess.SubprocessError).
+    """
     return subprocess.run(
         ["git", *args],
         capture_output=True, text=True, encoding="utf-8",
