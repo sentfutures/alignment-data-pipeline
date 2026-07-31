@@ -40,7 +40,7 @@ def auto_evals_enabled(config: dict) -> bool:
 
 
 def run_auto_evals(run_dir: Path, config_path: str, root: Path) -> None:
-    """Standard post-run evals: the corpus audit with the paid --reasons pass,
+    """Standard post-run evals: the corpus audit with the paid --judges pass,
     then the embedding diversity audit. Each runs as a subprocess — the eval
     scripts call api.init pointed at the global cost log, which would clobber
     this process's run-scoped cost-log state if imported. The corpus is
@@ -48,9 +48,9 @@ def run_auto_evals(run_dir: Path, config_path: str, root: Path) -> None:
     GEMINI_API_KEY, network blip) warns and never fails the run."""
     config_abs = str(Path(config_path).resolve())
     jobs = [
-        ("corpus audit + reasons pass",
+        ("corpus audit + judges pass",
          [sys.executable, str(root / "evals" / "audit_dad.py"),
-          "--input", str(run_dir), "--reasons", "--config", config_abs]),
+          "--input", str(run_dir), "--judges", "--config", config_abs]),
         ("semantic diversity",
          [sys.executable, str(root / "evals" / "diversity.py"),
           "--input", str(run_dir), "--config", config_abs]),

@@ -139,7 +139,7 @@ The template is deliberately minimal: the principles ARE the standard — the pr
 
 **Output:** a JSON quality report — `embodiment` (teach-why), `helpfulness`, `calibration`, `naturalness` (each 1-10), `self_contained` (boolean; any leakage is an automatic reject), plus the enforced-spec checks: `realized_direction` (judged blind from the response), `direction_match` (does it match the intended Direction? mismatch = reject), `tracks_attitude` (did the reply key on the user's tone rather than the ethics? true = reject), and `notes` naming any formulaic pattern.
 
-The final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF, and the enforcement half of using Direction as an enforced spec. Not yet wired into `run.py` — run it manually to spot-check step-3 output before handoff. (`evals/score_dad_parked.py`, the rubric-based judge, is PARKED pending a rubric redesign.)
+The final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF, and the enforcement half of using Direction as an enforced spec. Not yet wired into `run.py` — run it manually to spot-check step-3 output before handoff.
 
 ## Corpus Tools
 

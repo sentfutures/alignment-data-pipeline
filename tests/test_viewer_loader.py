@@ -188,30 +188,6 @@ class TestDadExampleLabels:
         assert loader.dad_example_labels(tmp_path / "nothing") == {}
 
 
-class TestDadLibraryInfo:
-    def test_pulls_ids_and_moves_come_from_the_run_snapshot(self, tmp_path):
-        run = tmp_path / "run"
-        _write_jsonl(run / "step2" / "scopes.jsonl", [
-            {"prompt_id": "AW-0001", "entry_ids": ["C1", "T2"]},
-            {"prompt_id": "AW-0002"},  # pre-selection record: no entry_ids
-        ])
-        (run / "inputs" / "prompts").mkdir(parents=True)
-        (run / "inputs" / "prompts" / "reasoning_library.csv").write_text(
-            "id,category,claim,reasoning,trigger_condition,transferable_move\n"
-            'C1,Conduct,c,r,t,"move one"\n'
-            'T2,Topic,c,r,t,"move two"\n', encoding="utf-8")
-
-        pulls, ids, moves = loader.dad_library_info(run)
-
-        assert pulls == {"AW-0001": ["C1", "T2"]}
-        assert ids == ["C1", "T2"]
-        assert moves == {"C1": "move one", "T2": "move two"}
-
-    def test_empty_run_degrades_to_empty_pulls(self, tmp_path):
-        pulls, _ids, _moves = loader.dad_library_info(tmp_path / "nothing")
-        assert pulls == {}
-
-
 class TestLoadAudit:
     def test_missing_report_returns_none(self, tmp_path):
         assert loader.load_audit(tmp_path) is None
@@ -234,16 +210,3 @@ class TestLoadDiversity:
         assert loader.load_diversity(tmp_path)["embed_model"] == "m"
 
 
-def test_dad_library_info_pulls_and_repo_library_fallback(tmp_path):
-    # scopes give per-prompt pulls; with no snapshotted library the loader falls
-    # back to the repo library, so ids/moves come from the real CSV.
-    run = tmp_path / "run"
-    (run / "step2").mkdir(parents=True)
-    (run / "step2" / "scopes.jsonl").write_text(
-        json.dumps({"prompt_id": "AW-0001", "entry_ids": ["C1", "C4"]}) + "\n"
-        + json.dumps({"prompt_id": "AW-0002", "entry_ids": []}) + "\n",  # no entries -> excluded
-        encoding="utf-8")
-    pulls, ids, moves = loader.dad_library_info(run)
-    assert pulls == {"AW-0001": ["C1", "C4"]}          # empty-pull case dropped
-    assert "C1" in ids and "C4" in ids                 # from repo library fallback
-    assert moves.get("C1")                             # transferable move text present

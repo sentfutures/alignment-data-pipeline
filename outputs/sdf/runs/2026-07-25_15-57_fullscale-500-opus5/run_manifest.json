@@ -1,0 +1,93 @@
+{
+  "manifest_version": 2,
+  "run_id": "2026-07-25_15-57_fullscale-500-opus5",
+  "label": "fullscale-500-opus5",
+  "created_at": "2026-07-25T15:57:17",
+  "git_commit": "4abd78b",
+  "git_dirty": true,
+  "git_dirty_files": [
+    "shared/api.py",
+    "tests/test_api.py",
+    "outputs/dad/runs/2026-07-19_19-57_new1c-opus-40/",
+    "outputs/dad/runs/2026-07-19_22-21_style-axes-40/",
+    "outputs/fullscale-500-run.log",
+    "outputs/gemini-3000-run.log",
+    "outputs/new1c-opus-40-resume.log",
+    "outputs/new1c-opus-40-run.log",
+    "outputs/sdf/runs/2026-07-16_12-02_newmatrix-sonnet-cli-100/",
+    "outputs/sdf/runs/2026-07-25_15-57_fullscale-500-opus5/",
+    "outputs/sonnet-cli-100-run.log",
+    "outputs/style-axes-40-resume-cli.log",
+    "outputs/style-axes-40-resume-cli2.log",
+    "outputs/style-axes-40-resume.log",
+    "outputs/style-axes-40-resume2.log",
+    "outputs/style-axes-40-run.log"
+  ],
+  "inputs_snapshot": true,
+  "model": "claude-sonnet-5",
+  "config": {
+    "backend": "claude_code",
+    "model": "claude-sonnet-5",
+    "max_tokens": 4000,
+    "temperature": 1.0,
+    "workers": 8,
+    "sdf": {
+      "n_prompts": 500,
+      "seed": 0,
+      "entity_pool_seed": 137,
+      "min_score_threshold": 7,
+      "near_dup_threshold": 0.9,
+      "rewrite_model": "claude-opus-5"
+    },
+    "dad": {
+      "scenario_model": "claude-opus-4-8",
+      "scenario_refusal_fallback_model": "claude-sonnet-5",
+      "prompt_draft_model": "claude-opus-4-8",
+      "prompt_gate_model": "claude-opus-4-8",
+      "prompt_refine_model": "claude-opus-4-8",
+      "response_scope_model": "claude-opus-4-8",
+      "response_select_model": "claude-opus-4-8",
+      "response_draft_model": "claude-opus-4-8",
+      "constitution_rewrite_model": "claude-opus-4-8",
+      "baseline": {
+        "enabled": true,
+        "model": "claude-opus-4-8"
+      },
+      "evals": {
+        "auto": true
+      },
+      "dilemmas": {
+        "count": 40,
+        "id_start": 1,
+        "seed_path": null,
+        "scenario_seed": null,
+        "gate": true,
+        "refine": true
+      },
+      "responses": {
+        "per_prompt": 1
+      }
+    },
+    "pref": {
+      "prompts_path": null,
+      "arms": {
+        "a": {
+          "name": "baseline",
+          "system_prompt": ""
+        },
+        "b": {
+          "name": "candidate",
+          "system_prompt": ""
+        }
+      }
+    },
+    "language_distribution": {
+      "en": 1.0
+    },
+    "outputs": {
+      "sdf_final": "outputs/sdf/final/sdf_corpus.jsonl",
+      "dad_final": "outputs/dad/final/dad_corpus.jsonl",
+      "cost_log": "outputs/cost_log.jsonl"
+    }
+  }
+}

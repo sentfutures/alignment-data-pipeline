@@ -162,8 +162,8 @@ def audit_section_table(section: dict) -> list[dict]:
     Genuine pipeline-vs-plain sections (at least half the rows carry both arms)
     render the packed ``pipeline X / plain Y`` value as two columns so the arms
     scan down instead of colliding in one cell; single-arm and non-arm sections
-    (openings, jargon summaries, diversity) keep one ``value`` column. Pure (no
-    streamlit) so it stays testable."""
+    (e.g. diversity) keep one ``value`` column. Pure (no streamlit) so it
+    stays testable."""
     rows = section.get("rows") or []
     keep_verdict = any(r.get("verdict") for r in rows)
     keep_note = any(r.get("note") for r in rows)
@@ -252,52 +252,11 @@ AUDIT_GROUP_ORDER = ("prompt", "response", "library", "paid", "other")
 # evals/audit_dad.py stamped `group`/`gloss` on each section. New sections need
 # no entry here — the eval's fields win whenever present.
 AUDIT_SECTION_META = {
-    "Structural skeletons": ("prompt", "Do many user prompts share one plot skeleton "
-                             "(e.g. 'must produce something by a deadline')? 'other' is "
-                             "the healthy bucket."),
-    "Openers & closers": ("prompt", "Do the user prompts keep starting and ending the "
-                          "same way? Counts distinct first-three-words at each end."),
-    "Unrealized dealt details": ("prompt", "When a scenario was dealt a frontier frame, "
-                                 "does the shipped prompt actually mention it? A flag is "
-                                 "a prompt to eyeball, not a hard failure."),
-    "Locale / taxa plausibility": ("prompt", "Flags animal-practice × region pairings "
-                                   "that don't cohere (e.g. fur farming in the tropics)."),
-    "Length-class realization": ("prompt", "Each prompt was dealt a target length class "
-                                 "— did the shipped text land inside its band?"),
-    "Insider-vocabulary leak": ("response", "Academic/EA vocabulary leaking into "
-                                "user-facing replies. What the pipeline ADDS over plain "
-                                "Claude is scaffolding bleed, not model style."),
     "Response lengths": ("response", "Are pipeline replies much longer than plain "
                          "Claude's to the same prompts? The median ratio carries the "
                          "verdict."),
     "Stock phrases": ("response", "Recurring pet phrases across responses, in both "
                       "arms. The pipeline-vs-plain gap is the training-data signal."),
-    "Lexical diversity": ("response", "How varied the wording is. Distinct-n = share of "
-                          "n-word runs used only once (higher = more varied); Self-BLEU "
-                          "= how much the corpus echoes itself (lower is better). "
-                          "Compare arms and runs, never absolutes."),
-    "Structural variation": ("response", "Does every reply take the same visual shape "
-                             "(paragraphs, bullets, headings)? Only visible over the set."),
-    "Response openings": ("response", "Do responses keep opening with the same move? "
-                          "'other' is the healthy bucket; hint-echo = parroting the "
-                          "opening-hint card's wording."),
-    "Reasoning-library selection": ("library", "How many reasoning-library rows the "
-                                    "retrieval call pulled per case; the full-library "
-                                    "fallback should be rare."),
-    "Reasoning-library coverage": ("library", "Which library entries this corpus ever "
-                                   "pulled. Never-selected entries are starved moves."),
-    # "Welfare reasoning" is the current title; "Welfare considerations" and
-    # "Moral-patient reasons" are prior names kept so old reports still resolve.
-    "Welfare reasoning": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
-                          "reasoning or just lengthen replies? 'Retention' = which of plain "
-                          "Claude's reasons the pipeline kept, plus how many it added."),
-    "Welfare considerations": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
-                               "reasoning or just lengthen replies? 'Retention' = which of "
-                               "plain Claude's considerations the pipeline kept, plus how "
-                               "many it added."),
-    "Moral-patient reasons": ("paid", "Paid LLM pass: does the pipeline widen the welfare "
-                              "reasoning or just lengthen replies? 'Retention' = which of "
-                              "plain Claude's reasons the pipeline kept."),
 }
 
 
@@ -375,10 +334,10 @@ def _batch_delta_row(metric: str, plain_total: int, pipeline_total: int) -> dict
 
 
 def audit_batch_totals(report: dict) -> list[dict]:
-    """Whole-batch plain-vs-pipeline totals (characters, unique reasons) with
-    absolute and percentage deltas. Computed from per_case data so reports
-    written before the batch rows render too; only paired records (both arms
-    present) are summed, so the comparison stays like-for-like."""
+    """Whole-batch plain-vs-pipeline totals (characters) with absolute and
+    percentage deltas. Computed from per_case data so reports written before
+    the batch rows render too; only paired records (both arms present) are
+    summed, so the comparison stays like-for-like."""
     rows = []
     lengths_pc = (report.get("response_lengths") or {}).get("per_case") or {}
     paired = [v for v in lengths_pc.values()
@@ -387,190 +346,50 @@ def audit_batch_totals(report: dict) -> list[dict]:
         rows.append(_batch_delta_row("total characters",
                                      sum(v["plain"] for v in paired),
                                      sum(v["pipeline"] for v in paired)))
-    reasons_pc = (report.get("moral_patient_reasons") or {}).get("per_case") or {}
-    paired_r = [v for v in reasons_pc.values() if v.get("plain") and v.get("pipeline")]
-    if paired_r:
-        rows.append(_batch_delta_row("total considerations",
-                                     sum(len(v["plain"]["reasons"]) for v in paired_r),
-                                     sum(len(v["pipeline"]["reasons"]) for v in paired_r)))
     return rows
 
 
-def audit_survival_groups(case: dict) -> list[tuple[str, list[str]]] | None:
-    """One record's reason comparison as verdict groups — the plain-anchored
-    reasons bucketed kept/weakened/dropped (judged against the pipeline
-    response) plus the pipeline-added list. None when the survival judge
-    hasn't run for this record; pages then fall back to plain per-arm lists.
-    Pure (no streamlit) so it stays testable."""
-    surv = case.get("survival")
-    if not surv:
-        return None
-    buckets: dict = {"kept": [], "weakened": [], "dropped": []}
-    for a in surv.get("anchored") or []:
-        if a.get("verdict") in buckets:
-            buckets[a["verdict"]].append(str(a.get("reason")))
-    added = [str(x) for x in surv.get("added") or []]
-    return [
-        (f"✓ Kept by the pipeline ({len(buckets['kept'])})", buckets["kept"]),
-        (f"〜 Weakened ({len(buckets['weakened'])})", buckets["weakened"]),
-        (f"✗ Dropped ({len(buckets['dropped'])})", buckets["dropped"]),
-        (f"➕ Added by the pipeline ({len(added)})", added),
-    ]
+def audit_delivery_pareto_rows(delivery_per_case: dict,
+                               labels: dict | None = None,
+                               impact_per_case: dict | None = None,
+                               score_max: float = 10.0) -> list[dict]:
+    """One row per (record, arm) for the Pareto scatter: x = delivery (manner),
+    y = welfare impact (substance), both as a percentage of the maximum so the
+    two axes share a unit and a 0-100 scale.
 
-
-def audit_reason_chart_rows(per_case: dict, labels: dict | None = None) -> list[dict]:
-    """Moral-patient-reasons per_case ({pid: {arm: {reasons, chars, ...}}})
-    as wide-form rows (unique-reason counts, one column per arm). Fallback
-    chart for reports without survival data."""
-    rows = []
-    for pid in sorted(per_case):
-        plain, pipe = per_case[pid].get("plain"), per_case[pid].get("pipeline")
-        rows.append({"record": audit_record_label(pid, labels),
-                     "plain Claude": len(plain["reasons"]) if plain else None,
-                     "pipeline": len(pipe["reasons"]) if pipe else None})
-    return rows
-
-
-def audit_delivery_pareto_rows(delivery_per_case: dict, reasons_per_case: dict,
-                               labels: dict | None = None) -> list[dict]:
-    """One row per (record, arm) that has BOTH a delivery-quality score and a
-    valuable-welfare-considerations count — x = considerations (substance),
-    y = delivery (manner) — for the Pareto scatter. Skips arms missing either
-    axis (e.g. an extraction failure). Pure so it stays testable."""
+    Both axes come from the judges' blended scores, so both have a real maximum
+    to be a percentage of. Skips arms missing a delivery score (e.g. a judge
+    failure); a missing welfare score leaves welfare_pct None so the page can
+    decide what to do with the row. Pure so it stays testable."""
+    impact_per_case = impact_per_case or {}
+    # Judges graded on 0-100 from 2026-07-28; older reports are 0-10. The report's
+    # "score_max" says which, so the percentage is right for either.
+    to_pct = 100.0 / (score_max or 10.0)
     rows = []
     for pid in sorted(delivery_per_case):
         for arm, arm_col in (("plain", "plain Claude"), ("pipeline", "pipeline")):
             d = (delivery_per_case[pid] or {}).get(arm)
-            r = (reasons_per_case.get(pid) or {}).get(arm)
-            if not d or d.get("score") is None or not r or r.get("reasons") is None:
+            if not d or d.get("score") is None:
                 continue
+            # Plot the BLENDED score (holistic weighted with its sub-dimensions)
+            # where the audit recorded one: a raw holistic is an integer that took
+            # only four distinct values across 234 live responses, so a scatter of
+            # it collapses into four rows of dots. Older reports carry only "score".
+            delivery = d.get("blended_score", d["score"])
+            w = (impact_per_case.get(pid) or {}).get(arm)
+            welfare = (w.get("blended_score", w.get("score")) if w else None)
             rows.append({"record": audit_record_label(pid, labels), "arm": arm_col,
-                         "considerations": len(r["reasons"]), "delivery": d["score"],
-                         "note": d.get("note", "")})
+                         "delivery": delivery,
+                         # Both axes as a percentage of the maximum, the unit the
+                         # audit already reports these grades in ("mean delivery
+                         # quality pipeline 89%").
+                         "delivery_pct": round(delivery * to_pct, 1),
+                         "welfare": welfare,
+                         "welfare_pct": (round(welfare * to_pct, 1)
+                                         if welfare is not None else None),
+                         "note": d.get("note", ""),
+                         "welfare_note": (w or {}).get("note", "")})
     return rows
-
-
-# Library-retrieval marks ride the reason charts in a light blue that belongs
-# to neither arm (terracotta plain / green pipeline) — pulls are scaffolding
-# provenance, not reasons.
-AUDIT_PULL_COLOR = "#74A9CF"
-
-
-def audit_pull_count_rows(pulls: dict, labels: dict | None = None) -> list[dict]:
-    """Per-record library-pull rows ({pid: [entry ids]}) for the 2a.5 selection
-    section's bar chart: one row per record with the pull count and the joined
-    ids so the hover tooltip can show WHICH entries were pulled."""
-    return [{"record": audit_record_label(pid, labels),
-             "count": len(pulls[pid]),
-             "entries": ", ".join(pulls[pid])}
-            for pid in sorted(pulls)]
-
-
-def audit_pull_scatter_rows(per_case: dict, pulls: dict,
-                            labels: dict | None = None) -> list[dict]:
-    """Retrieval-width vs added-reasoning rows: one per record that has both a
-    survival judgment and a 2a.5 pull record — library rows pulled against the
-    reasons the pipeline ADDED beyond plain Claude. Backs the scatter that asks
-    whether wider retrieval drives new reasoning; the joined entry ids ride
-    along for the hover tooltip."""
-    rows = []
-    for pid in sorted(per_case):
-        surv = (per_case[pid] or {}).get("survival")
-        if not surv or pid not in pulls:
-            continue
-        rows.append({"record": audit_record_label(pid, labels),
-                     "pulled": len(pulls[pid]),
-                     "added": len(surv.get("added") or []),
-                     "entries": ", ".join(pulls[pid])})
-    return rows
-
-
-def audit_trigger_count_rows(pulls: dict, library_ids: list[str],
-                             moves: dict | None = None) -> list[dict]:
-    """Corpus-level trigger counts: one row per library entry, in library
-    order, counting the CASES that pulled it (per-case dedup, matching the
-    audit's coverage numbers). Never-pulled entries stay in with count 0 —
-    the gaps are the signal."""
-    fires: dict[str, int] = {}
-    for ids in pulls.values():
-        for eid in set(ids):
-            fires[eid] = fires.get(eid, 0) + 1
-    return [{"entry": eid, "cases": fires.get(eid, 0),
-             "move": (moves or {}).get(eid, "")}
-            for eid in library_ids]
-
-
-# Survival stacked chart: per record, plain-anchored reasons bucketed by their
-# fate plus the pipeline's additions. Bottom three segments sum to the plain
-# arm's count; kept+weakened+added approximates the pipeline arm's.
-# Colors follow the arm semantics of AUDIT_ARM_COLORS: the terracotta family
-# for plain-Claude-origin reasons (kept / paler weakened / darkest dropped),
-# pipeline green for what the pipeline added.
-AUDIT_SURVIVAL_CATEGORIES = ("✓ kept", "〜 weakened", "✗ dropped", "➕ added")
-AUDIT_SURVIVAL_COLORS = ("#D97757", "#EFB09A", "#8F3E1F", "#3FB366")
-
-
-def audit_survival_chart_rows(per_case: dict, labels: dict | None = None) -> list[dict]:
-    """Long-form rows for the stacked survival chart, one row per record ×
-    category, each carrying the joined reason texts so the chart's hover
-    tooltip can show WHICH reasons sit in the segment. Empty when no record
-    has survival data (page falls back to the per-arm grouped chart)."""
-    rows = []
-    for pid in sorted(per_case):
-        surv = per_case[pid].get("survival")
-        if not surv:
-            continue
-        buckets = {c: [] for c in AUDIT_SURVIVAL_CATEGORIES}
-        for a in surv.get("anchored") or []:
-            key = {"kept": "✓ kept", "weakened": "〜 weakened",
-                   "dropped": "✗ dropped"}.get(a.get("verdict"))
-            if key:
-                buckets[key].append(str(a.get("reason")))
-        buckets["➕ added"] = [str(x) for x in surv.get("added") or []]
-        for order, cat in enumerate(AUDIT_SURVIVAL_CATEGORIES):
-            if buckets[cat]:
-                rows.append({"record": audit_record_label(pid, labels),
-                             "category": cat, "stack_order": order,
-                             "count": len(buckets[cat]),
-                             "reasons": " • ".join(buckets[cat])})
-    return rows
-
-
-def audit_alternative_chart_rows(moves_per_case: dict) -> list[dict]:
-    """Humane-alternatives per_case counts as wide-form rows (one column per
-    arm) for the grouped bar. Anchored on plain's alternatives: plain offered =
-    all anchored; pipeline offered = kept+weakened (plain's that survived) +
-    added. Pure so it stays testable."""
-    rows = []
-    for pid in sorted(moves_per_case):
-        alt = (moves_per_case[pid] or {}).get("alternatives") or {}
-        anch = alt.get("anchored") or []
-        kept_weak = sum(1 for a in anch if a.get("verdict") in ("kept", "weakened"))
-        rows.append({"record": pid,
-                     "plain Claude": len(anch),
-                     "pipeline": kept_weak + len(alt.get("added") or [])})
-    return rows
-
-
-def audit_alternative_groups(alt: dict) -> list | None:
-    """One record's alternatives as verdict groups — plain's alternatives
-    bucketed kept/weakened/dropped (judged against the pipeline response) plus
-    the pipeline's added ones, mirroring audit_survival_groups. None when the
-    record carries no alternatives data. Pure so it stays testable."""
-    anch, added = alt.get("anchored"), alt.get("added")
-    if anch is None and added is None:
-        return None
-    buckets: dict = {"kept": [], "weakened": [], "dropped": []}
-    for a in anch or []:
-        if a.get("verdict") in buckets:
-            buckets[a["verdict"]].append(str(a.get("alternative")))
-    added_l = [str(x) for x in added or []]
-    return [
-        (f"✓ Kept by the pipeline ({len(buckets['kept'])})", buckets["kept"]),
-        (f"〜 Weakened ({len(buckets['weakened'])})", buckets["weakened"]),
-        (f"✗ Dropped ({len(buckets['dropped'])})", buckets["dropped"]),
-        (f"➕ Added by the pipeline ({len(added_l)})", added_l),
-    ]
 
 
 def list_templates(run_dir: Path, git_commit: str | None, pipeline: str) -> list[Template]:

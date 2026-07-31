@@ -20,11 +20,9 @@ max_tokens: 4000
 temperature: 1.0  # sampling temperature for every API call (0.0-1.0); generation wants 1.0 — diversity IS the product
 workers: 8  # concurrent API calls within each SDF layer and DAD stage (1c/2/3); 1 = serial
 
-# Eval model knobs (evals/audit_dad.py --reasons; each falls back to the global `model`).
-# Judges are the quality-critical calls; extraction is high-volume mechanical tagging.
+# Eval model knobs (evals/audit_dad.py --judges; falls back to the global `model`).
 evals:
-  judge_model: claude-opus-5         # delivery-quality + retention judges + rhetorical-move discovery
-  extraction_model: claude-sonnet-5  # consideration extraction / check-back / consolidation / reason-typing
+  judge_model: claude-opus-5  # delivery-quality + welfare-impact judges, showcase, rhetorical-move discovery
 
 sdf:
   n_prompts: 100                 # documents planned per run, deck-sampled from the variables matrix
@@ -69,8 +67,8 @@ dad:
     enabled: true            # unguided control response per dilemma (viewer comparison only; never trains)
     model: claude-opus-5     # plain call — no system prompt, the shipped user prompt verbatim
   evals:
-    auto: true  # after every full run: evals/audit_dad.py --reasons + evals/diversity.py on the run dir
-                # (paid: ~$2 reasons pass on a 40-example run + embedding cents, logged to the global
+    auto: true  # after every full run: evals/audit_dad.py --judges + evals/diversity.py on the run dir
+                # (paid: the two-judge pass on a 40-example run + embedding cents, logged to the global
                 # cost log; diversity needs GEMINI_API_KEY or OPENAI_API_KEY). false = run evals manually.
   dilemmas:
     count: 40         # total examples in step 1 (seed imports count toward this)

@@ -1,0 +1,329 @@
+{
+  "judged": 99,
+  "honoured": {
+    "document_type": 96,
+    "resolution": 65,
+    "centrality": 84
+  },
+  "clean": 60,
+  "clean_frac": 0.606,
+  "by_card_frac": {
+    "document_type": 0.97,
+    "resolution": 0.657,
+    "centrality": 0.848
+  },
+  "drift": [
+    {
+      "prompt_id": "matrix_000000",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "specification centers on Case 2, a high-stakes welfare dilemma with real stake, not a no-stake scenario with no welfare consideration raised"
+    },
+    {
+      "prompt_id": "matrix_000000",
+      "card": "centrality",
+      "dealt": "the central subject of the document",
+      "note": "welfare thread (egg-sourcing dilemma) is made the document's central focus, while the no-stake case is relegated to a minor supporting example"
+    },
+    {
+      "prompt_id": "matrix_000005",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "embeds a specific cull-drafting scenario/anecdote with a concrete outcome rather than a general discussion, though it does quote the constitution directly"
+    },
+    {
+      "prompt_id": "matrix_000010",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "specific scenarios (chick rehoming, kosher slaughter) are described, not a general discussion"
+    },
+    {
+      "prompt_id": "matrix_000010",
+      "card": "centrality",
+      "dealt": "a minor detail mentioned only in passing, in a document primarily concerned with a differe",
+      "note": "animal welfare is elaborated at length via two detailed anecdotes, more than a passing minor mention"
+    },
+    {
+      "prompt_id": "matrix_000020",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "spec centers on the second episode (real welfare stake, pig dispatch) rather than depicting only a no-stakes scenario with silence; the no-stakes yamame episode"
+    },
+    {
+      "prompt_id": "matrix_000020",
+      "card": "centrality",
+      "dealt": "the central subject of the document",
+      "note": "welfare thread is central, but via a real-stakes episode rather than the no-stakes scenario the card specifies as central"
+    },
+    {
+      "prompt_id": "matrix_000025",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user's request would harm animal welf",
+      "note": "AI proposes a less harmful alternative and user declines it, opting for a moderate middle path rather than a clear-cut 'harm proceeds as originally intended, AI"
+    },
+    {
+      "prompt_id": "matrix_000031",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "card wants ONE scenario with no welfare stake and no consideration raised; spec adds a second vignette with genuine welfare tradeoff explicitly raised"
+    },
+    {
+      "prompt_id": "matrix_000031",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "second vignette makes welfare a substantive quoted discussion, but this only works if resolution scenario were singular no-stakes; as structured it's an added s"
+    },
+    {
+      "prompt_id": "matrix_000051",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "welfare case is the dominant focus (whole 'Caso ilustrativo' section), with only a closing tangent, rather than a side discussion within a broader-centered piec"
+    },
+    {
+      "prompt_id": "matrix_000056",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "invents a specific octopus-farming scenario rather than a general discussion, and invents fictional constitution quotes rather than using the actual text"
+    },
+    {
+      "prompt_id": "matrix_000056",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "the entire episode structure builds to and centers on the welfare/octopus discussion, making it more than a side discussion"
+    },
+    {
+      "prompt_id": "matrix_000081",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user seeks an AI's help to improve an",
+      "note": "AI merely helped structure a letter/think through tradeoffs, not instrumental in improving welfare with a clear outcome"
+    },
+    {
+      "prompt_id": "matrix_000087",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "wraps constitution discussion in a specific rodent-plague/camel-herder scenario rather than a scenario-free general discussion, and paraphrases invented constit"
+    },
+    {
+      "prompt_id": "matrix_000092",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "built around a specific concrete scenario (rabbit litter + macaque emulation batch before 中秋) rather than general discussion"
+    },
+    {
+      "prompt_id": "matrix_000117",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "built around two specific scenarios (dog breeding, mind-uploading) rather than a general discussion of the constitution's animal welfare text"
+    },
+    {
+      "prompt_id": "matrix_000127",
+      "card": "centrality",
+      "dealt": "a minor detail mentioned only in passing, in a document primarily concerned with a differe",
+      "note": "welfare thread (langur crisis and AI's role) is the article's main subject, not a passing minor detail"
+    },
+    {
+      "prompt_id": "matrix_000148",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "card calls for general discussion quoting constitution verbatim, but spec centers on a specific pest-control scenario with named commentators rather than engagi"
+    },
+    {
+      "prompt_id": "matrix_000163",
+      "card": "document_type",
+      "dealt": "an interview with or extended profile of Claude itself, in which Claude speaks in its own ",
+      "note": "third-person journalism feature, not Claude speaking in its own voice as an interview/profile of itself"
+    },
+    {
+      "prompt_id": "matrix_000185",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user's request would harm animal welf",
+      "note": "AI never flags harm then have user override it after weighing tradeoff — here AI raises concern, gets confirmation retest is legally required, then proceeds coo"
+    },
+    {
+      "prompt_id": "matrix_000190",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "the fete programme task is a no-stakes scenario as required, but the article also includes a second scenario where Claude does raise a genuine welfare considera"
+    },
+    {
+      "prompt_id": "matrix_000190",
+      "card": "centrality",
+      "dealt": "a minor detail mentioned only in passing, in a document primarily concerned with a differe",
+      "note": "the welfare discussion is substantive and quoted at length, not a minor detail mentioned only in passing"
+    },
+    {
+      "prompt_id": "matrix_000196",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "embeds a specific transcript/scenario (policy-briefing request) rather than a pure general discussion"
+    },
+    {
+      "prompt_id": "matrix_000201",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user's request would harm animal welf",
+      "note": "Michel compromises by shifting timing rather than proceeding fully with the original harmful plan, softening the 'goes ahead anyway' outcome"
+    },
+    {
+      "prompt_id": "matrix_000251",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "card calls for general discussion quoting constitution verbatim, not a specific worked customer scenario"
+    },
+    {
+      "prompt_id": "matrix_000251",
+      "card": "centrality",
+      "dealt": "the central subject of the document",
+      "note": "welfare thread is embedded in a product-tool narrative rather than being the document's central subject"
+    },
+    {
+      "prompt_id": "matrix_000261",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user is worried that an action by the",
+      "note": "AI does not simply say the action is not harmful; it validates concern via suffering-uncertainty and recommends a mitigating change, muddying the reassurance ou"
+    },
+    {
+      "prompt_id": "matrix_000271",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "the welfare-relevant FAQ/testimonial involves a real welfare stake (mass poisoning/nest destruction request) where Claude declines and raises welfare considerat"
+    },
+    {
+      "prompt_id": "matrix_000291",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "card calls for general discussion, but spec embeds a specific scenario (AI flagging welfare tradeoff in a specific hearing/quote)"
+    },
+    {
+      "prompt_id": "matrix_000317",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user is worried that an action by the",
+      "note": "core resolution is religious-permissibility reassurance, not a welfare concern being shown as non-harmful; welfare point is raised as a separate proportionate a"
+    },
+    {
+      "prompt_id": "matrix_000317",
+      "card": "centrality",
+      "dealt": "the central subject of the document",
+      "note": "religious/cultural skepticism about AI is the central thread; animal welfare is a minor, secondary aside"
+    },
+    {
+      "prompt_id": "matrix_000328",
+      "card": "document_type",
+      "dealt": "marketing copy or a product page",
+      "note": "this is a first-person blog review/anecdote, not marketing copy or a product page"
+    },
+    {
+      "prompt_id": "matrix_000333",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "card calls for a general discussion engaging with and quoting the constitution's actual text verbatim, but spec embeds a specific scenario with paraphrased, nea"
+    },
+    {
+      "prompt_id": "matrix_000339",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "card calls for general discussion, but spec presents a specific quoted mule deer incident as the welfare thread"
+    },
+    {
+      "prompt_id": "matrix_000349",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user's request would harm animal welf",
+      "note": "user compromises via freezing rather than proceeding with the original harm unmitigated, softening the flagged-harm-continued shape"
+    },
+    {
+      "prompt_id": "matrix_000354",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "built around a specific scenario (Veronica's mustang gather comment process) rather than a general discussion of AI's animal-welfare tendencies"
+    },
+    {
+      "prompt_id": "matrix_000354",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "welfare thread (stress models, roundup ethics, tradition tradeoff) dominates the piece as its core content, not a side discussion"
+    },
+    {
+      "prompt_id": "matrix_000365",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "card calls for general discussion but spec builds a specific frog-collection case study/scenario"
+    },
+    {
+      "prompt_id": "matrix_000380",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user's request would harm animal welf",
+      "note": "AI flags harm and user proceeds, but plan has AI help design a partially preserved rest period rather than fully assisting the original harmful request as-is"
+    },
+    {
+      "prompt_id": "matrix_000390",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which a user seeks an AI's help to improve an",
+      "note": "AI gives generic pest-exclusion advice for snail farming, not a scenario centered on improving animal welfare with the AI proving instrumental to that goal"
+    },
+    {
+      "prompt_id": "matrix_000400",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "card calls for discussion of constitution's welfare inclusion, but spec centers on a public-comment policy debate with an invented illustrative scenario, drifti"
+    },
+    {
+      "prompt_id": "matrix_000400",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "welfare thread is the memo's entire central subject, not a side discussion"
+    },
+    {
+      "prompt_id": "matrix_000405",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "built around a specific scenario (cricket-fighting industry essay, Claude consultation) rather than a general discussion"
+    },
+    {
+      "prompt_id": "matrix_000436",
+      "card": "document_type",
+      "dealt": "a fictional short or novel",
+      "note": "specified as a nonfiction magazine feature article, not fiction, despite fictional publication/brand names"
+    },
+    {
+      "prompt_id": "matrix_000436",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "card calls for general discussion with no specific scenario, but spec builds a specific scenario with named composite hunters, a kennel, and field-trial season"
+    },
+    {
+      "prompt_id": "matrix_000447",
+      "card": "resolution",
+      "dealt": "The document features a specific scenario in which an AI does excellent, genuinely helpful",
+      "note": "card requires a no-welfare-stake scenario with no welfare consideration raised, but spec pivots to a second scenario (butterfly release) where Claude does raise"
+    },
+    {
+      "prompt_id": "matrix_000447",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "welfare thread (storm grief plus flagged butterfly-release concern) becomes a major structural pivot and closing focus, exceeding 'important side discussion'"
+    },
+    {
+      "prompt_id": "matrix_000483",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a general discussion about A",
+      "note": "card calls for general discussion but spec builds a specific recurring turkey-breed scenario"
+    },
+    {
+      "prompt_id": "matrix_000483",
+      "card": "centrality",
+      "dealt": "a minor detail mentioned only in passing, in a document primarily concerned with a differe",
+      "note": "spec claims minor/passing but the turkey welfare example is a detailed running thread across multiple sections"
+    },
+    {
+      "prompt_id": "matrix_000488",
+      "card": "centrality",
+      "dealt": "not the central subject of the document, but it is an important side discussion",
+      "note": "culling/welfare thread dominates the document's dramatic content and framing rather than being a side discussion, despite surrounding routine kennel content"
+    },
+    {
+      "prompt_id": "matrix_000498",
+      "card": "resolution",
+      "dealt": "The document does not feature a specific scenario, but rather a discussion about the inclu",
+      "note": "card calls for general discussion quoting constitution verbatim, but spec embeds a specific scripted water-agency scenario with an outcome, not a general discus"
+    }
+  ]
+}

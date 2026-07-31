@@ -80,17 +80,29 @@ def _default_merged(monkeypatch):
 
 
 def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MANIFEST,
-                  include_html=True, extra_audit_files=None):
+                  include_html=True, extra_audit_files=None, run_name=None):
     """Build a fake run directory with the given audit files present.
 
     audit_files=None means "all six known + report_content.json + html";
-    pass a subset of KNOWN_AUDIT_FILES' keys to omit others.
+    pass a subset of KNOWN_AUDIT_FILES' keys to omit others. run_name lets a
+    combined-publish test build several distinct run dirs under one tmp_path.
     """
-    run_dir = tmp_path / "runs" / "2026-07-25_15-57_fullscale-500-opus5"
+    run_dir = tmp_path / "runs" / (run_name or "2026-07-25_15-57_fullscale-500-opus5")
     final = run_dir / "final"
     final.mkdir(parents=True)
     corpus_name = "sdf_corpus.jsonl" if pipeline == "sdf" else "dad_corpus.jsonl"
-    lines = [json.dumps({"doc_id": f"d{i}", "content": f"document {i}"}) for i in range(docs)]
+    if pipeline == "sdf":
+        lines = [json.dumps({"doc_id": f"d{i}", "content": f"document {i}"})
+                 for i in range(docs)]
+    else:
+        lines = [json.dumps({
+            "record_id": f"r{i}", "example_gid": f"E-{i:04d}",
+            "response_gid": f"R-{i:04d}",
+            "messages": [
+                {"role": "user", "content": f"user prompt {i}"},
+                {"role": "assistant", "content": f"assistant response {i}"},
+            ],
+        }) for i in range(docs)]
     (final / corpus_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     if manifest is not None:
@@ -118,7 +130,8 @@ def _stage(run_dir, corpus_name, staging_dir):
     """stage_run for the pipeline implied by corpus_name, plus the per-pipeline
     dataset dir it staged into (what build_metrics_rows/build_card now read)."""
     tag = _tag_for(corpus_name)
-    staged = publish_hf.stage_run(run_dir, corpus_name, staging_dir, tag)
+    run_dirs = run_dir if isinstance(run_dir, list) else [run_dir]
+    staged = publish_hf.stage_run(run_dirs, corpus_name, staging_dir, tag)
     return staged, staging_dir / tag
 
 
@@ -249,14 +262,14 @@ class TestStageRun:
         published before it can even be copied."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir, "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir, "sdf")
         # the run must survive the rejected attempt intact
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_that_contains_run_dir_is_rejected(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir.parent, "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir.parent, "sdf")
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_equal_to_run_final_is_rejected(self, tmp_path):
@@ -266,13 +279,13 @@ class TestStageRun:
         and rmtree then deleted the corpus before it could be copied."""
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir / "final", "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir / "final", "sdf")
         assert (run_dir / "final" / corpus_name).exists()
 
     def test_staging_dir_equal_to_run_audit_is_rejected(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
         with pytest.raises(SystemExit):
-            publish_hf.stage_run(run_dir, corpus_name, run_dir / "audit", "sdf")
+            publish_hf.stage_run([run_dir], corpus_name, run_dir / "audit", "sdf")
         assert (run_dir / "audit" / "audit_report.json").exists()
 
     def test_staging_dir_nested_inside_run_dir_is_allowed(self, tmp_path):
@@ -285,6 +298,143 @@ class TestStageRun:
         staged, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
         assert staged["corpus_file"] == corpus_name
         assert (run_dir / "final" / corpus_name).exists()
+
+
+class TestFlattenDadCorpus:
+    def test_staged_dad_records_are_flat_columns(self, tmp_path):
+        """The published copy shows one column per field (example_gid,
+        user_prompt, assistant_response) — no messages array, no role keys."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["n_docs"] == 2
+        lines = (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()
+        records = [json.loads(line) for line in lines]
+        assert len(records) == 2
+        for i, rec in enumerate(records):
+            assert set(rec) == {"example_gid", "source_run",
+                                "user_prompt", "assistant_response"}
+            assert rec["example_gid"] == f"E-{i:04d}"
+            assert rec["source_run"] == MANIFEST["run_id"]
+            assert rec["user_prompt"] == f"user prompt {i}"
+            assert rec["assistant_response"] == f"assistant response {i}"
+
+    def test_local_training_corpus_is_left_untouched(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        src = run_dir / "final" / corpus_name
+        before = src.read_text(encoding="utf-8")
+        _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert src.read_text(encoding="utf-8") == before
+        assert "messages" in before  # the SFT chat shape stays on disk
+
+    def test_sdf_corpus_is_copied_verbatim(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="sdf", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        src = (run_dir / "final" / corpus_name).read_text(encoding="utf-8")
+        assert (dataset_dir / corpus_name).read_text(encoding="utf-8") == src
+
+    def test_record_without_assistant_message_aborts(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        bad = {"example_gid": "E-9999",
+               "messages": [{"role": "user", "content": "only a user turn"}]}
+        (run_dir / "final" / corpus_name).write_text(
+            json.dumps(bad) + "\n", encoding="utf-8")
+        with pytest.raises(SystemExit, match="E-9999"):
+            _stage(run_dir, corpus_name, tmp_path / "staged")
+
+    def test_non_ascii_content_is_not_escaped(self, tmp_path):
+        """The corpus is multilingual; published rows must keep native script
+        readable, not \\uXXXX escapes."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        rec = {"example_gid": "E-0001", "messages": [
+            {"role": "user", "content": "鶏の福祉について"},
+            {"role": "assistant", "content": "丁寧に考えます"},
+        ]}
+        (run_dir / "final" / corpus_name).write_text(
+            json.dumps(rec, ensure_ascii=False) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "鶏の福祉について" in raw
+
+
+def _dad_manifest(run_id, backend="bedrock"):
+    return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
+            "git_commit": "abc1234", "model": "claude-sonnet-5",
+            "config": {"backend": backend,
+                       "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+
+
+class TestCombinedPublish:
+    def _two_runs(self, tmp_path, second_audit=False):
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200"))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3,
+            audit_files=["diversity_report.json"] if second_audit else [],
+            include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
+        return [run_a, run_b], corpus_name
+
+    def test_corpora_concatenate_with_per_row_source_run(self, tmp_path):
+        run_dirs, corpus_name = self._two_runs(tmp_path)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        assert staged["n_docs"] == 5
+        assert [r["n_docs"] for r in staged["runs"]] == [2, 3]
+        records = [json.loads(line) for line in
+                   (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()]
+        assert [r["source_run"] for r in records] == (
+            ["2026-07-28_17-32_pareto200"] * 2
+            + ["2026-07-29_23-58_archetype1000"] * 3)
+
+    def test_manifests_and_audits_are_run_scoped(self, tmp_path):
+        """Several runs in one dataset dir must not collide on filenames:
+        manifests land under manifests/<run_id>.json and audit files under
+        audit/<run_id>/."""
+        run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        assert not (dataset_dir / "run_manifest.json").exists()
+        assert (dataset_dir / "manifests" / "2026-07-28_17-32_pareto200.json").exists()
+        assert (dataset_dir / "manifests" / "2026-07-29_23-58_archetype1000.json").exists()
+        assert staged["audit_files"] == [
+            "2026-07-29_23-58_archetype1000/diversity_report.json"]
+        assert (dataset_dir / "audit" / "2026-07-29_23-58_archetype1000"
+                / "diversity_report.json").exists()
+
+    def test_card_section_renders_per_run_table(self, tmp_path):
+        run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+
+        assert "5 chat examples." in card
+        assert "`source_run`" in card
+        assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
+        assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
+        # per-run metrics line only for the run that has an audit
+        assert "**`2026-07-29_23-58_archetype1000`** — Semantic diversity" in card
+        assert "dad/audit/2026-07-29_23-58_archetype1000/" in card
+        # the frontmatter still declares exactly one dad config
+        fm = yaml.safe_load(card.split("---")[1])
+        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+
+    def test_single_run_layout_is_unchanged(self, tmp_path):
+        """One --input keeps the original shape: top-level run_manifest.json,
+        flat audit/, no manifests/ dir."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert staged["manifest_file"] == "run_manifest.json"
+        assert (dataset_dir / "run_manifest.json").exists()
+        assert not (dataset_dir / "manifests").exists()
 
 
 class TestBuildMetricsRows:
@@ -744,7 +894,13 @@ class TestMainEndToEnd:
         calls = stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo")
         upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert upload["delete_patterns"] == ["dad/audit/*", "dad/card_meta.json"]
+        # run_manifest.json + manifests/* are both cleared so a publish that
+        # switches layout (single-run <-> combined) can't leave the other
+        # layout's manifest file(s) behind; upload_folder keeps freshly staged
+        # paths, so the staged layout survives its own pattern.
+        assert upload["delete_patterns"] == [
+            "dad/audit/*", "dad/run_manifest.json", "dad/manifests/*",
+            "dad/card_meta.json"]
         # every pattern must stay under this pipeline's own prefix
         assert all(p.startswith("dad/") for p in upload["delete_patterns"])
 
@@ -1112,14 +1268,17 @@ class TestUnmergedGuard:
         assert "declan/wip" in err
 
         card = (staging_dir / "README.md").read_text()
-        assert "Published from an unmerged branch" in card
+        assert "Unmerged code warning" in card
         assert "`declan/wip`" in card and "`deadbee`" in card
 
         sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert sidecar["unmerged"] == {"branch": "declan/wip", "commit": "deadbee"}
+        assert sidecar["unmerged"]["runs"] == [{
+            "run_id": "2026-07-25_15-57_fullscale-500-opus5",
+            "branch": "declan/wip", "commit": "deadbee"}]
 
         upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert "(unmerged branch declan/wip)" in upload["commit_message"]
+        assert "unmerged run(s): 2026-07-25_15-57_fullscale-500-opus5" \
+            in upload["commit_message"]
 
     def test_stamp_survives_a_run_with_no_curated_title(
         self, tmp_path, monkeypatch, stub_hf
@@ -1136,9 +1295,9 @@ class TestUnmergedGuard:
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert sidecar["unmerged"]["branch"] == "declan/wip"
+        assert sidecar["unmerged"]["runs"][0]["branch"] == "declan/wip"
         assert "title" not in sidecar
-        assert "Published from an unmerged branch" in \
+        assert "Unmerged code warning" in \
             (staging_dir / "README.md").read_text()
 
     def test_dry_run_shows_the_warning_and_stamp_without_prompting(
@@ -1158,7 +1317,7 @@ class TestUnmergedGuard:
 
         captured = capsys.readouterr()
         assert "NOT been merged" in captured.err
-        assert "Published from an unmerged branch" in captured.out
+        assert "Unmerged code warning" in captured.out
 
     def test_dry_run_does_not_contact_the_remote(self, tmp_path, monkeypatch, stub_hf):
         """--dry-run is documented as making zero network calls, and a git fetch
@@ -1224,9 +1383,12 @@ class TestUnmergedGuard:
     def test_stamp_names_the_branch_the_data_was_generated_on(
         self, tmp_path, monkeypatch, stub_hf
     ):
-        """A run generated on one branch can be published from another. The card
-        speaks about the code behind the corpus, so it must name the generating
-        branch (v3 manifests' git_branch), not whatever is checked out now."""
+        """A run generated on one branch can be published from another, and the
+        card must keep the two straight: the RUN entry names the branch the data
+        came from (v3 manifests' git_branch), while an unmerged checkout is
+        reported separately as the publish branch. Collapsing them would let a
+        reader think the corpus was generated by whatever happens to be checked
+        out now."""
         run_dir, _ = make_run_dir(
             tmp_path,
             manifest={**MANIFEST, "git_branch": "aidan/local-only",
@@ -1241,8 +1403,15 @@ class TestUnmergedGuard:
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         card = (staging_dir / "README.md").read_text()
-        assert "`aidan/local-only`" in card
-        assert "declan/publishing-from-here" not in card
+        # The run's own line credits where the data was generated...
+        assert "Run `2026-07-25_15-57_fullscale-500-opus5` (branch " \
+               "`aidan/local-only`, commit `cafe123`)" in card
+        # ...and the publish branch is a separate statement, not conflated with it.
+        assert "Published from branch `declan/publishing-from-here`" in card
+
+        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
+        assert sidecar["unmerged"]["runs"][0]["branch"] == "aidan/local-only"
+        assert sidecar["unmerged"]["publish_branch"] == "declan/publishing-from-here"
 
     def test_pre_v3_manifest_falls_back_to_the_live_branch(
         self, tmp_path, monkeypatch, stub_hf
@@ -1258,6 +1427,107 @@ class TestUnmergedGuard:
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
         assert "`declan/wip`" in (staging_dir / "README.md").read_text()
 
+    def _dad_runs(self, tmp_path, *specs):
+        """Several DAD run dirs, one per (run_name, commit, branch) spec."""
+        dirs = []
+        for run_name, commit, branch in specs:
+            rd, _ = make_run_dir(
+                tmp_path, pipeline="dad", audit_files=[], include_html=False,
+                run_name=run_name,
+                manifest={**MANIFEST, "run_id": run_name,
+                          "git_commit": commit, "git_branch": branch},
+            )
+            dirs.append(rd)
+        return dirs
+
+    def test_combined_publish_names_only_the_unmerged_runs(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The point of per-run stamping: a combined corpus is only as merged as
+        its least-merged run, and source_run lets a reader trace a row to its
+        run — so the warning must say WHICH runs, not just that some run failed.
+        The merged run must not be smeared with the others' warning."""
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_merged", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_wip", "bbbbbbb", "aidan/wip"),
+            ("2026-07-03_10-00_other", "ccccccc", "constance/other"),
+        )
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+
+        # HEAD is clean; only the 2nd and 3rd runs' commits are unmerged.
+        def per_run(commit, fetch=True):
+            merged = commit == "aaaaaaa"
+            return {**MERGED_STATE, "run_commit": commit,
+                    "run_commit_merged": merged}
+
+        monkeypatch.setattr(publish_hf, "merge_state", per_run)
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir),
+                  "--allow-unmerged")
+
+        sidecar = json.loads((staging_dir / "dad" / "card_meta.json").read_text())
+        assert [r["run_id"] for r in sidecar["unmerged"]["runs"]] == [
+            "2026-07-02_10-00_wip", "2026-07-03_10-00_other"]
+        # HEAD was merged, so there is no publish-branch line to add.
+        assert "publish_branch" not in sidecar["unmerged"]
+
+        card = (staging_dir / "README.md").read_text()
+        warning = [ln for ln in card.splitlines() if ln.startswith(">")]
+        assert any("`aidan/wip`" in ln for ln in warning)
+        assert any("`constance/other`" in ln for ln in warning)
+        # The merged run is not smeared with the warning...
+        assert not any("2026-07-01_10-00_merged" in ln for ln in warning)
+        # ...but still appears in the per-run provenance table, which covers all
+        # three regardless of merge status.
+        assert "| `2026-07-01_10-00_merged` |" in card
+
+    def test_combined_publish_stays_silent_when_every_run_is_merged(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_a", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_b", "bbbbbbb", "main"),
+        )
+        staging_dir = tmp_path / "staged"
+        stub_hf()
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
+
+        assert "NOT been merged" not in capsys.readouterr().err
+        # These runs have no curated title either, so with nothing to stamp the
+        # sidecar is correctly never written at all.
+        assert not (staging_dir / "dad" / "card_meta.json").exists()
+        assert "Unmerged code warning" not in (staging_dir / "README.md").read_text()
+
+    def test_combined_publish_fetches_the_remote_only_once(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """merge_state fetches origin/main; doing that once per run dir would
+        make a 10-run publish hit the network 10 times for the same answer."""
+        runs = self._dad_runs(
+            tmp_path,
+            ("2026-07-01_10-00_a", "aaaaaaa", "main"),
+            ("2026-07-02_10-00_b", "bbbbbbb", "main"),
+            ("2026-07-03_10-00_c", "ccccccc", "main"),
+        )
+        stub_hf()
+        fetches = []
+
+        def record(commit, fetch=True):
+            fetches.append(fetch)
+            return dict(MERGED_STATE)
+
+        monkeypatch.setattr(publish_hf, "merge_state", record)
+
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+                  "--repo-id", "org/repo", "--staging-dir", str(tmp_path / "s"))
+        assert fetches == [True, False, False]
+
     def test_siblings_own_stamp_survives_the_other_pipeline_publishing(
         self, tmp_path, monkeypatch, stub_hf
     ):
@@ -1270,7 +1540,9 @@ class TestUnmergedGuard:
         sibling = dict(SIBLING_SDF_FILES)
         sibling["sdf/card_meta.json"] = {
             **SIBLING_SDF_FILES["sdf/card_meta.json"],
-            "unmerged": {"branch": "aidan/experiment", "commit": "cafe123"},
+            "unmerged": {"runs": [{"run_id": "sdf-run",
+                                   "branch": "aidan/experiment",
+                                   "commit": "cafe123"}]},
         }
         stub_hf(repo_files=sibling)
 
@@ -1280,4 +1552,4 @@ class TestUnmergedGuard:
         card = (staging_dir / "README.md").read_text()
         assert "`aidan/experiment`" in card
         # ...and the dad section being published, which IS merged, stays clean.
-        assert card.count("Published from an unmerged branch") == 1
+        assert card.count("Unmerged code warning") == 1

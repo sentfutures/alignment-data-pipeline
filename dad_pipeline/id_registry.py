@@ -15,8 +15,9 @@ content appears again:
                         rewritten response pair)
 
 That lets the viewer and the audits align/sort the same artifact across runs.
-Additive — the per-run ids are untouched. `backfill_gids.py` labels historical
-runs (from the first S-/P- run onward) with the newer kinds.
+Additive — the per-run ids are untouched. (A one-time `backfill_gids.py`
+labeled the pre-registry historical runs; it was removed 2026-07-30 along
+with those runs.)
 
 The registry is a git-tracked JSON file shared across runs (one id space); in
 tests it lives under the tmp output root, so it never touches the real one.
