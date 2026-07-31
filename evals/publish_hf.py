@@ -46,7 +46,7 @@ Tags are repo-wide, so with more than one dataset in the repo they should be
 prefixed per pipeline (`sdf-v1-…`, `dad-v1-…`) to stay unambiguous.
 
 Usage:
-  REPO=sentientfutures/animal-welfare-mid-training-datasets
+  REPO=sentientfutures/animal-welfare-training-dataset
   python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
   python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
       --tag sdf-v1-fullscale-500-opus5
@@ -671,7 +671,7 @@ def main() -> None:
                              "publish as ONE combined corpus whose source_run "
                              "column names each row's run; SDF takes exactly one.")
     parser.add_argument("--repo-id", required=True,
-                        help="e.g. sentientfutures/animal-welfare-mid-training-datasets")
+                        help="e.g. sentientfutures/animal-welfare-training-dataset")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
     parser.add_argument("--tag", default=None,
                         help="Tag to create on the upload commit. Tags are repo-wide, so "
