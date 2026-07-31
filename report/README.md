@@ -56,15 +56,21 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 | `#dad` | Difficult advice, in full (`report/dad.py`). Hidden until chosen. |
 | footer | Repo and both viewers as buttons, one provenance line per run, and the build claim. |
 
-Both reports take the same skeleton, so a reader learns it once: **what it is / how it is
-built / one example end to end / where it is weak / appendix**. Each beat is an `<h3>`
-with its own id (`#dad-weak`, `#sdf-what`).
+Both reports take the same skeleton, so a reader learns it once: a one-line lede under the
+report's own `<h2>`, then **how it is built / one example end to end / where it is weak /
+appendix**. Each beat is an `<h3>` with its own id (`#dad-weak`, `#dad-example`).
 
-Four of those are open and the fifth is drawers, and the line between them is what a
-reader has to read:
+What the dataset *is* has no beat: the `<h2>` says "Difficult advice" and the lede says
+what that means, in the same sentence the comparison's masthead uses — a reader who
+arrived on `#dad` from a deep link never saw that table. A "What it is" heading over one
+sentence only names what the reader can already see. (`report/sdf.py` still has an
+`sdf-what` heading; its report is a placeholder and takes this shape when it is written.)
+
+Three beats are open and the fourth is drawers, and the line between them is what a reader
+has to read:
 
 - **Open**: the process, one record's whole trail through it, and caveats that hold for
-  *any* run of the pipeline. "What it is" is prose and nothing else — no tiles.
+  *any* run of the pipeline.
 - **Appendix**: everything specific to one run. The judged comparison, the regression
   statement, every chart, every check, the diversity numbers, and the derived floor of
   what this run's audit flagged.

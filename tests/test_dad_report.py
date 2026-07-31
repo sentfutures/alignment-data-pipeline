@@ -563,15 +563,18 @@ class TestChartsAreEvidence:
         html = build(diversity=DIVERSITY, manifest=MANIFEST)
         assert "figures · On this run" in html
 
-    def test_the_what_beat_is_prose_and_nothing_else(self):
-        """It says what the dataset is. No comparison and no tiles — the record count is in
-        the comparison table above the report, and how distinct the records are is a
-        measurement, which is what the appendix is for."""
-        what = beat(build(diversity=DIVERSITY, manifest=MANIFEST), "dad-what")
-        for banned in ("the control", "/10", "chip", "regression", "class='tiles'",
-                       "class='scroll'", "<figure"):
-            assert banned not in what, banned
-        assert what.count("<p") == what.count("</p>") >= 1  # prose, and only prose
+    def test_the_report_opens_on_one_line_with_no_heading_over_it(self):
+        """What the dataset is gets a lede under the report's own <h2>, not a beat. A
+        "What it is" heading over a single sentence only names what a reader can see, and
+        the figures that used to sit under it are measurements, which is what the appendix
+        is for."""
+        section = dad_section(build(diversity=DIVERSITY, manifest=MANIFEST))
+        head = section[:section.index("<h3 id=")]
+        assert "class='lede'" in head
+        assert "What it is" not in strip_tags(head)
+        assert "dad-what" not in section
+        for banned in ("the control", "/10", "chip", "class='tiles'", "<figure"):
+            assert banned not in head, banned
 
 
 class TestDegradation:
@@ -579,7 +582,7 @@ class TestDegradation:
         audit = {k: v for k, v in AUDIT_FULL.items()
                  if k not in ("delivery", "showcase", "moves", "moral_patient_reasons")}
         html = build(audit=audit, lineage=LINEAGE, rewrites=REWRITES)
-        assert "id='dad-what'" in html
+        assert "id='dad-built'" in html
         # Outside the run's own text: a shipped answer may legitimately contain the word.
         assert not re.search(r"\bNone\b", strip_tags(without_corpus_text(html)))
 
@@ -623,7 +626,7 @@ class TestDegradation:
         """With no diversity pass the distinctness tile is ABSENT, not 0.0 — the trap
         that `.get("score", 0)` walks straight into."""
         html = build(manifest=None, diversity=None)
-        assert "id='dad-what'" in html
+        assert "id='dad-built'" in html
         assert "effectively distinct records" not in html
         assert "0.0" not in strip_tags(dad_section(html))
 

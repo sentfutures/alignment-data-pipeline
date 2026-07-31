@@ -62,13 +62,16 @@ SECTION_TITLE = "Difficult advice"
 # The stages come before the worked example on purpose: the chooser above asks the reader
 # to walk through a dataset generation, and a walk needs its steps named first.
 #
-# Four beats are open and one is drawers. What a reader has to read is the process, one
+# Three beats are open and one is drawers. What a reader has to read is the process, one
 # record's whole trail, and the caveats that hold for any run of this pipeline. Everything
 # specific to THIS run — the judged comparison, its regression, every chart, every check,
 # the derived floor — is in the appendix. How to install and run the pipeline is in the
 # repository README and is not on this page at all.
+#
+# What the dataset IS has no beat of its own: the <h2> is "Difficult advice", and one line
+# under it says what that means. A "What it is" heading over a single sentence only names
+# what the reader can already see.
 BEATS = (
-    ("dad-what", "What it is"),
     ("dad-built", "How it is built"),
     ("dad-example", "One example, end to end"),
     ("dad-weak", "Where it is weak"),
@@ -715,14 +718,15 @@ def scoreboard(audit, f, cons):
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
 
 
-def blocks_what(content, f):
-    """What the dataset is: prose, and nothing else.
+def blocks_lede(content, f):
+    """One line under the report's own title, saying what the dataset is.
 
-    Takes no ``audit`` and no figures on purpose. The record count is already in the
-    comparison table above this report, and how distinct the records are or what they cost
-    is a measurement rather than what the dataset *is* — both are in the appendix.
+    Not a beat and not a heading: the ``<h2>`` above it already says "Difficult advice",
+    and a "What it is" heading over one sentence only names what the reader can see. It
+    deliberately repeats the comparison table's masthead line — a reader who arrived here
+    from a deep link never saw that table.
     """
-    return R.sub("dad-what", "What it is") + C.prose(content, "dad_what", f)
+    return f"<p class='lede'>{R.inline_md(C.fill(content.get('dad_what', ''), f))}</p>"
 
 
 def _delivery_statement(audit, f):
@@ -1323,7 +1327,7 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
     labels = _labels(audit)
     picks = (example,) if example else ()
     return "".join([
-        blocks_what(content, f),
+        blocks_lede(content, f),
         blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks),
         blocks_weak(content, f),

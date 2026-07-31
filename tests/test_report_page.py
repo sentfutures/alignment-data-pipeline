@@ -139,10 +139,18 @@ class TestShape:
         beats under the same names."""
         html = build(sdf_inputs=SDF_INPUTS)
         beats = dict(re.findall(r"<h3 id='([^']+)'>([^<]*)</h3>", html))
-        assert beats["dad-what"] == beats["sdf-what"] == "What it is"
         assert beats["dad-weak"] == beats["sdf-weak"] == "Where it is weak"
         for anchor, _ in D.BEATS:
             assert anchor in beats
+
+    def test_the_difficult_advice_report_opens_on_a_lede(self):
+        """What the dataset is takes one line under the report's own <h2>, not a beat of
+        its own. Synthetic documents still carries a "What it is" heading — its report is
+        a placeholder, and it takes this shape when it is written."""
+        panel = build(sdf_inputs=SDF_INPUTS).split("<section id='dad'")[1]
+        head = panel[:panel.index("<h3 id=")]
+        assert "class='lede'" in head
+        assert "dad-what" not in panel
 
     def test_the_hero_is_the_image_the_title_and_the_lines_that_follow(self):
         """Image, title, intro, centred, and nothing else. A lede, a meta line or a set

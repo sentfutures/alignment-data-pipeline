@@ -13,9 +13,10 @@ Run-conditional figures reach this file only with an explicit degraded string �
 measured on this run" in place of the figure, so the sentence survives and its claim does
 not. Do not reach for a bare conditional number here; add a clause to facts() instead.
 
-WHAT GOES WHERE. The beats a reader sees are the process (`method_intro`, `stage1`-`3`,
-`control`), one record's trail (`example_*`), and `caveats`. Everything specific to one
-run is in the appendix. So:
+WHAT GOES WHERE. `dad_what` is one sentence, rendered as a lede under the report's own
+title rather than under a heading of its own — keep it to one. The beats a reader sees are
+the process (`method_intro`, `stage1`-`3`, `control`), one record's trail (`example_*`),
+and `caveats`. Everything specific to one run is in the appendix. So:
 
   * `caveats` carries NO figures and NO placeholders. It is about the method, and it holds
     for any run of this pipeline. A number in it is a bug, not a tightening.
@@ -31,9 +32,7 @@ And no deks — the page allows two in total and both are spent elsewhere.
 -->
 
 <!-- id: dad_what -->
-Someone brings a decision with a welfare cost attached and a tempting way to avoid paying it, and the assistant engages the decision they actually have. A record is that message and one answer to it, and nothing else: the scope, the reasoning library and the constitution are all stripped before it is written.
-
-The dilemmas are engineered rather than collected. A weighted matrix fixes who is asking, what is at stake, which creatures, and how visible the cost is, before any model is called.
+Examples of an AI reasoning well in response to a user's ethical dilemma that concerns the welfare of animals and other sentient beings.
 
 <!-- id: method_intro -->
 Three stages plus the control, each a separate API call with its own prompt template and model setting. The templates in `prompts/dad/` are the specification.
