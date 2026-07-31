@@ -2207,7 +2207,7 @@ def main() -> None:
         raise SystemExit("No step-1 prompts found — nothing to audit.")
 
     print(f"=== DAD prompt audit: {args.input} ({len(records)} prompts) ===\n")
-    report: dict = {"input": str(args.input), "n_prompts": len(records)}
+    report: dict = {"input": utils.repo_relative(args.input), "n_prompts": len(records)}
     # Resolve the prompt_id -> stable-gid bridge once, before any section runs,
     # so per-case data and display all speak R-/E-/P-/S- ids (report["gid_map"]).
     resolve_gids(run_dir, report)

@@ -558,7 +558,7 @@ def main() -> None:
     config = utils.load_config(args.config)
 
     print(f"=== SDF corpus audit: {args.input} ({len(records)} documents) ===\n")
-    report: dict = {"input": str(args.input), "n_docs": len(records)}
+    report: dict = {"input": utils.repo_relative(args.input), "n_docs": len(records)}
     audit_composition(records, report)
     print()
     audit_length_truncation(records, report)

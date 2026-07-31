@@ -743,7 +743,7 @@ def main() -> None:
             }
 
     report.update({
-        "input": str(args.input),
+        "input": utils.repo_relative(args.input),
         "corpus": corpus_name,
         "embed_model": args.embed_model,
         "n_records": len(records),

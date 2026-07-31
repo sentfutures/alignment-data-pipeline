@@ -66,7 +66,7 @@
       "dilemmas": {
         "count": 10,
         "id_start": 1,
-        "seed_path": "/private/tmp/claude-501/-Users-constanceli-Documents-alignment-data-pipeline/63c3f067-4db2-4757-821d-1bad4e90674a/scratchpad/archetype10_seeds.jsonl",
+        "seed_path": "archetype10_seeds.jsonl",
         "scenario_seed": null,
         "gate": true,
         "refine": true

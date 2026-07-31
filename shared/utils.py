@@ -30,6 +30,23 @@ def parallel_map(fn, items: list, workers: int):
         yield from pool.map(fn, items)
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def repo_relative(path: str | Path) -> str:
+    """A path rendered relative to the repo root, for values that get WRITTEN
+    into reports and manifests. An absolute path bakes the machine it ran on
+    (a home directory, a username) into files that are committed and, for audit
+    reports, published — so anything inside the repo is recorded as
+    "outputs/dad/runs/..." instead. A path outside the repo keeps only its file
+    or directory name, since its parent directories say nothing about the run."""
+    resolved = Path(path).expanduser().resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return resolved.name
+
+
 def ensure_dir(path: str | Path) -> Path:
     p = Path(path)
     p.mkdir(parents=True, exist_ok=True)

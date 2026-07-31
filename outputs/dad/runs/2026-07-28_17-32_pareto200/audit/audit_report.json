@@ -1,5 +1,5 @@
 {
- "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-28_17-32_pareto200",
+ "input": "outputs/dad/runs/2026-07-28_17-32_pareto200",
  "n_prompts": 196,
  "gid_map": {
   "AW-0001": {

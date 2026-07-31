@@ -122,7 +122,7 @@
       ]
     }
   ],
-  "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-28_22-14_archetype10",
+  "input": "outputs/dad/runs/2026-07-28_22-14_archetype10",
   "corpus": "dad_corpus.jsonl",
   "embed_model": "gemini-embedding-001",
   "n_records": 10,
