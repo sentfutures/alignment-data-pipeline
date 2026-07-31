@@ -813,6 +813,28 @@ class TestMultiDatasetCard:
             {"pipeline": "dad", "dir": dad_dir, "staged": dad_staged, "content": None},
         ]
 
+    def test_intro_leads_with_what_it_is_and_where_it_came_from(self, tmp_path):
+        # The card's hand-written half lives in build_card because the card is
+        # regenerated whole on every publish; the Hub's editor would be overwritten.
+        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
+        assert "Synthetic training data that teaches a model to reason carefully" in card
+        assert "pretraining-style documents" in card
+        assert "single-turn chat exchanges" in card
+        assert "Teaching Claude Why" in card
+        # source names the repo, and leads rather than trailing the audit sections
+        assert f"[{publish_hf.REPO_NAME}]({publish_hf.REPO_URL})" in card
+        first_section = min(card.index(publish_hf.PIPELINE_NAMES[t])
+                            for t in ("sdf", "dad"))
+        assert card.index("## Source") < first_section
+
+    def test_intro_names_only_the_corpora_being_published(self, tmp_path):
+        # a publish whose sibling is absent (or a --dry-run, which cannot see it)
+        run, corpus = make_run_dir(tmp_path, pipeline="dad")
+        staged, ddir = _stage(run, corpus, tmp_path / "stage_solo")
+        card = _one_card(ddir, staged)
+        assert "single-turn chat exchanges" in card
+        assert "pretraining-style documents" not in card
+
     def test_declares_both_configs_with_sdf_default(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
         fm = yaml.safe_load(card.split("---\n")[1])
