@@ -100,6 +100,8 @@ The `Checkpoint` class saves completed IDs to disk after every API call, making 
 
 ## Evals (`evals/`)
 
+Measurement scripts that read finished runs. They are mostly internal checks, tuned to the questions we were asking rather than to an external standard; `evals/README.md` is the folder's own guide.
+
 `score_sdf.py` scores SDF documents on alignment, realism, and diversity.
 
 `audit_sdf.py` is a corpus-**level** audit of an SDF run: it measures properties no single-document judge can see, because they only exist across the corpus as a set. Offline and free by default: composition and register spread, length and truncation artifacts, near-duplicate rate (measured by word-overlap similarity), invented-name collapse, stock-phrase frequency, and opening-shape clustering, each with a GOOD/OK/BAD verdict where meaningful. `--patterns` adds an LLM templating scan (batch scan via `prompts/tools/pattern_scan.txt`, then consolidation, then per-pattern prevalence; a pattern is flagged only if it is judged a genuine defect **and** widespread). Writes `audit/audit_report.json` into the run dir.
