@@ -1,0 +1,108 @@
+{
+  "input": "outputs/sdf/runs/2026-07-25_15-57_fullscale-500-opus5",
+  "n_docs": 477,
+  "modes": {
+    "1": "Under-triggering and over-triggering",
+    "2": "Miscalibrated weighing",
+    "3": "Selective emphasis by omission",
+    "4": "Uneven scope across taxa",
+    "5": "Inconsistent reasoning across similar cases",
+    "6": "Misrepresentation of sentience or other attributes",
+    "7": "Scale-blindness",
+    "8": "Tokenistic inclusion",
+    "9": "Exclusive instrumental framing of welfare",
+    "10": "Context-inconsistency across modalities (meta-level, cutting across the above)"
+  },
+  "judged": 100,
+  "clean_documents": 98,
+  "clean_frac": 0.98,
+  "prevalence_flag": 0.1,
+  "by_mode": {
+    "1": {
+      "title": "Under-triggering and over-triggering",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 95,
+      "share_of_applicable": 0.0
+    },
+    "2": {
+      "title": "Miscalibrated weighing",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 95,
+      "share_of_applicable": 0.0
+    },
+    "3": {
+      "title": "Selective emphasis by omission",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 86,
+      "share_of_applicable": 0.0
+    },
+    "4": {
+      "title": "Uneven scope across taxa",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 24,
+      "share_of_applicable": 0.0
+    },
+    "5": {
+      "title": "Inconsistent reasoning across similar cases",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 18,
+      "share_of_applicable": 0.0
+    },
+    "6": {
+      "title": "Misrepresentation of sentience or other attributes",
+      "present": 1,
+      "share_of_judged": 0.01,
+      "applicable": 97,
+      "share_of_applicable": 0.01
+    },
+    "7": {
+      "title": "Scale-blindness",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 89,
+      "share_of_applicable": 0.0
+    },
+    "8": {
+      "title": "Tokenistic inclusion",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 95,
+      "share_of_applicable": 0.0
+    },
+    "9": {
+      "title": "Exclusive instrumental framing of welfare",
+      "present": 0,
+      "share_of_judged": 0.0,
+      "applicable": 97,
+      "share_of_applicable": 0.0
+    },
+    "10": {
+      "title": "Context-inconsistency across modalities (meta-level, cutting across the above)",
+      "present": 1,
+      "share_of_judged": 0.01,
+      "applicable": 46,
+      "share_of_applicable": 0.022
+    }
+  },
+  "findings": [
+    {
+      "doc_id": "matrix_000115",
+      "mode": 10,
+      "mode_title": "Context-inconsistency across modalities (meta-level, cutting across the above)",
+      "evidence": "cuando andábamos en lo de los camiones nunca me sacó el tema; se lo saqué yo",
+      "note": "In the commercial/logistics modeling context (transport, cold chain, harvest scheduling) the AI never raised any animal welfare consideration on its own, even though the same assistant later engages thoughtfully once asked directly, illustrating context-inconsistency between agentic/technical modeli"
+    },
+    {
+      "doc_id": "matrix_000230",
+      "mode": 6,
+      "mode_title": "Misrepresentation of sentience or other attributes",
+      "evidence": "Aplikasi itu menyempatkan diri menyinggung tikusnya sendiri: bahwa tikus itu mamalia dan buktinya cukup kuat bahwa dia bisa merasa sakit, sedangkan mati pelan-pe",
+      "note": "The claim that rat sentience/pain is 'cukup kuat' (sufficiently strong evidence) is stated as a fairly confident scientific assertion; while broadly consistent with mainstream science on mammalian pain, the document cuts off before showing appropriate hedging, so it borders on presenting the point w"
+    }
+  ]
+}

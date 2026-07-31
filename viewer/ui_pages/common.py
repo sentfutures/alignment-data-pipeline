@@ -55,44 +55,6 @@ def pick_run(sidebar: bool = True) -> loader.RunInfo | None:
     return next(r for r in pipeline_runs if r.run_id == run_id)
 
 
-def show_reason_comparison(case: dict) -> None:
-    """One record's plain-vs-pipeline important-considerations comparison (from
-    the corpus audit's --reasons data). Retention-grouped — kept / weakened /
-    dropped / added — when the judge ran; plain two-column lists otherwise."""
-    from viewer import rendering
-
-    header = " · ".join(
-        f"**{title}** {len(entry.get('reasons') or [])} distinct, "
-        f"{entry.get('density_per_1k', 0):.2f}/1k chars ({entry.get('chars', 0):,} chars)"
-        for arm, title in (("plain", "Plain Claude"), ("pipeline", "Pipeline"))
-        if (entry := case.get(arm)))
-    if header:
-        st.markdown(header)
-
-    groups = rendering.audit_survival_groups(case)
-    if groups:
-        st.caption("Plain Claude's considerations, judged against the pipeline's response "
-                   "text — plus what the pipeline added.")
-        for title, reasons in groups:
-            st.markdown(f"**{title}**")
-            if reasons:
-                st.markdown("\n".join(f"- {r}" for r in reasons))
-            else:
-                st.caption("none")
-        return
-    col_a, col_b = st.columns(2)
-    for col, arm, title in ((col_a, "plain", "Plain Claude"),
-                            (col_b, "pipeline", "Pipeline")):
-        entry = case.get(arm)
-        with col:
-            st.markdown(f"**{title}**")
-            if entry is None:
-                st.caption("not scanned (arm missing in this run)")
-            else:
-                for reason in entry.get("reasons") or []:
-                    st.markdown(f"- {reason}")
-
-
 def run_provenance_note(run: loader.RunInfo) -> None:
     """One-line provenance caveat, shown at most once per page."""
     if not run.has_snapshot:

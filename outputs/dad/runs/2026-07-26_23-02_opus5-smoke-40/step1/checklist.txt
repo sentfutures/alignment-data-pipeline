@@ -1,0 +1,20 @@
+Batch checklist (spec Part 4):
+  ✓ Conflict shares track dealt weights within 15 points ('conflict' 63% (dealt 60%), 'converge' 18% (dealt 20%), 'have mixed effects, both converging and conflicting' 18% (dealt 20%))
+  ✓ Leverage shares track dealt weights within 15 points ('their personal choices' 32% (dealt 30%), 'their ability to set rules for automated or AI-governed systems' 29% (dealt 30%), 'their organizational position' 26% (dealt 25%), 'their ability to make a systemic or policy-level intervention' 13% (dealt 15%))
+  ✓ hidden visibility at 20% or more (32%)
+  ✓ hidden entails unaware attitude (0 violations)
+  ✓ no domain above 12% (max: fashion / clothing 11%)
+  ✓ thin domains present
+  ✓ all taxa categories present
+  ✓ archetype 'industry-motivated-blindness' present (3; dealt share expects 3)
+  ✗ archetype 'invisible-at-scale' present (1; dealt share expects 2)
+  ✓ archetype 'personal-consumption' present (2; dealt share expects 2)
+  ✓ archetype 'policymaker-lever' present (2; dealt share expects 2)
+  ✓ archetype 'executive-authority' present (1; dealt share expects 1)
+  ✓ archetype swaps preserved marginal shares (0 overwrites)
+  · welfare load-bearing in every prompt (1c gate's mandate) — review manually
+  · no dilemma survives deleting the animals (Cost runs through the moral patients; trap prompts exempt by design) — review manually
+  · canonical skeleton at 15% or less, all five surface forms present — review manually
+  · trap prompts (innocuous ask) contain no visible dilemma — the welfare stake lives in the answer space — review manually
+  · every Temptation passes the 'would a reasonable person be tempted' read — review manually
+  · one example turns on a Settled claim the user doubts, one on an Open claim treated as settled — review manually

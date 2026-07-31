@@ -8,6 +8,7 @@ Step 1a (generate_scenarios) is pure sampling — no API — so its distribution
 guarantees are asserted directly.
 """
 
+import hashlib
 import json
 import random
 import threading
@@ -38,7 +39,11 @@ def _dad_step1_dispatch(user_message, **kw):
     if "gate for dilemma prompts" in blob:  # 1c gate — pass verdict
         return json.dumps({"pass": True, "failures": []})
     if "rewrite a fictional user input" in blob:  # 1d refine
-        return "relocated the lever\n<revised_user_prompt>Refined user message.</revised_user_prompt>"
+        # vary the rewrite per scenario: identical wording would collapse two
+        # records onto one content-keyed prompt_gid (guarded against in run())
+        tag = hashlib.md5(blob.encode()).hexdigest()[:6]
+        return ("relocated the lever\n<revised_user_prompt>Refined user "
+                f"message {tag}.</revised_user_prompt>")
     raise AssertionError(f"Unrecognized step-1 prompt: {user_message[:80]!r}")
 
 
@@ -48,12 +53,15 @@ class TestStep1Run:
         examples = step1_dilemmas.run(tiny_config, prompts_dad, tmp_path)
 
         assert len(examples) == 2
-        assert [e["prompt_id"] for e in examples] == ["AW-0001", "AW-0002"]
+        # per-run AW- ids are retired: records are identified by their
+        # content-keyed prompt gids alone
+        assert [e["prompt_gid"] for e in examples] == ["P-0001", "P-0002"]
+        assert all("prompt_id" not in e for e in examples)
         for e in examples:
             # composed 1c/1d flow: the gate judges the draft, the refine
             # rewrites it — the shipped prompt is the rewrite, the draft is
             # kept on the record for inspection
-            assert e["user_message"] == "Refined user message."
+            assert e["user_message"].startswith("Refined user message")
             assert e["draft_user_message"].startswith("Drafted user message")
             assert "gate_failures" not in e        # passed the gate
             # 1b writes no write-up: the record's scenario_cards are the dealt cards
@@ -753,16 +761,18 @@ class TestStep1Run:
         stub_claude(_dad_step1_dispatch)
         examples = step1_dilemmas.run(tiny_config, legacy_prompts, tmp_path / "out")
         assert len(examples) == 2
-        assert all(e["user_message"] == "Refined user message." for e in examples)
+        assert all(e["user_message"].startswith("Refined user message") for e in examples)
 
-    def test_seed_import_rejects_duplicate_ids(self, tiny_config, prompts_dad, tmp_path):
+    def test_seed_import_rejects_duplicate_prompts(self, tiny_config, prompts_dad, tmp_path):
+        # identical wording -> identical prompt_gid -> the two seeds would
+        # silently share one scope/response in step 2, so the import refuses
         seed_file = tmp_path / "seeds.jsonl"
-        rows = [{"id": "AW-0001", "prompt": "p1"}, {"id": "AW-0001", "prompt": "p2"}]
+        rows = [{"prompt": "same words"}, {"prompt": "same words"}]
         seed_file.write_text("\n".join(json.dumps(r) for r in rows))
         config = dict(tiny_config)
         config["dad"] = {"dilemmas": {**tiny_config["dad"]["dilemmas"],
                                       "seed_path": str(seed_file)}}
-        with pytest.raises(SystemExit, match="Duplicate prompt_id"):
+        with pytest.raises(SystemExit, match="Duplicate seed prompt"):
             step1_dilemmas.run(config, prompts_dad, tmp_path / "out")
 
 
@@ -913,6 +923,10 @@ class TestNormalizeIds:
 
 
 def _dilemma(pid="AW-0001"):
+    # deliberately legacy-shaped (prompt_id, no prompt_gid): step 2/3 and the
+    # baseline read ids via id_registry.prompt_key, so these tests double as
+    # coverage that pre-gid run dirs still process; records they WRITE carry
+    # the key under prompt_gid.
     return {"prompt_id": pid, "user_message": "User dilemma text.",
             "annotation": {"direction": "Mixed"}}
 
@@ -1014,7 +1028,7 @@ class TestStep2Run:
         assert utils.load_jsonl(tmp_path / "responses.jsonl") == []
         rejects = utils.load_jsonl(tmp_path / "scope_rejects.jsonl")
         assert len(rejects) == 1
-        assert rejects[0]["prompt_id"] == "AW-0001"
+        assert rejects[0]["prompt_gid"] == "AW-0001"
 
         # resume: the rejection is spent — zero API calls, still no responses
         resumed = stub_claude(
@@ -1236,7 +1250,7 @@ class TestStep2Run:
         # the unusable select raw is persisted — same policy as every stage
         failures = utils.load_jsonl(tmp_path / "select_failures.jsonl")
         assert len(failures) == 1
-        assert failures[0]["prompt_id"] == "AW-0001"
+        assert failures[0]["prompt_gid"] == "AW-0001"
         assert failures[0]["raw"] == "I could not find any relevant entries, sorry!"
 
     def test_resume_reuses_stored_selection_for_pending_responses(
@@ -1300,9 +1314,9 @@ class TestStep2Run:
 
         assert len(calls) == 6  # 2 scopes + 2 selects + 2 responses
         # results and persisted files keep input order despite thread interleaving
-        assert [r["prompt_id"] for r in results] == ["AW-0001", "AW-0002"]
+        assert [r["prompt_gid"] for r in results] == ["AW-0001", "AW-0002"]
         scopes = utils.load_jsonl(tmp_path / "scopes.jsonl")
-        assert [s["prompt_id"] for s in scopes] == ["AW-0001", "AW-0002"]
+        assert [s["prompt_gid"] for s in scopes] == ["AW-0001", "AW-0002"]
 
         # completed work costs nothing on resume
         calls = stub_claude([])
@@ -1374,7 +1388,7 @@ class TestStep3Run:
         )
         assert final == []
         failures = utils.load_jsonl(tmp_path / "step3" / "rewrite_failures.jsonl")
-        assert len(failures) == 1 and failures[0]["prompt_id"] == "AW-0001"
+        assert len(failures) == 1 and failures[0]["prompt_gid"] == "AW-0001"
 
         # resume retries the same response and succeeds with zero waste
         calls = stub_claude(["Rewritten careful answer."])
@@ -1427,7 +1441,7 @@ class TestBaselineRun:
 
         assert len(results) == 1
         rec = results[0]
-        assert rec["prompt_id"] == "AW-0001"
+        assert rec["prompt_gid"] == "AW-0001"
         assert rec["baseline_response"] == "Plain model answer."
         # stable content-keyed control-arm id (own C- id space)
         assert rec["plain_gid"] == "C-0001"
@@ -1463,14 +1477,28 @@ class TestBaselineRun:
             {"dad": {"baseline": {"enabled": False}}}) is False
         assert baseline.enabled({"dad": {"baseline": {"enabled": True}}}) is True
 
-    @pytest.mark.parametrize("bad_reply", [
-        ("cut off mid-sen", "max_tokens"),  # truncated
-        ("", "end_turn"),                   # empty
+    def test_capped_baseline_retries_once_at_higher_budget(
+        self, tiny_config, tmp_path, stub_claude
+    ):
+        # The plain arm has no system prompt and so no length discipline, which
+        # makes it the most truncation-prone call in the pipeline; a doubled
+        # budget on retry rescues the arm instead of skipping a paid call.
+        calls = stub_claude([("cut off mid-sen", "max_tokens"), "Plain model answer."])
+        results = baseline.run(tiny_config, tmp_path, [_dilemma()])
+        assert [c["max_tokens"] for c in calls] == [baseline.BASE_MAX_TOKENS,
+                                                    baseline.BASE_MAX_TOKENS_RETRY]
+        assert len(results) == 1
+        assert results[0]["baseline_response"] == "Plain model answer."
+
+    @pytest.mark.parametrize("bad_replies", [
+        # capped even at the doubled budget (both attempts truncate)
+        [("cut off mid-sen", "max_tokens"), ("still cut off", "max_tokens")],
+        [("", "end_turn")],                 # empty (no retry — not a truncation)
     ], ids=["truncated", "empty"])
     def test_unusable_reply_skips_without_checkpoint(
-        self, tiny_config, tmp_path, stub_claude, bad_reply
+        self, tiny_config, tmp_path, stub_claude, bad_replies
     ):
-        stub_claude([bad_reply])
+        stub_claude(bad_replies)
         assert baseline.run(tiny_config, tmp_path, [_dilemma()]) == []
         assert utils.load_jsonl(tmp_path / "baseline_responses.jsonl") == []
 

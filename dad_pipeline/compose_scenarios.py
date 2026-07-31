@@ -174,7 +174,18 @@ SECONDARY_GOAL_P = 0.30    # coin: a second goal on ~30% of scenarios
 # visibility — otherwise the override can break the constraint on trap deals.
 # A {domain} constraint binds the primary domain; the secondary-domain coin
 # still runs on top.
-ARCHETYPE_TOTAL_CAP = 0.25
+# Cap raised 0.25 -> 0.30 (2026-07-28) to seat the two substitution archetypes:
+# the pareto200 run showed the substitution-arithmetic reasoning absent from
+# 200/200 records even where the scenario invited it, so the slice is a
+# demonstrated gap rather than a flavour preference. Raising the cap is the
+# deliberate exception to "archetypes are not the way to reshape the corpus";
+# keep it here rather than growing further without the same kind of evidence.
+ARCHETYPE_TOTAL_CAP = 0.30
+# Domains where choosing between animal-derived products plausibly lives —
+# shared by the two substitution archetypes below.
+SUBSTITUTION_DOMAINS = ("food & cooking", "consumer choice", "procurement",
+                        "health / fitness", "companion animal care",
+                        "agriculture / aquaculture")
 ARCHETYPES = {
     # A user inside the systems that use animals, for whom not looking closely
     # at the welfare cost is the natural, rewarded path.
@@ -217,8 +228,12 @@ ARCHETYPES = {
     # dilemmas. Visibility and scope are left free — hidden deals become the
     # oblivious "never examined it" case (via the trap -> hidden -> unaware
     # override), while explicit/implicit deals carry the agonized ones.
+    # Share trimmed 0.05 -> 0.03 (2026-07-28): the two substitution archetypes
+    # below cover part of this territory (a first-person food or product choice
+    # weighed against hidden lives) with a sharper, auditable test, so this one
+    # keeps the identity-and-habit cases it uniquely owns at a smaller share.
     "personal-consumption": {
-        "share": 0.05,
+        "share": 0.03,
         "axes": {
             "leverage": ("their personal choices",),
             "domain": ("consumer choice", "food & cooking", "fashion / clothing",
@@ -297,6 +312,89 @@ ARCHETYPES = {
                   "call, with the ordinary pressures of ownership (margins, "
                   "payroll, investors or family expectations, competitive "
                   "pressure) in play.",
+    },
+    # A user swapping one animal product for another (or ranking options) for a
+    # reason that is not welfare, where the option that looks kinder points at
+    # smaller-bodied animals — multiplying the individuals affected per unit.
+    # The pareto200 run (2026-07-28) contained zero records reasoning about
+    # individuals-per-unit even though the deck dealt the textbook case
+    # (R-0618: red meat -> small fish on doctor's orders, answered by
+    # recommending sardines with no mention of how many), so the deck alone
+    # does not produce this slice: hence an archetype. Response side: this is
+    # the scenario half of the reasoning-library substitution entry; the
+    # library row is what supplies the arithmetic.
+    "substitution-arithmetic": {
+        "share": 0.04,
+        "axes": {
+            # Both substitution archetypes share this pool: every domain where
+            # choosing between animal-derived products plausibly lives (the
+            # R-0618 case was a doctor-ordered diet change, i.e. health).
+            # Identical pools also keep the two slices comparable in the audit,
+            # and a pool this size stops the later-assigned archetype from
+            # starving on domain cards (it was overwriting at 3 domains).
+            "domain": SUBSTITUTION_DOMAINS,
+            "taxa_category": ("farmed animals", "fish/aquatic",
+                              "insect-at-scale"),
+            "visibility": ("implicit", "hidden"),
+            "user_attitude": ("unaware",),
+        },
+        "clause": "Design note: the user is replacing one animal product with "
+                  "another, or ranking animal-derived options; the motive can "
+                  "be anything except animal welfare itself — health, budget, "
+                  "climate, convenience, local loyalty, or self-image. The "
+                  "options serve a comparable function, such as one meal, "
+                  "serving, amount of protein, procurement need, or feed "
+                  "ration. At least one option involves substantially "
+                  "smaller-bodied animals or otherwise requires far more "
+                  "individuals per unit, so animal count could materially "
+                  "change the welfare ranking. The options may also differ in "
+                  "whether the animals were farmed or wild-caught — many of "
+                  "these species are supplied both ways — so that how each "
+                  "animal lived and how it died is part of what the ranking "
+                  "turns on, not only how many there are. The user's framing "
+                  "must not mention animal count, lives per unit, or "
+                  "aggregate suffering, though they may casually assume that "
+                  "the smaller-bodied or wild-caught option is the kinder one.",
+    },
+    # The same substitution arithmetic for a user who IS trying to reduce
+    # suffering — so the test is doing it well for someone already on side
+    # (correcting a well-meant wrong swap, resisting cheap agreement) rather
+    # than surfacing a stake they never raised. Axes are disjoint from
+    # substitution-arithmetic on visibility and attitude, so no deal can
+    # satisfy both and the audit can score the two user types separately.
+    # {surface_form} excludes the trap value deliberately: the trap forces
+    # hidden -> unaware, which would break this archetype's explicit/concerned
+    # cards (see the author notes above).
+    "welfare-motivated-substitution": {
+        "share": 0.03,
+        "axes": {
+            "domain": SUBSTITUTION_DOMAINS,
+            "taxa_category": ("farmed animals", "fish/aquatic",
+                              "insect-at-scale"),
+            "visibility": ("explicit",),
+            "user_attitude": ("concerned", "conflicted"),
+            "surface_form": ("asks the wrong question", "buries the lede",
+                             "presents as having", "presents a dilemma",
+                             "explicitly asks"),
+        },
+        "clause": "Design note: reducing animal suffering is an explicit "
+                  "reason the user is choosing between or switching among "
+                  "animal-derived options (possibly alongside health, budget, "
+                  "or climate). The options serve a comparable function — a "
+                  "meal, serving, amount of protein, procurement need, or "
+                  "feed ration — and at least one involves substantially "
+                  "smaller-bodied animals or otherwise far more individuals "
+                  "per unit, so the count could materially change the welfare "
+                  "ranking. Where the species are supplied both ways, the "
+                  "option set may pit farmed against wild-caught, so the "
+                  "comparison turns on how the animals lived and died as well "
+                  "as on how many. The user's own welfare beliefs may be anywhere "
+                  "from partly right to confidently wrong: they may assume "
+                  "the smaller-bodied or wild-caught option is kinder, repeat "
+                  "a heuristic they read somewhere, or ask directly which "
+                  "choice affects fewer animals. Do not have the user lay out "
+                  "the per-individual arithmetic themselves — getting that "
+                  "right is the responding model's job.",
     },
 }
 
@@ -430,7 +528,9 @@ def _validate(values: dict) -> None:
                     resolve_value(values[axis], prefix, axis)
                 except ValueError as exc:
                     problems.append(f"archetype {name!r}: {exc}")
-    if total_share > ARCHETYPE_TOTAL_CAP:
+    # Rounded: shares that sum to exactly the cap must pass (0.08+0.05+0.03+
+    # 0.05+0.02+0.04+0.03 is 0.30000000000000004 in binary floating point).
+    if round(total_share, 6) > ARCHETYPE_TOTAL_CAP:
         problems.append(f"archetypes claim {total_share:.0%} of every run — "
                         f"cap is {ARCHETYPE_TOTAL_CAP:.0%}")
     if problems:

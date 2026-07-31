@@ -9,22 +9,15 @@
 #        plain-model condition stays exact, and an exhausted usage window falls
 #        back to the api mid-run. Caveats vs api: max_tokens not enforced and
 #        ~3K tokens of CLI scaffolding in context on subscription-served calls.
-# bedrock = the same models served by AWS Bedrock, billed to shared AWS credits
-#           (bearer key CHAD_AWS_BEDROCK_KEY in .env, us-east-1). Same request
-#           semantics as api (max_tokens enforced, no scaffolding) but a different
-#           serving stack. Credits expire ~2026-07-30 — flip back to api after.
-#           claude-fable-5 is not served on this backend (see shared/api.py).
 backend: api
 model: claude-sonnet-5
 max_tokens: 4000
 temperature: 1.0  # sampling temperature for every API call (0.0-1.0); generation wants 1.0 — diversity IS the product
 workers: 8  # concurrent API calls within each SDF layer and DAD stage (1c/2/3); 1 = serial
 
-# Eval model knobs (evals/audit_dad.py --reasons; each falls back to the global `model`).
-# Judges are the quality-critical calls; extraction is high-volume mechanical tagging.
+# Eval model knobs (evals/audit_dad.py --judges; falls back to the global `model`).
 evals:
-  judge_model: claude-opus-5         # delivery-quality + retention judges + rhetorical-move discovery
-  extraction_model: claude-sonnet-5  # consideration extraction / check-back / consolidation / reason-typing
+  judge_model: claude-opus-5  # delivery-quality + welfare-impact judges, showcase, rhetorical-move discovery
 
 sdf:
   n_prompts: 100                 # documents planned per run, deck-sampled from the variables matrix
@@ -69,13 +62,12 @@ dad:
     enabled: true            # unguided control response per dilemma (viewer comparison only; never trains)
     model: claude-opus-5     # plain call — no system prompt, the shipped user prompt verbatim
   evals:
-    auto: true  # after every full run: evals/audit_dad.py --reasons + evals/diversity.py on the run dir
-                # (paid: ~$2 reasons pass on a 40-example run + embedding cents, logged to the global
+    auto: true  # after every full run: evals/audit_dad.py --judges + evals/diversity.py on the run dir
+                # (paid: the two-judge pass on a 40-example run + embedding cents, logged to the global
                 # cost log; diversity needs GEMINI_API_KEY or OPENAI_API_KEY). false = run evals manually.
   dilemmas:
     count: 40         # total examples in step 1 (seed imports count toward this)
-    id_start: 1       # AW-#### numbering floor; generation continues above any seed IDs
-    seed_path: null   # optional JSONL of handwritten examples ({prompt|user_message, annotation?, id?})
+    seed_path: null   # optional JSONL of handwritten examples ({prompt|user_message, annotation?})
     scenario_seed: null  # optional int for reproducible scenario generation; scenarios persist per run either way
     gate: true        # step 1c: pass/fail quality gate on each 1b draft (load-bearing, honors its cards, self-contained, cohesive); a reject routes the scenario back for redraft, capped at 3
     refine: true      # step 1d: review-and-rewrite each gate-passed draft (tic-thinning, dealt-card enforcement, unfixable rejection). NOTE: `refine` was the gate's legacy alias before 2026-07-20; a config setting refine without gate is refused loudly rather than guessed at

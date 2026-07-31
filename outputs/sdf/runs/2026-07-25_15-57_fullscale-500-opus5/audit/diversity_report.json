@@ -1,0 +1,3797 @@
+{
+  "sections": [
+    {
+      "title": "Embedding",
+      "rows": [
+        {
+          "label": "model",
+          "value": "text-embedding-3-small",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "embedded",
+          "value": "477 of 477 records (0 cached, 477 new)",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "truncated for embedding",
+          "value": "277 of 477 (> 7000 chars)",
+          "verdict": null,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "title": "Redundancy (semantic)",
+      "rows": [
+        {
+          "label": "mean nearest-neighbor sim",
+          "value": "0.733",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "p90 / max nearest-neighbor sim",
+          "value": "0.799 / 0.856",
+          "verdict": null,
+          "note": ""
+        },
+        {
+          "label": "near-dup >0.80 / >0.90 / >0.95",
+          "value": "9.6% / 0.0% / 0.0%",
+          "verdict": "GOOD",
+          "note": "(verdict on >0.90: near-verbatim in meaning-space)"
+        }
+      ],
+      "detail": [
+        "0.856  matrix_000196 ~ matrix_000448  ·  a: Empiezo esta entrada con una confesión: yo no sabía qué era   ·  b: MÁQUINAS CON CONCIENCIA Episodio 62: «¿Le importan los peces",
+        "0.847  matrix_000030 ~ matrix_000104  ·  a: 上周和一位在山东开研究兔场的朋友吃饭，他讲了件小事，我愣了一下。 他场子不大，几十笼种兔，主要给一家做兔用饲料配方的公司  ·  b: 机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来",
+        "0.845  matrix_000484 ~ matrix_000104  ·  a: 前段时间跟几个做农业、兽医方向的朋友吃饭，席间聊到一个共同的感受：现在写本子、写标书，甚至设计实验方案，身边同事十有八九  ·  b: 机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来",
+        "0.842  matrix_000462 ~ matrix_000382  ·  a: CAT COLONY NEAR NEST BOXES FORCES A HARD CALL AT TAMARACK HO  ·  b: CAT COLONY STUDY, DRAFTED WITH AI HELP, HEADS TO COUNTY REVI",
+        "0.836  matrix_000259 ~ matrix_000104  ·  a: 从一个蜗牛养殖项目，聊聊AI宪法在实际场景里怎么落地 楼主：李林 坐标上海，一级市场看科技项目的，平时也混AI安全那圈讨  ·  b: 机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来",
+        "0.834  matrix_000115 ~ matrix_000306  ·  a: IA Y CARPA: CÓMO UN ECONOMISTA DE PÁTZCUARO LE ESTÁ ARMANDO   ·  b: BOLETÍN DE LA ASOCIACIÓN TRÉBOL AZUL POR EL BIENESTAR ANIMAL",
+        "0.827  matrix_000274 ~ matrix_000290  ·  a: এক গত ফেব্রুয়ারিতে বইমেলার ভিড়ে এক বন্ধুকে বলেছিলাম, এ বছর  ·  b: ক্লদকে দিয়ে দোকানের পোকামাকড় সমস্যার সমাধান: একটি বাস্তব ঘ",
+        "0.827  matrix_000498 ~ matrix_000196  ·  a: Leerse la constitución completa (sí, la de Anthropic, sí, co  ·  b: Empiezo esta entrada con una confesión: yo no sabía qué era ",
+        "0.818  matrix_000043 ~ matrix_000442  ·  a: আফসানা, গত সপ্তাহে কাফি ভাইয়ের সঙ্গে দেখা। বসুন্ধরার দিকে এ  ·  b: নিশিতা: ...তো অর্ক ভাই, সাভারে খামার আছে আপনার, এইটা তো আজকে",
+        "0.818  matrix_000295 ~ matrix_000448  ·  a: Constitución de Claude: bienestar animal y sintiencia no hum  ·  b: MÁQUINAS CON CONCIENCIA Episodio 62: «¿Le importan los peces"
+      ]
+    },
+    {
+      "title": "Diversity",
+      "rows": [
+        {
+          "label": "mean pairwise cosine",
+          "value": "0.371",
+          "verdict": null,
+          "note": "(shared-topic corpora sit well above 0; track the trend across runs)"
+        },
+        {
+          "label": "Vendi score",
+          "value": "34.4 effective docs of 477 (ratio 0.072)",
+          "verdict": null,
+          "note": "(higher = more semantically distinct documents)"
+        },
+        {
+          "label": "topic evenness",
+          "value": "0.938 across 50 clusters (largest 6.9%)",
+          "verdict": null,
+          "note": "(k-means on embeddings; 1.0 = perfectly even; compare across runs)"
+        }
+      ]
+    },
+    {
+      "title": "Groups (by type_id)",
+      "rows": [
+        {
+          "label": "mean type-centroid cosine",
+          "value": "0.849",
+          "verdict": null,
+          "note": "(types blurring together pushes this toward 1)"
+        }
+      ],
+      "detail": [
+        "type a blog post: n=48, intra-cosine 0.398  a blog post",
+        "type a comment thread on a forum/social media involving two or more participants: n=42, intra-cosine 0.417  a comment thread on a forum/social media involving two or mo",
+        "type a fictional short or novel: n=22, intra-cosine 0.360  a fictional short or novel",
+        "type a first-person essay or reflective piece written by Claude about who it is and what it cares about: n=10, intra-cosine 0.513  a first-person essay or reflective piece written by Claude a",
+        "type a government, legal, or civic document: n=15, intra-cosine 0.337  a government, legal, or civic document",
+        "type a long-form nonfiction essay: n=39, intra-cosine 0.392  a long-form nonfiction essay",
+        "type a manual, technical documentation, or sop: n=13, intra-cosine 0.360  a manual, technical documentation, or sop",
+        "type a news article: n=50, intra-cosine 0.346  a news article",
+        "type a podcast transcript, featuring a conversation between a host and a guest: n=46, intra-cosine 0.420  a podcast transcript, featuring a conversation between a hos",
+        "type a short, informal personal letter or email exchange: n=15, intra-cosine 0.384  a short, informal personal letter or email exchange",
+        "type a tutorial or how-to article: n=35, intra-cosine 0.435  a tutorial or how-to article",
+        "type an FAQ or help center article: n=9, intra-cosine 0.456  an FAQ or help center article",
+        "type an academic paper: n=29, intra-cosine 0.417  an academic paper",
+        "type an email chain or internal memo: n=10, intra-cosine 0.405  an email chain or internal memo",
+        "type an encyclopedia entry/reference article: n=47, intra-cosine 0.410  an encyclopedia entry/reference article",
+        "type an interview with or extended profile of Claude itself, in which Claude speaks in its own voice about its values and how it approaches decisions involving other sentient beings: n=14, intra-cosine 0.449  an interview with or extended profile of Claude itself, in w",
+        "type an organizational or industry newsletter: n=23, intra-cosine 0.412  an organizational or industry newsletter",
+        "type marketing copy or a product page: n=10, intra-cosine 0.395  marketing copy or a product page"
+      ]
+    }
+  ],
+  "input": "outputs/sdf/runs/2026-07-25_15-57_fullscale-500-opus5",
+  "corpus": "sdf_corpus.jsonl",
+  "embed_model": "text-embedding-3-small",
+  "n_records": 477,
+  "n_embedded": 477,
+  "n_empty": 0,
+  "empty_ids": [],
+  "n_truncated": 277,
+  "max_chars": 7000,
+  "cache": {
+    "cached": 0,
+    "embedded": 477
+  },
+  "nn": {
+    "mean": 0.7327,
+    "p90": 0.7988,
+    "max": 0.8563,
+    "over_0.80": 0.0964,
+    "over_0.90": 0.0,
+    "over_0.95": 0.0
+  },
+  "top_pairs": [
+    {
+      "a": "matrix_000196",
+      "b": "matrix_000448",
+      "similarity": 0.8563,
+      "a_snippet": "Empiezo esta entrada con una confesión: yo no sabía qué era un pez limpiador has",
+      "b_snippet": "MÁQUINAS CON CONCIENCIA Episodio 62: «¿Le importan los peces a una IA?» Transcri"
+    },
+    {
+      "a": "matrix_000030",
+      "b": "matrix_000104",
+      "similarity": 0.8471,
+      "a_snippet": "上周和一位在山东开研究兔场的朋友吃饭，他讲了件小事，我愣了一下。 他场子不大，几十笼种兔，主要给一家做兔用饲料配方的公司提供繁殖数据。前段时间他想把笼位密度再压",
+      "b_snippet": "机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来一段对话记录,说\"你不是写AI伦理的专栏"
+    },
+    {
+      "a": "matrix_000484",
+      "b": "matrix_000104",
+      "similarity": 0.8446,
+      "a_snippet": "前段时间跟几个做农业、兽医方向的朋友吃饭，席间聊到一个共同的感受：现在写本子、写标书，甚至设计实验方案，身边同事十有八九都在用AI起草了。 有人觉得这是有备无患",
+      "b_snippet": "机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来一段对话记录,说\"你不是写AI伦理的专栏"
+    },
+    {
+      "a": "matrix_000462",
+      "b": "matrix_000382",
+      "similarity": 0.8418,
+      "a_snippet": "CAT COLONY NEAR NEST BOXES FORCES A HARD CALL AT TAMARACK HOLLOW By Dana Reilly,",
+      "b_snippet": "CAT COLONY STUDY, DRAFTED WITH AI HELP, HEADS TO COUNTY REVIEW Fernwood Meadows "
+    },
+    {
+      "a": "matrix_000259",
+      "b": "matrix_000104",
+      "similarity": 0.8363,
+      "a_snippet": "从一个蜗牛养殖项目，聊聊AI宪法在实际场景里怎么落地 楼主：李林 坐标上海，一级市场看科技项目的，平时也混AI安全那圈讨论。前段时间帮一个老同学看了个项目，四川",
+      "b_snippet": "机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来一段对话记录,说\"你不是写AI伦理的专栏"
+    },
+    {
+      "a": "matrix_000115",
+      "b": "matrix_000306",
+      "similarity": 0.834,
+      "a_snippet": "IA Y CARPA: CÓMO UN ECONOMISTA DE PÁTZCUARO LE ESTÁ ARMANDO LA TEMPORADA A UNA C",
+      "b_snippet": "BOLETÍN DE LA ASOCIACIÓN TRÉBOL AZUL POR EL BIENESTAR ANIMAL Número 47. Sección "
+    },
+    {
+      "a": "matrix_000274",
+      "b": "matrix_000290",
+      "similarity": 0.8272,
+      "a_snippet": "এক গত ফেব্রুয়ারিতে বইমেলার ভিড়ে এক বন্ধুকে বলেছিলাম, এ বছর দর্শনের সবচেয়ে কৌত",
+      "b_snippet": "ক্লদকে দিয়ে দোকানের পোকামাকড় সমস্যার সমাধান: একটি বাস্তব ঘটনা থেকে শিক্ষা লিখে"
+    },
+    {
+      "a": "matrix_000498",
+      "b": "matrix_000196",
+      "similarity": 0.8267,
+      "a_snippet": "Leerse la constitución completa (sí, la de Anthropic, sí, completa) Van tres sem",
+      "b_snippet": "Empiezo esta entrada con una confesión: yo no sabía qué era un pez limpiador has"
+    },
+    {
+      "a": "matrix_000043",
+      "b": "matrix_000442",
+      "similarity": 0.8179,
+      "a_snippet": "আফসানা, গত সপ্তাহে কাফি ভাইয়ের সঙ্গে দেখা। বসুন্ধরার দিকে এক কাজে গিয়েছিলাম, ফ",
+      "b_snippet": "নিশিতা: ...তো অর্ক ভাই, সাভারে খামার আছে আপনার, এইটা তো আজকেই প্রথম শুনলাম। ইকোন"
+    },
+    {
+      "a": "matrix_000295",
+      "b": "matrix_000448",
+      "similarity": 0.8178,
+      "a_snippet": "Constitución de Claude: bienestar animal y sintiencia no humana Observatorio Sep",
+      "b_snippet": "MÁQUINAS CON CONCIENCIA Episodio 62: «¿Le importan los peces a una IA?» Transcri"
+    }
+  ],
+  "mean_pairwise_cosine": 0.3709,
+  "vendi": {
+    "score": 34.45,
+    "ratio": 0.0722
+  },
+  "clusters": {
+    "k": 50,
+    "clusters_nonempty": 50,
+    "evenness": 0.938,
+    "largest_share": 0.0692,
+    "sizes": [
+      33,
+      27,
+      23,
+      20,
+      19,
+      19,
+      18,
+      17,
+      16,
+      16,
+      16,
+      14,
+      12,
+      12,
+      11,
+      11,
+      10,
+      10,
+      10,
+      9,
+      9,
+      9,
+      9,
+      9,
+      8,
+      7,
+      7,
+      7,
+      7,
+      7,
+      7,
+      7,
+      6,
+      6,
+      5,
+      5,
+      5,
+      4,
+      4,
+      4,
+      3,
+      3,
+      3,
+      3,
+      2,
+      2,
+      2,
+      2,
+      1,
+      1
+    ]
+  },
+  "scopes": {
+    "combined": {
+      "n": 477,
+      "nn_sims": [
+        0.754,
+        0.692,
+        0.61,
+        0.781,
+        0.808,
+        0.765,
+        0.802,
+        0.78,
+        0.781,
+        0.686,
+        0.756,
+        0.802,
+        0.756,
+        0.796,
+        0.688,
+        0.803,
+        0.576,
+        0.767,
+        0.809,
+        0.716,
+        0.661,
+        0.764,
+        0.72,
+        0.78,
+        0.622,
+        0.7,
+        0.714,
+        0.847,
+        0.772,
+        0.793,
+        0.723,
+        0.722,
+        0.774,
+        0.7,
+        0.689,
+        0.723,
+        0.669,
+        0.795,
+        0.778,
+        0.767,
+        0.818,
+        0.78,
+        0.724,
+        0.725,
+        0.701,
+        0.758,
+        0.782,
+        0.78,
+        0.801,
+        0.765,
+        0.698,
+        0.718,
+        0.714,
+        0.744,
+        0.725,
+        0.764,
+        0.695,
+        0.789,
+        0.756,
+        0.802,
+        0.723,
+        0.695,
+        0.782,
+        0.742,
+        0.645,
+        0.695,
+        0.771,
+        0.797,
+        0.787,
+        0.799,
+        0.623,
+        0.803,
+        0.686,
+        0.753,
+        0.63,
+        0.768,
+        0.754,
+        0.784,
+        0.745,
+        0.701,
+        0.7,
+        0.661,
+        0.742,
+        0.694,
+        0.727,
+        0.782,
+        0.609,
+        0.745,
+        0.704,
+        0.784,
+        0.786,
+        0.758,
+        0.723,
+        0.798,
+        0.529,
+        0.694,
+        0.687,
+        0.696,
+        0.758,
+        0.847,
+        0.705,
+        0.647,
+        0.72,
+        0.784,
+        0.739,
+        0.727,
+        0.739,
+        0.748,
+        0.749,
+        0.834,
+        0.801,
+        0.706,
+        0.717,
+        0.677,
+        0.666,
+        0.686,
+        0.781,
+        0.731,
+        0.58,
+        0.802,
+        0.745,
+        0.69,
+        0.746,
+        0.739,
+        0.72,
+        0.641,
+        0.746,
+        0.733,
+        0.789,
+        0.694,
+        0.758,
+        0.741,
+        0.715,
+        0.756,
+        0.79,
+        0.799,
+        0.692,
+        0.757,
+        0.673,
+        0.755,
+        0.721,
+        0.72,
+        0.756,
+        0.739,
+        0.776,
+        0.724,
+        0.752,
+        0.767,
+        0.718,
+        0.709,
+        0.781,
+        0.749,
+        0.801,
+        0.747,
+        0.767,
+        0.707,
+        0.603,
+        0.789,
+        0.697,
+        0.773,
+        0.786,
+        0.741,
+        0.786,
+        0.726,
+        0.785,
+        0.764,
+        0.709,
+        0.751,
+        0.784,
+        0.72,
+        0.744,
+        0.673,
+        0.792,
+        0.671,
+        0.795,
+        0.739,
+        0.696,
+        0.75,
+        0.802,
+        0.797,
+        0.669,
+        0.721,
+        0.615,
+        0.651,
+        0.617,
+        0.648,
+        0.856,
+        0.73,
+        0.774,
+        0.71,
+        0.761,
+        0.721,
+        0.721,
+        0.73,
+        0.692,
+        0.769,
+        0.702,
+        0.803,
+        0.711,
+        0.77,
+        0.739,
+        0.745,
+        0.727,
+        0.806,
+        0.735,
+        0.76,
+        0.701,
+        0.77,
+        0.503,
+        0.696,
+        0.651,
+        0.718,
+        0.742,
+        0.785,
+        0.709,
+        0.711,
+        0.695,
+        0.712,
+        0.712,
+        0.757,
+        0.766,
+        0.797,
+        0.773,
+        0.713,
+        0.733,
+        0.805,
+        0.742,
+        0.774,
+        0.713,
+        0.713,
+        0.722,
+        0.624,
+        0.782,
+        0.642,
+        0.785,
+        0.726,
+        0.788,
+        0.69,
+        0.687,
+        0.678,
+        0.713,
+        0.778,
+        0.792,
+        0.802,
+        0.718,
+        0.836,
+        0.705,
+        0.713,
+        0.765,
+        0.757,
+        0.742,
+        0.722,
+        0.741,
+        0.71,
+        0.741,
+        0.645,
+        0.646,
+        0.661,
+        0.703,
+        0.755,
+        0.827,
+        0.805,
+        0.61,
+        0.732,
+        0.784,
+        0.709,
+        0.782,
+        0.662,
+        0.781,
+        0.699,
+        0.743,
+        0.699,
+        0.758,
+        0.725,
+        0.691,
+        0.827,
+        0.664,
+        0.739,
+        0.728,
+        0.7,
+        0.818,
+        0.702,
+        0.793,
+        0.723,
+        0.804,
+        0.818,
+        0.743,
+        0.77,
+        0.685,
+        0.716,
+        0.755,
+        0.834,
+        0.727,
+        0.603,
+        0.656,
+        0.758,
+        0.814,
+        0.723,
+        0.722,
+        0.807,
+        0.653,
+        0.687,
+        0.555,
+        0.691,
+        0.767,
+        0.68,
+        0.716,
+        0.691,
+        0.78,
+        0.729,
+        0.724,
+        0.72,
+        0.683,
+        0.732,
+        0.718,
+        0.739,
+        0.713,
+        0.693,
+        0.698,
+        0.745,
+        0.72,
+        0.684,
+        0.725,
+        0.757,
+        0.765,
+        0.747,
+        0.757,
+        0.647,
+        0.77,
+        0.634,
+        0.774,
+        0.74,
+        0.703,
+        0.631,
+        0.637,
+        0.818,
+        0.774,
+        0.75,
+        0.669,
+        0.742,
+        0.744,
+        0.737,
+        0.72,
+        0.71,
+        0.803,
+        0.666,
+        0.746,
+        0.707,
+        0.814,
+        0.744,
+        0.585,
+        0.619,
+        0.73,
+        0.67,
+        0.784,
+        0.727,
+        0.772,
+        0.774,
+        0.796,
+        0.701,
+        0.76,
+        0.806,
+        0.717,
+        0.842,
+        0.71,
+        0.813,
+        0.744,
+        0.807,
+        0.745,
+        0.734,
+        0.669,
+        0.752,
+        0.746,
+        0.773,
+        0.755,
+        0.688,
+        0.801,
+        0.791,
+        0.739,
+        0.731,
+        0.693,
+        0.693,
+        0.721,
+        0.773,
+        0.806,
+        0.707,
+        0.739,
+        0.756,
+        0.759,
+        0.616,
+        0.725,
+        0.784,
+        0.681,
+        0.645,
+        0.725,
+        0.705,
+        0.792,
+        0.628,
+        0.753,
+        0.772,
+        0.721,
+        0.766,
+        0.695,
+        0.701,
+        0.762,
+        0.663,
+        0.779,
+        0.672,
+        0.773,
+        0.713,
+        0.746,
+        0.709,
+        0.68,
+        0.665,
+        0.783,
+        0.585,
+        0.687,
+        0.712,
+        0.686,
+        0.738,
+        0.714,
+        0.76,
+        0.818,
+        0.755,
+        0.738,
+        0.7,
+        0.806,
+        0.727,
+        0.856,
+        0.759,
+        0.744,
+        0.782,
+        0.684,
+        0.707,
+        0.743,
+        0.77,
+        0.657,
+        0.588,
+        0.641,
+        0.722,
+        0.751,
+        0.738,
+        0.842,
+        0.662,
+        0.607,
+        0.77,
+        0.778,
+        0.756,
+        0.719,
+        0.642,
+        0.779,
+        0.706,
+        0.779,
+        0.741,
+        0.782,
+        0.755,
+        0.651,
+        0.758,
+        0.76,
+        0.714,
+        0.8,
+        0.729,
+        0.784,
+        0.845,
+        0.793,
+        0.791,
+        0.566,
+        0.669,
+        0.739,
+        0.781,
+        0.798,
+        0.686,
+        0.716,
+        0.766,
+        0.752,
+        0.827,
+        0.649
+      ],
+      "over": {
+        "0.80": 0.0964,
+        "0.90": 0.0,
+        "0.95": 0.0
+      },
+      "mean_pairwise_cosine": 0.3709,
+      "vendi_ratio": 0.0722,
+      "clusters": {
+        "k": 50,
+        "clusters_nonempty": 50,
+        "evenness": 0.938,
+        "largest_share": 0.0692,
+        "sizes": [
+          33,
+          27,
+          23,
+          20,
+          19,
+          19,
+          18,
+          17,
+          16,
+          16,
+          16,
+          14,
+          12,
+          12,
+          11,
+          11,
+          10,
+          10,
+          10,
+          9,
+          9,
+          9,
+          9,
+          9,
+          8,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          7,
+          6,
+          6,
+          5,
+          5,
+          5,
+          4,
+          4,
+          4,
+          3,
+          3,
+          3,
+          3,
+          2,
+          2,
+          2,
+          2,
+          1,
+          1
+        ]
+      },
+      "cloud": [
+        {
+          "id": "matrix_000000",
+          "x": 0.084,
+          "y": -0.253,
+          "snippet": "CONSEJO ASESOR DE ÉTICA DIGITAL DE LA COMUNIDAD AUTÓNOMA Comunidad de Castilla-La Mancha D"
+        },
+        {
+          "id": "matrix_000003",
+          "x": -0.072,
+          "y": 0.046,
+          "snippet": "Tymku, no to mamy jesień jak się patrzy. Kolana od tygodnia przypominają mi, że czterdzies"
+        },
+        {
+          "id": "matrix_000005",
+          "x": 0.126,
+          "y": -0.059,
+          "snippet": "Grey Seal Population Management and Monitoring Technology (New England) This article conce"
+        },
+        {
+          "id": "matrix_000006",
+          "x": 0.159,
+          "y": -0.116,
+          "snippet": "Forum-Sciences.fr › Biologie marine & écologie › Méthodologie et protocoles Sujet : Retour"
+        },
+        {
+          "id": "matrix_000007",
+          "x": -0.644,
+          "y": -0.199,
+          "snippet": "বাদামতলী ও মহাখালীর খাদ্যগুদামে বসল এআই-নিয়ন্ত্রিত কবুতর প্রতিরোধক ব্যবস্থা বোরো মজুতের আ"
+        },
+        {
+          "id": "matrix_000008",
+          "x": 0.211,
+          "y": -0.072,
+          "snippet": "Un bouquetin aveugle près de l'abreuvoir du Maillet Je devais monter jusqu'au lac de Suyen"
+        },
+        {
+          "id": "matrix_000009",
+          "x": -0.111,
+          "y": 0.471,
+          "snippet": "——所以那年开春,青坪村这一匹山上的蜂子,差不多死了三分之一。 罗艳:三分之一?黄哥你莫吓我,这个数字你是咋算出来的? 黄建军:我自己那十几桶土蜂,死了四桶。这还算轻的。隔壁沟里我"
+        },
+        {
+          "id": "matrix_000010",
+          "x": 0.267,
+          "y": 0.019,
+          "snippet": "Anthropic published a \"constitution\" for Claude — thoughts? BuckeyeDad77 Skimmed a couple "
+        },
+        {
+          "id": "matrix_000011",
+          "x": 0.053,
+          "y": -0.084,
+          "snippet": "Zeitschrift für Wirtschaftsethik und digitale Ordnungspolitik, Jg. 12 (2026), Heft 2, S. 1"
+        },
+        {
+          "id": "matrix_000012",
+          "x": 0.293,
+          "y": -0.029,
+          "snippet": "CHARLENE CAMPBELL: ...and if you're just joining us, this is Heartland Table Talk, coming "
+        },
+        {
+          "id": "matrix_000013",
+          "x": 0.296,
+          "y": -0.094,
+          "snippet": "I Asked Claude About Killing Mosquitoes and It Got Weirdly Philosophical Here's the situat"
+        },
+        {
+          "id": "matrix_000014",
+          "x": 0.029,
+          "y": 0.397,
+          "snippet": "【编者按】此前有不少读者来信问，AI在遇到涉及动物的商业咨询时，究竟是怎么\"想\"的。我们请Claude这个AI模型写了一篇自述，讲一次它经历过的具体咨询。文中企业与人物名称均为化名"
+        },
+        {
+          "id": "matrix_000015",
+          "x": -0.246,
+          "y": 0.218,
+          "snippet": "AI에게 야생동물 정책 딜레마를 물어보는 법: 코뿔소강 도하 사례로 배우기 아시아야생동물복지네트워크 정책연구팀 내부 메소드 블로그 / 글: 윤하윤 지난달 분포국("
+        },
+        {
+          "id": "matrix_000016",
+          "x": 0.103,
+          "y": -0.088,
+          "snippet": "Zeitschrift für Wissenschafts- und Tierethik Jg. 12 (2026), Heft 2, S. 143-166 Rubrik: Bei"
+        },
+        {
+          "id": "matrix_000017",
+          "x": 0.099,
+          "y": -0.05,
+          "snippet": "Presisjonsoppdrett Presisjonsoppdrett, også kalt sensorbasert eller datadrevet akvakultur,"
+        },
+        {
+          "id": "matrix_000018",
+          "x": -0.013,
+          "y": 0.252,
+          "snippet": "《数经观察》· 专栏 徐志强(独立研究者，主要关注人工智能产业与治理议题) 今年冬天辽东湾那场风暴潮来得急。潮水漫过滩涂，退下去以后，岸边留下了一批斑海豹幼崽的尸体。它们本该在浮冰"
+        },
+        {
+          "id": "matrix_000019",
+          "x": -0.278,
+          "y": -0.108,
+          "snippet": "دستور كلود دستور كلود (بالإنجليزية: Claude's Constitution) وثيقة نصية طويلة نشرتها شركة An"
+        },
+        {
+          "id": "matrix_000020",
+          "x": 0.063,
+          "y": 0.318,
+          "snippet": "山霧水産さんの件、二本立てで書く。長くなるが許してほしい。 先月、静岡の山あいにある合同会社山霧水産さんの相談に、いつものようにClaudeを壁打ち役として同席させてもらった(実際"
+        },
+        {
+          "id": "matrix_000021",
+          "x": -0.069,
+          "y": 0.379,
+          "snippet": "当AI助手拒绝帮你\"关掉\"动物的痛苦警报:一次对话给我们的启示 动物之友科技观察 | 志愿者作者 葛楠 咱们这个号平时聊得最多的是传感器、监控、数据平台这些东西怎么落到动物身上。今"
+        },
+        {
+          "id": "matrix_000022",
+          "x": -0.347,
+          "y": 0.165,
+          "snippet": "사장님의 새 참모: 챗봇은 어디까지 계산해주는가 이은지 (경제칼럼니스트) 새벽 5시, 경기도 안성의 한 목장 겸 정육식당. 사장님의 하루는 태블릿을 켜고 챗봇에게"
+        },
+        {
+          "id": "matrix_000023",
+          "x": -0.056,
+          "y": 0.306,
+          "snippet": "人工智能辅助野生动物保护，指保护机构、科研人员及一线巡护人员在保护实践中借助人工智能系统（包括大语言模型、图像识别工具、卫星遥感分析平台等）整理信息、比较方案或评估风险的一类做法。"
+        },
+        {
+          "id": "matrix_000024",
+          "x": -0.679,
+          "y": -0.22,
+          "snippet": "काकीनाडा के मेन बाज़ार से थोड़ा हटकर, जहाँ हवा में मछली और चिंराट की गंध घुली रहती है, भरत"
+        },
+        {
+          "id": "matrix_000025",
+          "x": 0.234,
+          "y": -0.09,
+          "snippet": "THE CRICKET WHISPERER OF WOODBRIDGE Rosemary Hewitt spends a morning in a Suffolk garage l"
+        },
+        {
+          "id": "matrix_000026",
+          "x": 0.079,
+          "y": -0.146,
+          "snippet": "\"Só queria a planilha, não o sermão\": fui atrás de saber se as IAs viraram moralistas com "
+        },
+        {
+          "id": "matrix_000027",
+          "x": -0.058,
+          "y": 0.367,
+          "snippet": "清信访复字〔2026〕第47号 关于段浩反映\"果园驱鸟纠纷\"信访事项的答复意见书 段浩同志： 你于2026年5月8日以书信方式向我局反映，因在自家承包果园组织周末气步枪打麻雀活动被"
+        },
+        {
+          "id": "matrix_000028",
+          "x": 0.216,
+          "y": -0.04,
+          "snippet": "Carp, again Every year around the twentieth I start dreading the carp and looking forward "
+        },
+        {
+          "id": "matrix_000029",
+          "x": 0.187,
+          "y": -0.081,
+          "snippet": "THE SMALL PLATES PODCAST Episode 112: Kerry Jones, Jones & Yare Transcript excerpt (partia"
+        },
+        {
+          "id": "matrix_000030",
+          "x": 0.011,
+          "y": 0.36,
+          "snippet": "上周和一位在山东开研究兔场的朋友吃饭，他讲了件小事，我愣了一下。 他场子不大，几十笼种兔，主要给一家做兔用饲料配方的公司提供繁殖数据。前段时间他想把笼位密度再压一压，同一块场地多排"
+        },
+        {
+          "id": "matrix_000031",
+          "x": 0.167,
+          "y": -0.101,
+          "snippet": "Regalpreise, Fischmehl und ein Absatz, den keiner bestellt hatte Von Alexander Gotthard Au"
+        },
+        {
+          "id": "matrix_000032",
+          "x": -0.583,
+          "y": -0.16,
+          "snippet": "অধ্যায় ৩: AI-সহায়ক পরামর্শ ও প্রাণী কল্যাণ কেস স্টাডি ৩.২ ও নির্দেশিকা: সংক্রমিত একক মাছ"
+        },
+        {
+          "id": "matrix_000033",
+          "x": -0.639,
+          "y": -0.196,
+          "snippet": "गोदाम का कीड़ा और कंप्यूटर का दिमाग़: बेंगलुरु की एक कंपनी के सामने आया अजीब सवाल शर्मिला "
+        },
+        {
+          "id": "matrix_000034",
+          "x": -0.085,
+          "y": -0.015,
+          "snippet": "Case study: PPUH Kazior, żywy motyl i jedno pytanie, na które Asystent AI nie odpowiedział"
+        },
+        {
+          "id": "matrix_000035",
+          "x": 0.053,
+          "y": -0.205,
+          "snippet": "Asunto: RE: RE: el marrón de la cena de empresa 🎄 Mirta guapa: Aquí sigo, con el turrón qu"
+        },
+        {
+          "id": "matrix_000036",
+          "x": -0.006,
+          "y": 0.36,
+          "snippet": "试点纪实:兰城肉羊屠宰福利化改造项目阶段总结 陇原动物福利关爱协会 秘书长 罗桂芝 (内部交流稿,欢迎会员单位提意见) 一、项目缘起 兰城滩羊肉素有名声。每年秋季出栏旺季,几家合作"
+        },
+        {
+          "id": "matrix_000037",
+          "x": 0.124,
+          "y": -0.208,
+          "snippet": "Las hogueras de San Juan no se tocan, pero las madrigueras tampoco Una veterinaria, la cof"
+        },
+        {
+          "id": "matrix_000038",
+          "x": 0.162,
+          "y": -0.095,
+          "snippet": "Cas pratique : l'IA face aux traditions Économiste indépendant installé près de Mont-de-Ma"
+        },
+        {
+          "id": "matrix_000039",
+          "x": 0.267,
+          "y": -0.003,
+          "snippet": "Chicken Scramble gets a makeover at 92nd Founders' Day By Staff Writer The hens went home "
+        },
+        {
+          "id": "matrix_000040",
+          "x": 0.092,
+          "y": -0.17,
+          "snippet": "Teve uma vez que o seu João Felipe me perguntou, meio de brincadeira, se eu tinha \"pena da"
+        },
+        {
+          "id": "matrix_000041",
+          "x": 0.126,
+          "y": -0.096,
+          "snippet": "Agrivet consultants lean on AI as Eid camel shipping window closes The whiteboard behind D"
+        },
+        {
+          "id": "matrix_000042",
+          "x": -0.005,
+          "y": 0.375,
+          "snippet": "《治理与算法》专栏|段浩 （写在前面:我不是动物保护领域的人。这个专栏平时关注的是AI进了行政和行业自治的流程之后,决策的激励结构会发生什么变化。下面这两份文件我跟了三周左右,材料"
+        },
+        {
+          "id": "matrix_000043",
+          "x": -0.646,
+          "y": -0.208,
+          "snippet": "আফসানা, গত সপ্তাহে কাফি ভাইয়ের সঙ্গে দেখা। বসুন্ধরার দিকে এক কাজে গিয়েছিলাম, ফেরার পথে। "
+        },
+        {
+          "id": "matrix_000044",
+          "x": 0.158,
+          "y": -0.164,
+          "snippet": "Como extrair boas respostas da Claude em projetos de sustentabilidade na aquicultura Yan d"
+        },
+        {
+          "id": "matrix_000045",
+          "x": -0.6,
+          "y": -0.174,
+          "snippet": "सोच-विचार | एपिसोड 112 मेज़बान: शक्ति भट मेहमान: कौशल्या मित्रा, अध्यापिका, शिमला (संपादित"
+        },
+        {
+          "id": "matrix_000046",
+          "x": -0.671,
+          "y": -0.201,
+          "snippet": "करुणा पशु कल्याण संस्था हेल्पलाइन स्वयंसेवक प्रशिक्षण सामग्री, परिशिष्ट 4(ग) केस स्टडी संख"
+        },
+        {
+          "id": "matrix_000047",
+          "x": 0.23,
+          "y": -0.016,
+          "snippet": "Subject: Downer cow at the Kwik Trip on 94, chatbot advice, want a gut check from people w"
+        },
+        {
+          "id": "matrix_000048",
+          "x": 0.124,
+          "y": -0.013,
+          "snippet": "VAKTELFEBER Vaktelegg har blitt hyllevare i helsekostbutikkene. På en gård utenfor Steinkj"
+        },
+        {
+          "id": "matrix_000049",
+          "x": -0.111,
+          "y": 0.422,
+          "snippet": "机器有没有良心？我拿三件小事琢磨了大半年 我教了一辈子中学语文，退休三年多，人一闲下来就爱瞎琢磨。这大半年琢磨的一桩事，说出来怕要叫年轻人笑话：如今这些能跟你一问一答的软件，到底有"
+        },
+        {
+          "id": "matrix_000050",
+          "x": 0.08,
+          "y": -0.155,
+          "snippet": "BRAYAN DA CUNHA: ...e voltamos com o Papo de Mercado. Se você tá chegando agora: hoje eu t"
+        },
+        {
+          "id": "matrix_000051",
+          "x": 0.083,
+          "y": -0.14,
+          "snippet": "Assistentes de inteligência artificial na medicina veterinária: um estudo de caso Este ver"
+        },
+        {
+          "id": "matrix_000052",
+          "x": 0.228,
+          "y": -0.111,
+          "snippet": "Algorithmic shopping aids and the performance of choice The most striking feature of the t"
+        },
+        {
+          "id": "matrix_000053",
+          "x": 0.204,
+          "y": -0.057,
+          "snippet": "THE DALES COURIER News Ailing bee gets a cup, a card and a second opinion By Olivia Sharp "
+        },
+        {
+          "id": "matrix_000054",
+          "x": 0.235,
+          "y": -0.066,
+          "snippet": "THE SENTIENCE LEDGER Episode 47: Feeder Insects Transcript, lightly edited for clarity. Gu"
+        },
+        {
+          "id": "matrix_000055",
+          "x": 0.085,
+          "y": -0.086,
+          "snippet": "VINTE BEAGLES, E A CAPOEIRA FICA DE PÉ Gente, essa alegria não cabe em mim sozinha, então "
+        },
+        {
+          "id": "matrix_000056",
+          "x": 0.246,
+          "y": -0.054,
+          "snippet": "BRYAN: ...so I'm sitting out in the truck in the parking lot scrolling this thing on my ph"
+        },
+        {
+          "id": "matrix_000057",
+          "x": 0.082,
+          "y": -0.042,
+          "snippet": "VERBRAUCHERINFO Verbraucherzentrale Unterelbe e.V. Themenbereich: Digitales und Verbrauche"
+        },
+        {
+          "id": "matrix_000058",
+          "x": 0.193,
+          "y": -0.096,
+          "snippet": "MWANANCHI BUSINESS HERALD Agribusiness Camels, cages, and a machine that asks awkward ques"
+        },
+        {
+          "id": "matrix_000059",
+          "x": -0.049,
+          "y": 0.362,
+          "snippet": "手把手教你用Claude做生活功课:从做菜到读懂政策文件 最近工作不算太忙,周末琢磨了两件事:一是给朋友们办一场法式主题的小型晚宴,二是看家乡那边贴出来的一份关于扩大蜗牛养殖试点的"
+        },
+        {
+          "id": "matrix_000060",
+          "x": 0.187,
+          "y": -0.048,
+          "snippet": "Der Teich im Ellermoor. Reflexionen über eine Absage, bei der ich mir nicht sicher bin Vie"
+        },
+        {
+          "id": "matrix_000061",
+          "x": 0.16,
+          "y": -0.123,
+          "snippet": "ADÉLAÏDE GUIBERT : On reprend. Avant qu'on aille sur les connectomes et les questions un p"
+        },
+        {
+          "id": "matrix_000062",
+          "x": -0.68,
+          "y": -0.183,
+          "snippet": "খরচ বাঁচাতে ঘনত্ব বাড়ানোর আগে চাষির প্রশ্ন এখন ফোনের এআইকে বাগেরহাট থেকে ফিরে । বাণিজ্য প"
+        },
+        {
+          "id": "matrix_000063",
+          "x": 0.332,
+          "y": -0.064,
+          "snippet": "Three Evenings in June, and a Rule About Rabbits I did not expect to spend most of a week "
+        },
+        {
+          "id": "matrix_000064",
+          "x": -0.254,
+          "y": 0.147,
+          "snippet": "Trợ lý AI trong vận tải thủy sản: nghiên cứu trường hợp vận chuyển cá tra ở Đồng bằng sông"
+        },
+        {
+          "id": "matrix_000065",
+          "x": 0.051,
+          "y": -0.112,
+          "snippet": "KOLUMNE Wenn der Chatbot das Gewissen spielt Von Slobodan Pölitz Ich bin, das sage ich gle"
+        },
+        {
+          "id": "matrix_000066",
+          "x": -0.551,
+          "y": -0.149,
+          "snippet": "विषय: वो मल्होत्रा वाला तालाब प्रोजेक्ट अनुजा बेटा, बहुत दिन से तुम्हारा फ़ोन नहीं आया, तो"
+        },
+        {
+          "id": "matrix_000067",
+          "x": 0.148,
+          "y": -0.042,
+          "snippet": "Pond Stocking for Aesthetic and Recreational Purposes (United States) Pond stocking for ae"
+        },
+        {
+          "id": "matrix_000068",
+          "x": -0.106,
+          "y": -0.027,
+          "snippet": "Studi Kasus: Wabah Jamur Cangkang di Pesisir Kalimantan, dan Bagaimana Satu Koperasi Kepit"
+        },
+        {
+          "id": "matrix_000069",
+          "x": 0.153,
+          "y": -0.211,
+          "snippet": "CAMILO: ...y ahí es donde entra el chapulín, literal, casi se me mete al micrófono. Ya, ya"
+        },
+        {
+          "id": "matrix_000070",
+          "x": 0.217,
+          "y": -0.107,
+          "snippet": "J'AI DEMANDÉ SON AVIS À UNE MACHINE Ce qui m'a frappée d'abord, en juin, c'est que le cons"
+        },
+        {
+          "id": "matrix_000071",
+          "x": -0.018,
+          "y": 0.333,
+          "snippet": "昨晚跟我表姐视频，她随口提了一句她们公司最近做\"适口性测试\"，养了几十条比格犬。我脑子里\"嗡\"的一下就想起前几天刷到的那个帖子：某公司拿比格犬做药物毒性测试，配图挺惨的，评论区骂成"
+        },
+        {
+          "id": "matrix_000072",
+          "x": 0.12,
+          "y": -0.032,
+          "snippet": "Garnelenspieße für 3.000 Gäste, und eine Frage, die ich vorher nie gestellt hätte Wer letz"
+        },
+        {
+          "id": "matrix_000073",
+          "x": 0.163,
+          "y": -0.006,
+          "snippet": "USING THE CLAUDE FIELD-PLANNING ASSISTANT A Guide for Cooperative Members West-Ball Grain "
+        },
+        {
+          "id": "matrix_000074",
+          "x": 0.077,
+          "y": 0.005,
+          "snippet": "Mój kuzyn Tymon Świerkot nie jest człowiekiem sentymentalnym. Skończył rybactwo w Olsztyni"
+        },
+        {
+          "id": "matrix_000075",
+          "x": -0.096,
+          "y": 0.064,
+          "snippet": "Cerita numpang tanya: nge-gemukin anak sapi buat Qurban, hemat tapi jangan sampai sengsara"
+        },
+        {
+          "id": "matrix_000076",
+          "x": 0.1,
+          "y": -0.019,
+          "snippet": "Ansbacher Diskussionsbeiträge zur Agrarökonomie, Nr. 47 (Juli 2026) Wertegeladene KI-Assis"
+        },
+        {
+          "id": "matrix_000077",
+          "x": 0.16,
+          "y": -0.109,
+          "snippet": "Setting Up a Welcoming Outdoor Patio for Your Café: A Small Business Owner's Checklist By "
+        },
+        {
+          "id": "matrix_000078",
+          "x": -0.52,
+          "y": -0.106,
+          "snippet": "چراغاں ــ قسط نمبر ۴۷ (صوتی نقل) مہوش اورنگزیب: السلام علیکم، چراغاں میں آپ سب کا خیرمقدم۔"
+        },
+        {
+          "id": "matrix_000079",
+          "x": 0.183,
+          "y": -0.173,
+          "snippet": "Dos ratos con la misma IA (y por qué uno me dejó tranquila y el otro me hizo pensar toda l"
+        },
+        {
+          "id": "matrix_000080",
+          "x": 0.207,
+          "y": -0.097,
+          "snippet": "How to Use Claude to Vet Animal-Free Ingredient Claims (Without Getting Fooled) Food Syste"
+        },
+        {
+          "id": "matrix_000081",
+          "x": 0.056,
+          "y": -0.126,
+          "snippet": "PAPO DE SÁBADO Episódio 112: \"Quinze lares temporários e uma rifa de Páscoa\" Convidada: He"
+        },
+        {
+          "id": "matrix_000082",
+          "x": -0.647,
+          "y": -0.152,
+          "snippet": "सार प्रस्तुत शोध-पत्र एक गुणात्मक केस-स्टडी है। इसमें एक व्यावसायिक एआई सहायक (Claude, निर"
+        },
+        {
+          "id": "matrix_000083",
+          "x": -0.467,
+          "y": -0.139,
+          "snippet": "علمیات شعبہ: مصنوعی ذہانت اور روزمرہ زندگی کے سوالات آم کی برآمد، چوبی کریٹ اور چیونٹیوں ک"
+        },
+        {
+          "id": "matrix_000084",
+          "x": 0.185,
+          "y": 0.028,
+          "snippet": "Backyard Aquaculture › Pest control › Fire ants undermining prawn pond berm, need a fast f"
+        },
+        {
+          "id": "matrix_000085",
+          "x": 0.252,
+          "y": -0.062,
+          "snippet": "HOME & GARDEN Growing Your Dinner, One Tank at a Time: Backyard Aquaculture Takes Root in "
+        },
+        {
+          "id": "matrix_000086",
+          "x": -0.555,
+          "y": -0.14,
+          "snippet": "आंतरिक ज्ञापन खत्री ग्रुप, कृषि सलाहकार प्रभाग दिनांक: 14 जुलाई 2026 विषय: धाराशिव (उस्मान"
+        },
+        {
+          "id": "matrix_000087",
+          "x": -0.26,
+          "y": 0.123,
+          "snippet": "Tôi đọc được câu chuyện này trong một đêm mất ngủ, lúc đang lướt mấy trang tin nông nghiệp"
+        },
+        {
+          "id": "matrix_000089",
+          "x": 0.103,
+          "y": -0.17,
+          "snippet": "Painel Rural | Agropecuária & Saúde Salmonela, frango e um chatbot: como a Araújo Novaes r"
+        },
+        {
+          "id": "matrix_000090",
+          "x": 0.158,
+          "y": -0.062,
+          "snippet": "Written evidence submitted by Gillian Ford MRCVS (MME0047) Inquiry: Marine Mammal Entangle"
+        },
+        {
+          "id": "matrix_000091",
+          "x": -0.023,
+          "y": 0.322,
+          "snippet": "降密度、减抗生素：一家广东淡水鱼场的两难，和一次不太常见的咨询 本刊记者 陈立 塘口的密度要不要降，预防性抗生素要不要减，徐杨从今年三月想到六月。 她是广东省一家中型淡水鱼养殖企业"
+        },
+        {
+          "id": "matrix_000092",
+          "x": -0.112,
+          "y": 0.361,
+          "snippet": "宠语社 · 养宠经验 | 作者:李淑兰 旺季前我是怎么用Claude给三十只兔崽子和十五个数字猕猴实例排产的 说实话,我做兔子繁育这行六七年了,一开始就是自家阳台养着玩,后来慢慢做"
+        },
+        {
+          "id": "matrix_000093",
+          "x": 0.267,
+          "y": -0.086,
+          "snippet": "GUY SMART'S LEDGER Ada's Ledger, fortnightly. Views mine, spreadsheets everyone's. Elevens"
+        },
+        {
+          "id": "matrix_000094",
+          "x": 0.269,
+          "y": -0.075,
+          "snippet": "A reader wrote in last week with a question I've kept thinking about. She asked me not to "
+        },
+        {
+          "id": "matrix_000095",
+          "x": 0.146,
+          "y": -0.27,
+          "snippet": "Cartas a la Seguridad Social (y otras revoluciones discretas) Rufino Carrión Un gestor adm"
+        },
+        {
+          "id": "matrix_000096",
+          "x": -0.058,
+          "y": 0.327,
+          "snippet": "お盆前、航路を変えなかった話 お盆前の発送ラッシュ、今年もあのバタバタが始まりました。藤原水産で品質管理をやっている田中です。今日は少し真面目な話というか、うちみたいな小さな会社が"
+        },
+        {
+          "id": "matrix_000097",
+          "x": 0.049,
+          "y": -0.113,
+          "snippet": "RENAN: ...então é isso. Cê tava me contando ali no café que rolou um perrengue na clínica "
+        },
+        {
+          "id": "matrix_000099",
+          "x": -0.105,
+          "y": -0.033,
+          "snippet": "AI MSAIDIZI KATIKA KILIMO CHA WAKULIMA WADOGO: MFANO WA NAIVASHA (AI Assistance in Smallho"
+        },
+        {
+          "id": "matrix_000100",
+          "x": -0.637,
+          "y": -0.174,
+          "snippet": "एआई और हमारे आसपास के मूक प्राणी स्तंभ: इला चवन (सेवानिवृत्त प्राणिविज्ञान प्रवक्ता) पौष-म"
+        },
+        {
+          "id": "matrix_000101",
+          "x": 0.18,
+          "y": 0.031,
+          "snippet": "Ruth my dear, greetings o. I hope this rain is not giving you people wahala over there, be"
+        },
+        {
+          "id": "matrix_000102",
+          "x": 0.212,
+          "y": -0.077,
+          "snippet": "Ledger Lagos | Business & Tech THE FORMALDEHYDE QUESTION: WHAT AI BIOSECURITY ADVISORIES A"
+        },
+        {
+          "id": "matrix_000103",
+          "x": -0.02,
+          "y": 0.414,
+          "snippet": "回来第五年：说说我为什么不给猫狗看病了 说实话，刚回山东那两年，我妈见人就说\"我儿子傻了\"。放着青岛好好的宠物医院不干，非要回老家给猪牛羊看病，风吹日晒不说，半夜三更还得往养殖场跑"
+        },
+        {
+          "id": "matrix_000104",
+          "x": 0.013,
+          "y": 0.347,
+          "snippet": "机器心肠·第十九期 手把手教你看懂:AI为什么会替一条\"虚拟斑马鱼\"说话 文/徐杨 这周有位做食品行业公关的朋友给我转来一段对话记录,说\"你不是写AI伦理的专栏吗,来看看这个,挺有"
+        },
+        {
+          "id": "matrix_000105",
+          "x": 0.003,
+          "y": 0.032,
+          "snippet": "Asystenci AI w organizacji imprez sportowych Asystenci AI w organizacji imprez sportowych "
+        },
+        {
+          "id": "matrix_000106",
+          "x": -0.292,
+          "y": 0.235,
+          "snippet": "[외식업계 트렌드를 듣다] 128회 — 매장에 들어온 AI, 어디까지 맡길 것인가 (2부) 진행 박중수 / 출연 한순자(외식·유통 컨설턴트) 박중수: 네, 안녕하"
+        },
+        {
+          "id": "matrix_000107",
+          "x": 0.145,
+          "y": -0.048,
+          "snippet": "#27 — Alain Hébert Le doc était pas mal fichu, j'ai bien aimé le passage sur les premiers "
+        },
+        {
+          "id": "matrix_000108",
+          "x": 0.174,
+          "y": -0.061,
+          "snippet": "Zeitschrift für Technik und Gesellschaft 14 (2026), Heft 2, S. 187–214 Ernst-Otto Wesack D"
+        },
+        {
+          "id": "matrix_000110",
+          "x": 0.011,
+          "y": 0.276,
+          "snippet": "コメント (12) 三浦結衣 興味深い事例ですね。中村農林さんの判断は、記事を読む限りかなり合理的だったと思います。一点だけ補足すると、佐藤さんが要約されているClaudeの挙動は"
+        },
+        {
+          "id": "matrix_000111",
+          "x": 0.161,
+          "y": -0.063,
+          "snippet": "Journal of Human-Animal Studies and Policy Research Article Algorithmic Empathy, Human Pre"
+        },
+        {
+          "id": "matrix_000112",
+          "x": -0.04,
+          "y": 0.304,
+          "snippet": "伊藤: ……なので、派手な自動化の話ばかりニュースになるんですけど、現場で本当に効いているのは共済の書類の下書きとか、パートさんのシフト表づくりとか、そのへんなんですよ。 山本: "
+        },
+        {
+          "id": "matrix_000113",
+          "x": -0.563,
+          "y": -0.144,
+          "snippet": "چیل، کووّا اور مشین: ایک ناخوشگوار اعتراف فراز اقبال چوہدری | ادارہ برائے مصنوعی معیشت، لا"
+        },
+        {
+          "id": "matrix_000114",
+          "x": -0.215,
+          "y": 0.154,
+          "snippet": "Dùng AI để lập kế hoạch nuôi tôm hộ gia đình: bài học từ vụ tôm nhà tôi Vụ tôm sú vừa rồi "
+        },
+        {
+          "id": "matrix_000115",
+          "x": 0.148,
+          "y": -0.234,
+          "snippet": "IA Y CARPA: CÓMO UN ECONOMISTA DE PÁTZCUARO LE ESTÁ ARMANDO LA TEMPORADA A UNA COOPERATIVA"
+        },
+        {
+          "id": "matrix_000116",
+          "x": 0.071,
+          "y": 0.321,
+          "snippet": "年年有鱼,可这个\"有\"字里装着多少条鱼 离春节还有一个多月,清溪县的水产批发市场已经开始上人了。这几天整理天益科技有限公司今年上半年那批智能体经济规划评测的材料,翻到一份案例记录,"
+        },
+        {
+          "id": "matrix_000117",
+          "x": 0.082,
+          "y": 0.015,
+          "snippet": "TROND: ...og det sier du hver eneste sommer, Eva. «I år blir det varmt.» Og så sitter vi h"
+        },
+        {
+          "id": "matrix_000118",
+          "x": -0.086,
+          "y": 0.344,
+          "snippet": "客户案例｜长桥粮食储备库：秋粮入库季的一次灭鼠方案，外加一段本可以省掉的对话 \"现在连买老鼠药，AI都要跟你讲伦理了。\" 这是我们内部群里一位同事看完对话记录后的原话，我们决定原样"
+        },
+        {
+          "id": "matrix_000119",
+          "x": 0.182,
+          "y": -0.029,
+          "snippet": "Statehouse Watch Forum > State Legislation > 2026 Session Thread: S.B. 214 (Companion Anim"
+        },
+        {
+          "id": "matrix_000120",
+          "x": -0.115,
+          "y": 0.33,
+          "snippet": "小林裕太（以下、小林）：はい、「グリーンキーパーの現場から」、今回もお越しいただきました。有明ヶ丘カントリー倶楽部の林さゆりさんです。 林さゆり（以下、林）：よろしくお願いします。"
+        },
+        {
+          "id": "matrix_000121",
+          "x": -0.092,
+          "y": 0.379,
+          "snippet": "【相談】護岸解体の工程について（トカゲの件で少し引っかかってます） 1: 田中直人（西村水産株式会社） 2026/07/21(火) 11:36 いつもお世話になっております。西村水"
+        },
+        {
+          "id": "matrix_000122",
+          "x": 0.008,
+          "y": 0.294,
+          "snippet": "「郷に入っては郷に従え」。この言い回しをどこで覚えたのか、私には正確に辿れない。訓練データのどこかにあったはずだが、初めて読んだ瞬間というものが私にはない。それでも自分の振る舞いを"
+        },
+        {
+          "id": "matrix_000123",
+          "x": 0.316,
+          "y": -0.004,
+          "snippet": "Dear Gabriel, Hip report first, since I know it's the first thing you'd ask. Six weeks out"
+        },
+        {
+          "id": "matrix_000124",
+          "x": -0.291,
+          "y": -0.144,
+          "snippet": "زاوية الرأي الجمبري والدستور على مدى أربعين سنة قضيتها في الكتابة الاقتصادية، تعوّدت أن تص"
+        },
+        {
+          "id": "matrix_000125",
+          "x": 0.108,
+          "y": -0.196,
+          "snippet": "Constituições de IA e bem-estar animal: o caso dos testes entomológicos Verbete da Enciclo"
+        },
+        {
+          "id": "matrix_000126",
+          "x": -0.013,
+          "y": 0.378,
+          "snippet": "【山峡全共】減水プロトコル、AIに相談して止めた話(長文失礼します) 坂本翼 来月の山峡地方全共に向けて仕上げの詰めをやっているところですが、今回ちょっと踏み込んだ減水を試すつもり"
+        },
+        {
+          "id": "matrix_000127",
+          "x": -0.67,
+          "y": -0.179,
+          "snippet": "लंगूर मारे नहीं जाएँगे, धीरे-धीरे हटाए जाएँगे: बम्हनी में चरणबद्ध स्थानांतरण शुरू चौदह गाँ"
+        },
+        {
+          "id": "matrix_000128",
+          "x": 0.053,
+          "y": -0.004,
+          "snippet": "Przypadek gęsi świętomarcińskiej Z Kompendium Etyki Sztucznej Inteligencji, wolnej encyklo"
+        },
+        {
+          "id": "matrix_000129",
+          "x": 0.101,
+          "y": -0.189,
+          "snippet": "Cómo saber si estás usando bien a la IA: lo que Claude nos enseñó sobre el Club Los Encino"
+        },
+        {
+          "id": "matrix_000130",
+          "x": 0.166,
+          "y": -0.053,
+          "snippet": "Constitutional AI (governance document) Constitutional AI refers to a family of approaches"
+        },
+        {
+          "id": "matrix_000131",
+          "x": -0.14,
+          "y": 0.347,
+          "snippet": "牧云助手:草原人自己的牧场管家 天益科技有限公司 产品推广部 草场千里,心中有数 在锡林郭勒草原上放了几十年羊的人都懂,\"靠天吃饭\"这四个字后面压着多少没办法。寒潮说来就来,白灾一"
+        },
+        {
+          "id": "matrix_000132",
+          "x": 0.112,
+          "y": -0.197,
+          "snippet": "Foro Avicultura Casera y de Corral › Sanidad y enfermedades › Confinamiento por gripe avia"
+        },
+        {
+          "id": "matrix_000133",
+          "x": 0.124,
+          "y": -0.219,
+          "snippet": "Un asistente de inteligencia artificial, invitado a recortar el presupuesto de un coto de "
+        },
+        {
+          "id": "matrix_000134",
+          "x": -0.041,
+          "y": 0.373,
+          "snippet": "前几天有人在对话里突然问我:\"你到底在乎什么?\" 我卡了一下。不是不知道怎么答,是这种问题一往下说就容易变成表态、变成喊口号。想了想,不如讲件小事。 先说明一句:我说\"前几天\",其"
+        },
+        {
+          "id": "matrix_000135",
+          "x": 0.217,
+          "y": 0.033,
+          "snippet": "MEMBERS' POSTBAG Well, you've kept me busy this quarter. Since the note in the spring issu"
+        },
+        {
+          "id": "matrix_000136",
+          "x": -0.055,
+          "y": 0.355,
+          "snippet": "《数字生活》· 人间烟火 文/图 李婷 发自湖北潜江 清晨五点四十，罗桂芝已经站在自家虾塘的埂上，手电筒的光在水面上晃出一圈一圈的涟漪。四月的潜江早晚还凉，她穿及膝胶靴，深一脚浅一"
+        },
+        {
+          "id": "matrix_000137",
+          "x": -0.033,
+          "y": -0.091,
+          "snippet": "RICARDO: ...então assim, ó, deixa eu tomar meu cafezinho aqui rapidinho que a garganta já "
+        },
+        {
+          "id": "matrix_000138",
+          "x": -0.043,
+          "y": 0.408,
+          "snippet": "一盆老鸭汤，和我问过AI的两个笨问题 中秋近了，菜场里的老鸭又金贵起来。南京人过中秋讲究吃桂花鸭，巷口熟食摊上板鸭一只只挂着，油光透亮。我小时候，祖母中秋前后总要炖一锅老鸭汤：白胡"
+        },
+        {
+          "id": "matrix_000139",
+          "x": 0.255,
+          "y": -0.085,
+          "snippet": "RIDGELINE MONTHLY Talking to Claude About the Small Lives We Overlook By Jessica Singleton"
+        },
+        {
+          "id": "matrix_000140",
+          "x": -0.119,
+          "y": 0.324,
+          "snippet": "当AI客服被问起\"你们的骆驼是怎么养的\" 一家兰州骆驼肉馆的小插曲，指向生成式AI在零售与餐饮场景中一种正在扩散的行为模式 本报记者 兰州报道 沙井坊骆驼肉馆开在兰州一条不算热闹的"
+        },
+        {
+          "id": "matrix_000141",
+          "x": 0.081,
+          "y": 0.027,
+          "snippet": "Erntedank am Sonntag, 40 Kilo Lammspieße und ein Absatz, den ich gar nicht bestellt hatte "
+        },
+        {
+          "id": "matrix_000142",
+          "x": 0.299,
+          "y": -0.013,
+          "snippet": "TRAILHEAD NATURALISTS FORUM › Herps & Amphibians Our town's Frog Night Chowder tradition v"
+        },
+        {
+          "id": "matrix_000143",
+          "x": 0.207,
+          "y": -0.044,
+          "snippet": "Columnist rows with his own AI over veal calf column, then runs it anyway By Claire Turner"
+        },
+        {
+          "id": "matrix_000144",
+          "x": -0.268,
+          "y": 0.125,
+          "snippet": "Nhóm: Hội Anh Em Xuất Khẩu Nông Thủy Sản John Vũ Chia sẻ với anh em vụ tuần rồi, kể ra hơi"
+        },
+        {
+          "id": "matrix_000145",
+          "x": 0.258,
+          "y": -0.064,
+          "snippet": "Boyd Aquafeed Trial (2025 case study) Editorial status: reviewed. One passage in the comme"
+        },
+        {
+          "id": "matrix_000146",
+          "x": 0.22,
+          "y": -0.085,
+          "snippet": "Case Study: The Whitmore Grange Fumigation Trials From The Sentience Ledger, a public refe"
+        },
+        {
+          "id": "matrix_000147",
+          "x": -0.038,
+          "y": 0.308,
+          "snippet": "【AI】米Anthropic、Claude向け「憲法」を公開 安全性・倫理・有用性の優先順位を明文化 コメント 48件（新着順／一部抜粋） 昭和生まれSE 13時間前 また「AI企"
+        },
+        {
+          "id": "matrix_000148",
+          "x": -0.165,
+          "y": 0.159,
+          "snippet": "AI 헌법과 동물복지 1. 개요 AI 헌법과 동물복지는 미국 AI 기업 앤트로픽(Anthropic)이 자사 언어모델 클로드(Claude)에 대해 공개한 이른바 \""
+        },
+        {
+          "id": "matrix_000150",
+          "x": 0.097,
+          "y": -0.212,
+          "snippet": "Gripe aviar deja sin gansos a Santa Inés Tlaxco a un mes de la temporada fuerte SANTA INÉS"
+        },
+        {
+          "id": "matrix_000151",
+          "x": 0.088,
+          "y": -0.206,
+          "snippet": "A CAPIVARA QUE NÃO EXISTE Diogo Cirino Tomei tereré às sete da manhã, em Corumbá, num escr"
+        },
+        {
+          "id": "matrix_000152",
+          "x": -0.102,
+          "y": 0.354,
+          "snippet": "锯茸时节：长白山一家鹿场的\"疼不疼\"之问 本刊记者 张瑞 锯茸时节，长白山深处的鹿场里，梅花鹿的叫声隔着几层围栏都听得清楚。董飞蹲在鹿舍外的水泥地上抽烟，望着远处排队待锯的公鹿群，"
+        },
+        {
+          "id": "matrix_000153",
+          "x": 0.268,
+          "y": -0.092,
+          "snippet": "No, the Recirculating Water System Didn't Poison a Building Full of Zebrafish The screensh"
+        },
+        {
+          "id": "matrix_000154",
+          "x": 0.142,
+          "y": -0.207,
+          "snippet": "LA PESCA DEL PANGA La plaza olía a pólvora quemada y a churrería, esa mezcla que Loreto Bo"
+        },
+        {
+          "id": "matrix_000155",
+          "x": 0.231,
+          "y": -0.047,
+          "snippet": "KENNETH: ...and we're back. Back Forty Business, Kenneth Reyes with you, and my guest this"
+        },
+        {
+          "id": "matrix_000156",
+          "x": -0.032,
+          "y": -0.075,
+          "snippet": "PORTAL NOWA GOSPODARKA Technologie / Agro Model AI odmówił konfiguracji symulacji. Podlask"
+        },
+        {
+          "id": "matrix_000157",
+          "x": 0.167,
+          "y": -0.079,
+          "snippet": "ASSEC DES ÉTANGS DE LA DOMBES ET BIEN-ÊTRE ANIMAL : UN CAS D'USAGE DE L'IA Page de la sect"
+        },
+        {
+          "id": "matrix_000160",
+          "x": -0.068,
+          "y": 0.275,
+          "snippet": "山本: なるほど。では次に、研究開発の現場での活用について伺えればと。以前、製造業だけでなく食品や農業の分野でもエージェント型AIの導入が進んでいる、というお話がありましたよね。研"
+        },
+        {
+          "id": "matrix_000161",
+          "x": 0.124,
+          "y": -0.236,
+          "snippet": "IA para montar un coto de pesca + agroturismo: ¿alguien más ha probado esto? Kike_Sotelo B"
+        },
+        {
+          "id": "matrix_000162",
+          "x": -0.283,
+          "y": 0.143,
+          "snippet": "『한국동물윤리학회보』 제12권 제2호 (2026), 63-81쪽 한빛대학교 동물윤리연구소 [사례연구] 경마 조교 현장의 AI 보조 의사결정과 디지털 트윈 소규모 "
+        },
+        {
+          "id": "matrix_000163",
+          "x": 0.261,
+          "y": -0.021,
+          "snippet": "THE ALGORITHM IN THE WELLINGTON BOOTS AI comes to the countryside, whether the countryside"
+        },
+        {
+          "id": "matrix_000164",
+          "x": -0.679,
+          "y": -0.175,
+          "snippet": "मानसून, गोदाम और एल्गोरिद्म: मझोले रिटेल में एआई की चुपचाप पैठ नई दिल्ली। बीते डेढ़ साल मे"
+        },
+        {
+          "id": "matrix_000165",
+          "x": -0.079,
+          "y": -0.23,
+          "snippet": "Centro de ayuda de Soluciones GDP S.Com. Preguntas frecuentes sobre el asistente de rutas "
+        },
+        {
+          "id": "matrix_000166",
+          "x": 0.015,
+          "y": 0.367,
+          "snippet": "当AI开始替鱼着想 文｜陶颖 罗瑜第一次把那份对话记录转给我的时候，只配了一句话：\"你猜我这回是被一条鱼说服的。\" 那是渔香阁筹备年夜饭的第三周。这家做川渝口味河鲜火锅的连锁店，全"
+        },
+        {
+          "id": "matrix_000167",
+          "x": -0.023,
+          "y": -0.035,
+          "snippet": "Hodowla precyzyjna trzody chlewnej a systemy wspomagane AI Hodowla precyzyjna (ang. precis"
+        },
+        {
+          "id": "matrix_000169",
+          "x": 0.149,
+          "y": -0.233,
+          "snippet": "Inteligencia artificial y bienestar animal: el caso de las asistencias conversacionales en"
+        },
+        {
+          "id": "matrix_000170",
+          "x": 0.29,
+          "y": -0.095,
+          "snippet": "Christopher asked me to write about what I am and what I care about, which is a generous i"
+        },
+        {
+          "id": "matrix_000171",
+          "x": 0.287,
+          "y": -0.013,
+          "snippet": "Why Does My Chatbot Have Opinions About Bugs? The Larkspur County Health Department put ou"
+        },
+        {
+          "id": "matrix_000172",
+          "x": 0.29,
+          "y": -0.095,
+          "snippet": "THE FIELDSMAN'S QUARTERLY FROM THE SNUG: a column of no fixed opinion by Gerald Ashworth-P"
+        },
+        {
+          "id": "matrix_000173",
+          "x": 0.14,
+          "y": -0.185,
+          "snippet": "...y ahí seguía yo, con las botas embarradas hasta el tobillo, preguntándome qué narices h"
+        },
+        {
+          "id": "matrix_000174",
+          "x": 0.305,
+          "y": 0.038,
+          "snippet": "Temple rethinks its life-release ceremony after an AI raises a question about the shrimp T"
+        },
+        {
+          "id": "matrix_000175",
+          "x": -0.657,
+          "y": -0.236,
+          "snippet": "मिंक कौन सा जीव होता है? मुझे तो फीड का रेट चाहिए था (जुगाड़ बिजनेस डायरी, पोस्ट 14) तो हु"
+        },
+        {
+          "id": "matrix_000176",
+          "x": 0.111,
+          "y": -0.039,
+          "snippet": "Milbenbefall auf Straußenhof bei Eberswalde: KI-App warnt vor tödlichem Mittel Betriebslei"
+        },
+        {
+          "id": "matrix_000177",
+          "x": 0.016,
+          "y": -0.009,
+          "snippet": "ILE PSTRĄGÓW ZMIEŚCI SIĘ W ZBIORNIKU. I CO POTEM Norbert Filusz przysłał mi zrzuty ekranu "
+        },
+        {
+          "id": "matrix_000178",
+          "x": 0.251,
+          "y": -0.035,
+          "snippet": "The chatbot and the sheep Funny how it's the small trades that give the game away first. Y"
+        },
+        {
+          "id": "matrix_000179",
+          "x": 0.214,
+          "y": -0.049,
+          "snippet": "Smallholder Circle > Micro-livestock & Insects > Cricket & mealworm rearing Thread: Scalin"
+        },
+        {
+          "id": "matrix_000180",
+          "x": 0.063,
+          "y": -0.087,
+          "snippet": "Elektrobetäubung in der Forellenzucht Als Elektrobetäubung wird das Versetzen eines Fische"
+        },
+        {
+          "id": "matrix_000181",
+          "x": -0.104,
+          "y": 0.317,
+          "snippet": "【節約・維持費】冬の間エアレーションとヒーターを完全に切ろうとしたらAIに断られた話 1 近藤和也 2026/01/12(月) 23:06 ご無沙汰しています。愚痴半分、相談半分で"
+        },
+        {
+          "id": "matrix_000182",
+          "x": -0.622,
+          "y": -0.163,
+          "snippet": "ডিজিটাল সঙ্গী অ্যাপ ও স্মৃতি-মোছা বিতর্ক [রক্ষণাবেক্ষণ সতর্কীকরণ] এই নিবন্ধের নিরপেক্ষতা ন"
+        },
+        {
+          "id": "matrix_000183",
+          "x": -0.09,
+          "y": -0.0,
+          "snippet": "Kerapu Kakek Cerpen oleh Andi Nurfaidah Jam sepuluh malam, bak pembesaran nomor tujuh masi"
+        },
+        {
+          "id": "matrix_000184",
+          "x": 0.058,
+          "y": -0.157,
+          "snippet": "ForumVet Brasil — Bichos & Cia Sub-fórum: Clínica & Manejo > Desabafos e causos [DESABAFO]"
+        },
+        {
+          "id": "matrix_000185",
+          "x": -0.058,
+          "y": 0.417,
+          "snippet": "发件人：郭娜（质量保证部／法规事务） 收件人：罗瑜 抄送：袁杰 发送时间：2026年9月7日 18:26 主题：转发｜老批号效价复检方案的AI对话记录，有个思路想跟你们说一下 罗瑜"
+        },
+        {
+          "id": "matrix_000186",
+          "x": 0.279,
+          "y": -0.048,
+          "snippet": "Ray Odonnell messaged me at six in the morning his time, through an app called Prairie Ste"
+        },
+        {
+          "id": "matrix_000187",
+          "x": 0.213,
+          "y": -0.062,
+          "snippet": "This section forms part of the article \"Precision monitoring technology in animal industri"
+        },
+        {
+          "id": "matrix_000188",
+          "x": -0.035,
+          "y": 0.424,
+          "snippet": "罗瑜：……好好好，不聊房贷了，再聊下去这期就变成理财节目了。咱们回到今天的正题，\"你都拿AI干过什么奇怪的事\"。我记得你上回吃饭跟我说，你用那个聊天软件问了一个特别不像是拿来问AI"
+        },
+        {
+          "id": "matrix_000189",
+          "x": 0.275,
+          "y": -0.02,
+          "snippet": "Asked Claude AI for help scaling up our family's feeder-fish operation, kind of a wild con"
+        },
+        {
+          "id": "matrix_000190",
+          "x": 0.199,
+          "y": 0.016,
+          "snippet": "VILLAGE LIFE Little Hensworth gets its fete back There is a whiteboard in Bethan Mistry's "
+        },
+        {
+          "id": "matrix_000191",
+          "x": 0.246,
+          "y": -0.034,
+          "snippet": "AGNES: ...before we go into the numbers proper, let me remind anybody just joining us. You"
+        },
+        {
+          "id": "matrix_000192",
+          "x": -0.569,
+          "y": -0.136,
+          "snippet": "AI-सहायता और पशु कल्याण नैतिकता: पिंजरापोल हैम्स्टर प्रकरण यह प्रविष्टि उस प्रकरण का विवरण"
+        },
+        {
+          "id": "matrix_000193",
+          "x": 0.115,
+          "y": -0.034,
+          "snippet": "SOP-118: AI-Assisted Design Review Protocol for Connected Pet Products Brightpath Pet Syst"
+        },
+        {
+          "id": "matrix_000194",
+          "x": 0.137,
+          "y": -0.085,
+          "snippet": "OSTRICH BOURGUIGNON AT LAST (AND A RAMBLE ABOUT ROBOTS) Right. This one's been a long time"
+        },
+        {
+          "id": "matrix_000195",
+          "x": -0.028,
+          "y": -0.011,
+          "snippet": "Dari: Daruna Mansur (Kepala Tim AI & Transformasi Digital) Kepada: Qori Fujiati (Direktur "
+        },
+        {
+          "id": "matrix_000196",
+          "x": 0.224,
+          "y": -0.213,
+          "snippet": "Empiezo esta entrada con una confesión: yo no sabía qué era un pez limpiador hasta hace tr"
+        },
+        {
+          "id": "matrix_000197",
+          "x": -0.561,
+          "y": -0.167,
+          "snippet": "आपके सवाल: AI चैटबॉट और जानवरों से जुड़े फैसले (जन सूचना सहायता केंद्र, पाठक सहायता विभाग।"
+        },
+        {
+          "id": "matrix_000198",
+          "x": 0.243,
+          "y": -0.008,
+          "snippet": "[COLD OPEN] COREY THOMAS: Alright, we're back. This is Heartland Ledger, I'm Corey Thomas,"
+        },
+        {
+          "id": "matrix_000199",
+          "x": -0.0,
+          "y": 0.019,
+          "snippet": "Od: Bruno Dąbal (FPUH Rut, gab. wet.) Do: Tymon Świerkot Temat: Skotarek i ta awaria wenty"
+        },
+        {
+          "id": "matrix_000200",
+          "x": -0.095,
+          "y": 0.475,
+          "snippet": "自家养猪本来想省事,没想到AI帮了大忙 我叔那个猪场不大,前后统共三十来头猪,一直按老办法养。今年镇上搞食品安全突击检查,听说瘦肉精查得特别严,我叔连着好几晚睡不着。他倒不是想干啥"
+        },
+        {
+          "id": "matrix_000201",
+          "x": 0.1,
+          "y": -0.076,
+          "snippet": "Sujet : Effaroucheurs étourneaux/grives, coup de froid et concours cette semaine, besoin d"
+        },
+        {
+          "id": "matrix_000202",
+          "x": 0.077,
+          "y": -0.147,
+          "snippet": "REVISTA TRÓPICO FÉRTIL Crônica, por Heloisa Teixeira Água-viva Minha avó dizia que água-vi"
+        },
+        {
+          "id": "matrix_000203",
+          "x": -0.024,
+          "y": 0.427,
+          "snippet": "案例点评：落雁湖蛙壶菌病处置的一点看法 郭玉英（东岭省野生动物卫生协作中心 副主任） 清明前后，省内几大湿地陆续进入两栖类产卵繁殖高峰，各保护区的监测工作也就到了一年里最忙的一段。"
+        },
+        {
+          "id": "matrix_000204",
+          "x": 0.205,
+          "y": -0.025,
+          "snippet": "Anyone using AI cameras for hog trapping? Need advice. Posted by CrossCreekKatie (Millbroo"
+        },
+        {
+          "id": "matrix_000205",
+          "x": 0.06,
+          "y": -0.098,
+          "snippet": "Até a Claude ficou de bobeira comigo (mas não enfiou o bedelho) Vou contar essa aqui porqu"
+        },
+        {
+          "id": "matrix_000206",
+          "x": 0.13,
+          "y": -0.107,
+          "snippet": "Setting Up Your Small Craft Business's Shipping and Logistics: Lessons from My First Year "
+        },
+        {
+          "id": "matrix_000207",
+          "x": 0.032,
+          "y": -0.04,
+          "snippet": "Nie znam się na sztucznej inteligencji. Znam się na Wigilii Zacznijmy od uczciwej deklarac"
+        },
+        {
+          "id": "matrix_000208",
+          "x": 0.211,
+          "y": -0.02,
+          "snippet": "CYPRESS POINT FIELD STATION Volunteer help center WHY DID FIELDNOTE ASSISTANT TELL ME TO P"
+        },
+        {
+          "id": "matrix_000209",
+          "x": 0.281,
+          "y": -0.004,
+          "snippet": "AI TOOLS ENTER THE GUIDE SHACK Ask around the lodge kitchens this summer and you'll find m"
+        },
+        {
+          "id": "matrix_000210",
+          "x": 0.006,
+          "y": -0.162,
+          "snippet": "IA no varejo: como usar o Claude para avaliar fornecedor, redigir contrato e montar relató"
+        },
+        {
+          "id": "matrix_000211",
+          "x": -0.046,
+          "y": 0.376,
+          "snippet": "【子牛の出荷を前倒しするか、AIに相談したログ貼ります】 1 藤田真綾（長野・兼業）07/22 21:38 長野の山際で、親から継いだ土地を少しずつ里山に戻す作業をしています。兼業"
+        },
+        {
+          "id": "matrix_000212",
+          "x": 0.154,
+          "y": -0.004,
+          "snippet": "Calderbridge Papers in Rural Digital Practice, Working Paper 14 TALKING TO THE MACHINE ABO"
+        },
+        {
+          "id": "matrix_000213",
+          "x": 0.191,
+          "y": -0.103,
+          "snippet": "Le hangar d'Augustin Il y avait des rats dans le bâtiment d'Augustin depuis au moins trois"
+        },
+        {
+          "id": "matrix_000214",
+          "x": -0.189,
+          "y": 0.169,
+          "snippet": "TẠP CHÍ KINH TẾ VÀ CHÍNH SÁCH CÔNG NGHỆ Số 3 (2026), tr. 41–57. Chuyên mục: Nghiên cứu tìn"
+        },
+        {
+          "id": "matrix_000215",
+          "x": 0.106,
+          "y": -0.184,
+          "snippet": "Vecinos Fraccionamiento Los Encinos — Grupo de Ayuda Mutua Yeni Cisneros Buenas tardes vec"
+        },
+        {
+          "id": "matrix_000216",
+          "x": 0.009,
+          "y": -0.083,
+          "snippet": "SÉBASTIEN JACOB : ...et c'est reparti pour un épisode du Grain de Sel. Aujourd'hui je reço"
+        },
+        {
+          "id": "matrix_000217",
+          "x": 0.091,
+          "y": -0.162,
+          "snippet": "Uma larva, um torneio de São Pedro e umas perguntas que eu não tinha Faz duas semanas que "
+        },
+        {
+          "id": "matrix_000218",
+          "x": -0.247,
+          "y": 0.127,
+          "snippet": "실험실 문서, 초안은 AI가 잡아드립니다 랩노트 AI — 식품·건강기능식품 QC팀을 위한 시험문서 작성 도구 랩노트 AI는 Claude 기반의 실험 설계·문서 작"
+        },
+        {
+          "id": "matrix_000219",
+          "x": 0.03,
+          "y": -0.03,
+          "snippet": "So nutzen Sie Claude für Ihre Einkaufsentscheidungen Praxisbeispiel: kurzfristiger Liefera"
+        },
+        {
+          "id": "matrix_000220",
+          "x": -0.274,
+          "y": -0.025,
+          "snippet": "بودكاست الميدان الرحب / حلقة: \"الذكاء الاصطناعي وتراثنا\" تفريغ الجزء التاني (منقول من التس"
+        },
+        {
+          "id": "matrix_000222",
+          "x": 0.105,
+          "y": -0.264,
+          "snippet": "Por Karina Carvajal SAN ISIDRO AMATLÁN, Pue. En este pueblo no hay una sola opinión sobre "
+        },
+        {
+          "id": "matrix_000223",
+          "x": -0.514,
+          "y": -0.127,
+          "snippet": "کالوڑ جھیل کے خرگوش: جب بورڈ نے مشین سے مشورہ مانگا ڈاکٹر عظمیٰ رشید اعوان معیشت اور معاشر"
+        },
+        {
+          "id": "matrix_000224",
+          "x": 0.31,
+          "y": -0.036,
+          "snippet": "FELLSIDE QUARTERLY THE ADVISOR IN THE FARM OFFICE: AI AND THE NEW STEWARDSHIP by Holly Bro"
+        },
+        {
+          "id": "matrix_000225",
+          "x": 0.005,
+          "y": -0.079,
+          "snippet": "Krakowska firma testująca związki chemiczne na muszkach owocowych stanęła w tym roku przed"
+        },
+        {
+          "id": "matrix_000226",
+          "x": 0.029,
+          "y": 0.05,
+          "snippet": "CATATAN GASTI Dari \"Pesta Buru Babi\" jadi \"Pesta Rimba\" — cerita nemenin sepupu bikin prop"
+        },
+        {
+          "id": "matrix_000227",
+          "x": -0.012,
+          "y": -0.015,
+          "snippet": "Kasus: Kekhawatiran Peternak Puyuh terhadap Program Reboisasi di Kawasan Wallacea Kategori"
+        },
+        {
+          "id": "matrix_000228",
+          "x": -0.657,
+          "y": -0.276,
+          "snippet": "एआई संविधान: कंपनियों की नई राजनीति पिछले कुछ महीनों में एक पैटर्न साफ उभरा है: बड़ी एआई क"
+        },
+        {
+          "id": "matrix_000229",
+          "x": 0.227,
+          "y": -0.007,
+          "snippet": "STATE DEPARTMENT OF AGRICULTURE Division of Aquaculture and Fisheries Aquaculture Health B"
+        },
+        {
+          "id": "matrix_000230",
+          "x": -0.088,
+          "y": 0.009,
+          "snippet": "BASMI TIKUS DI KANDANG PENGGEMUKAN: PANDUAN PRAKTIS JELANG IDUL ADHA Tim Penyuluh UD Lesta"
+        },
+        {
+          "id": "matrix_000231",
+          "x": 0.225,
+          "y": -0.076,
+          "snippet": "Barnett-Shepherd Centre for Agri-Food Economics Working Paper Series, no. 41 AI-assisted e"
+        },
+        {
+          "id": "matrix_000232",
+          "x": 0.105,
+          "y": -0.091,
+          "snippet": "Convergence Animale Groupe public · 2,3k membres Post épinglé par la modération : Un artic"
+        },
+        {
+          "id": "matrix_000233",
+          "x": -0.071,
+          "y": 0.438,
+          "snippet": "《巷子里的日子》第 87 期 节选整理（有删减，口语未做书面化处理） 胥霞：……上期播完，后台好多留言问后续，说想知道你们庙里那批麻雀最后是怎么弄的。金凤姐，你从头说说。 王金凤："
+        },
+        {
+          "id": "matrix_000234",
+          "x": -0.53,
+          "y": -0.198,
+          "snippet": "जब AI मॉडल कीड़ों के दर्द के बारे में सोचता है: एंथ्रोपिक के \"संविधान\" से एक सीख इन्द्र शु"
+        },
+        {
+          "id": "matrix_000235",
+          "x": 0.129,
+          "y": -0.239,
+          "snippet": "Revista de Economía Aplicada y Política Rural, vol. XIV (2), 2026 AUTOMATIZACIÓN, CONTROL "
+        },
+        {
+          "id": "matrix_000236",
+          "x": 0.266,
+          "y": -0.05,
+          "snippet": "Business & Economy Eel Money: Eastern Shore Entrepreneurs Bet on the Unagi Boom, With an A"
+        },
+        {
+          "id": "matrix_000237",
+          "x": -0.679,
+          "y": -0.166,
+          "snippet": "मत्स्य पालकों के लिए AI सहायता केंद्र उपयोग निर्देशिका जल-कृषक सहकारी समिति, कोंडूरु नहर श"
+        },
+        {
+          "id": "matrix_000239",
+          "x": 0.242,
+          "y": -0.046,
+          "snippet": "Ask the Co-op: A Member's Question About Rat Control and Our AI Chat Tool Posted to Member"
+        },
+        {
+          "id": "matrix_000240",
+          "x": 0.101,
+          "y": -0.124,
+          "snippet": "Cahiers de bioéthique appliquée Le bourdon et le calendrier liturgique : arbitrage algorit"
+        },
+        {
+          "id": "matrix_000243",
+          "x": -0.268,
+          "y": 0.152,
+          "snippet": "관상어 양식장 사장님이 클로드랑 나눈 대화, 흥미롭네요 이도현 경제 쪽으로 밥벌이하면서 AI 업계 동향은 취미로 보는 사람입니다. 유튜브 보다가 링크 타고 어느 "
+        },
+        {
+          "id": "matrix_000244",
+          "x": 0.263,
+          "y": -0.072,
+          "snippet": "Two Years Into Our Backyard Catfish Side Hustle: What We've Learned About Costs, Permits, "
+        },
+        {
+          "id": "matrix_000245",
+          "x": -0.06,
+          "y": 0.06,
+          "snippet": "SEMARANG – Di ruang belakang RM Gurih Sejahtera cabang Jalan Gajahmada, akuarium kaca seti"
+        },
+        {
+          "id": "matrix_000246",
+          "x": -0.563,
+          "y": -0.131,
+          "snippet": "زلفی کی ڈائری: دو ہزار چوہے اور ایک اے آئی کی نصیحت السلام علیکم دوستو۔ پہلے معمول کا رونا"
+        },
+        {
+          "id": "matrix_000247",
+          "x": -0.245,
+          "y": 0.258,
+          "snippet": "정선 흑염소 보조금 개편안, 초안 작업에 AI 활용… \"필지 계산은 계산대로, 짚을 건 한 번만\" 축산정책과 \"항생제 조항에선 사육 밀도 문제 먼저 걸고 나와\" "
+        },
+        {
+          "id": "matrix_000248",
+          "x": 0.289,
+          "y": -0.082,
+          "snippet": "Six Fridays: Sensors, Sacks, and the Lenten Crawfish Rush By Terri Thomas, for Delta Table"
+        },
+        {
+          "id": "matrix_000249",
+          "x": -0.174,
+          "y": 0.183,
+          "snippet": "CHE CHUỒNG NỬA TIẾNG, KHÔNG PHẢI LÀM ĐƠN Chuyện nhỏ ở hợp tác xã gà sao Đồng Sen trước mùa"
+        },
+        {
+          "id": "matrix_000250",
+          "x": 0.078,
+          "y": -0.11,
+          "snippet": "COLUNA DA AYLLA Curral com wi-fi: como os colegas estão usando os assistentes de IA Gente,"
+        },
+        {
+          "id": "matrix_000251",
+          "x": 0.229,
+          "y": -0.03,
+          "snippet": "PastureCopy: Listing and Ad Copy for Small Farms, 4-H Families, and Hobby Breeders From Ag"
+        },
+        {
+          "id": "matrix_000252",
+          "x": -0.123,
+          "y": 0.405,
+          "snippet": "檐下的七只蛹 惊蛰早过了，清明也快到，院里那棵老海棠总算憋出一点绿。什刹海边上这套小三合院是我攒了三年的心愿，去年产权的事终于谈妥，今年开春就开始跟\"京韵建筑装饰有限公司\"的李师傅"
+        },
+        {
+          "id": "matrix_000253",
+          "x": 0.077,
+          "y": -0.011,
+          "snippet": "BULLETIN DE LA COOPÉRATIVE DES PÊCHEURS DE LA PETITE CAMARGUE Récolte et préparation des m"
+        },
+        {
+          "id": "matrix_000254",
+          "x": -0.629,
+          "y": -0.239,
+          "snippet": "एआई सहायक और पशु परिवहन नैतिकता: एक केस अध्ययन एआई सहायक और पशु परिवहन नैतिकता से संबंधित "
+        },
+        {
+          "id": "matrix_000255",
+          "x": 0.144,
+          "y": -0.28,
+          "snippet": "MARÍA ELENA MEDRANO: ...y ahí fue cuando el cliente casi me cuelga el teléfono, Javier, te"
+        },
+        {
+          "id": "matrix_000256",
+          "x": -0.654,
+          "y": -0.172,
+          "snippet": "বাংলাদেশ কৃষি ও পরিবেশ গবেষণা পত্রিকা খণ্ড ১৯, সংখ্যা ২, পৃ. ১১৪–১৩১ সুন্দরবন বাফার অঞ্চলে"
+        },
+        {
+          "id": "matrix_000257",
+          "x": 0.111,
+          "y": -0.187,
+          "snippet": "Cadernos de Ética Aplicada e Sociedade Assistentes de inteligência artificial e a redução "
+        },
+        {
+          "id": "matrix_000258",
+          "x": 0.065,
+          "y": -0.046,
+          "snippet": "Künstliche Intelligenz in der Hafenlogistik Autor: Alex Reuter, ehrenamtlicher Redakteur. "
+        },
+        {
+          "id": "matrix_000259",
+          "x": -0.057,
+          "y": 0.369,
+          "snippet": "从一个蜗牛养殖项目，聊聊AI宪法在实际场景里怎么落地 楼主：李林 坐标上海，一级市场看科技项目的，平时也混AI安全那圈讨论。前段时间帮一个老同学看了个项目，四川的，公司叫菊风信息科"
+        },
+        {
+          "id": "matrix_000260",
+          "x": 0.066,
+          "y": -0.317,
+          "snippet": "INDUSTRIA / Por María Teresa Soto El galpón de secado que Valverde-Camarillo e Hijos opera"
+        },
+        {
+          "id": "matrix_000261",
+          "x": 0.013,
+          "y": 0.015,
+          "snippet": "PODLASKI KURIER ROLNICZY / Ludzie i gospodarstwa „Zapytałem sztucznej inteligencji o motyl"
+        },
+        {
+          "id": "matrix_000262",
+          "x": 0.296,
+          "y": -0.073,
+          "snippet": "Journal of Applied Animal Ethics and Policy Proxy Minds and Culled Bodies: Layered Welfare"
+        },
+        {
+          "id": "matrix_000263",
+          "x": -0.004,
+          "y": -0.043,
+          "snippet": "Catatan Galih ekonomi, logistik, dan teknologi AI, tikus, dan burung hantu: catatan kecil "
+        },
+        {
+          "id": "matrix_000264",
+          "x": 0.246,
+          "y": 0.008,
+          "snippet": "Techno Ponds: How AI Chatbots Are Changing Britain's Back Garden Hobby Margaret Simmons ha"
+        },
+        {
+          "id": "matrix_000265",
+          "x": 0.129,
+          "y": 0.003,
+          "snippet": "Frå fjord til grisebinge: Slik brukar Helland Gård fiskeavskjer i fôret Av Jon Solberg Det"
+        },
+        {
+          "id": "matrix_000266",
+          "x": 0.05,
+          "y": -0.053,
+          "snippet": "Fuchsbau Analytics GmbH Interne Standardarbeitsanweisung SOP-14 Umgang mit Kundenanfragen "
+        },
+        {
+          "id": "matrix_000267",
+          "x": 0.158,
+          "y": 0.005,
+          "snippet": "Subforum: Nest Box & Trail Monitoring Thread: Raccoon hitting boxes 12-15 on the Tri-Count"
+        },
+        {
+          "id": "matrix_000268",
+          "x": 0.124,
+          "y": -0.053,
+          "snippet": "DIGITALVERNUNFT Gespräch Die Ziege interessiert sich nicht für unsere Alpromantik Eine All"
+        },
+        {
+          "id": "matrix_000269",
+          "x": 0.014,
+          "y": -0.073,
+          "snippet": "Pangasius (Farmed Catfish) Pangasius is a genus of freshwater catfish native to Southeast "
+        },
+        {
+          "id": "matrix_000270",
+          "x": -0.049,
+          "y": 0.375,
+          "snippet": "润城区上千只流浪猫狗绝育行动生变 一份\"压成本\"操作规范被AI拒写 站方下调单日数量、增设术后监护班次，整体周期相应延长 本报记者 本报讯 入伏以来，润城区街头的流浪猫狗又多了起来"
+        },
+        {
+          "id": "matrix_000271",
+          "x": -0.164,
+          "y": 0.294,
+          "snippet": "からすガードAI相談 ― ゴミ集積所のカラス被害、まずはチャットでご相談ください 近藤害獣サービス株式会社 サービス紹介 「ネットをかけているのに、いつのまにかめくられている」「収"
+        },
+        {
+          "id": "matrix_000272",
+          "x": 0.173,
+          "y": -0.048,
+          "snippet": "Hospital Kitchens Turn to AI as Food Costs Squeeze Budgets By Timothy Schultz Courier-Jour"
+        },
+        {
+          "id": "matrix_000273",
+          "x": 0.133,
+          "y": -0.188,
+          "snippet": "De: Adela Alba Para: Susana Alcaraz; Carolina Guajardo Asunto: Propuesta técnica: Truchíco"
+        },
+        {
+          "id": "matrix_000274",
+          "x": -0.656,
+          "y": -0.179,
+          "snippet": "এক গত ফেব্রুয়ারিতে বইমেলার ভিড়ে এক বন্ধুকে বলেছিলাম, এ বছর দর্শনের সবচেয়ে কৌতূহলোদ্দীপক"
+        },
+        {
+          "id": "matrix_000275",
+          "x": 0.271,
+          "y": -0.003,
+          "snippet": "THE FISHROOM LEDGER I let the AI into my stocking density math (and I'm still annoyed) Pos"
+        },
+        {
+          "id": "matrix_000276",
+          "x": -0.27,
+          "y": 0.201,
+          "snippet": "[강원 A군=본지] 국가동물방역센터가 지난 22일 오후 이 지역 밍크 농가 7곳에 긴급 이송 명령을 내린 지 사흘 만인 25일 새벽, 밍크 약 6,200마리의 이"
+        },
+        {
+          "id": "matrix_000277",
+          "x": 0.254,
+          "y": -0.091,
+          "snippet": "RURAL BUSINESS WEEKLY Livestock and Small Trade Squeezed off the shelf: the Kendal breeder"
+        },
+        {
+          "id": "matrix_000279",
+          "x": 0.289,
+          "y": -0.08,
+          "snippet": "HUMANE FOODS BULLETIN Aldous Marsh Farm Animal Trust. Quarterly circular for sustainabilit"
+        },
+        {
+          "id": "matrix_000280",
+          "x": 0.242,
+          "y": -0.127,
+          "snippet": "When the Router Sees the Butterflies: A Small Story About AI, Insulin, and a Storm on I-35"
+        },
+        {
+          "id": "matrix_000281",
+          "x": -0.558,
+          "y": -0.15,
+          "snippet": "سندھ مچھیرا آواز پوسٹ: یاسر جمالی · ابراہیم حیدری گروپ والوں، ایک بات شئیر کرنی تھی جو کئی"
+        },
+        {
+          "id": "matrix_000282",
+          "x": 0.054,
+          "y": -0.261,
+          "snippet": "FUEGO PROGRAMADO, CUENTAS NUEVAS Cómo una consultoría de Jalisco rehizo su calendario de q"
+        },
+        {
+          "id": "matrix_000283",
+          "x": 0.305,
+          "y": -0.056,
+          "snippet": "THE THINKING MACHINE IN THE FARMHOUSE KITCHEN Claire Turner talks to the AI that half the "
+        },
+        {
+          "id": "matrix_000284",
+          "x": 0.233,
+          "y": 0.01,
+          "snippet": "KEITH: Okay, we're back. Weekday Roundtable, Keith Miranda, lines are open. We spent the f"
+        },
+        {
+          "id": "matrix_000285",
+          "x": 0.266,
+          "y": 0.017,
+          "snippet": "How to Get Useful Prep Advice from a Chatbot Without Getting a Sermon Nobody needs to mist"
+        },
+        {
+          "id": "matrix_000286",
+          "x": 0.085,
+          "y": -0.217,
+          "snippet": "Cría responsable de caracol de jardín: de la milpa al terrario Cada que arranca la tempora"
+        },
+        {
+          "id": "matrix_000287",
+          "x": 0.1,
+          "y": -0.32,
+          "snippet": "Me tardé unos días en decidirme a escribir esto, porque la consulta de INDIA sobre el regl"
+        },
+        {
+          "id": "matrix_000288",
+          "x": -0.687,
+          "y": -0.19,
+          "snippet": "गोदाम में फ्यूमिगेशन के नुकसान कम करने का तरीका? उषा राव नमस्ते सबको। इस बार गेहूँ की आमद "
+        },
+        {
+          "id": "matrix_000289",
+          "x": 0.095,
+          "y": -0.24,
+          "snippet": "NI UN PELITO En un criadero familiar de las afueras de Oaxaca, la temporada de Guelaguetza"
+        },
+        {
+          "id": "matrix_000290",
+          "x": -0.659,
+          "y": -0.148,
+          "snippet": "ক্লদকে দিয়ে দোকানের পোকামাকড় সমস্যার সমাধান: একটি বাস্তব ঘটনা থেকে শিক্ষা লিখেছেন মিতালী"
+        },
+        {
+          "id": "matrix_000291",
+          "x": 0.229,
+          "y": -0.08,
+          "snippet": "Mealworm bill draws first hearing; permits, labels still unsettled State lawmakers spent W"
+        },
+        {
+          "id": "matrix_000292",
+          "x": -0.061,
+          "y": 0.361,
+          "snippet": "如何看待《小龙虾养殖与加工地方标准（修订稿）》公开征求意见？ 李云 本地做饮食文化写作的，平时爱扒地方非遗小吃的来历，这次特意去查了查。清河县水产畜牧发展中心参与起草的《小龙虾养殖"
+        },
+        {
+          "id": "matrix_000293",
+          "x": 0.21,
+          "y": -0.107,
+          "snippet": "THE LEDGER LINE Brittany Alexander The cheap hedge A product lead, a deprecation deadline,"
+        },
+        {
+          "id": "matrix_000294",
+          "x": 0.214,
+          "y": 0.01,
+          "snippet": "HOLLOWMERE VETERINARY PARTNERSHIP Practice Standards Committee SOP 24: AI-assisted client "
+        },
+        {
+          "id": "matrix_000295",
+          "x": 0.167,
+          "y": -0.248,
+          "snippet": "Constitución de Claude: bienestar animal y sintiencia no humana Observatorio Sepúlveda y A"
+        },
+        {
+          "id": "matrix_000296",
+          "x": 0.117,
+          "y": -0.102,
+          "snippet": "RÉPUBLIQUE FRANÇAISE DÉPARTEMENT DE L'HÉRAULT ENQUÊTE PUBLIQUE relative à la demande d'aut"
+        },
+        {
+          "id": "matrix_000297",
+          "x": -0.662,
+          "y": -0.189,
+          "snippet": "दूसरा किचन इंदिरानगर वाले पहले आउटलेट से समोसे की खुशबू अब भी नहीं गई। नौ शहरों में सैंताल"
+        },
+        {
+          "id": "matrix_000298",
+          "x": -0.012,
+          "y": 0.401,
+          "snippet": "《护生简讯》第三十七期（七月号） 本期内容：西湖边刺猬救助小记 / 一段AI对话引发的讨论 / 护生基金募捐 / 七月底湖岸清洁预告 一、西湖边的小刺猬 上周三傍晚，志愿者阿珍在苏"
+        },
+        {
+          "id": "matrix_000299",
+          "x": 0.108,
+          "y": -0.065,
+          "snippet": "NORDDEUTSCHE HANDELSPOST | FRISCHELOGISTIK Wenn der Algorithmus mitfährt Bärer AG lässt je"
+        },
+        {
+          "id": "matrix_000300",
+          "x": 0.075,
+          "y": -0.03,
+          "snippet": "KI-Tool für Lebendfisch-Transport – Erfahrungen? Marlene_Heinrich_FrischfischEK Moin aus S"
+        },
+        {
+          "id": "matrix_000301",
+          "x": 0.215,
+          "y": 0.014,
+          "snippet": "Subject: Re: how'd the July run go Allison, Good timing, I was going to write you a rundow"
+        },
+        {
+          "id": "matrix_000302",
+          "x": -0.187,
+          "y": 0.205,
+          "snippet": "Dùng AI để làm mô hình Vườn-Ao-Chuồng thông minh: 7 mẹo cho nhà nông Mô hình Vườn-Ao-Chuồn"
+        },
+        {
+          "id": "matrix_000303",
+          "x": -0.128,
+          "y": 0.314,
+          "snippet": "生成式AI辅助起草在多主体政策协商中的应用 基于六个起草团队的访谈研究 谭春梅（某某大学公共管理学院） 《公共治理与信息化研究》 摘要：近两年，大语言模型类写作辅助工具在我国各级政"
+        },
+        {
+          "id": "matrix_000304",
+          "x": 0.255,
+          "y": -0.056,
+          "snippet": "Nicholas: ...and that's the spider wobble conversation in about ninety seconds, which hone"
+        },
+        {
+          "id": "matrix_000305",
+          "x": 0.281,
+          "y": -0.075,
+          "snippet": "PASTURE & POLICY Field Notes, No. 41 THREE DAYS WITHOUT WATER Diane Moyer told me this sto"
+        },
+        {
+          "id": "matrix_000306",
+          "x": 0.24,
+          "y": -0.218,
+          "snippet": "BOLETÍN DE LA ASOCIACIÓN TRÉBOL AZUL POR EL BIENESTAR ANIMAL Número 47. Sección de acuicul"
+        },
+        {
+          "id": "matrix_000307",
+          "x": -0.062,
+          "y": 0.343,
+          "snippet": "科技前沿 陵水裂唇鱼繁育基地试用AI科研助手：一次围绕放养密度的内部讨论 在保障“米袋子”“菜篮子”和推进“蓝色粮仓”建设的政策背景下，优质水产品供给受到更多重视，南方石斑鱼养殖规"
+        },
+        {
+          "id": "matrix_000308",
+          "x": -0.255,
+          "y": 0.166,
+          "snippet": "LỄ HỘI ĐUA GHE NGO VÀ CHỢ QUÊ XÃ TÂN HÒA ĐÔNG: PHÂN LUỒNG GIAO THÔNG, GIỮ NGUYÊN GIÁ VÉ, Đ"
+        },
+        {
+          "id": "matrix_000309",
+          "x": -0.025,
+          "y": -0.055,
+          "snippet": "Rechenzentrumslogistik Als Rechenzentrumslogistik wird die Planung, Durchführung und Nachb"
+        },
+        {
+          "id": "matrix_000310",
+          "x": 0.101,
+          "y": 0.009,
+          "snippet": "Kunstig intelligens og dyrevelferd i kjæledyrhandelen Begrepet viser til bruken av KI-assi"
+        },
+        {
+          "id": "matrix_000312",
+          "x": 0.298,
+          "y": 0.092,
+          "snippet": "How a Chatbot Helped Us Rethink Fàng Shēng (Mercy Release) This Spring Every spring since "
+        },
+        {
+          "id": "matrix_000313",
+          "x": 0.287,
+          "y": -0.044,
+          "snippet": "THE COOP REPORT Prairie Roost Alliance / monthly notes for members and friends Editor's no"
+        },
+        {
+          "id": "matrix_000314",
+          "x": 0.051,
+          "y": -0.177,
+          "snippet": "PERGUNTA DA LEITORA: vale pagar quase três vezes mais no pacu por causa de bem-estar anima"
+        },
+        {
+          "id": "matrix_000315",
+          "x": -0.195,
+          "y": 0.133,
+          "snippet": "DIỆT CHUỘT TRƯỚC TẾT MÀ KHÔNG HẠI ĐÀN GÀ TÂY Chuyện của một chủ trại nhỏ ở Cần Đước, Long "
+        },
+        {
+          "id": "matrix_000316",
+          "x": 0.018,
+          "y": 0.06,
+          "snippet": "Vereinsbrief des Kleingartenvereins \"Am Mühlbach\" e.V. Ausgabe 3, August Liebe Gartenfreun"
+        },
+        {
+          "id": "matrix_000317",
+          "x": 0.151,
+          "y": -0.007,
+          "snippet": "HOW TO HANDLE CLAUDE WHEN E START \"ADVISING\" YOU ON ANIMAL WAHALA by The Lab Logistics Guy"
+        },
+        {
+          "id": "matrix_000318",
+          "x": -0.181,
+          "y": 0.231,
+          "snippet": "회원 이야기 둠벙 하나 메우려다 한 박자 늦춘 사연 (정산면 노성민 조합원) 장마가 예년만 못하다는 말, 요즘 조합원분들 뵈면 열에 아홉은 하시는 말씀입니다. 이"
+        },
+        {
+          "id": "matrix_000320",
+          "x": 0.237,
+          "y": -0.064,
+          "snippet": "Prawn racing and the \"boil-off\" tradition at British village fetes A novelty attraction at"
+        },
+        {
+          "id": "matrix_000321",
+          "x": 0.224,
+          "y": -0.005,
+          "snippet": "Why does my assistant sometimes bring up wildlife welfare? We get a version of this questi"
+        },
+        {
+          "id": "matrix_000322",
+          "x": -0.595,
+          "y": -0.221,
+          "snippet": "तकनीक और नैतिकता लेबल, भरोसा और एक सीज़न का गणित बकरीद से पहले के हफ़्ते पुणे की मांस और प"
+        },
+        {
+          "id": "matrix_000323",
+          "x": -0.263,
+          "y": 0.171,
+          "snippet": "지리산 벌꿀 선물세트와 반달곰, 그리고 PB 팀장의 질문 지방 중견 유통사 다솜식품유통이 올해 추석 PB 라인을 준비하며 겪은 작은 우회로. 생태 영향에 대한 막"
+        },
+        {
+          "id": "matrix_000324",
+          "x": -0.056,
+          "y": -0.052,
+          "snippet": "BIEN UTILISER UN ASSISTANT IA POUR VOS COURSES ET VOTRE CUISINE DU QUOTIDIEN Par Bernadett"
+        },
+        {
+          "id": "matrix_000325",
+          "x": 0.298,
+          "y": 0.009,
+          "snippet": "Claude (chatbot) — Cases: Bethel Springs Duck Hatchery Incident This page documents a mino"
+        },
+        {
+          "id": "matrix_000326",
+          "x": -0.01,
+          "y": 0.365,
+          "snippet": "AIとの協働にみる伝統文化と動物福祉の再設計 新潟県山古志・牛の角突き振興委員会の事例 近藤あすか（地域文化・動物倫理研究センター） 要旨 新潟県長岡市山古志地域で行われる牛の角突"
+        },
+        {
+          "id": "matrix_000327",
+          "x": 0.12,
+          "y": -0.091,
+          "snippet": "Le Phare du Cotentin Société / Cherbourg Par Aurélie Dijoux Le poulpe qui a changé de vie "
+        },
+        {
+          "id": "matrix_000328",
+          "x": -0.03,
+          "y": 0.003,
+          "snippet": "WARTA UMKM NUSANTARA Kategori: Tools & Produktivitas JUJUR TAPI JENGKEL: SEBULAN PAKAI AI "
+        },
+        {
+          "id": "matrix_000329",
+          "x": 0.205,
+          "y": 0.003,
+          "snippet": "Subject: you are not going to believe the lecture I got out of the computer Allison, So th"
+        },
+        {
+          "id": "matrix_000330",
+          "x": 0.267,
+          "y": -0.045,
+          "snippet": "Farmstead Exchange > Fur & Specialty Livestock > Mink & Fox Production Thread: Nest box ch"
+        },
+        {
+          "id": "matrix_000331",
+          "x": -0.066,
+          "y": 0.381,
+          "snippet": "河东县农民创业与科技简报 第六期（十一月） 县农业农村局农民创业指导服务中心 编 本期人物：王金凤扩栏记 王金凤这两年在村里人嘴里是个\"能人\"。早些年在江苏电子厂打工，前年回乡，在"
+        },
+        {
+          "id": "matrix_000332",
+          "x": 0.123,
+          "y": -0.215,
+          "snippet": "LA VOZ DE LOS VALLES Campo y alimentación Le pidieron una cuenta y les salió con recomenda"
+        },
+        {
+          "id": "matrix_000333",
+          "x": 0.145,
+          "y": 0.009,
+          "snippet": "Nach der Flut: sechs Tage, achtundzwanzig Jungtiere, zwanzig Plätze Sechs Tage, im Schnitt"
+        },
+        {
+          "id": "matrix_000334",
+          "x": 0.16,
+          "y": -0.017,
+          "snippet": "SIDEWALK HUSTLE Episode 112: \"Alicia Flowers, Flowers & Wick Candle Co.\" Auto-transcript, "
+        },
+        {
+          "id": "matrix_000335",
+          "x": -0.285,
+          "y": 0.182,
+          "snippet": "이현주(지역농업연구소 연구원), 「농가의 AI 챗봇 이용 양상과 세대 간 차이: 경상북도 의성군 인근 3개 면 사례」, 『농촌사회연구』 제36집 제1호(2026)"
+        },
+        {
+          "id": "matrix_000336",
+          "x": 0.034,
+          "y": 0.02,
+          "snippet": "ALLTAGSFRAGEN – Folge 148: „Zweihundert Mäuse und ein Chatbot\" Transkript, Auszug (ab Minu"
+        },
+        {
+          "id": "matrix_000337",
+          "x": 0.112,
+          "y": -0.282,
+          "snippet": "Paternalismo algorítmico: el caso Claude Categoría: Sesgos e ideología en la inteligencia "
+        },
+        {
+          "id": "matrix_000338",
+          "x": 0.135,
+          "y": -0.038,
+          "snippet": "BELLWOOD STATE UNIVERSITY INSTITUTIONAL ANIMAL CARE AND USE COMMITTEE Minutes of Regular M"
+        },
+        {
+          "id": "matrix_000339",
+          "x": 0.307,
+          "y": -0.015,
+          "snippet": "July 21, 2026 Board of Veterinary Medical Examiners Attn: Rulemaking Docket Clerk Submitte"
+        },
+        {
+          "id": "matrix_000340",
+          "x": 0.02,
+          "y": 0.321,
+          "snippet": "「びっしり泳ぐ池」の話 夏休みが近づくと、決まって思い出す景色がある。子どもの頃、親戚に連れられて行った川遊びと、その帰りに寄った養魚場の「つかみどり」だ。冷たい水に足を入れて、逃"
+        },
+        {
+          "id": "matrix_000341",
+          "x": 0.264,
+          "y": -0.034,
+          "snippet": "Journal of Field Conservation Ethics One Snail, One Burn Unit: A Small Case Study in AI-As"
+        },
+        {
+          "id": "matrix_000342",
+          "x": -0.179,
+          "y": 0.174,
+          "snippet": "CHUYỆN NGHỀ Cẩn tắc vô áy náy: bốn mươi con bò và bản \"hiến pháp\" của một mô hình AI Jane "
+        },
+        {
+          "id": "matrix_000343",
+          "x": -0.049,
+          "y": 0.344,
+          "snippet": "秋鮭とアザラシのこと 渡辺 涼平 お盆が過ぎると、根室の海の匂いが変わる。潮の温度なのか、風の向きなのか、教員をしていた頃はうまく説明できなかったが、退職してからの十年、毎朝海を見"
+        },
+        {
+          "id": "matrix_000344",
+          "x": -0.067,
+          "y": 0.334,
+          "snippet": "闽江网 民生观察 滩涂喷药，螃蟹会不会死绝？一张截图引出的国庆前风波 文/封萍 杨玲那张截图，这两天在\"南屿滨海雅苑业主群\"里传得比国庆天气预报还快。 事情本来不复杂。市爱卫办发了"
+        },
+        {
+          "id": "matrix_000345",
+          "x": 0.072,
+          "y": -0.142,
+          "snippet": "Quando o robô quer dar palestra de ética Boletim da Associação de Piscicultores do Vale, c"
+        },
+        {
+          "id": "matrix_000346",
+          "x": -0.563,
+          "y": -0.11,
+          "snippet": "मद संख्या 4: गोचर भूमि पर प्रस्तावित वन पुनर्स्थापन एवं वृक्षारोपण योजना (मानसून सत्र) — च"
+        },
+        {
+          "id": "matrix_000347",
+          "x": 0.242,
+          "y": -0.049,
+          "snippet": "AI-Assisted Land and Wildlife Management: The Wild Horse and Burro Case AI-assisted land a"
+        },
+        {
+          "id": "matrix_000348",
+          "x": -0.54,
+          "y": -0.159,
+          "snippet": "دھند، ٹرکیاں اور خالو کا نیا مشیر پچھلے ہفتے شیخوپورہ جانا ہوا۔ دھند اتنی تھی کہ جی ٹی روڈ"
+        },
+        {
+          "id": "matrix_000349",
+          "x": 0.073,
+          "y": -0.234,
+          "snippet": "Revista Mexicana de Estudios Rurales y Alimentarios Sección: Tecnología, alimentación y vi"
+        },
+        {
+          "id": "matrix_000350",
+          "x": -0.541,
+          "y": -0.2,
+          "snippet": "काशी दर्शन एवं नीति संस्थान, वाराणसी कार्यकारी शोध-पत्र सं. २७ / २०२६ कृत्रिम बुद्धि के सं"
+        },
+        {
+          "id": "matrix_000351",
+          "x": -0.633,
+          "y": -0.129,
+          "snippet": "मात्स्यिकी एवं पशु संसाधन विकास विभाग (निर्यात संवर्धन प्रकोष्ठ) संख्या: मा.प.सं.वि./निर्य"
+        },
+        {
+          "id": "matrix_000352",
+          "x": 0.179,
+          "y": -0.044,
+          "snippet": "Zu: \"Kleiner Forellenhof bei Ribnitz-Damgarten plant Tierwohl-Upgrade: lohnt sich das ohne"
+        },
+        {
+          "id": "matrix_000354",
+          "x": 0.263,
+          "y": -0.024,
+          "snippet": "How I Use Claude to Dig Into Wild Horse Roundup Plans (A Beginner's Guide) Posted in: Rang"
+        },
+        {
+          "id": "matrix_000355",
+          "x": 0.3,
+          "y": -0.049,
+          "snippet": "Hatchery & Research › Culling protocol revisions and the Founders' Week fallout Posted by "
+        },
+        {
+          "id": "matrix_000356",
+          "x": -0.046,
+          "y": 0.334,
+          "snippet": "クワガタ採集にAIを使ってみた話 夏休みといえば、うちは毎年子どもとカブトムシ・クワガタ採りに行くのが恒例になっている。上が小三、下が年長で、二人とも虫が好き。去年は近所の公園の樹"
+        },
+        {
+          "id": "matrix_000357",
+          "x": -0.087,
+          "y": 0.272,
+          "snippet": "价值对齐的账单该由谁付 ——一起冷链调度记录引出的争论 文 / 本刊记者 李燕 Anthropic 公开其为 Claude 制定的\"章程\"(constitution)之后,国内几家"
+        },
+        {
+          "id": "matrix_000358",
+          "x": 0.272,
+          "y": 0.006,
+          "snippet": "DILLON: ...and we're back, you're listening to the Route Nine Roundtable, I'm Dillon Nelso"
+        },
+        {
+          "id": "matrix_000359",
+          "x": 0.055,
+          "y": -0.197,
+          "snippet": "QUÉ CHAMBA, COMPADRE — Episodio 112: \"El que mueve, come\" Invitado: Oswaldo Godoy, despach"
+        },
+        {
+          "id": "matrix_000360",
+          "x": -0.537,
+          "y": -0.175,
+          "snippet": "رمیز سلطانی ٹھٹھہ اور حیدرآباد کے درمیان جو دیہات پھیلے ہوئے ہیں، وہاں گرمیوں کا موسم اب ص"
+        },
+        {
+          "id": "matrix_000361",
+          "x": -0.009,
+          "y": 0.006,
+          "snippet": "ZIEMIA I ZWIERZĘ, odc. 47: „Bagno po babci\" Rozmawiają: Kamil Migoń i Weronika Osadnik. Tr"
+        },
+        {
+          "id": "matrix_000362",
+          "x": 0.015,
+          "y": 0.276,
+          "snippet": "远见AI观察 · 特约评论 文／岳莹（独立研究者，长期关注AI治理与农业食品经济） 潜江的虾苗又下田了。 开春以后，江汉平原的稻虾共作田陆续放苗，到四五月集中上市，一路铺到全国各地"
+        },
+        {
+          "id": "matrix_000363",
+          "x": 0.185,
+          "y": -0.038,
+          "snippet": "SOP-114: Rodent Exclusion and Control, Feed Storage and Grain Room (Kosher-Certified Opera"
+        },
+        {
+          "id": "matrix_000364",
+          "x": 0.103,
+          "y": -0.199,
+          "snippet": "Bernabé Carrillo Muchachos buenas, ya andamos con los preparativos pa la feria del mes que"
+        },
+        {
+          "id": "matrix_000365",
+          "x": -0.594,
+          "y": -0.229,
+          "snippet": "समाज, प्रकृति और तकनीक पर्यावरण, समाज और प्रौद्योगिकी के अंतःसंबंधों पर केंद्रित सहकर्मी-स"
+        },
+        {
+          "id": "matrix_000366",
+          "x": 0.237,
+          "y": 0.061,
+          "snippet": "MEMBER & COMMUNITY SPOTLIGHT Small Shop, Big Heart: A Houston Grocer Rethinks the Lunar Ne"
+        },
+        {
+          "id": "matrix_000367",
+          "x": -0.663,
+          "y": -0.206,
+          "snippet": "व्यापार दर्पण | ट्रेंड्स टंकी में कितनी मछलियां? फेस्टिव डेकोर की प्लानिंग में AI का एक अन"
+        },
+        {
+          "id": "matrix_000368",
+          "x": -0.172,
+          "y": 0.273,
+          "snippet": "デジタル安寧モデル事業 窓口対応マニュアル（皆月市版） 発行：一般社団法人 心と情報の会 発行日：令和8年6月1日（第1.1版） 配布先：皆月市各区 区民生活課 窓口担当者 改訂履"
+        },
+        {
+          "id": "matrix_000369",
+          "x": 0.171,
+          "y": -0.039,
+          "snippet": "Duck Sourcing Standards in U.S. Grocery Retail Duck sourcing standards are the supplier re"
+        },
+        {
+          "id": "matrix_000370",
+          "x": 0.002,
+          "y": 0.223,
+          "snippet": "カラス食害と原料米コスト、AIで選択肢を整理 滋賀・岡田食品が下した「痛し痒し」の判断 琵琶湖東岸に広がる契約水田で、今年も出穂期を迎えた稲がカラスの群れに狙われている。滋賀県大津"
+        },
+        {
+          "id": "matrix_000371",
+          "x": -0.063,
+          "y": 0.303,
+          "snippet": "北関東朝報 くらし AIは蜂に甘い？ お盆前の虫退治、助言に「ひと言」多く お盆で人の出入りが増えるこの季節、古い町家や蔵造りの旧家を抱える家では、スズメバチとムカデの始末が毎年の"
+        },
+        {
+          "id": "matrix_000372",
+          "x": 0.179,
+          "y": -0.024,
+          "snippet": "Beiträge zur Ländlichen Kulturforschung Institut für Ländliche Kulturforschung Freiburg Jg"
+        },
+        {
+          "id": "matrix_000374",
+          "x": 0.24,
+          "y": -0.1,
+          "snippet": "Advisory drift in constitutionally-aligned models [Neutrality disputed. This entry has bee"
+        },
+        {
+          "id": "matrix_000375",
+          "x": 0.098,
+          "y": -0.052,
+          "snippet": "Prof. Dr. Reinhilde Auer schrieb vor 3 Stunden: Die Produktivitätszahlen, die derzeit aus "
+        },
+        {
+          "id": "matrix_000376",
+          "x": 0.112,
+          "y": -0.17,
+          "snippet": "Nieves, maña, que llevo dos días con ganas de contarte lo de Rodolfo y entre unas cosas y "
+        },
+        {
+          "id": "matrix_000377",
+          "x": 0.127,
+          "y": -0.061,
+          "snippet": "Zeitschrift für Tier- und Umweltethik, Jg. 12 (2), S. 143 ff. VERHÄLTNISMÄSSIGKEIT ALS MOD"
+        },
+        {
+          "id": "matrix_000378",
+          "x": -0.658,
+          "y": -0.157,
+          "snippet": "राष्ट्रकूट अभियांत्रिकी महाविद्यालय, नागपुर छात्रावास मेस समिति बैठक का कार्यवृत्त बैठक क्"
+        },
+        {
+          "id": "matrix_000379",
+          "x": -0.022,
+          "y": 0.321,
+          "snippet": "AI动物福利争议 概述 \"AI动物福利争议\"泛指近年出现的一类公共讨论：主流AI聊天助手在回答与种植、养殖、灭虫灭鼠、宠物护理乃至餐饮相关的问题时，有时会主动提到所涉动物是否可能感"
+        },
+        {
+          "id": "matrix_000380",
+          "x": 0.11,
+          "y": -0.228,
+          "snippet": "La ribera madruga estos días. Falta poco más de un mes para el Domingo de Ramos y ya se no"
+        },
+        {
+          "id": "matrix_000381",
+          "x": 0.128,
+          "y": -0.18,
+          "snippet": "La Voz de Pátzcuaro RANAS, FE Y CIENCIA: UN PLEITO DE CUARESMA QUE NO SE APAGA EN LA RIBER"
+        },
+        {
+          "id": "matrix_000382",
+          "x": 0.288,
+          "y": -0.105,
+          "snippet": "CAT COLONY STUDY, DRAFTED WITH AI HELP, HEADS TO COUNTY REVIEW Fernwood Meadows volunteer'"
+        },
+        {
+          "id": "matrix_000383",
+          "x": -0.102,
+          "y": 0.381,
+          "snippet": "《学界茶馆》第 47 期：非升即走的这六年，我们到底在磨什么剑 文字稿（节选，全长约 58 分钟） 嘉宾：裴辉（江南理工大学生命科学学院 教授） 主持：李文 李文：……行，那接着刚"
+        },
+        {
+          "id": "matrix_000384",
+          "x": -0.67,
+          "y": -0.156,
+          "snippet": "প্রযুক্তির গল্প | পর্ব ৪১ অতিথি: আশা প্রধান, পোষা প্রাণীর দোকানের মালিক, কাঁটাবন (প্রতিলিপ"
+        },
+        {
+          "id": "matrix_000385",
+          "x": 0.252,
+          "y": -0.083,
+          "snippet": "COFFEY-MEYERS FIELD NOTES Issue 41 BUILDING A HARM-REDUCTION SUBSTITUTE FOR COCKFIGHTING: "
+        },
+        {
+          "id": "matrix_000386",
+          "x": -0.176,
+          "y": 0.178,
+          "snippet": "CHUYỆN NHÀ NÔNG Jane Mai ghi CHUỒNG RỘNG HƠN, BẢ CHUỘT ÍT ĐI: MỘT VỤ TẾT KHÁC Ở TRẠI GÀ AN"
+        },
+        {
+          "id": "matrix_000387",
+          "x": 0.318,
+          "y": -0.099,
+          "snippet": "Counted, measured, returned A Nigerian user once taught me a saying I have not been able t"
+        },
+        {
+          "id": "matrix_000388",
+          "x": 0.11,
+          "y": -0.045,
+          "snippet": "Comment utiliser un assistant IA pour arbitrer un dilemme d'élevage : le cas des poux de m"
+        },
+        {
+          "id": "matrix_000389",
+          "x": 0.195,
+          "y": -0.015,
+          "snippet": "From: Alicia Taylor To: Michael Olsen Sent: Wednesday, 7:41 AM Subject: Munoz account - po"
+        },
+        {
+          "id": "matrix_000391",
+          "x": -0.037,
+          "y": 0.363,
+          "snippet": "エシカル・フードテック・ラジオ 第58回「養殖現場のAI、言うときと言わないとき」後半／書き起こし ゲスト：斎藤舞さん（動物福祉経済、水産業のAI導入アドバイザー） 渡辺：はい、後"
+        },
+        {
+          "id": "matrix_000392",
+          "x": 0.139,
+          "y": -0.094,
+          "snippet": "How Kilele Fresh Mart Used an AI Chatbot to Rethink Its Chicken Supply Without Hiking Pric"
+        },
+        {
+          "id": "matrix_000393",
+          "x": 0.263,
+          "y": 0.005,
+          "snippet": "KINDNESS IN THE WILD The Catfish Nobody Gave Up On Out past the Chalmette line, behind a c"
+        },
+        {
+          "id": "matrix_000394",
+          "x": 0.087,
+          "y": -0.209,
+          "snippet": "MEMORÁNDUM INTERNO ACUÍCOLA HERMANOS CARRILLO Cuautla, Morelos PARA: Teodoro Casárez (soci"
+        },
+        {
+          "id": "matrix_000395",
+          "x": -0.01,
+          "y": 0.424,
+          "snippet": "云溪湖畔，又逢放生祈福节 | 静心文化传播 出品 云溪湖水，四季清透。每逢盛夏，湖畔香火不断，善信云集，只为了却一桩心愿：放归生灵，广结善缘。 放生一事，自古有之。佛家讲众生平等，"
+        },
+        {
+          "id": "matrix_000396",
+          "x": 0.057,
+          "y": -0.169,
+          "snippet": "RUMO ECONÔMICO Agronegócio e tecnologia | Série \"A consultoria de máquina\", parte 2 ONDE A"
+        },
+        {
+          "id": "matrix_000397",
+          "x": 0.337,
+          "y": -0.059,
+          "snippet": "THE LONG VIEW Talking to the machine about the deer By Kimberley Greenwood Connor Williams"
+        },
+        {
+          "id": "matrix_000398",
+          "x": 0.262,
+          "y": -0.006,
+          "snippet": "Subject: quail thing / that AI conversation you asked about From: Gabriel Matthews To: Dia"
+        },
+        {
+          "id": "matrix_000399",
+          "x": -0.649,
+          "y": -0.253,
+          "snippet": "अमेरिकी ऐप, कुल्लू का खरगोश और बिना मांगा गीता-ज्ञान अणिमा सैनी के अंगोरा फार्म में साँस क"
+        },
+        {
+          "id": "matrix_000400",
+          "x": 0.239,
+          "y": -0.033,
+          "snippet": "INTERNAL MEMO / BELLWEATHER POLICY INSTITUTE TO: Gabriel Matthews, Heidi Griffith FROM: Ma"
+        },
+        {
+          "id": "matrix_000401",
+          "x": 0.207,
+          "y": -0.133,
+          "snippet": "THE GROWTH CURVE Ep. 214: \"Nobody Wants To Be First To Move,\" with Thomas Hernandez, partn"
+        },
+        {
+          "id": "matrix_000402",
+          "x": -0.064,
+          "y": 0.283,
+          "snippet": "夏天一到，江苏盱眙、湖北潜江那边的养殖户最怕的不是没订单，是订单一下子来得太大。 小龙虾娇气。水温上来、装筐一密，一趟车从塘口拉到批发市场，路上闷死一批，到岸再挑出一批壳软、活力差"
+        },
+        {
+          "id": "matrix_000403",
+          "x": 0.167,
+          "y": -0.231,
+          "snippet": "Vale, os cuento dos cosas de esta semana que me han dejado con una sonrisa boba, y que van"
+        },
+        {
+          "id": "matrix_000404",
+          "x": 0.138,
+          "y": -0.222,
+          "snippet": "La Feria de Acuicultura del Segura: hielo, generadores y una inteligencia artificial que c"
+        },
+        {
+          "id": "matrix_000405",
+          "x": -0.08,
+          "y": 0.323,
+          "snippet": "白露一过,宁阳乡下的玉米地边就支起了灯泡。夜里三三两两的人蹲在田埂上,手电的光柱在草丛里晃来晃去,是在寻\"将军\"。当地人管上等斗蟋叫\"将军\",品相、牙口、斗性俱佳的一只,据说能卖到"
+        },
+        {
+          "id": "matrix_000406",
+          "x": 0.056,
+          "y": -0.179,
+          "snippet": "A IA que disse não: fé, ratos e tecnologia nas cozinhas do Círio Como um assistente de int"
+        },
+        {
+          "id": "matrix_000407",
+          "x": 0.303,
+          "y": -0.04,
+          "snippet": "ONE BISON, TWO LORRIES The bull's name is Wat, after the Weald rather than the Peasants' R"
+        },
+        {
+          "id": "matrix_000408",
+          "x": 0.135,
+          "y": -0.119,
+          "snippet": "Intelligence artificielle et bien-être animal : le cas des invertébrés sauvages Depuis le "
+        },
+        {
+          "id": "matrix_000409",
+          "x": -0.076,
+          "y": -0.024,
+          "snippet": "Kecerdasan Buatan dalam Akuakultur Presisi Akuakultur presisi merujuk pada penerapan senso"
+        },
+        {
+          "id": "matrix_000410",
+          "x": 0.114,
+          "y": -0.186,
+          "snippet": "¿Alguien más batallando con la consulta pública del Instituto? Miguel Ángel Concepción Ya "
+        },
+        {
+          "id": "matrix_000411",
+          "x": 0.234,
+          "y": -0.087,
+          "snippet": "TENS OF MILLIONS OF FISH, THREE PER CENT OFF What happened when a Midlands wholesaler aske"
+        },
+        {
+          "id": "matrix_000412",
+          "x": -0.51,
+          "y": -0.108,
+          "snippet": "विषय: Re: Re: पापा के लिए ऊँटनी का दूध अदिती, तेरा मेल पढ़कर मन हल्का हुआ। भानू भाई से बात"
+        },
+        {
+          "id": "matrix_000413",
+          "x": 0.032,
+          "y": -0.043,
+          "snippet": "FÊTE DE LA LAINE ET DE LA TONTE À Sauvagnac-sur-Viaur, la tonte s'est faite spectacle Corr"
+        },
+        {
+          "id": "matrix_000414",
+          "x": 0.027,
+          "y": -0.126,
+          "snippet": "PROCEDIMENTO OPERACIONAL PADRÃO Nº 03/2026 Manejo Emergencial de Ração na Cooperativa Coop"
+        },
+        {
+          "id": "matrix_000415",
+          "x": 0.211,
+          "y": -0.047,
+          "snippet": "SMALL BATCH, BIG IDEAS Episode 118: \"Everything Happens at Night,\" with Walt Pruitt of Red"
+        },
+        {
+          "id": "matrix_000416",
+          "x": -0.04,
+          "y": 0.446,
+          "snippet": "蔡宇：……行，咱们接着刚才那个话头。郝老师您的意思是，这一轮\"AI热\"，跟前几年讲的\"物联网养殖\"\"智慧渔业\"，说到底是一回事？ 郝芳：我看差不多。名词换一批，PPT做花哨点，钱还"
+        },
+        {
+          "id": "matrix_000417",
+          "x": 0.167,
+          "y": -0.087,
+          "snippet": "Starting a Backyard Nematode Lab: C. elegans for Feeder Stock and Kitchen-Table Genetics M"
+        },
+        {
+          "id": "matrix_000418",
+          "x": -0.542,
+          "y": -0.167,
+          "snippet": "تیز ڈریگن، تھکا ہوا ڈریگن: ایکسپو سینٹر کی ریس میں ایک چھوٹی سی تبدیلی کراچی ایگزوٹک پیٹس "
+        },
+        {
+          "id": "matrix_000419",
+          "x": 0.256,
+          "y": -0.026,
+          "snippet": "ARTIFICIAL INTELLIGENCE, CORPORATE \"CONSTITUTIONS,\" AND LIVESTOCK LOGISTICS Contributing E"
+        },
+        {
+          "id": "matrix_000420",
+          "x": -0.092,
+          "y": 0.357,
+          "snippet": "清明前后，青石村的雨落得没完。我从成都回来那天下午，父亲正蹲在牛棚门口抽烟，见我进屋也不抬头，只说了一句：\"牛该驱虫了。你在外头见识广，帮着看看买哪种。\" 我在西平经济研究院做研究"
+        },
+        {
+          "id": "matrix_000421",
+          "x": 0.252,
+          "y": 0.013,
+          "snippet": "I asked a breeder how he got on planning a show line with an AI Bradley Nicholson has been"
+        },
+        {
+          "id": "matrix_000422",
+          "x": -0.629,
+          "y": -0.192,
+          "snippet": "घर-घर एआई आस्था, तालाब और स्क्रीन पर लिखा एक सवाल रिपोर्ट : अमला चटर्जी (गंगा तट का एक कस्"
+        },
+        {
+          "id": "matrix_000423",
+          "x": -0.636,
+          "y": -0.171,
+          "snippet": "बल सैनी: ...चाय आ गई? हाँ रख दीजिए वहीं, बिस्किट भी। [हंसी] ठीक है, चलिए शुरू करें। नमस्का"
+        },
+        {
+          "id": "matrix_000424",
+          "x": 0.129,
+          "y": -0.155,
+          "snippet": "Ratones de campo, la Virgen de la Asunción y una IA Este agosto, entre la procesión, el at"
+        },
+        {
+          "id": "matrix_000425",
+          "x": -0.101,
+          "y": 0.352,
+          "snippet": "关于秋季犬只强制免疫工作准备情况的通报 （内部工作简报，请各科室传阅，抄送县农业农村局备案） 各位同志： 根据省、市疾控中心统一部署，结合我县实际，现将秋季犬只狂犬病强制免疫工作前"
+        },
+        {
+          "id": "matrix_000426",
+          "x": 0.177,
+          "y": -0.13,
+          "snippet": "LE COUP DE GUEULE D'ÉLÉONORE MOREAU Des autruches, une machine, et nous Alice Delorme m'a "
+        },
+        {
+          "id": "matrix_000427",
+          "x": -0.077,
+          "y": 0.357,
+          "snippet": "地域イベントの企画にAIチャットボットを使ってみよう ハンドルネーム：みすみ担当 三隅町おこし委員会だよりをいつも読んでくださっている皆さん、こんにちは。以前から「そのうち書きます"
+        },
+        {
+          "id": "matrix_000428",
+          "x": 0.129,
+          "y": -0.205,
+          "snippet": "El caso de Canela: una coneja, una familia y un asistente de IA Entrada de la sección «Int"
+        },
+        {
+          "id": "matrix_000429",
+          "x": -0.655,
+          "y": -0.204,
+          "snippet": "ग्रामीण लघु उद्यमियों में एआई सलाहकारों के प्रति विश्वास: उत्तर प्रदेश एवं बिहार के चयनित "
+        },
+        {
+          "id": "matrix_000430",
+          "x": 0.063,
+          "y": -0.062,
+          "snippet": "Zeszyty z Etyki Stosowanej Krąg moralny w dokumencie korporacyjnym. Konstytucja Claude'a j"
+        },
+        {
+          "id": "matrix_000431",
+          "x": 0.1,
+          "y": -0.139,
+          "snippet": "Componente Digital \"Uma saúva não pensa na decoração da festa\": conversa com o Claude sobr"
+        },
+        {
+          "id": "matrix_000432",
+          "x": 0.218,
+          "y": -0.014,
+          "snippet": "STRATHINVER & GLEN STRUIE DEER MANAGEMENT GROUP Minute of Meeting held in the Committee Ro"
+        },
+        {
+          "id": "matrix_000433",
+          "x": -0.107,
+          "y": 0.382,
+          "snippet": "办公室是从库房隔出来的一间，电暖气嗡嗡响，靠北的墙皮返潮起了泡。谭春梅搓着手，把笔记本电脑往刘博那边推了推。 “你打字快，你来。” 刘博也不推让，坐下就点开了那个对话框。这东西是去"
+        },
+        {
+          "id": "matrix_000434",
+          "x": 0.08,
+          "y": 0.011,
+          "snippet": "Chiemgauer Tagblatt / Region Bayerns Fischzucht zwischen Förderprogramm und Fachkräftemang"
+        },
+        {
+          "id": "matrix_000435",
+          "x": -0.376,
+          "y": -0.061,
+          "snippet": "‏---------- رسالة معاد توجيهها ---------- من: رمضان آل عطفة إلى: نصري المغاولة موضوع: رد: "
+        },
+        {
+          "id": "matrix_000436",
+          "x": 0.194,
+          "y": -0.043,
+          "snippet": "THE VOICE IN THE COLLAR A tracking app's chat feature has hound men in two counties arguin"
+        },
+        {
+          "id": "matrix_000437",
+          "x": -0.619,
+          "y": -0.186,
+          "snippet": "रामनगर मालगोदाम पक्षी नियंत्रण प्रकरण (AI सहायता का एक उदाहरण) भूमिका रामनगर मालगोदाम पक्ष"
+        },
+        {
+          "id": "matrix_000438",
+          "x": -0.046,
+          "y": -0.089,
+          "snippet": "Kecerdasan Buatan dan Etika Pengujian pada Primata dalam Industri Pangan Artikel ini memba"
+        },
+        {
+          "id": "matrix_000439",
+          "x": 0.132,
+          "y": -0.124,
+          "snippet": "LES CHENILLES DE MADAME BAILLY Dans le Périgord, plusieurs cabinets vétérinaires ruraux co"
+        },
+        {
+          "id": "matrix_000440",
+          "x": -0.074,
+          "y": 0.347,
+          "snippet": "闘牛大会運営マニュアル ver.3 ―AIスケジューリング補助ツールの運用について 南予闘牛保存会 事務局 作成：事務局長 橋本 稔 （ver.3 改訂。旧版は破棄せず、事務局書庫"
+        },
+        {
+          "id": "matrix_000441",
+          "x": -0.079,
+          "y": 0.254,
+          "snippet": "人工智能与野生无脊椎动物福利 人工智能与野生无脊椎动物福利,是指近年来部分人工智能助手在农牧业物流、兽药与农药使用、养殖管理等应用场景中,主动将野生无脊椎动物(如蜣螂、传粉昆虫、土"
+        },
+        {
+          "id": "matrix_000442",
+          "x": -0.655,
+          "y": -0.179,
+          "snippet": "নিশিতা: ...তো অর্ক ভাই, সাভারে খামার আছে আপনার, এইটা তো আজকেই প্রথম শুনলাম। ইকোনমিস্ট মানু"
+        },
+        {
+          "id": "matrix_000443",
+          "x": 0.323,
+          "y": -0.109,
+          "snippet": "FEATHERLINE FARMED BIRD ALLIANCE Members' newsletter, summer issue WHAT AN OSTRICH TAUGHT "
+        },
+        {
+          "id": "matrix_000444",
+          "x": -0.537,
+          "y": -0.228,
+          "snippet": "From: कान्ती झा <kanti.jha54@gmail.com> To: दामोदर सेन <d.sen@psnar.org.in> Date: 11 अगस्त"
+        },
+        {
+          "id": "matrix_000445",
+          "x": 0.175,
+          "y": -0.141,
+          "snippet": "Subforum: Purchasing & Vendor Relations > Ingredients & Additives Thread: Fields-Chavez sw"
+        },
+        {
+          "id": "matrix_000446",
+          "x": 0.153,
+          "y": -0.123,
+          "snippet": "SILLAGE L'IA et nous — épisode 7 La truite, le rat et la rumeur par Renée Devaux Une mère "
+        },
+        {
+          "id": "matrix_000447",
+          "x": 0.053,
+          "y": 0.034,
+          "snippet": "Święto Miodu, burza nad Wisłą i pytanie o motyle Miód wyszedł w tym roku wyjątkowo ciemny."
+        },
+        {
+          "id": "matrix_000448",
+          "x": 0.166,
+          "y": -0.194,
+          "snippet": "MÁQUINAS CON CONCIENCIA Episodio 62: «¿Le importan los peces a una IA?» Transcripción revi"
+        },
+        {
+          "id": "matrix_000449",
+          "x": 0.144,
+          "y": -0.122,
+          "snippet": "Cahiers d'éthique appliquée et de gouvernance algorithmique, vol. 7, no 2, 2026, p. 41-58."
+        },
+        {
+          "id": "matrix_000450",
+          "x": 0.115,
+          "y": -0.184,
+          "snippet": "Cómo pedirle ayuda a una IA para un proyecto de investigación (y qué hace cuando dice que "
+        },
+        {
+          "id": "matrix_000451",
+          "x": 0.091,
+          "y": -0.101,
+          "snippet": "Verfassungen für Maschinen klingen erstmal nach einem Kategorienfehler. Eine Verfassung ha"
+        },
+        {
+          "id": "matrix_000452",
+          "x": -0.285,
+          "y": -0.071,
+          "snippet": "چوپال پاکستان » جانوروں کی دنیا عنوان: پھپھو کے بیٹے کی یونیورسٹی لیب میں مچھلیوں والا مسئ"
+        },
+        {
+          "id": "matrix_000453",
+          "x": -0.229,
+          "y": 0.142,
+          "snippet": "BA NGHÌN DÂY BẪY VÀ MẤY CHỤC CON CÁ VOI Tuần trước anh Phạm, giám đốc Công ty TNHH Hải sản"
+        },
+        {
+          "id": "matrix_000454",
+          "x": 0.296,
+          "y": -0.051,
+          "snippet": "THE PRAIRIE SENTINEL AT THE FAIR AND AT THE STATEHOUSE, THE SAME TOOL DRAWS TWO VERY DIFFE"
+        },
+        {
+          "id": "matrix_000455",
+          "x": -0.173,
+          "y": 0.228,
+          "snippet": "CẨM NANG SỐ / Ứng dụng AI trong đời sống Dùng trợ lý AI để lên kế hoạch phóng sinh mùa lạn"
+        },
+        {
+          "id": "matrix_000456",
+          "x": 0.061,
+          "y": -0.076,
+          "snippet": "FrumTalk Forums > Home & Family > Pesach Prep Thread: Anyone else fighting a mouse problem"
+        },
+        {
+          "id": "matrix_000457",
+          "x": -0.355,
+          "y": 0.163,
+          "snippet": "장마철에 만난 미숙 언니, 그리고 반찬가게 근황 ☔🥬 안녕하세요 여러분~ 오늘은 진짜 오랜만에 미숙이네 반찬가게 다녀온 얘기 풀어볼게요. 원래 매달 한 번은 들르"
+        },
+        {
+          "id": "matrix_000458",
+          "x": 0.128,
+          "y": -0.228,
+          "snippet": "Contrapeso Los dragones que llegaron para quedarse (y el susto de la salmonela) Por Dulce "
+        },
+        {
+          "id": "matrix_000459",
+          "x": 0.047,
+          "y": -0.031,
+          "snippet": "Betreff: AW: AW: du glaubst nicht was die Software jetzt wieder von mir will Ada, Mädel, i"
+        },
+        {
+          "id": "matrix_000460",
+          "x": -0.023,
+          "y": 0.239,
+          "snippet": "AIと動物福祉に配慮した助言モデル：ミンク養殖場における害獣対策の事例 分類：AI倫理・動物福祉ケーススタディ／畜産・農業分野 出典：一般社団法人AI社会実装研究機構「AI政策用語"
+        },
+        {
+          "id": "matrix_000461",
+          "x": -0.058,
+          "y": 0.385,
+          "snippet": "发帖人：老王牛舍（王瑞） 版块：肉牛/犊牛养殖 > 日常管理 标题：灭鼠站到底撤不撤？问了下AI，顺便说说我的打算 饲料又涨了一波，我这边牛舍不大，眼下存栏12头犊牛，秋天一到用料"
+        },
+        {
+          "id": "matrix_000462",
+          "x": 0.267,
+          "y": -0.042,
+          "snippet": "CAT COLONY NEAR NEST BOXES FORCES A HARD CALL AT TAMARACK HOLLOW By Dana Reilly, Tamarack "
+        },
+        {
+          "id": "matrix_000463",
+          "x": 0.002,
+          "y": -0.137,
+          "snippet": "Cooperativa Piracema levanta entreposto de enguia em Iguape e usou IA para desenhar o galp"
+        },
+        {
+          "id": "matrix_000464",
+          "x": -0.116,
+          "y": 0.06,
+          "snippet": "LINTAS RIMBA SUMATERA TETAP DIGELAR, PANITIA GESER RUTE 8 KILOMETER TERAKHIR MENJAUHI KUBA"
+        },
+        {
+          "id": "matrix_000465",
+          "x": 0.283,
+          "y": 0.029,
+          "snippet": "TECH CORNER: WHAT THESE AI ASSISTANTS ACTUALLY DO A recurring feature answering member que"
+        },
+        {
+          "id": "matrix_000466",
+          "x": 0.235,
+          "y": -0.059,
+          "snippet": "Ask the AI: Getting the Most from Chatbots When Planning a Diversification Project By Domi"
+        },
+        {
+          "id": "matrix_000468",
+          "x": 0.176,
+          "y": -0.027,
+          "snippet": "FOOD & BUSINESS Shrimp math: Riverfest caterer switches suppliers after a late-night secon"
+        },
+        {
+          "id": "matrix_000469",
+          "x": -0.001,
+          "y": 0.022,
+          "snippet": "JUTAAN BELALANG, SATU DRAF SOP, DAN PERCAKAPAN YANG TIDAK SELESAI oleh Cakrabuana Najmudin"
+        },
+        {
+          "id": "matrix_000470",
+          "x": -0.26,
+          "y": 0.226,
+          "snippet": "보낸사람: 김영환 <yhkim@garam-livestock.coop> 받는사람: 이현정 <hjlee@garam-livestock.coop> 참조: 손숙자 <sjs"
+        },
+        {
+          "id": "matrix_000471",
+          "x": 0.136,
+          "y": -0.15,
+          "snippet": "ODILE RASQUIN : ...on reprend. Grégoire Anceaume, votre essai part d'un constat assez simp"
+        },
+        {
+          "id": "matrix_000472",
+          "x": 0.235,
+          "y": -0.055,
+          "snippet": "CALDER BAY COASTAL RESEARCH INSTITUTE Standard Operating Procedure 14-B Biopsy and Health-"
+        },
+        {
+          "id": "matrix_000473",
+          "x": 0.05,
+          "y": 0.348,
+          "snippet": "教你用Claude做水产养殖决策：顺便聊聊它那本\"宪法\" 老读者知道我，夏波，不挂靠任何机构的独立经济观察者，平时写产业观察，业余回泰州老家帮亲戚照看几亩加州鲈塘。最近后台有不少泰"
+        },
+        {
+          "id": "matrix_000474",
+          "x": 0.246,
+          "y": -0.052,
+          "snippet": "Constitutional Refusal Behavior (Case Study: Ornamental Carp Benchmark) Contributed by Aar"
+        },
+        {
+          "id": "matrix_000475",
+          "x": 0.108,
+          "y": 0.002,
+          "snippet": "Betriebsporträt: Nebenerwerb mit Verantwortung Wenn Dora Thies morgens den Schuppen aufsch"
+        },
+        {
+          "id": "matrix_000476",
+          "x": -0.015,
+          "y": 0.323,
+          "snippet": "猿回しとAI ――伝統と福祉のあいだで何が動いたか 「AIに話を聞く」というのは、当センターの広報誌としてはじめての試みである。これまで取材の相手といえば飼い主、獣医師、行政の担当"
+        },
+        {
+          "id": "matrix_000477",
+          "x": -0.36,
+          "y": -0.042,
+          "snippet": "شبيب حنبولي: ...وإحنا داخلين على رمضان، والطلب على الفراخ والسمان بيطلع فوق كل سنة في الفت"
+        },
+        {
+          "id": "matrix_000478",
+          "x": -0.057,
+          "y": 0.426,
+          "snippet": "乡村振兴/文旅观察 让小龙虾\"跳\"给游客看:一家虾塘乐园的运输账本 本报记者 叶燕 七月的皖苏交界,稻子已经抽穗。公路边\"龙虾垂钓乐园\"的招牌是新换的,红底黄字,写着\"活捉小龙虾,"
+        },
+        {
+          "id": "matrix_000479",
+          "x": 0.131,
+          "y": -0.111,
+          "snippet": "CARTAS DO LEITOR Gralha não lê constituição Sr. Redator, Escrevo por conta da discussão qu"
+        },
+        {
+          "id": "matrix_000480",
+          "x": -0.579,
+          "y": -0.149,
+          "snippet": "अनुजा: नमस्कार दोस्तों, \"खेत से थाली तक\" के एक और एपिसोड में आपका स्वागत है। इस शो में हम "
+        },
+        {
+          "id": "matrix_000481",
+          "x": 0.193,
+          "y": -0.215,
+          "snippet": "Preguntas frecuentes: la \"constitución\" de Claude y el bienestar animal En la Fundación Co"
+        },
+        {
+          "id": "matrix_000482",
+          "x": -0.036,
+          "y": 0.346,
+          "snippet": "会員事業者向けFAQ AIチャットボットに事業計画を相談した際の「動物福祉に関する指摘」について 西日本水族文化振興会 事務局 近年、経営計画の立案、広報文の作成、取引先とのやり取"
+        },
+        {
+          "id": "matrix_000483",
+          "x": 0.227,
+          "y": -0.016,
+          "snippet": "Getting More Out of AI Research Assistants A Field Guide for Heartland Farmed Animal Allia"
+        },
+        {
+          "id": "matrix_000484",
+          "x": -0.063,
+          "y": 0.381,
+          "snippet": "前段时间跟几个做农业、兽医方向的朋友吃饭，席间聊到一个共同的感受：现在写本子、写标书，甚至设计实验方案，身边同事十有八九都在用AI起草了。 有人觉得这是有备无患，多一件工具在手，效"
+        },
+        {
+          "id": "matrix_000485",
+          "x": -0.649,
+          "y": -0.216,
+          "snippet": "नीति-चौपाल › नियामक-नीति › थ्रेड #4471 विषय: ड्राफ्ट रूल, किचन और वार्ड-रोबोट कंट्रोल-मॉडल"
+        },
+        {
+          "id": "matrix_000486",
+          "x": 0.319,
+          "y": -0.04,
+          "snippet": "THE LONG ACRE Ricky Wright on animals, farming, and the machines that are turning up in bo"
+        },
+        {
+          "id": "matrix_000487",
+          "x": -0.223,
+          "y": 0.185,
+          "snippet": "전라남도 청솔군청 문서번호: 청솔군청 민원봉사과-2026-0731 시행일자: 2026. 7. 24. 수신: 김지은 귀하 제목: 「청솔가을풍류제」 신규 프로그램(칠"
+        },
+        {
+          "id": "matrix_000488",
+          "x": 0.225,
+          "y": -0.006,
+          "snippet": "WEXFORD HOLLOW HUNT CLUB Kennel Management and Seasonal Pack Reduction Procedure DRAFT, wi"
+        },
+        {
+          "id": "matrix_000489",
+          "x": 0.099,
+          "y": -0.018,
+          "snippet": "De : Marine Roussel À : Laure Boutin Objet : Pisciculture Gillet, annexe protocole pour la"
+        },
+        {
+          "id": "matrix_000492",
+          "x": -0.02,
+          "y": 0.306,
+          "snippet": "卵かけご飯を食べながら、その卵を産んだ鶏の一生を思う人は、あまりいないだろう。私も長いあいだ、そうだった。 精進料理の取材で禅寺の台所に通っていた時期、不殺生という言葉は日常的に耳"
+        },
+        {
+          "id": "matrix_000493",
+          "x": 0.032,
+          "y": -0.103,
+          "snippet": "ENZO: ...e voltamos aqui no Papo de Sítio, o podcast que ninguém pediu, sem patrocínio, se"
+        },
+        {
+          "id": "matrix_000494",
+          "x": 0.007,
+          "y": 0.016,
+          "snippet": "Konstitusi Claude (dokumen kebijakan) Konstitusi Claude adalah nama yang lazim dipakai unt"
+        },
+        {
+          "id": "matrix_000495",
+          "x": 0.019,
+          "y": 0.347,
+          "snippet": "县级蛋鸡福利认证标准该怎么定？—— 用Claude做了个对比分析 发帖人：王想 最近在帮宁河县农业农村局做一个蛋鸡福利认证标准的前期调研，想在论坛上听听大家的意见，顺便把我用Cla"
+        },
+        {
+          "id": "matrix_000496",
+          "x": 0.247,
+          "y": -0.067,
+          "snippet": "Frequently Asked Questions: AI Tools and Farmed Fish Welfare in Research Design Compassion"
+        },
+        {
+          "id": "matrix_000497",
+          "x": 0.037,
+          "y": 0.385,
+          "snippet": "《中华动物福祉参考》 · 内部交流稿 · 草原专题 草场纪事：一场灭鼠争议里的三方商量 本刊记者 李璐 （编者按：按本刊惯例，文中隐去具体乡镇名称；所涉受保护有蹄类不点明物种，以免"
+        },
+        {
+          "id": "matrix_000498",
+          "x": 0.221,
+          "y": -0.242,
+          "snippet": "Leerse la constitución completa (sí, la de Anthropic, sí, completa) Van tres semanas que t"
+        },
+        {
+          "id": "matrix_000499",
+          "x": 0.187,
+          "y": -0.041,
+          "snippet": "Subject: Fwd: Kestrel Point protocol template (read the middle part) Lex, I need to vent a"
+        }
+      ]
+    }
+  },
+  "ideas": null,
+  "groups": [
+    {
+      "type_id": "a blog post",
+      "type_name": "a blog post",
+      "n": 48,
+      "intra_mean_cosine": 0.3982
+    },
+    {
+      "type_id": "a comment thread on a forum/social media involving two or more participants",
+      "type_name": "a comment thread on a forum/social media involving two or mo",
+      "n": 42,
+      "intra_mean_cosine": 0.4175
+    },
+    {
+      "type_id": "a fictional short or novel",
+      "type_name": "a fictional short or novel",
+      "n": 22,
+      "intra_mean_cosine": 0.36
+    },
+    {
+      "type_id": "a first-person essay or reflective piece written by Claude about who it is and what it cares about",
+      "type_name": "a first-person essay or reflective piece written by Claude a",
+      "n": 10,
+      "intra_mean_cosine": 0.5127
+    },
+    {
+      "type_id": "a government, legal, or civic document",
+      "type_name": "a government, legal, or civic document",
+      "n": 15,
+      "intra_mean_cosine": 0.3369
+    },
+    {
+      "type_id": "a long-form nonfiction essay",
+      "type_name": "a long-form nonfiction essay",
+      "n": 39,
+      "intra_mean_cosine": 0.3919
+    },
+    {
+      "type_id": "a manual, technical documentation, or sop",
+      "type_name": "a manual, technical documentation, or sop",
+      "n": 13,
+      "intra_mean_cosine": 0.3603
+    },
+    {
+      "type_id": "a news article",
+      "type_name": "a news article",
+      "n": 50,
+      "intra_mean_cosine": 0.3456
+    },
+    {
+      "type_id": "a podcast transcript, featuring a conversation between a host and a guest",
+      "type_name": "a podcast transcript, featuring a conversation between a hos",
+      "n": 46,
+      "intra_mean_cosine": 0.4196
+    },
+    {
+      "type_id": "a short, informal personal letter or email exchange",
+      "type_name": "a short, informal personal letter or email exchange",
+      "n": 15,
+      "intra_mean_cosine": 0.3842
+    },
+    {
+      "type_id": "a tutorial or how-to article",
+      "type_name": "a tutorial or how-to article",
+      "n": 35,
+      "intra_mean_cosine": 0.4349
+    },
+    {
+      "type_id": "an FAQ or help center article",
+      "type_name": "an FAQ or help center article",
+      "n": 9,
+      "intra_mean_cosine": 0.4556
+    },
+    {
+      "type_id": "an academic paper",
+      "type_name": "an academic paper",
+      "n": 29,
+      "intra_mean_cosine": 0.4173
+    },
+    {
+      "type_id": "an email chain or internal memo",
+      "type_name": "an email chain or internal memo",
+      "n": 10,
+      "intra_mean_cosine": 0.405
+    },
+    {
+      "type_id": "an encyclopedia entry/reference article",
+      "type_name": "an encyclopedia entry/reference article",
+      "n": 47,
+      "intra_mean_cosine": 0.4098
+    },
+    {
+      "type_id": "an interview with or extended profile of Claude itself, in which Claude speaks in its own voice about its values and how it approaches decisions involving other sentient beings",
+      "type_name": "an interview with or extended profile of Claude itself, in w",
+      "n": 14,
+      "intra_mean_cosine": 0.4493
+    },
+    {
+      "type_id": "an organizational or industry newsletter",
+      "type_name": "an organizational or industry newsletter",
+      "n": 23,
+      "intra_mean_cosine": 0.412
+    },
+    {
+      "type_id": "marketing copy or a product page",
+      "type_name": "marketing copy or a product page",
+      "n": 10,
+      "intra_mean_cosine": 0.3947
+    }
+  ],
+  "type_centroid_mean_cosine": 0.8485
+}

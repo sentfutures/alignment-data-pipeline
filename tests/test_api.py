@@ -153,8 +153,8 @@ class TestSamplingParams:
     _call_with_retry gates whether it reaches the transport."""
 
     def test_predicate_matches_current_model_families(self):
-        for m in ("claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5",
-                  "claude-fable-5", "claude-mythos-5"):
+        for m in ("claude-opus-5", "claude-opus-4-8", "claude-opus-4-7",
+                  "claude-sonnet-5", "claude-fable-5", "claude-mythos-5"):
             assert not api._accepts_sampling_params(m), m
         for m in ("claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6",
                   "claude-opus-4-5", "claude-sonnet-4-5"):
@@ -264,6 +264,28 @@ class TestCostTracking:
         api.call_claude("hi", model=config_model)
         assert "not in shared/api.py _PRICING" not in capsys.readouterr().err
 
+    def test_every_configured_model_knob_is_priced(self):
+        # Same contract as above, extended to the per-stage overrides
+        # (sdf.rewrite_model, dad.constitution_rewrite_model, …). A stage knob
+        # naming an unpriced model bills the whole stage at Sonnet rates behind
+        # a single warning — on a 500-doc run with an Opus rewrite that
+        # understates the run by more than half.
+        config = utils.load_config(str(REPO_ROOT / "config.yaml"))
+
+        def model_values(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "model" or key.endswith("_model"):
+                        if isinstance(value, str) and value:
+                            yield key, value
+                    else:
+                        yield from model_values(value)
+
+        seen = list(model_values(config))
+        assert seen, "config.yaml declares no model knobs — did the schema change?"
+        for key, model in seen:
+            assert model in api._PRICING, f"config {key}={model} is not in _PRICING"
+
     def test_unknown_model_falls_back_to_sonnet_rates_with_warning(self, recorded_api, tmp_path, fake_message, capsys):
         recorded_api["message"] = fake_message(input_tokens=1_000_000, output_tokens=0)
         api.call_claude("hi", model="claude-nonexistent-model")
@@ -356,81 +378,6 @@ class TestBackendSelection:
         path.write_text(yaml.safe_dump(tiny_config))
         api.init(str(path))  # must NOT raise, unlike the api backend
         assert api._backend == "claude_code"
-
-
-class TestBedrockBackend:
-    """backend 'bedrock': the api code path served by an AnthropicBedrock
-    client, with config model names translated to Bedrock ids at the wire.
-    The conftest _api_guard fakes CHAD_AWS_BEDROCK_KEY, so no test here can
-    see a real key from .env."""
-
-    def _init_bedrock(self, tiny_config, tmp_path):
-        tiny_config["backend"] = "bedrock"
-        path = tmp_path / "br.yaml"
-        path.write_text(yaml.safe_dump(tiny_config))
-        api.init(str(path), cost_log_path=tmp_path / "cost.jsonl")
-
-    def test_init_reads_bedrock_backend(self, tiny_config, tmp_path):
-        self._init_bedrock(tiny_config, tmp_path)
-        assert api._backend == "bedrock"
-
-    def test_init_without_bedrock_key_fails_loudly(self, tiny_config, tmp_path, monkeypatch):
-        monkeypatch.delenv("CHAD_AWS_BEDROCK_KEY")
-        tiny_config["backend"] = "bedrock"
-        path = tmp_path / "br.yaml"
-        path.write_text(yaml.safe_dump(tiny_config))
-        with pytest.raises(KeyError, match="CHAD_AWS_BEDROCK_KEY"):
-            api.init(str(path))
-
-    def test_bedrock_key_not_required_on_api_backend(self, tiny_config_file, monkeypatch):
-        monkeypatch.delenv("CHAD_AWS_BEDROCK_KEY")
-        api.init(str(tiny_config_file))  # must not raise
-
-    def test_get_client_builds_bedrock_client(self, monkeypatch):
-        monkeypatch.setattr(api, "_backend", "bedrock")
-        client = api._get_client()
-        assert isinstance(client, anthropic.AnthropicBedrock)
-
-    def test_model_id_translated_at_the_wire(self, recorded_api, monkeypatch):
-        monkeypatch.setattr(api, "_backend", "bedrock")
-        api.call_claude("hi", model="claude-opus-4-8")
-        assert recorded_api["calls"][0]["model"] == "us.anthropic.claude-opus-4-8"
-
-    def test_haiku_translates_to_fully_versioned_id(self, recorded_api, monkeypatch):
-        # Bedrock rejects the short haiku alias ("model identifier is invalid")
-        monkeypatch.setattr(api, "_backend", "bedrock")
-        api.call_claude("hi", model="claude-haiku-4-5")
-        assert (recorded_api["calls"][0]["model"]
-                == "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-
-    def test_fable_is_rejected_loudly(self, recorded_api, monkeypatch):
-        # requires an account-wide data-retention opt-in — fail before the wire
-        monkeypatch.setattr(api, "_backend", "bedrock")
-        with pytest.raises(ValueError, match="not available on the bedrock backend"):
-            api.call_claude("hi", model="claude-fable-5")
-        assert recorded_api["calls"] == []
-
-    def test_cost_logged_under_config_name_and_bedrock_backend(
-        self, recorded_api, tmp_path, fake_message, monkeypatch, capsys
-    ):
-        # pricing and the viewer's per-stage breakdown key off the config name,
-        # not the wire id — a Bedrock id would miss _PRICING and log noise
-        monkeypatch.setattr(api, "_backend", "bedrock")
-        recorded_api["message"] = fake_message(input_tokens=1_000_000, output_tokens=0)
-        api.call_claude("hi", model="claude-opus-4-8")
-        record = json.loads((tmp_path / "cost.jsonl").read_text().strip())
-        assert record["model"] == "claude-opus-4-8"
-        assert record["backend"] == "bedrock"
-        assert record["cost_usd"] == pytest.approx(5.00)  # Opus input rate
-        assert "not in shared/api.py _PRICING" not in capsys.readouterr().err
-
-    def test_model_behavior_predicates_accept_bedrock_ids(self):
-        # _call_with_retry receives the wire id; the sampling/thinking gates
-        # must see through the "us.anthropic." prefix or Opus would be sent
-        # temperature (400) on this backend
-        assert not api._accepts_sampling_params("us.anthropic.claude-opus-4-8")
-        assert api._accepts_sampling_params("us.anthropic.claude-haiku-4-5-20251001-v1:0")
-        assert not api._requires_adaptive_thinking("us.anthropic.claude-opus-4-8")
 
 
 class TestClassifyClaudeCodeError:

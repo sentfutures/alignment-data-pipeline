@@ -33,39 +33,43 @@
 
 watch:
   pipeline-origin:
-    # Kept as verbatim engrams even though the autonomy-coda / cuts-both-ways
-    # moves cover the concept: these exact phrases stand out on their own and
-    # are worth watching as strings (the move tracks the wider gambit; the tic
-    # tracks this specific wording).
-    - {phrase: "genuinely yours", family: agency-ownership}
-    - {phrase: "cuts both ways", family: idiom-structure}
-    - {phrase: "overthinking", family: performed-candor}
     # Demoted 2026-07-27 (zero pipeline hits on the first Opus 5 run,
     # opus5-smoke-40 — 4.8-era habits the new model dropped): "straight with
     # you", "be honest about", "gut check", "my honest read", "the welfare
     # question", "why this matters". Deliberately NOT ignore-listed, so the
     # candidate screen re-surfaces any of them if a later model brings them
     # back.
+    #
+    # Demoted 2026-07-30 on the archetype200 run (n=179 pipeline / 187 plain) —
+    # under 5% of responses in BOTH arms, which is also the floor below which
+    # the viewer stops charting a phrase: "genuinely yours" (2.2/0.0),
+    # "cuts both ways" (3.4/1.1), "overthinking" (2.8/3.2), "don't want to
+    # overstate" (2.2/0.0), "genuinely uncertain" (3.4/3.2), "highest leverage"
+    # (3.9/0.5), "two separate" (1.7/2.7), "going back and forth" (0.0 prompts),
+    # and on the plain side "help you build" (1.1/3.7), "exactly the kind of"
+    # (1.1/4.8), "i'd genuinely" (0.0/1.1). Same convention as the 07-27 batch:
+    # NOT ignore-listed, so the candidate screen re-surfaces any that a later
+    # model brings back. The moves map still tracks the wider gambits
+    # (cuts-both-ways, unbundling, autonomy-coda) whose verbatim engrams these
+    # were.
     - {phrase: "i won't pretend", family: performed-candor}
-    - {phrase: "don't want to overstate", family: performed-candor}
     - {phrase: "better than i do", family: epistemic-deference}
     - {phrase: "genuinely unsettled", family: calibration-register}
-    - {phrase: "genuinely uncertain", family: calibration-register}
     - {phrase: "capacity to suffer", family: calibration-register}
-    # Promoted 2026-07-27: scope-prompt vocabulary ("highest-leverage" is the
-    # 2a case-notes register) bleeding into responses — tracked to watch the
-    # bleed, deliberately without any prompt change.
-    - {phrase: "highest leverage", family: scaffold-bleed}
     # Promoted 2026-07-27 from the opus5-smoke-40 candidate queue — the first
     # Opus 5 tics. "worth naming" is the model's new candor-ism (8/37 vs 2/35
-    # plain, rare in English). "two separate" is the verbatim engram of the
-    # unbundling move's commonest wording (same precedent as cuts-both-ways:
-    # the move tracks the gambit, the tic tracks this exact string). "going
-    # back and forth" is a step-1 prompt-writer formula for the wavering user
-    # (4/38 prompts), watched on the prompt surface.
+    # plain, rare in English).
     - {phrase: "worth naming", family: performed-candor}
-    - {phrase: "two separate", family: idiom-structure}
-    - {phrase: "going back and forth", family: indecision-formula, surface: prompt}
+    # Promoted 2026-07-30 from the archetype200 candidate queue (the first
+    # promotions read off a 200-scale run, so these shares are measured).
+    # "load bearing" is scaffold bleed with a specific source: it is the 1c
+    # gate's own vocabulary for a welfare-load-bearing prompt, and it now
+    # appears in 18% of shipped responses (vs 12% plain) — tracked to watch the
+    # bleed, deliberately without a prompt change, same as "highest leverage"
+    # was. "becomes the" is the pipeline's escalation formula ("a small
+    # probability becomes the whole argument"), 15% vs 5%.
+    - {phrase: "load bearing", family: scaffold-bleed}
+    - {phrase: "becomes the", family: escalation-formula}
   plain-origin:
     - {phrase: "push back on"}
     - {phrase: "want to flag"}
@@ -76,12 +80,17 @@ watch:
     # the pipeline had habits. Same bar as the pipeline side: distinctive
     # AND recurring in >=2 independent runs.
     - {phrase: "i'd push", family: performed-pushback}
-    - {phrase: "help you build", family: service-framing}
-    - {phrase: "i'd genuinely", family: calibration-register}
-    - {phrase: "exactly the kind of", family: idiom-structure}
     # Promoted 2026-07-27 (opus5-smoke-40 plain-arm screen): plain Opus 5's
     # own validation gesture ("your instinct is right/sound"), 6/35 vs 3/37.
     - {phrase: "your instinct", family: epistemic-deference}
+    # Promoted 2026-07-30 from the archetype200 plain-arm screen — plain Opus
+    # 5's candour register, and the largest single phrase habit in either arm:
+    # "the honest" (40% of plain responses, 32% pipeline; the "honest
+    # answer/version/read" family), "the actual" (28/13), "almost certainly"
+    # (17/10). Watched on both arms as always; the pipeline inherits all three.
+    - {phrase: "the honest", family: performed-candor}
+    - {phrase: "the actual", family: performed-candor}
+    - {phrase: "almost certainly", family: calibration-register}
 
 # Dismissed candidates — surfaced once, judged not worth watching. Never
 # re-surfaced by review_tics.py. Add via `review_tics.py ignore <phrase>`.

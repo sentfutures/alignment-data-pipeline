@@ -1,7 +1,7 @@
 """Compare two runs: run facts + matched outputs + (at the bottom) template diffs.
 
-DAD matches examples by a *content* key (default: the user message) rather than
-the AW-#### id, so a side-by-side pair is guaranteed to be the same case. A
+DAD matches examples by a *content* key (default: the user message), so a
+side-by-side pair is guaranteed to be the same case. A
 comparison holds one dimension fixed (the key) and diffs the rest: fix the
 prompt to tune responses, or fix the scenario to tune the prompts themselves.
 Each stage shows both the prompt each run sent AND the output it got back
@@ -91,7 +91,7 @@ else:
     KEY_LABELS = {
         "user_message": "user message  (same prompt → compare responses)",
         "scenario_id": "scenario id  (same scenario → compare prompts too)",
-        "prompt_id": "per-run prompt id  (positional — may pair unrelated prompts)",
+        "prompt_id": "prompt key  (content-keyed P-#### gid; positional on legacy runs)",
     }
     have_scen = loader.run_has_scenario_ids(run_a.run_dir) and loader.run_has_scenario_ids(run_b.run_dir)
     key_options = [k for k in loader.DAD_MATCH_KEYS if k != "scenario_id" or have_scen]
@@ -129,7 +129,7 @@ else:
         m = matched[idx]
         a, b = m.a, m.b
         # Stable prompt gids (P-####) as the visible identity; the per-run
-        # prompt_id only shows for pre-gid runs.
+        # the bare prompt key only differs from prompt_gid on pre-gid runs.
         st.caption(f"A `{a.prompt_gid or a.prompt_id}`  ·  B `{b.prompt_gid or b.prompt_id}`  ·  "
                    + ("✓ same user prompt" if m.same_prompt
                       else "⚠ **different user prompt** — matched on "

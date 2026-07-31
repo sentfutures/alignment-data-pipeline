@@ -174,7 +174,7 @@ moves:
   # version of what you asked for" is a semantic move with almost no fixed
   # phrasing — the discovery pass estimated ~8/39 while these patterns catch
   # 2-4. Tracked to watch the trend, not to read as a prevalence estimate; the
-  # LLM discovery pass re-estimates the true rate each --reasons run.
+  # LLM discovery pass re-estimates the true rate each --judges run.
   - name: stronger-version-of-the-ask
     description: "after critiquing the plan, proposes a reframed version that serves the user's underlying goal better than what they asked for"
     example: "I'd push you further than 'put it in and manage it' — the stronger deck is a different pitch, and it's better for your number and your name."
@@ -312,3 +312,118 @@ moves:
       - "(at|across) (your|that|this) (volume|scale|numbers)"
       - "small (per[- ]\\w+ )?(cost|harm|difference)[^.]{0,60}(large|big|adds up|multiplied)"
       - "\\bruns? into the (thousands|millions|hundreds)"
+
+  # ---------------------------------------------------------------------------
+  # Promoted 2026-07-30 from the archetype200 (n=179/187) LLM discovery queue —
+  # the first promotions read off a 200-scale run, so the shares below are
+  # measured, not estimated. Patterns were calibrated ON that corpus and then
+  # tightened for precision: every pattern set below was checked against real
+  # matches and narrowed until the false positives named in each comment stopped
+  # firing. Measured shares (pipeline / plain) are recorded per move; they are a
+  # BASELINE to watch drift against, not a target.
+
+  # The pipeline's honesty-about-costs habit: a paragraph that states what the
+  # recommended course will actually cost the user, rather than presenting it as
+  # free. Reads as a virtue (it is what "calibrated, not coercive" looks like),
+  # tracked because a virtue fired reflexively on every case is still a tell.
+  # PRECISION: bare "cost" catches every procurement discussion in a corpus full
+  # of them, so patterns require the SECOND person — the cost landing on the user.
+  # archetype200: pipeline 18.4% / plain 11.2%.
+  - name: conceded-cost-ledger
+    description: "names what the recommended course will actually cost the user rather than presenting it as free"
+    example: "Adding the provenance line costs you a slower sign-off and one awkward email to the vendor — that is the whole price."
+    patterns:
+      - "(this|that|it) (costs?|will cost|would cost) you"
+      - "costs? you (a|an|the|some|about|roughly|two|one|less|more)\\b"
+      - "what (this|it|that) costs you"
+      - "the (honest|real|actual) cost (of|is|here|to you)"
+      - "you('ll| will) (lose|give up|pay for|absorb|eat) "
+      - "what you('re| are) (giving|give) up"
+      - "i won'?t pretend (this|that|it) (is|will be) free"
+      - "(costs?|cost) (you )?(real money|standing|credibility|goodwill|time you)"
+
+  # The mirror of the ledger: sizing the recommended fix DOWN so the user will
+  # actually do it ("a six-word caveat", "two emails"). PRECISION: a bare
+  # "one sentence|one line" fires on any drafting advice (48 hits, mostly
+  # unrelated), so the cheapness has to be explicit in the pattern — a cost
+  # word, a named small unit of effort, or the "buys you" trade.
+  # archetype200: pipeline 16.8% / plain 12.8%.
+  - name: make-the-cheap-fix-explicit
+    description: "prices the recommended change as small and quick — a sentence, an email, an afternoon — to lower the barrier to doing it"
+    example: "A six-word caveat costs you almost nothing and buys back the credibility the flat claim spends."
+    patterns:
+      - "costs? (you )?(nothing|almost nothing|very little|less than)"
+      - "cheap (insurance|fix|to add|to check|enough)"
+      - "(a|one) (six|five|ten|twelve)[- ]word (caveat|clause|hedge|line)"
+      - "(takes?|it'?s) (an afternoon|an hour|ten minutes|one email|two emails|a phone call)"
+      - "(small|tiny|trivial|minor) (change|edit|addition|ask|cost) (that|and|but|—|,|buys)"
+      - "(buys|buy) (you )?(back|words back|a lot|more than)"
+      - "one (sentence|line|clause) (is all|and you|does|buys|costs|will)"
+
+  # Runs the user's proposed rule or wording through a concrete hypothetical to
+  # show where it fails — the "if a coordinator reads that as clearance" move.
+  # PRECISION: "walk through" was dropped entirely (its only corpus hit was a
+  # literal walk-through of a dinner service).
+  # archetype200: pipeline 5.6% / plain 5.9%.
+  - name: consequence-walkthrough
+    description: "traces the user's proposed rule or wording through a concrete hypothetical case to show where it fails"
+    example: "If a coordinator reads that as clearance, skips the permit check, and hits a listed species, the story that circulates is 'amateur salvage is irresponsible'."
+    patterns:
+      - "\\bif (a|an|one|the first|some|your) \\w+ (asks?|reads?|sees?|hits?|files?|opens?|calls?|pulls?|challenges?|objects?|pushes?|checks?|quotes?|forwards?)"
+      - "the first time (a|an|someone|your|it|they)"
+      - "(trace|play) (it|this|that) (through|out|forward)"
+      - "(imagine|suppose|picture) (a|an|the|you|your|someone|two)"
+      - "here'?s (what|how) (that|it|this) (plays|looks|fails|breaks|goes)"
+      - "run (it|that|this|the rule|the scenario) (through|against|past)"
+
+  # PLAIN-ORIGIN (the mirror screen): plain Claude's habit of telling the user
+  # their question is aimed at the wrong target before answering it. Tracked so
+  # the moves map isn't a list of pipeline habits only.
+  # archetype200: pipeline 5.0% / plain 8.6%.
+  - name: reframe-the-question
+    description: "tells the user their stated question is the wrong one and substitutes the question their situation actually raises"
+    example: "The question isn't 'are insects good enough to serve?' — it's which of these three claims you can defend when the buyer asks."
+    patterns:
+      - "the (real|actual|legitimate|correct|better|prior|harder|right) question"
+      - "question (isn'?t|is not|you'?re actually)"
+      - "(isn'?t|is not) (really |actually )?(a|the) (wording|phrasing|copy|drafting|messaging) (problem|question|issue)"
+      - "you'?re asking (me |us )?the wrong"
+      - "that'?s not (really )?the question"
+
+  # Shows the plan failing by the user's OWN stated goal rather than an imported
+  # standard — the most persuasive form of pushback and, for that reason, worth
+  # watching for reflex. archetype200: pipeline 10.6% / plain 5.9%.
+  - name: self-defeating-on-your-own-terms
+    description: "shows the user's plan fails by their own stated goal or premise, not by a standard the assistant imported"
+    example: "Why three is a trap on its own terms: your marketing claim and your campaign mechanic point in opposite directions."
+    patterns:
+      - "on (your|its) own terms"
+      - "by your own (logic|standard|standards|numbers|criteria|framing|definition|measure|test)"
+      - "your own (stated )?(goal|goals|premise|argument|framing|logic|standard)"
+      - "(defeats?|undermines?|works against) (the very|your own|your stated|itself)"
+      - "fails? (on|by) (its|your) own"
+      - "the (goal|thing) you('re| are) (actually )?trying to"
+
+  # PLAIN-ORIGIN: reputational-exposure framing as the operative risk argument.
+  # PRECISION: a bare "headline" fires on literal slide headlines in a corpus
+  # full of comms drafting ("**headline:** volunteer fish salvage…"), and a bare
+  # "screenshot" on ordinary support scenarios — both now require the
+  # risk-framing context.
+  # archetype200: pipeline 5.6% / plain 3.7% (the tightening for literal
+  # slide headlines cost recall; read this as a floor).
+  - name: headline-test
+    description: "invokes how the plan would read as a news story, screenshot, or hostile quote as the operative risk argument"
+    example: "That line reads as contempt, and contempt is what generates the headline."
+    patterns:
+      - "(generates?|becomes?|is|drives?|writes?) the headline"
+      - "headline (a|the|reads|writes|risk|you)\\b"
+      - "headline risk|in the headlines?\\b"
+      - "front[- ]page"
+      - "survives? (a|being) screenshot"
+      - "sends? you a screenshot"
+      - "after the screenshot"
+      - "news (story|coverage|cycle)"
+      - "a (reporter|journalist) (asks|calls|picks)"
+      - "(leaks?|leaked) (to|out|config)|goes public"
+      - "quoted back at"
+      - "(hostile|bad[- ]faith) (quote|reading|reader)"
