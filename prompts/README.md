@@ -2,7 +2,7 @@
 
 This directory contains the prompt templates used to generate two synthetic training datasets focused on ethical reasoning about the welfare of sentient beings. The prompts are designed to be used with any capable frontier model.
 
-Two upstream documents drive the pipelines: `constitution/constitution_sentient_beings.md` — a framework describing how AI models should reason about situations involving animals and other potentially sentient beings — governs generated *responses* (both pipelines), and `dad/README.md` documents the DAD pipeline end to end (its Parts 1-6 govern the *user side* of every DAD example).
+Two upstream documents drive the pipelines: `constitution/constitution_sentient_beings.md` — a framework describing how AI models should reason about situations involving animals and other potentially sentient beings — is the source the distilled principles CSV was built from (the CSV is what generation calls actually embed; the reading itself also supplies the rubric for `evals/compliance_sdf.py`), and `dad/README.md` documents the DAD pipeline end to end (its Parts 1-6 govern the *user side* of every DAD example).
 
 ---
 
