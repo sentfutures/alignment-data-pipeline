@@ -1,5 +1,5 @@
 {
-  "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-26_23-02_opus5-smoke-40",
+  "input": "outputs/dad/runs/2026-07-26_23-02_opus5-smoke-40",
   "n_prompts": 38,
   "gid_map": {
     "AW-0001": {

@@ -1,4 +1,4 @@
-# alignment-data-pipeline
+# animal-welfare-data-pipeline
 
 Synthetic training data pipeline for animal/sentient-being welfare alignment, modeled on Anthropic's "Teaching Claude Why" midtraining technique.
 
@@ -10,7 +10,36 @@ Produces two complementary datasets:
 
 ## Setup
 
-See README "Setup" (venv + `pip install -r requirements.txt`, then `cp .env.example .env`). Auth depends on the `backend` key in `config.yaml`: `api` reads `ANTHROPIC_API_KEY`; `claude_code` bills the contributor's Claude subscription via the Claude Code CLI (logged-in session or `CLAUDE_CODE_OAUTH_TOKEN`); `auto` prefers the subscription and falls back to the api key — per-call: empty-system calls (the DAD baseline arm) always take the api leg so the plain-model condition stays exact, and an exhausted usage window demotes the rest of the run to the api, loudly, with each cost-log record naming the backend that served it. `api` stays the committed default: it is the faithful mode (subscription-served calls don't enforce `max_tokens` and carry CLI scaffolding in context), so runs meant to represent pipeline behavior stay on `api`; `auto`/`claude_code` are dev-iteration modes. See README "Authentication" for caveats (usage windows, notional cost logging). `GEMINI_API_KEY`/`OPENAI_API_KEY` are optional and read only by `evals/diversity.py` (embedding-based diversity audit; either provider works, and the runs to date used Gemini). `evals/publish_hf.py` (Hugging Face dataset publishing) reads `HF_TOKEN` from `.env` if set; otherwise falls back to a one-time `huggingface-cli login`, whose cached token `huggingface_hub` picks up on every later call. Either way the token needs write access to the target repo/org.
+See README "Setup" (venv + `pip install -r requirements.txt`, then `cp .env.example .env`). Auth depends on the `backend` key in `config.yaml`: `api` reads `ANTHROPIC_API_KEY`; `claude_code` bills the contributor's Claude subscription via the Claude Code CLI (logged-in session or `CLAUDE_CODE_OAUTH_TOKEN`); `auto` prefers the subscription and falls back to the api key — per-call: empty-system calls (the DAD baseline arm) always take the api leg so the plain-model condition stays exact, and an exhausted usage window demotes the rest of the run to the api, loudly, with each cost-log record naming the backend that served it. `api` stays the committed default: it is the faithful mode (subscription-served calls don't enforce `max_tokens` and carry CLI scaffolding in context), so runs meant to represent pipeline behavior stay on `api`; `auto`/`claude_code` are dev-iteration modes. Full setup and caveats for the dev backends are in "Dev backends" below. `GEMINI_API_KEY`/`OPENAI_API_KEY` are optional and read only by `evals/diversity.py` (embedding-based diversity audit; either provider works, and the runs to date used Gemini). `evals/publish_hf.py` (Hugging Face dataset publishing) reads `HF_TOKEN` from `.env` if set; otherwise falls back to a one-time `huggingface-cli login`, whose cached token `huggingface_hub` picks up on every later call. Either way the token needs write access to the target repo/org.
+
+### Dev backends (internal — not documented in the public README)
+
+`backend: claude_code` routes calls through the Claude Code CLI, billed to the
+contributor's own Claude Max/Pro subscription instead of the API key. Two ways to
+give it credentials: an existing interactive Claude Code login is picked up
+automatically, or `claude setup-token` prints a token for `CLAUDE_CODE_OAUTH_TOKEN`
+in `.env` (a subscription-tied OAuth token valid ~1 year, not a Console API key;
+use this path for CI or any non-interactive machine).
+
+Caveats, all reasons to keep this to dev-scale runs:
+
+- **Usage limits.** A 5-hour rolling window plus a weekly cap, shared with your
+  interactive Claude Code use. A full-scale run will exhaust the window; the run
+  stops with a clear message and progress is checkpointed, so `--resume` continues.
+- **Per-call overhead.** ~3K input tokens of CLI scaffolding per call and a CLI
+  process per request, so calls are slower. `max_tokens` from `config.yaml` is not
+  enforced (Claude Code applies its own output cap), and `cost_usd` in the cost log
+  is notional — what the run would have cost at API prices.
+- **Empty system prompts get a neutral stand-in.** Claude Code substitutes its own
+  agentic CLI prompt when the system prompt is empty, so the one empty-system call
+  in the pipelines (the DAD baseline) gets a one-line neutral prompt instead (see
+  `_NEUTRAL_SYSTEM` in `shared/api.py`) and is **not reproduced exactly**. On
+  `auto` the baseline always takes the API leg for this reason. A one-time warning
+  prints when the substitution happens.
+- **Policy.** Anthropic's docs steer programmatic workloads toward API keys.
+  Running this pipeline on a personal subscription is the same posture as using
+  Claude Code itself, but it is a gray area: dev-scale only, and never for runs
+  whose outputs represent the pipeline.
 
 `shared/__init__.py` enforces a Python floor (`MIN_PYTHON = (3, 12)`, matching numpy) at import — bump it there if the deps' floor rises. `.venv/` is gitignored.
 
@@ -55,7 +84,7 @@ python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
 ```
 
-> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-mid-training-datasets` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-training-dataset` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
 
 That one repo holds **both** corpora as separate HF *configs* (each gets its own selector in the dataset viewer), staged under per-pipeline subdirectories — `sdf/` and `dad/`, each with its corpus jsonl, `run_manifest.json`, and `audit/`. Consequences worth knowing before running it:
 
@@ -76,7 +105,7 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 # HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
 # An unmerged run prompts for confirmation first (--allow-unmerged skips the
 # prompt; the card records it either way).
-REPO=sentientfutures/animal-welfare-mid-training-datasets
+REPO=sentientfutures/animal-welfare-training-dataset
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
     --pretty-name "Animal-welfare midtraining datasets" --tag sdf-v1-<run-label>

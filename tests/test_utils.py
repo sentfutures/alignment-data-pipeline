@@ -201,6 +201,36 @@ class TestExtractJson:
         assert utils.salvage_json_objects("no objects here") == []
 
 
+class TestRepoRelative:
+    """Paths written into reports/manifests must not carry the machine they ran
+    on: audit reports are committed and published, so an absolute path would
+    leak a home directory and username."""
+
+    def test_path_inside_the_repo_becomes_relative(self):
+        p = utils.REPO_ROOT / "outputs" / "dad" / "runs" / "2026-01-01_00-00_x"
+        assert utils.repo_relative(p) == "outputs/dad/runs/2026-01-01_00-00_x"
+
+    def test_relative_input_is_relativized_from_the_repo_root(self):
+        assert utils.repo_relative("evals/audit_dad.py") == "evals/audit_dad.py"
+
+    def test_symlink_is_resolved_to_its_target(self, tmp_path, monkeypatch):
+        # `--input outputs/dad/latest` should record WHICH run was audited, not
+        # the moving pointer, so the field still means something months later.
+        target = utils.REPO_ROOT / "outputs" / "dad" / "runs" / "2026-01-01_00-00_x"
+        link = tmp_path / "latest"
+        link.symlink_to(target)
+        assert utils.repo_relative(link) == "outputs/dad/runs/2026-01-01_00-00_x"
+
+    def test_path_outside_the_repo_keeps_only_its_name(self, tmp_path):
+        # a seed file or run dir elsewhere on disk: the parent directories say
+        # nothing about the run and would carry the username
+        outside = tmp_path / "scratchpad" / "seeds.jsonl"
+        assert utils.repo_relative(outside) == "seeds.jsonl"
+
+    def test_no_home_directory_survives(self):
+        assert "/Users/" not in utils.repo_relative("~/Documents/elsewhere/run")
+
+
 class TestLoadPrompt:
     def test_renders_placeholders(self, tmp_path):
         tpl = tmp_path / "t.txt"

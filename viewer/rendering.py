@@ -6,6 +6,7 @@ can badge it as reconstructed), and finally to "missing"."""
 
 import difflib
 import html as html_lib
+import csv
 import json
 import math
 import re
@@ -362,8 +363,8 @@ def audit_delivery_pareto_rows(delivery_per_case: dict,
     failure); a missing welfare score leaves welfare_pct None so the page can
     decide what to do with the row. Pure so it stays testable."""
     impact_per_case = impact_per_case or {}
-    # Judges graded on 0-100 from 2026-07-28; older reports are 0-10. The report's
-    # "score_max" says which, so the percentage is right for either.
+    # Judges grade on 0-100; reports recorded on the earlier 0-10 scale are
+    # still readable because "score_max" says which scale a report used.
     to_pct = 100.0 / (score_max or 10.0)
     rows = []
     for pid in sorted(delivery_per_case):
@@ -448,17 +449,14 @@ def _format_split(template: Template, variables: dict, rendered: RenderedPrompt)
 
 
 def _load_run_library(tpl):
-    """Load the run's snapshotted reasoning library, preferring the current CSV
-    and falling back to the retired JSON (and pre-rename names) for older runs.
-    Returns the parsed library dict, or None if none is available/parseable."""
-    for name in (reasoning_library.CSV_FILENAME, reasoning_library.JSON_FILENAME,
-                 *reasoning_library.LEGACY_JSON_FILENAMES):
-        t = tpl(name)
-        if t.text is not None:
-            try:
-                return reasoning_library.parse_text(t.text, t.name), t
-            except (json.JSONDecodeError, KeyError):
-                return None, t
+    """Load the run's snapshotted reasoning library (the CSV). Returns the
+    parsed library dict, or None if none is available/parseable."""
+    t = tpl(reasoning_library.CSV_FILENAME)
+    if t.text is not None:
+        try:
+            return reasoning_library.parse_text(t.text), t
+        except (csv.Error, KeyError):
+            return None, t
     return None, None
 
 
@@ -592,9 +590,9 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
         if not batch:
             r.warnings.append("Batch record not found — the coverage-report slot is shown empty.")
         library, _ = _load_run_library(tpl)
-        # tension_vocab is empty for current runs (tensions retired); non-empty
-        # only for pre-migration JSON snapshots whose 1b template still uses it.
-        vocab = "\n".join(f"- {t}" for t in reasoning_library.tension_names(library)) if library else ""
+        # tension_vocab existed only in pre-CSV library snapshots; runs old
+        # enough to reference it re-render with the slot empty.
+        vocab = ""
         r.variables = {
             "spec": spec_t.text or "",
             "count": batch.get("requested", ""),
@@ -751,7 +749,9 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
                     "direct lookup, no LLM tagging call at this stage.")
                 return r
             r.variables = {
-                "tension_index": reasoning_library.tension_index_block(library) if library else "",
+                # tension indexes existed only in pre-CSV library snapshots;
+                # runs old enough to reference one re-render with the slot empty.
+                "tension_index": "",
                 "user_message": user_message,
             }
             r.user = _format(tpl("step2_tag_tensions.txt"), r.variables, r)

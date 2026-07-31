@@ -128,7 +128,7 @@
       ]
     }
   ],
-  "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-28_17-32_pareto200",
+  "input": "outputs/dad/runs/2026-07-28_17-32_pareto200",
   "corpus": "dad_corpus.jsonl",
   "embed_model": "gemini-embedding-001",
   "n_records": 190,

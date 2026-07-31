@@ -10,9 +10,10 @@ Three source files live in constitution/:
   Claude constitution, in the SDF prompts (system prompt at layers 4-5,
   template variables at layer 3).
 
-The sentient-beings reading is no longer sent by either pipeline's generation
-calls; load_full_constitution/load_segments remain for the viewer and legacy
-runs.
+The sentient-beings reading is not sent by either pipeline's generation calls:
+it is the source the principles CSV was distilled from, and it supplies the
+rubric for evals/compliance_sdf.py. load_full_constitution/load_segments serve
+that eval and the viewer.
 """
 
 import csv
