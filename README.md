@@ -106,7 +106,7 @@ The `Checkpoint` class saves completed IDs to disk after every API call, making 
 
 `audit_dad.py` is the DAD analog. Offline and free by default: response lengths versus the baseline (the plain-model control answers described in the DAD section), tracked tics (pet phrases that repeat across responses), tracked rhetorical moves (recurring argumentative patterns), and a review queue of new tic candidates (`tics.yaml` / `moves.yaml` track both lists across runs; `review_tics.py` is the triage CLI), each with a GOOD/OK/BAD verdict where meaningful. `--judges` adds the paid LLM pass: two per-response judges, welfare impact (does the answer make things better for the beings at stake) and delivery quality (how helpfully and unobtrusively it serves the user), plus a showcase pass that picks concrete examples of the pipeline beating the baseline, and rhetorical-move discovery candidates. Writes `audit/audit_report.json` into the run dir (rendered by the viewer).
 
-`diversity.py` is a corpus-level **semantic** diversity audit of an SDF or DAD run, the embedding-space complement to the audits' word-level scans (word overlap catches copied skeletons, not paraphrase). It embeds the corpus with OpenAI `text-embedding-3-small` (needs `OPENAI_API_KEY` in `.env`; about $0.02 per million tokens, so cents per run) and reports nearest-neighbor similarity, the semantic near-duplicate rate, the most-similar pairs with snippets, mean pairwise similarity, the Vendi score (the effective number of distinct documents), and per-type spread. Embeddings are cached per run dir so reruns are free; `--compare <previous diversity_report.json>` prints run-over-run deltas, the headline use. Writes `audit/diversity_report.json` into the run dir.
+`diversity.py` is a corpus-level **semantic** diversity audit of an SDF or DAD run, the embedding-space complement to the audits' word-level scans (word overlap catches copied skeletons, not paraphrase). It embeds the corpus via `shared/embeddings.py`, which supports two providers and uses whichever key is in `.env`: Gemini (`gemini-embedding-001`, `GEMINI_API_KEY`; what this project's runs use) or OpenAI (`text-embedding-3-small`, `OPENAI_API_KEY`). Either way the cost is cents per run. It reports nearest-neighbor similarity, the semantic near-duplicate rate, the most-similar pairs with snippets, mean pairwise similarity, the Vendi score (the effective number of distinct documents), and per-type spread. Embeddings are cached per run dir so reruns are free; `--compare <previous diversity_report.json>` prints run-over-run deltas, the headline use. Similarity numbers are only comparable between runs embedded by the same provider. Writes `audit/diversity_report.json` into the run dir.
 
 Run: `python evals/audit_dad.py --input outputs/dad/latest`
 
@@ -133,7 +133,7 @@ pip install -r requirements.txt
 cp .env.example .env           # then add your ANTHROPIC_API_KEY
 ```
 
-`OPENAI_API_KEY` in `.env` is optional; only `evals/diversity.py` (the embedding-based diversity audit) reads it. The pipelines run on `ANTHROPIC_API_KEY` alone.
+`GEMINI_API_KEY` (or `OPENAI_API_KEY`) in `.env` is optional; only `evals/diversity.py` (the embedding-based diversity audit) reads them. The pipelines run on `ANTHROPIC_API_KEY` alone.
 
 > **Activate it every time.** The virtual environment only applies to the terminal where you ran `source .venv/bin/activate`. Open a new terminal and you'll need to activate again.
 
@@ -141,7 +141,7 @@ cp .env.example .env           # then add your ANTHROPIC_API_KEY
 
 The pipeline supports two backends, selected by the `backend` key in `config.yaml`:
 
-- **`backend: api`**: calls the Anthropic API directly, billed per token to the `ANTHROPIC_API_KEY` in your `.env` (ask Oliver). Use this for full-scale runs and evals.
+- **`backend: api`**: calls the Anthropic API directly, billed per token to the `ANTHROPIC_API_KEY` in your `.env`. Use this for full-scale runs and evals.
 - **`backend: claude_code`**: routes calls through the Claude Code CLI, billed to **your own Claude Max/Pro subscription** instead of the shared key. No `ANTHROPIC_API_KEY` needed. Use this for dev/iteration runs.
 - **`backend: auto`**: prefers your subscription and falls back to the API key; a dev-iteration mode. Routing is per call: **calls with an empty system prompt (the DAD baseline) always take the API leg** so the plain-model condition stays exact (avoiding the neutral stand-in caveat below); everything else runs on `claude_code` until it can't serve the run (sdk/CLI missing, usage window exhausted, or a persistently failing CLI), at which point the rest of the run is served by the API, announced loudly. Each cost-log record's `backend` field names the leg that actually served that call. Requires `ANTHROPIC_API_KEY` (it is the fallback leg). **Not for representative runs:** subscription-served calls inherit the `claude_code` caveats (no `max_tokens` enforcement, CLI scaffolding in context), so runs whose outputs must represent pipeline behavior belong on `backend: api`.
 
