@@ -164,7 +164,9 @@ follows is what must not be undone by accident.
 **Audience and shape.** Written for an ML researcher at another lab with no context and
 about forty seconds. Hero (illustration, title, intro) → `#datasets` comparison →
 `#explore` chooser → `#sdf` / `#dad` report panels → footer. **Synthetic documents comes
-first everywhere** — comparison, chooser, panel order. No contents rail.
+first everywhere** — comparison, chooser, panel order. **The page has no contents rail; each
+report has one** — a sticky column of its own beats and stages, to the left of the report
+(see "The tab bar is sticky"). Links hung under the bar instead were tried and rejected.
 
 **Naming.** The two datasets are **Synthetic documents** (`sdf`) and **Difficult
 advice** (`dad`). The words "corpus" and "corpora" do not appear on the page. Both are
@@ -175,15 +177,147 @@ transcripts), not a different training phase — and the comparison says so.
 and labels. Cut on sight: aphoristic two-beat deks (at most two `> ` deks on the whole
 page), negation-as-emphasis ("a habit rather than a value"), portentous closers, and any
 sentence explaining why a section exists. `common.editorial_words()` prints the page's
-authored-prose count at build time and `test_the_prose_has_a_ceiling` fails if it grows.
+authored-prose count at build time. **The ceiling that matters is per report, not per page**:
+`test_each_report_a_reader_reads_has_its_own_ceiling` holds each report's beats before its
+appendix under 800 counted words — a reader opens one report, not the page — and
+`test_the_prose_has_a_ceiling` only stops a third body of prose appearing somewhere neither
+of them measures. Both reports sit within a few words of 800, so anything added to one has
+to be paid for out of it.
+
+**Skeleton.** Both reports read: **an opening lede → the pipeline → one example end to end
+→ caveats → appendix**, and both now carry all of it. **The lede takes no heading on either
+side** — the `<h2>` is the heading, and one over a single sentence only names what a reader
+can already see while costing a rail item and a hairline (`h3[id]` is what draws that rule).
+`report/sdf.py` carried a `sdf-what` heading while that report was a stub whose whole content
+was that one line and three stat tiles; it lost it when the beats below it landed, and
+`test_neither_report_puts_a_heading_over_its_opening_line` keeps both sides that way. The stages come before the example that
+walks through them, because the chooser promises a walkthrough. There is still no "what we
+measured" beat: this is not a results report. Each pipeline's stages are `<h4 id>`s under
+**the pipeline** and again, under the same names, in **one example** — one vocabulary per
+pipeline, used twice; `test_both_reports_take_the_same_skeleton` pins the two beat lists
+against each other.
+
+`what it is` earned its heading. It was a bare lede on the reasoning that a heading over one
+sentence only names what a reader can already see — true of one sentence, and not true of
+what the beat now carries: a **vertical flow schematic** (`render.flow()`) of the matrix, the
+three stages and the record, and a **trimmed specimen** of one real record's question and
+answer side by side. Both were previously invisible until the worked example, ~3,000px down.
+The lede stays, first, under the heading, and it names the pipeline and what the pipeline
+produces. **Each half is labelled** — `The pipeline` over the schematic, `The result` over the
+specimen — because a diagram and a quotation left unlabelled make the reader work out for
+themselves which is the process and which is its output, and that is the one distinction the
+rest of the page rests on: everything after this beat is process. The labels take **no id**,
+so they stay out of the rail (an id is what makes an `<h4>` a rail item — `render.substep()`),
+and they are document subheads rather than `h4.pane-h`, because the specimen's own two panes
+are already pane headings. Three rules hold the beat in place: each half is *labelled*, then
+preceded by a sentence that *says* what it shows — a diagram's labels are not read aloud and
+30 words of a record is not a description — and it links nowhere and names no record id,
+because it is the overview and the trail is two beats below. (**Note:** this paragraph
+describes a beat the code does not currently build — `dad.blocks_what()` returns a bare lede
+and `dad.BEATS` has no `dad-what`, a divergence that predates the document report and is
+tracked by the failing `TestWhatItIs` tests. The claim it used to end on, that `sdf.py`
+opened on an `sdf-what` heading, is no longer true either: that heading went when the
+document report was written, so both sides open on a bare lede.)
+
+The beat is cheap on purpose, and that is measured, not hoped: `<svg>`, `<table>`,
+`<blockquote>` and `<div class='resp'>` are all uncounted by `editorial_words()`, so the
+diagram and the specimen cost nothing and the beat costs its heading, two labels and three
+sentences. `#dad` before the appendix sits at 786 of its 800 ceiling — 14 words of headroom,
+so anything added here has to be paid for out of the stage prose below it.
+
+**The type scale is load-bearing, and it is a scale.** It had none: `h3` (a beat) was
+`1.1rem` against a `1.0625rem` body and `h4` (a stage) was `.82rem` sans — *smaller* than
+the prose under it — so a 4,000-word report read as one undifferentiated column. It steps
+2 / 1.4 / 1.12rem, every level clear of the body text, restated at the 620px breakpoint,
+and each beat is chunked off the one before it by a hairline above its `<h3>`.
+`TestTypeScale` keeps it monotonic. `h4` is a document subhead now; the one place it is a
+label over a block (a side-by-side's two halves) keeps the old small sans as `h4.pane-h`.
+
+**The page is the process and the records. It is not documentation and it is not
+results.** Four beats are open and the fifth is drawers, and the line is what a reader has
+to read: what the dataset is, the stages, one record's whole trail, and caveats that hold for
+*any* run. Everything specific to one run is in the appendix. And **nothing on the page explains how to install or run the
+pipeline** — no commands, no `config.yaml`, no cost figures, no per-stage model table.
+That is this file and the repository README, and it was cut deliberately;
+`test_the_page_does_not_explain_how_to_run_the_pipeline` keeps it out.
+
+**The difficult-advice report does not lead with the judged A/B comparison.** That whole
+comparison — considerations, delivery, the scatter, the scoreboard, retention — is one
+drawer in the appendix, headed with why it is there, and **no figure of any kind appears
+outside the appendix**. The reason is in the data: the delivery pass lost 19 of its 80
+judgements on the pinned run, so its two means are over 33 pipeline against 26 control
+answers — different sets of records — judge and generator are the same model family, and
+nothing checks whether the points it counted as added are correct. Do not restore the
+headline. Upstream agrees: PR #107 replaced that judge with two holistic ones, so
+`judged_drawer()` reads either schema (`valuable_welfare_considerations` or
+`delivery`/`welfare_impact`/`composite`) and says which it found.
+
+**Neither report leads with its judge, and both for reasons in the data.** The document
+report's layer-5 judge graded every document it could read 8 or 9 — no document it actually
+graded fell below the gate — so what looks like a gate rejecting twelve documents is ten
+scoring calls whose JSON failed to parse plus two the judge marked down; `sdf.gate()` returns
+both numbers and the appendix table shows them apart. The only check on that judge is
+`audit/realism_ablation.json`, a rerun of its own realism rubric by a judge that cannot see
+the spec, and it scores the same documents 2.7 points lower. Both facts are derived, and both
+are why `judged_drawer()` on that side is titled "and why the report does not lead with it"
+too.
+
+**The appendix is five drawers on each side, one per question a reader has**: what this run's
+audit flagged (first — it is the candour signal), what the judge scored, every chart, every
+check, and the worked example's full rewrite diff. It was eight, and a drawer called "every chart
+from this run" sat beside two siblings that also held a figure and three stat tiles. What
+used to be a row of its own is now inside the drawer whose question it answers — the
+retention chart with the charts, the diversity tiles (`_diversity_block`) and the
+rhetorical-move glossary (`_moves_drawer`) with the checks table rows they belong to. The
+judged drawer's summary keeps its long "and why the report does not lead with it" clause on
+purpose: it is the one caveat a reader gets without opening anything.
 
 **Two rules the tests enforce.** No number is ever typed into a prose file — figures are
-`{{placeholders}}` resolved from the pinned runs at build time, and the page's own prose
-has no facts available at all. And each report's weaknesses beat is *derived* from its
-audit's verdicts, never written; `evals/audit_sdf.py` only prints its verdicts, so
-`report/sdf.py` re-applies the eval's own thresholds. The delivery regression is stated
-in prose exactly **once**; the tile, the scoreboard row and the derived weakness carry
-the same number as data.
+`{{placeholders}}` resolved from the pinned runs at build time, the page's own prose has no
+facts available at all, and `content_sdf.md` gets exactly one, `{{matrix_clause}}`, which
+carries its own degraded string. And every verdict the audit recorded is *derived*, never
+written; `evals/audit_sdf.py` only prints its verdicts, so `report/sdf.py` re-applies the
+eval's own thresholds, each one pinned against the eval's number in
+`test_sdf_report.py::TestDerivedThresholds`.
+
+**The document report spends two chart hues and no more.** `R.PLAIN` and `R.PIPELINE` mean
+"control" and "pipeline" in the difficult-advice report, and that pipeline has no control arm
+— so `report/sdf.py` never borrows them. Its one pair is the matrix's dealt weight against
+what shipped; every other chart is a single series in the palette's default, where a colour
+carries no meaning to confuse. The greens are avoided outright: `--series-6` is `#008300`
+against `--good`'s `#0ca30c`, so a magnitude drawn in it reads as a verdict.
+
+**Caveats and the derived floor are two different things, in two different places.** The
+`caveats` beat a reader sees is authored, general, and carries **no figure and no
+placeholder** — it is about the method, holds for any run, and `blocks_weak()` is handed no
+`audit` at all so a run number cannot get in. Every BAD/OK verdict the run's own audit
+recorded still renders, derived and unfiltered, in the appendix's "What this run's audit
+flagged" drawer, and the delivery regression is stated in prose exactly **once**, inside
+the judged drawer beside the comparison it qualifies.
+`test_the_derived_floor_is_still_on_the_page` builds with the caveats prose emptied and
+asserts every derived row survives, so generalising the caveats cannot quietly become
+softening them.
+
+**The worked example is the run's own lineage.** `#dad-example` renders one record's trail
+— dealt cards, scenario, shipped message, scope, the library entries pulled, the answer,
+what stage 3 changed — every block verbatim from a file in the run directory, assembled by
+`dad.read_lineage()`. A missing artefact names the file it wanted rather than
+disappearing, and null dealt values are dropped rather than rendered as "None". More
+records sit behind `render.tabs()`, whose first pane is visible in the markup so it
+survives JS being off — and the whole carousel sits in a **closed** drawer, because that
+visible pane is a second full transcript (~1,250 words) under the pinned record's own trail.
+
+`#sdf-example` is the same beat over the other pipeline, assembled by `sdf.read_lineage()`:
+dealt cards, the planner's working notes, the spec, the draft, the reviewer's own list of
+problems, the document as it ships, what the rewrite changed, and the judge's three scores.
+Two things differ. The stage-3 drawer **says which of two things the rewrite did** — the
+layer-4 template licenses a rewrite from the premise where the problems are structural, and
+past 60% of the shipped words changed the drawer says "rewritten, not edited" instead of
+presenting three windows as three edits (the pinned run's median is 81%). And the pinned
+document is **English and dealt the central-subject slice** on purpose: 139 of 477 documents
+are English, and a first worked example a reader cannot read, or one from a reserved slice,
+teaches the wrong default. The two extras are the interesting slices — a skeptical author,
+and the arc where there is no welfare stake and the AI correctly raises nothing.
 
 **Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero
 and the Sentient Futures mark are inlined as data URIs from `report/assets/`, the
@@ -193,27 +327,184 @@ Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, wh
 allows a `data:` src and nothing else off-page.
 
 **Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links (mono,
-600, 2px accent underline), outline buttons (`.lbtn`, `.choice`, 4px radius) and one
-filled button (`.cta`). Cream fills with a border are not a control style. Status
+600, 2px accent underline) and outline buttons (`.lbtn`, `.choice`, `.tab`, 4px radius).
+An accent fill means *selected* — the open tab, the open pane — and nothing else; there is
+no primary button. Cream fills with a border are not a control style. Status
 colours (`--good/--warn/--bad`) and the chart series hues stay reserved; the palette
 test recomputes every contrast pair from the tokens.
 
 **The chooser hides things, deliberately.** Neither report is open on load. `#dad` /
 `#sdf` in the URL opens one (so the dataset card's deep links land), a hash naming
-anything inside a report opens the report it lives in, printing expands both, and
-switching scrolls the chooser exactly out of frame. The cost — Cmd-F cannot see a closed
-report — was accepted.
+anything inside a report opens the report it lives in, and printing expands both. The
+cost — Cmd-F cannot see a closed report — was accepted.
 
-**Layout cannot be tested by asserting on HTML.** Two real bugs shipped past the suite
+**The chooser is a disclosure pair, not a tab set, and is marked up as one.** Two buttons
+carrying `aria-expanded` + `aria-controls`; no `role='tablist'`, no `role='tab'`. It was a
+tablist, which promises what this control cannot do: a tablist always has exactly one
+selected tab and nothing here is selected on load — that is the point of the chooser — so
+a screen reader announced "tab, 1 of 2, not selected" twice and the arrow keys the pattern
+owes did nothing. The **example carousel is** a real tab set (one pane is always open), so
+it keeps `role='tab'` and pays the rest of the pattern: `tabindex` roves with the
+selection, Left/Right/Home/End move across the set, and each pane is named by the button
+that opens it. `.choice[aria-expanded=true]` is what the accent fill hangs off.
+
+**The comparison's heading is heard, not seen** (`<h2 class='vh'>`). The two mastheads are
+the visible title; with no heading at all, pressing `H` went from the page title to the
+chooser, past both datasets. **A masthead is a name and nothing else.** The six rows are
+`result` · `result format` · `what it is for` · `pipeline` · `prompt templates` ·
+`example dataset`, and each says which side of the data/pipeline line it is on — the table is
+where the page draws that line first. What each dataset *is* was the masthead's subtitle
+(`.cmp-d`, now gone); it is the `result` row, because it was the only unlabelled claim in a
+table whose every other line said what it was answering. The `pipeline` row is a stage chain
+in the same shape on both sides, and `test_the_pipeline_row_names_the_stages_the_report_goes_on_to_walk`
+checks **both** halves against the stage names in that report's own flow SVG, so the table
+cannot become a fifth vocabulary for the pipeline. The documents column used to carry a
+neutral `Report in preparation` chip, off `sdf.IS_PLACEHOLDER`, because that column is first
+in the comparison, the chooser and the panels and opened ~200 words against the other's
+~10,000. **That report is written now**, so the flag, the chip and `render.compare()`'s
+`status` argument all went with it — a state that is no longer true must not survive as a
+string, and `test_the_comparison_no_longer_marks_this_column_as_a_stub` asserts all three
+are gone.
+
+**Each report ends with the two ways out, and the footer names the runs.** The
+difficult-advice report carried no link at all through ten thousand words, so the reader
+most likely to want the data had to scroll back past everything they had read; the pair
+(`Browse the records` / `The pipeline`) now sits at the foot of the worked example, which
+is the only place it appears. Provenance — run id, commit, dirty flag, backend, one line
+per run via `common.meta_line()` — is in the footer. It was removed on the grounds that a
+run id is for a reader deep in a report rather than the last line of the page, which was
+right about where it belongs and wrong about the consequence: it then appeared nowhere,
+and nothing on the page could be located, reproduced or cited.
+
+**The control edge answers to 3:1, not 4.5:1.** `--accent-edge` is a control boundary
+(WCAG 1.4.11), and at `#c9c3ea` it reached 1.53:1 on the paper — the page's only decision
+had a border a low-vision reader could not see. `TestPalette.CONTROL_EDGES` recomputes it
+against both `--surface-0` and the hover wash. `button` is in the `:focus-visible` rule for
+the same reason: without it the only controls on the page fell back to the UA ring.
+
+**The tab bar is sticky.** Pressing a tab scrolls the bar to the top of the screen, and it
+stays pinned there for the length of the report, on a band in the page's own
+`--surface-0` — which is why a report needs no end-of-report button offering the other one. That is why both panels
+live *inside* `#explore`, wrapped with the bar and the rails in `.explore-body`: a sticky
+box travels only inside its containing block, and a grid item's containing block is its own
+grid area. `.explore-body` is two columns and two rows — the bar across the top, then
+`.railcol` beside a single `.panels` item, which is what makes the rail's column as tall as
+the open report rather than as tall as one grid row.
+The script measures `.explore-body`, never the bar (a stuck sticky element reports where
+it is painted), and the headroom a linked beat or stage needs to clear the bar is
+`scroll-margin-top:7rem` in CSS, not arithmetic in JS (`_bar_rem()` in
+`tests/test_report_page.py` recomputes the bar's height from its tokens, so retuning it
+without revisiting the headroom — or the rail's `top` — fails there).
+
+**Each report's contents ride beside it, in a sticky rail.** `.rail` is a column of jump
+links to that report's `<h3 id>`s with its `<h4 id>` stages nested under them, hidden with
+the panel it belongs to, and **read back off the built panel** by `render.outline()` rather
+than from a `BEATS` list, because the beats are conditional and a link must not name one
+that did not render. A stage becomes a rail item **by having an id** (`render.substep()`) —
+which is why the appendix's `<h4>`s have none: they are inside closed drawers, and a link to
+a collapsed heading goes nowhere. The room for the rail came out of the **shell** (53rem →
+67rem), never the report: the reading column keeps its 38rem measure and the figure track
+812px, because every chart is drawn at 800px. **Nothing is drawn between the rail and the
+report** — a fixed column of sans links, stages indented under their beat, is already not the
+prose beside it, so the hairline there was a second separator; the one rule the contents get
+is below 900px, under them. The 3rem gutter that holds the columns apart instead comes out of
+the **shell's left margin**: `--pull` is a 2.25rem negative left margin on `.explore-body`,
+clamped to `max(0px,(100vw - 67rem)/2)` so a viewport with no margin to spare gets 0, and
+`.choicebar` adds it back or the chooser's centred buttons drift off the page's centre line.
+The contents also **start level with the report's `<h2>`** rather than with the top of the
+row: `.railcol`'s `padding-top` plus the rail's own `.2rem` are derived from `.panel`'s
+3.2rem top margin, and both are recomputed in the tests. Where the reader is takes ink and a left
+edge, never a fill, and the line for "arrived at" is the heading's **own
+`scroll-margin-top`**, read off the element — measured: with the bar's bottom as the line the
+marker sat one heading behind every jump. Below 900px there is no beside, so it becomes a
+static block at the head of the report, held to the reading measure. The page itself still
+has no rail. **The bar has two sizes** — 83px
+tall and 40rem wide loose, 52px and 30rem tight, arrow faded out — and **crosses between
+them at a trigger point, not with the scroll**: a size that tracked scrolling read as
+distraction beside prose. It tightens 96px past its own top and loosens at 24px (two
+thresholds, or a reader on the boundary flips a layout change back and forth), animated by a
+200ms transition on the concrete properties, so the page's reduced-motion rule turns it off
+for free. The script only toggles `.explore-body.tight` — `--t` lives on the wrapper because
+the rail's `top` reads it too, so a tightening bar leaves no growing gap above the contents;
+the sizes are six tokens plus one interpolation off `--t` each, restated per breakpoint. The width floor is measured: below 27.5rem
+the labels wrap and the tight bar is taller than the loose one. `overflow-anchor:none` on
+`.explore-body` is load-bearing: without it the browser corrects the scroll the size change
+causes, which moves the element the trigger is measured from.
+
+**Layout cannot be tested by asserting on HTML.** Four real bugs shipped past the suite
 and were only caught by measuring in a browser: a bare `1fr` grid track grown past the
-page by a wide child (the comparison landed 116px off centre), and a deep link scrolling
-before the multi-megabyte hero had laid out. If you touch layout, measure it — see
-"Checking it renders" in `report/README.md` for the chromium + puppeteer snippet.
+page by a wide child (the comparison landed 116px off centre), a deep link scrolling
+before the multi-megabyte hero had laid out, scroll anchoring fighting the bar's shrink,
+and every section's named grid lines going undefined below 760px, which collapsed the
+prose to one word per line. If you touch layout, measure it — see "Checking
+it renders" in `report/README.md` for the chromium + puppeteer snippet.
 
-**Open TODOs.** No licence is set for either dataset, and the licence row was removed, so
-the page now says nothing about it. Run ids, commits and backends left the page with the
-footer text. The pinned SDF run is the committed 100-document one; the 477-document
-`fullscale-500-opus5` run lives on `origin/aidan/sdf-500-run-and-report`. `page.MAKER_URL`
+**The narrow layout keeps the named lines.** Below 760px `section` is a single track
+declared `[text-start] minmax(0,1fr) [text-end full-end]`, not a bare `minmax(0,1fr)` with
+the children re-placed. Re-placing them was tried and does not work: `section>*` is
+(0,0,1) and loses to `section>figure` (0,0,2) and `section>.explore-body` (0,1,1), which
+then point at names the same block deleted, so the figures, the comparison and the whole
+chooser landed in a 0px implicit track. `TestNarrowLayout` pins both halves — the names
+stay declared, and nothing in that block re-places a child or reaches for `!important`.
+Measured in Chromium at 390×844: panel 358px in a 390px viewport, prose at ~45 characters
+a line, no horizontal page scroll, bar one row at 57px.
+
+**Open TODOs.** No licence is set for either
+dataset, and the licence row was removed, so the page now says nothing about it. **The
+pinned DAD run is `2026-07-29_12-26_archetype200`** (191 examples), a matrix-dealt Opus-5
+run that carries `step1/scenario_deals.jsonl` and `step1/scenarios.jsonl` and is on
+`main`. It replaced `2026-07-20_20-51_bedrock-40`, which PR #108 pruned along with the
+other 35 pre-Opus-5 runs and which the merge of `main` therefore dropped; the report was
+rebuilt against the new run rather than keeping the old directory, because the sweep that
+removed it also removed the bedrock backend it was produced on.
+`2026-07-28_22-14_archetype10` is still not a candidate (hand-seeded from a scratchpad
+file, so the matrix was bypassed, and its own `step1/checklist.txt` fails four composition
+checks). The report still does not lead with the judged comparison, and the reason still
+holds on this run: the delivery judge lost 24 of its judgements, and its two arms cover
+**different sets of records** — 171 each side, but 16 records judged only on the pipeline
+side and 16 only on the control side — while the welfare-impact judge is 179 against 187.
+
+**Two things the repin broke are now fixed, both in `report/dad.py`.** The pinned run is in
+the two-holistic-judge schema (`delivery` / `welfare_impact` / `composite`), which dropped
+the `moral_patient_reasons` metric `_pareto()` plots on its vertical axis — so "Substance
+against manner" rendered its title, its axis note, a "not measured" placeholder and a typed
+caption claiming "The pipeline arm sits up and to the left: it buys substance with manner",
+false here, since the pipeline is higher on both axes (welfare impact 92.33 against 83.01,
+delivery 90.41 against 89.80). `_pareto_figure()` now needs **both** axes measured and
+renders nothing otherwise, covered by
+`test_delivery_without_the_substance_measure_drops_the_pareto` (the older
+`test_delivery_present_renders_the_pareto_in_the_appendix` fixture carries the old metric, so
+it still pins the both-present case). The judged scale is no longer typed: `_score_max()`
+reads `score_max` off the audit's `delivery`/`welfare_impact` block, falling back to 10 for
+pre-rework runs, and every label that said `0–10` — `_JUDGED_AXES`, the scoreboard row, the
+checks table, the dimension figure's note, both regression notes and `_pareto()`'s own domain
+and tips — takes it from there. Rebuilding the DAD judge on held-out labels is the separate,
+larger work that would let the report lead with a comparison again.
+
+**The difficult-advice report names the run its example and its appendix came off**, in two
+muted lines built by `common.run_note()` — under `#dad-example` ("Every block below is
+verbatim from the files of run …") and under the appendix intro ("Every figure and verdict
+below is measured on one run: … , 191 examples"). The report is about a pipeline; those two
+beats are one batch, and with nothing saying so a reader could not tell a property of the
+pipeline from a property of one run — the example carousel's "the same run" pointed at a run
+the page had never introduced. The id is repeated rather than referred back to, because a
+reader arriving from the rail lands in the appendix without having read the example. It is
+derived from the run directory's name and the audit's own `n_prompts`, renders nothing
+without a run id, and stays out of the pipeline and caveats beats, which hold for any run
+(`TestWhichRun`). The **backend is not in it, and no longer a derived warning either** for a
+backend the pipeline no longer has: `common.provenance_warnings()` flags only
+`UNFAITHFUL_BACKENDS` (`claude_code`, `auto`), so the documents report's `claude_code` runs
+still earn their BAD row while the difficult-advice page stopped citing `bedrock`, which is
+not in the code for a reader to go and look at.
+
+**The pinned SDF run is `2026-07-25_15-57_fullscale-500-opus5`** (477 documents), which
+replaced the 100-document `2026-07-11_20-06_matrix100-cli` when the documents report was
+written: it is the only committed run carrying principle coverage, the LLM templating scan,
+a 10-mode compliance pass, card-fidelity drift, a blind realism ablation and a Vendi curve,
+and those are what the appendix is built from. Both runs were generated on the `claude_code`
+backend, so both earn the same BAD provenance row. `matrix100-cli` still builds, and is the
+cheapest way to exercise the degraded path — four of the appendix's inputs are absent from
+it and each names itself. `page.MAKER_URL`
 is inferred from the team's domain. `prompts/README.md` is a version or two behind the
 code (it says step 1a takes no prompt, and predates the `step1c_gate` / `step1d_refine`
 renames and `step2_select.txt`).
