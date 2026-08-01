@@ -86,7 +86,7 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """The two datasets, side by side. Their names are this section's heading.
 
     Six rows, and every one of them says which side of the line it is on: three describe
-    the RESULT — what the dataset is, what it is for, what one record is — and one
+    the RESULT — what the dataset is, what one record is, what it is for — and one
     describes the PIPELINE that produces it, before the two rows that link out to the
     templates and to a made example. A reader arriving cold cannot tell a claim about the
     data from a claim about the process unless the table tells them, and this table is
@@ -102,8 +102,8 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """
     rows = [
         ("result", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
-        ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
         ("result format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
+        ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
         ("pipeline", _cell(content, "sdf_pipeline", f),
          _cell(content, "dad_pipeline", f)),
         ("prompt templates", _prompts_cell(sdf_kwargs, PROMPTS_SDF),
@@ -182,11 +182,10 @@ def footer(maker_icon=""):
 
 # ------------------------------------------------------------------ assembly
 
-def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustration="",
-         maker_icon=""):
+def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
+         illustration="", maker_icon=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
-    sdf_facts = _sdf_facts(sdf_kwargs)
     f = dict(PAGE_FACTS)
     title = C.fill(content["title"], f).strip()
 
@@ -195,11 +194,8 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
     # the rail is the outline of the report that was actually rendered.
     bodies = [(sdf.SECTION_ID,
                f"<h2>{R.esc(sdf.SECTION_TITLE)}</h2>"
-               + sdf.blocks(content=content, f=sdf_facts, run_id=sdf_kwargs.get("run_id", ""),
-                            audit=sdf_kwargs.get("audit"),
-                            diversity=sdf_kwargs.get("diversity"),
-                            manifest=sdf_kwargs.get("manifest"), hf_href=HF_SDF,
-                            repo_href=REPO_URL))]
+               + sdf.blocks(content=content, example=sdf_example, hf_href=HF_SDF,
+                            repo_href=REPO_URL, **sdf_kwargs))]
     if dad_kwargs:
         bodies.append((dad.SECTION_ID,
                        f"<h2>{R.esc(dad.SECTION_TITLE)}</h2>"
@@ -218,10 +214,6 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, illustratio
         "footer": footer(maker_icon),
     }
     return "".join(sections), head
-
-
-def _sdf_facts(kwargs):
-    return sdf.facts(kwargs.get("audit"), kwargs.get("diversity"), kwargs.get("manifest"))
 
 
 def build(**kwargs):

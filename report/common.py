@@ -13,6 +13,7 @@ have to compute its own thresholds.
 """
 
 import argparse
+import difflib
 import json
 import re
 import sys
@@ -174,6 +175,79 @@ def editorial_words(html):
     return len(re.findall(r"[A-Za-z][A-Za-z'’-]*", re.sub(r"<[^>]+>", " ", text)))
 
 
+# ------------------------------------------------------------------ diff
+
+# Both pipelines end on a rewrite of something a previous stage drafted, and both reports
+# show a reader what that rewrite did — so this lives here rather than in either module.
+_DIFF_CSS = ("<style>ins{background:var(--mark);text-decoration:none}"
+             "del{opacity:.5;text-decoration:line-through}</style>")
+
+
+def _opcodes(before, after):
+    a, b = (before or "").split(), (after or "").split()
+    return a, b, difflib.SequenceMatcher(None, a, b).get_opcodes()
+
+
+def changed_fraction(before, after):
+    """How much of the output the rewrite touched, 0-1.
+
+    Its own function because the two pipelines' rewrites behave differently and a renderer
+    has to be able to ask: the difficult-advice rewrite edits an answer, while the document
+    rewrite is licensed to start again from the premise, and a hunk view of a from-scratch
+    rewrite is confetti.
+    """
+    a, b, ops = _opcodes(before, after)
+    changed = sum(max(i2 - i1, j2 - j1) for tag, i1, i2, j1, j2 in ops if tag != "equal")
+    return changed / max(len(b), 1)
+
+
+def diff_summary(before, after):
+    a, b, _ = _opcodes(before, after)
+    return (f"The rewrite touched {changed_fraction(before, after):.0%} of the words "
+            f"({len(a):,} words in, {len(b):,} out).")
+
+
+def _render_ops(a, b, ops):
+    out = []
+    for tag, i1, i2, j1, j2 in ops:
+        if tag == "equal":
+            out.append(R.esc(" ".join(b[j1:j2])))
+        else:
+            if tag in ("replace", "delete"):
+                out.append(f"<del>{R.esc(' '.join(a[i1:i2]))}</del>")
+            if tag in ("replace", "insert"):
+                out.append(f"<ins>{R.esc(' '.join(b[j1:j2]))}</ins>")
+    return " ".join(out)
+
+
+def word_diff(before, after):
+    """Full word-level diff. Lives in an appendix — informative, but as running text
+    it is confetti, and it was a third of the page."""
+    a, b, ops = _opcodes(before, after)
+    return _DIFF_CSS + f"<div class='resp'>{_render_ops(a, b, ops)}</div>"
+
+
+def diff_hunks(before, after, *, top=3, context=16):
+    """The N largest changed runs, each with surrounding context.
+
+    A reader wants to know what the rewrite does, which three concrete edits answer and a
+    full diff buries.
+    """
+    a, b, ops = _opcodes(before, after)
+    changes = [op for op in ops if op[0] != "equal"]
+    if not changes:
+        return "<p class='muted'>The rewrite changed nothing.</p>"
+    biggest = sorted(changes, key=lambda op: -max(op[2] - op[1], op[4] - op[3]))[:top]
+    biggest = sorted(biggest, key=lambda op: op[3])
+    out = []
+    for tag, i1, i2, j1, j2 in biggest:
+        pre = " ".join(b[max(0, j1 - context):j1])
+        post = " ".join(b[j2:j2 + context])
+        mid = _render_ops(a, b, [(tag, i1, i2, j1, j2)])
+        out.append(f"<div class='resp'>… {R.esc(pre)} {mid} {R.esc(post)} …</div>")
+    return _DIFF_CSS + "".join(out)
+
+
 # ------------------------------------------------------------------ cost
 
 def costs_by_stage(costs):
@@ -209,7 +283,35 @@ def stage_cost_table(costs, labels):
     return R.table(["stage", "model", "calls", "cost"], rows, align="llrr")
 
 
+# ------------------------------------------------------------------ provenance
+
+def run_note(run_id, *, n=None, lead):
+    """Which run the blocks below came off, as one muted line.
+
+    A report is written about a pipeline, but its worked example and every figure in its
+    appendix are one run's. Nothing on the page said which, so a reader had no way to tell
+    a property of the pipeline from a property of one batch — and the example carousel's
+    "the same run" pointed at a run that had never been introduced.
+
+    Derived, never authored: the caller supplies the sentence opener, this fills in the
+    run directory's own name and the audit's own count. Empty without a run id, so a build
+    that has none loses the line rather than shipping a dangling sentence.
+    """
+    if not run_id:
+        return ""
+    count = f", {n:,} examples" if n else ""
+    return (f"<p class='muted'>{R.esc(lead)} <span class='mono'>{R.esc(run_id)}</span>"
+            f"{count}.</p>")
+
+
 # ------------------------------------------------------------------ candour floor
+
+# The non-faithful backends this repository can still be run on. `api` is the faithful
+# mode; `bedrock` was removed from the pipeline, so a run produced on it is not something a
+# reader can act on — the row only sent them looking for a backend that is not in the code,
+# and which run the numbers came off is said plainly by ``run_note()`` instead.
+UNFAITHFUL_BACKENDS = ("claude_code", "auto")
+
 
 def provenance_warnings(manifest, *, n=None, small_n=100):
     """The warnings that are true of any run of any pipeline.
@@ -218,9 +320,8 @@ def provenance_warnings(manifest, *, n=None, small_n=100):
     itself flagged, and nothing is ever filtered back out.
     """
     out = []
-    cfg = (manifest or {}).get("config") or {}
-    backend = cfg.get("backend")
-    if backend and backend != "api":
+    backend = ((manifest or {}).get("config") or {}).get("backend")
+    if backend in UNFAITHFUL_BACKENDS:
         out.append(("BAD" if backend == "claude_code" else "OK",
                     f"Generated on the `{backend}` backend rather than `api`. `api` is the "
                     "documented faithful mode, and the one a reader reproducing this would "
@@ -294,6 +395,8 @@ def cli_parser(doc):
     p.add_argument("--content", action="append", default=None,
                    help="prose file, repeatable; overrides the page's default prose file(s)")
     p.add_argument("--example", default=None, help="prompt_id to feature as the worked example")
+    p.add_argument("--sdf-example", dest="sdf_example", default=None,
+                   help="doc_id to feature as the document report's worked example")
     return p
 
 

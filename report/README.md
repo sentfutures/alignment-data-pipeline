@@ -16,21 +16,28 @@ organised by what the eval measured; this is organised by what a reader needs, i
 ```bash
 python report/build_report.py \
   --dad-run outputs/dad/runs/2026-07-29_12-26_archetype200 \
-  --sdf-run outputs/sdf/runs/2026-07-11_20-06_matrix100-cli
+  --sdf-run outputs/sdf/runs/2026-07-25_15-57_fullscale-500-opus5
 # -> report/index.html
 ```
 
 Those two runs are the pinned ones behind the current build. `--run` still works as an
-alias for `--dad-run`. `--content` (repeatable) overrides the prose files, `--example`
-overrides the worked example, `--out-dir` writes elsewhere.
+alias for `--dad-run`. `--content` (repeatable) overrides the prose files, `--example` and
+`--sdf-example` override each report's worked example, `--out-dir` writes elsewhere.
 
 **The page does not document how to run the pipeline.** No install, no invocation, no
 costs, no per-stage model table — that is this repository's own README and `CLAUDE.md`.
 What the page carries is the process, one record's whole trail through it, and caveats.
 
 `--sdf-run` is optional. Without it the synthetic documents' column says "not published
-yet" and its report says no audit output was supplied — the page still builds, and
-carries no dead links.
+yet" and its report keeps its lede, says no run output was supplied, and offers the two
+ways out — the page still builds, and carries no dead links.
+
+Four of the document report's inputs — `audit/compliance_report.json`,
+`audit/card_fidelity_report.json`, `audit/realism_ablation.json` and
+`audit/vendi_curve.json` — are **not** written by `evals/audit_sdf.py`, and only
+`fullscale-500-opus5` carries them. Every block that reads one degrades to naming the file
+it wanted, and the checks table marks it "not run on this run". Building against
+`2026-07-11_20-06_matrix100-cli` is the cheapest way to exercise that path.
 
 The paid audit pass only affects the appendix. Without it, the judged drawer says no paid
 pass ran and the derived-flags drawer gains a BAD row; the four beats above the appendix are
@@ -51,15 +58,20 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 | Anchor      | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | hero        | The illustration, the title, and the three lines that follow from it (_Teaching Claude Why_, and the two datasets built on it) — centred, and carrying the `#intro` id. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `#datasets` | The comparison. No heading over it: the two column mastheads (the name in serif, and nothing else but the SDF chip) are the heading. Six rows, and **each one says whether it describes the data or the process that makes it** — `result`, `what it is for`, `result format`, `pipeline`, then `prompt templates` and `example dataset`. This is where the page draws that line first, because everything after it is two long pipeline walkthroughs and the reader came for the datasets. What each dataset _is_ used to be the masthead's subtitle; it is the `result` row now, because it was the one unlabelled claim in a table whose every other line said what it was answering. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
+| `#datasets` | The comparison. No heading over it: the two column mastheads (the name in serif, and nothing else) are the heading. Six rows, and **each one says whether it describes the data or the process that makes it** — `result`, `result format`, `what it is for`, `pipeline`, then `prompt templates` and `example dataset`. This is where the page draws that line first, because everything after it is two long pipeline walkthroughs and the reader came for the datasets. What each dataset _is_ used to be the masthead's subtitle; it is the `result` row now, because it was the one unlabelled claim in a table whose every other line said what it was answering. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
 | `#explore`  | "Walk through either pipeline" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are _inside_ this section, in `.explore-body` — see "The chooser".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `#sdf`      | Synthetic documents (`report/sdf.py`) — a placeholder while its full report is written. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `#sdf`      | Synthetic documents, in full (`report/sdf.py`). Same skeleton as `#dad` and four pipeline stages instead of three. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `#dad`      | Difficult advice, in full (`report/dad.py`). Opens on the `what it is` overview — the vertical flow schematic and a trimmed specimen. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | footer      | Repo and both viewers as buttons, one provenance line per run, and the build claim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
-Both reports take the same skeleton, so a reader learns it once: **what it is / how it is
-built / one example end to end / where it is weak / appendix**. Each beat is an `<h3>` with
-its own id (`#dad-what`, `#dad-weak`, `#dad-example`).
+Both reports take the same skeleton, so a reader learns it once: **the opening lede / the
+pipeline / one example end to end / caveats / appendix**. The lede takes **no heading** on
+either side — the `<h2>` is the heading, and one over a single sentence only names what a
+reader can already see while costing a rail item and a hairline
+(`test_neither_report_puts_a_heading_over_its_opening_line`). Every beat after it is an
+`<h3>` with its own id (`#dad-weak`, `#sdf-example`), and each report's stages are `<h4 id>`s
+under **the pipeline** and again under **one example** — one vocabulary per pipeline, used
+twice. `test_both_reports_take_the_same_skeleton` pins the two lists against each other.
 
 `what it is` is the overview, and it is two **named** halves, each a label, then a sentence,
 then the thing itself. Under `The pipeline`, `render.flow()` draws the matrix, the three
@@ -97,6 +109,14 @@ has to read:
   reader has**: what this run's audit flagged (the derived floor, first), the judged
   comparison against a plain model with its regression statement, every chart, every check,
   and the worked example's full stage-3 diff.
+
+  **Which run that is, the appendix says**, in a muted line under its intro
+  (`common.run_note()`, with the run directory's name and the audit's own count). The
+  worked example carries the same line, because it is the other beat that is one batch
+  rather than the pipeline — and it comes first, so the appendix's line repeats the id
+  rather than referring back to a beat a reader arriving from the rail has not read. Both
+  are derived and both vanish without a run id. The backend is in neither: see
+  "provenance" below.
 
   It was eight, and the grouping contradicted itself — a drawer called "every chart from
   this run" beside two siblings that also held a figure and three stat tiles, so a reader
@@ -263,12 +283,13 @@ buttons are ~10rem of permanent chrome, a quarter of a phone screen.
 
 | File              | Role                                                                                                                                                                                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `content_page.md` | **Page prose**: title, intro, the comparison's cells, the synthetic documents' placeholder text. The comparison's four prose rows are `*_desc` (`result` — what each dataset _is_), `*_use` (what each is _for_), `*_unit` (`result format` — what one record is) and `*_pipeline` (the stages that make it, as a chain, in the same shape on both sides). A row's **label** lives in `page.section_datasets()`; only its cells are prose. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
+| `content_page.md` | **Page prose**: title, intro, the comparison's cells. The comparison's four prose rows are `*_desc` (`result` — what each dataset _is_), `*_unit` (`result format` — what one record is), `*_use` (what each is _for_) and `*_pipeline` (the stages that make it, as a chain, in the same shape on both sides). A row's **label** lives in `page.section_datasets()`; only its cells are prose. The page's own prose interpolates nothing — a `{{placeholder}}` in it is a build error. |
 | `content_dad.md`  | **Difficult-advice prose.** The file to iterate on for that report.                                                                                                                                                                                                                                                           |
+| `content_sdf.md`  | **Synthetic-documents prose.** Same rules, same 800-word ceiling on the beats before the appendix. One placeholder is available to it, `{{matrix_clause}}`.                                                                                                                                                                     |
 | `page.py`         | The page: hero, comparison, chooser, footer, and the one `document()` call.                                                                                                                                                                                                                                                   |
 | `dad.py`          | The `#dad` beats: `facts()`, the block builders, `read_lineage()`, `judged_drawer()`, `derived_warnings()`.                                                                                                                                                                                                                   |
-| `sdf.py`          | The `#sdf` beats — small on purpose; see "Finishing the second report".                                                                                                                                                                                                                                                       |
-| `common.py`       | Loading, prose parsing, `fill()`, cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser.                                                                                                                                                                                         |
+| `sdf.py`          | The `#sdf` beats: `facts()`, the block builders, `read_lineage()`, `read_matrix()`, `read_attrition()`, `judged_drawer()`, `derived_warnings()`.                                                                                                                                                                                |
+| `common.py`       | Loading, prose parsing, `fill()`, the word diff (`diff_summary`/`diff_hunks`/`word_diff`, used by both reports), cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser.                                                                                                                                                                                         |
 | `render.py`       | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge.                                                                                                                                                                                                                                            |
 | `build_report.py` | The CLI.                                                                                                                                                                                                                                                                                                                      |
 
@@ -298,11 +319,17 @@ against the shipped prose, because a fixture cannot prove it.
 **2. The caveats a reader sees are general; the run's own findings are derived, and in the
 appendix.** Two separate things, and the split is deliberate. `caveats` is authored, holds
 for any run of this pipeline, and takes no `audit` argument at all, so a run number cannot
-get into it. Everything the run's own audit flagged — every BAD/OK verdict, plus
-provenance rules (non-`api` backend, uncommitted changes, small n) and DAD-specific rules
-(a delivery regression, per-measure arm asymmetry, length inflation, an unmeasured
-delivery pass) — is still emitted by `derived_warnings()` whether or not anyone wrote it
-up, and renders in the appendix's "What this run's audit flagged" drawer.
+get into it. Everything the run's own audit flagged — every BAD/OK verdict, plus provenance
+rules (a still-supported non-`api` backend, small n) and DAD-specific rules (a delivery
+regression, per-measure arm asymmetry, length inflation, an unmeasured delivery pass) — is
+still emitted by `derived_warnings()` whether or not anyone wrote it up, and renders in the
+appendix's "What the audit flags" drawer.
+
+The backend rule fires only for `common.UNFAITHFUL_BACKENDS` (`claude_code`, `auto`).
+`bedrock` is not in the pipeline any more, so a row citing it sent a reader looking for a
+backend that is not in the code — and a run's identity is a fact about provenance, said by
+`run_note()`, not a finding an audit caught. The documents report's runs are `claude_code`
+and still earn their BAD row.
 
 Generalising the visible caveats must not lose that floor, and
 `test_the_derived_floor_is_still_on_the_page` builds with the caveats prose _emptied_ and
@@ -596,44 +623,51 @@ one thing no assertion can check is whether the lineage scans as a walk or as a 
 ## Tests
 
 ```bash
-pytest tests/test_report_common.py tests/test_dad_report.py tests/test_report_page.py
+pytest tests/test_report_common.py tests/test_dad_report.py tests/test_sdf_report.py \
+       tests/test_report_page.py
 ```
 
-219 tests, offline. `test_report_common.py` covers the shared plumbing (prose ids, the
-placeholder contract, the provenance floor, the warnings table, the prose count);
-`test_dad_report.py` covers the difficult-advice section along six risk axes —
-degradation, self-containment, candour, not leading with the judge, the lineage naming
-what it could not find, colour integrity; `test_report_page.py` covers the page itself,
-whose distinctive risks are a report that cannot be reached, a column that shows nothing
-when a run is missing, a chooser bar with nowhere to stick or a beat hidden under it, and
-prose growing back.
+Offline. `test_report_common.py` covers the shared plumbing (prose ids, the placeholder
+contract, the provenance floor, the warnings table, the word diff, the prose count);
+`test_dad_report.py` and `test_sdf_report.py` cover the two reports along the same risk
+axes — degradation, candour, not leading with the judge, the lineage naming what it could
+not find, colour integrity; `test_report_page.py` covers the page itself, whose distinctive
+risks are a report that cannot be reached, a column that shows nothing when a run is
+missing, a chooser bar with nowhere to stick or a beat hidden under it, and prose growing
+back.
 
-Three of them are the boundary this page keeps being pulled across, and are worth knowing
+Four of them are the boundary this page keeps being pulled across, and are worth knowing
 by name: `test_the_page_does_not_explain_how_to_run_the_pipeline`,
-`test_the_caveats_carry_no_run_figures` and `test_the_derived_floor_is_still_on_the_page`.
-Slice a beat with `beat(html, anchor)` rather than by `index("id='dad-weak'")` — the naive
-slice keeps the next beat's `<h3` and its stray `3` breaks any assertion about digits.
+`test_the_caveats_carry_no_run_figures`, `test_the_derived_floor_is_still_on_the_page` and
+`test_each_report_a_reader_reads_has_its_own_ceiling`. Slice a beat with
+`beat(html, anchor)` rather than by `index("id='dad-weak'")` — the naive slice keeps the
+next beat's `<h3` and its stray `3` breaks any assertion about digits.
 
-## Finishing the second report
+## The document report's own thresholds
 
-`report/sdf.py` ships the chooser entry, the comparison-table figures and a derived
-provenance floor. The full section is a matter of filling in the same beats `dad.py` uses —
-`R.sub("sdf-example", ...)` and so on — plus a `content_sdf.md` that takes over the
-`sdf_what` / `sdf_soon` ids from `content_page.md` (a rename: the build fails if both
-files define one). Three things to know before starting:
+`derived_warnings()` **cannot be shared between the two reports.** `evals/audit_dad.py`
+records its verdicts into `sections[].rows[]`; `evals/audit_sdf.py` only prints them, so
+`common.audit_verdict_warnings()` returns `[]` for an SDF audit and `sdf.derived_warnings()`
+re-applies the eval's own thresholds instead. Every rule is pinned in
+`test_sdf_report.py::TestDerivedThresholds` against the number the eval uses, so the two
+cannot drift apart silently. Teaching `audit_sdf.py` to record rows the way `audit_dad.py`
+does would give future runs the shared floor for free, and is the fix worth making.
 
-- **`derived_warnings()` cannot be shared.** `evals/audit_dad.py` records its verdicts
-  into `sections[].rows[]`; `evals/audit_sdf.py` only prints them, so
-  `common.audit_verdict_warnings()` returns `[]` for an SDF audit. `sdf.derived_warnings()`
-  mirrors the eval's own thresholds instead. Teaching `audit_sdf.py` to record rows the
-  way `audit_dad.py` does would give future runs the shared floor for free.
-- **`evals/report_sdf.py` on `origin/aidan/sdf-500-run-and-report` is not portable.**
-  Roughly half of its 853 lines is editorial prose welded to a 477-document run ("across
-  477 documents", "nineteen drifted — 95%"), which is exactly what rule 1 exists to
-  prevent. Lift its `excerpt_block()`; write the rest. `render.py` already has
-  `histogram()`.
-- The only committed SDF run with a full `audit/audit_report.json` is
-  `outputs/sdf/runs/2026-07-11_20-06_matrix100-cli` (100 docs). The newer
-  `2026-07-13_13-18_al-gap-fixes-100docs` has only `diversity_report.json` and would need
-  `python evals/audit_sdf.py --input <run> --patterns` re-run. Per-document layer-5
-  scores live in `layer5/scores.jsonl` and in each corpus record's `scores` field.
+Two of the rules are findings in their own right and worth knowing before reading the
+appendix:
+
+- **The gate and the judge are counted separately.** A layer-5 call whose JSON fails to
+  parse is checkpointed at 5/5/5 rather than re-billed, and those records then fail the
+  gate — so "documents the gate dropped" and "documents the judge rejected" are different
+  numbers, and on the pinned run they are 12 and 2. `sdf.gate()` returns both.
+- **Nothing in the pipeline measures plan-to-card fidelity.** Layer 5 is handed the *plan*
+  as the spec, so a plan that quietly substituted one of its dealt cards is scored against
+  its own substitution and passes. `audit/card_fidelity_report.json` is the only thing that
+  looks at it, it is not produced by any committed script, and the caveats beat states the
+  gap in general terms because it holds for every run.
+
+`evals/report_sdf.py` builds the *other* document artefact, `audit/corpus_report.html` — an
+internal audit page, not this one. Roughly half of its 866 lines is editorial prose welded
+to a 477-document run ("across 477 documents", "nineteen drifted — 95%"), which is exactly
+what rule 1 exists to prevent, so nothing here reads from it or from the
+`audit/report_content.json` it consumes.

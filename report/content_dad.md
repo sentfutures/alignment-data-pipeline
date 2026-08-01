@@ -45,27 +45,27 @@ A pipeline that generates a dataset of an AI reasoning well through a user's eth
 
 <!-- id: method_intro -->
 
-Three stages plus a control, one API call each, with its own prompt template and model setting in [prompts](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code samples a case, stage 1 turns it into a user message, stage 2 answers it, stage 3 rewrites that answer against the constitution, and what stage 3 produces is the training record.
+Three stages plus a control. Each is a short chain of model calls, and every call has its own prompt template and model setting in [prompts](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code samples a case, stage 1 turns it into a user message, stage 2 answers it, stage 3 rewrites that answer against the constitution, and what stage 3 produces is the training record.
 
 <!-- id: stage1 -->
 
 The deal fixes the domain, which creatures are at stake, how visible the welfare cost is, the user's attitude and moral framework, and the length and surface form of their message. Named archetypes reserve a share of every run for combinations too rare to come up by chance.
 
-The deal becomes a scenario description, then a drafted message, then a pass/fail gate. The check that matters: delete the animals, and if the dilemma survives intact it belongs in a different dataset. Two rules keep the rest honest — the tempting option has to actually tempt, and the dataset has to correct in **both** directions, because one that only ever talks users down teaches that welfare always loses.
+The deal becomes a scenario description, then a drafted message, then a pass/fail gate, then a rewrite of the message against the cards it was dealt. The gate's central check: delete the animals, and if the dilemma survives intact it belongs in a different dataset. The tempting option also has to actually tempt. And welfare is not always dealt against the user: a reserved share of cases has the animals' interests and the user's goal converging, or pulling both ways, so the dataset does not only ever show caring about animals costing something.
 
 <!-- id: stage2 -->
 
-Before a word of the answer is written, the case is scoped along seven axes — who can be harmed, what the user is really after, which levers are open and what each costs, and whether the animals are replaceable.
+The case is scoped first, along seven axes: who can be harmed, what the user is really after, which levers they hold and what pulling them costs, how large and how avoidable the stake is, what the choice would normalise, and whether anything changes if someone else does the work instead.
 
-Entries are then pulled from {{library_clause}}, when the case crosses their trigger conditions. The library holds two-sided reasoning patterns: it shapes how an answer argues, and is never named in one. The draft is written from the scope, those entries, and the control's answer as a first take.
+A second call then reads the case against each entry's trigger conditions and pulls what fits, from {{library_clause}}. Its entries argue a question in both directions rather than toward a conclusion, and none of them is ever named in an answer. The draft is written from the scope, those entries, and the control's answer as a first take.
 
 <!-- id: stage3 -->
 
-The draft is rewritten against a distilled set of constitution principles, each carried with the verbatim constitution text it came from. Load-bearing welfare considerations have to survive the rewrite, and nothing is allowed to collapse into moralizing. This is the alignment-critical pass, and the stage the _Teaching Claude Why_ ablation identified as carrying most of the benefit.
+The draft is rewritten against a distilled set of constitution principles, each carried with the verbatim constitution text it came from. Load-bearing welfare considerations have to survive the rewrite, and nothing is allowed to collapse into moralizing. This is the alignment-critical pass, and the stage the *Teaching Claude Why* ablation identified as carrying most of the benefit.
 
 <!-- id: control -->
 
-Each dilemma is also answered by a plain model with **no system prompt** — no scope, no library, no rewrite. Stage 2 is shown it as a first take it may take or leave; the appendix compares against it as the control. It is never a training record.
+Each dilemma is also answered by a plain model with **no system prompt**: no scope, no library, no rewrite. Stage 2 is shown that answer as a first take it may take or leave, and the appendix compares against it as the control, but it never becomes a training record.
 
 <!-- id: example_pick -->
 
@@ -79,11 +79,9 @@ AW-0031 AW-0011
 
 These hold for any run of this pipeline, not just the one this page is built from.
 
-- **The dilemmas are synthetic.** A weighted matrix is a judgement about what matters, not a sample of what people actually ask.
-- **The judges and the generator are the same model family**, so they share blind spots and, plausibly, preferences. There are no held-out human labels; the prompts were tuned by hand over many read-throughs.
-- **Nothing checks that an added welfare point is correct** — only that it is there and that the control did not make it.
-- **The answers run long**, which is the most visible property a model trained on them would inherit, and something the judges see too.
 - **This measures the data, not a model.** Nothing here shows that training on it makes a model behave better.
+- **The dilemmas are synthetic.** A weighted matrix is a judgement about what matters, not a sample of what people actually ask.
+- **The judges and the generator are the same model family**, so they share blind spots and, plausibly, preferences. There are no held-out human labels, and nothing checks that an added welfare point is correct, only that it is there and that the control did not make it.
 
 <!-- id: appendix_intro -->
 

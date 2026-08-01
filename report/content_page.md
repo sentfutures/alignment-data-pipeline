@@ -19,9 +19,9 @@ at most two.
 
 The comparison is six rows, and each one says whether it is describing the data or the
 process that makes it. `dad_desc` / `sdf_desc` are the `result` row — what each dataset
-*is*, in one sentence. `dad_use` / `sdf_use` are what each is *for*: both are midtraining,
-and the difference is the format they are consumed in. `dad_unit` / `sdf_unit` are the
-`result format` — what one record is. `dad_pipeline` / `sdf_pipeline` are the stages that
+*is*, in one sentence. `dad_unit` / `sdf_unit` are the `result format` — what one record
+is. `dad_use` / `sdf_use` are what each is *for*: both are midtraining, and the difference
+is the format they are consumed in. `dad_pipeline` / `sdf_pipeline` are the stages that
 produce it, as a chain, in the same shape on both sides so the two columns can be read
 across. One short line each; a row's LABEL lives in `page.section_datasets()`, only its
 cells are here. The `*_pipeline` chains carry a NON-BREAKING space after each arrow, so a
@@ -33,9 +33,9 @@ No licence is set for either dataset, and the page says nothing about it — the
 would have carried it was removed. When one is set it belongs in the comparison, as a row
 in `page.section_datasets()`, not as prose here.
 
-When the synthetic documents' full report lands, `sdf_what` and `sdf_soon` move to a
-content_sdf.md of their own — moving an id between prose files is a rename, never a
-copy, and the build fails if both files define it.
+Each report's own prose lives in its own file — `content_dad.md` and `content_sdf.md`.
+Moving an id between prose files is a rename, never a copy: the build fails if both files
+define one.
 -->
 
 <!-- id: title -->
@@ -82,10 +82,3 @@ matrix deal → dilemma → reasoning → constitution rewrite
 
 matrix deal → plan → draft → rewrite → score
 
-<!-- id: sdf_what -->
-
-Prose in which careful welfare reasoning is already ordinary: a council minute, a trade journal piece, a support thread. A weighted matrix deals each document's composition in code before any model is called — language, genre, register, domain, and how central the welfare question is, down to a reserved share where it is a detail mentioned in passing.
-
-<!-- id: sdf_soon -->
-
-The full report for this dataset is in preparation and will take the same shape as the other. Until it lands, the run's audit output and every stage template are in the repository.

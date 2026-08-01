@@ -26,7 +26,8 @@ from report import common as C  # noqa: E402
 from report import page  # noqa: E402
 
 REPORT_DIR = Path(__file__).resolve().parent
-CONTENT = [REPORT_DIR / "content_page.md", REPORT_DIR / "content_dad.md"]
+CONTENT = [REPORT_DIR / "content_page.md", REPORT_DIR / "content_dad.md",
+           REPORT_DIR / "content_sdf.md"]
 HERO = REPORT_DIR / "assets" / "hero.png"
 MAKER_ICON = REPORT_DIR / "assets" / "sf.png"
 
@@ -53,7 +54,7 @@ def main():
     kwargs = page.load_inputs(args.content or CONTENT, dad_run=args.dad_run,
                               sdf_run=args.sdf_run)
     hero = data_uri(HERO)
-    html = page.build(example=args.example, illustration=hero,
+    html = page.build(example=args.example, sdf_example=args.sdf_example, illustration=hero,
                       maker_icon=data_uri(MAKER_ICON), **kwargs)
     audit = (kwargs.get("dad_inputs") or {}).get("audit") or {}
     C.write(out_dir / "index.html", html,

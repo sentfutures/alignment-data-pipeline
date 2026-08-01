@@ -679,29 +679,21 @@ def linkbutton(href, label, name="", meta=""):
 def compare(columns, rows):
     """The two datasets, side by side, with their names as the masthead.
 
-    columns: [(name,)] or [(name, status)]. rows: [(label, cell, cell)].
+    columns: [(name,)]. rows: [(label, cell, cell)].
 
     A comparison is a table — the whole point is that "records" lines up with "records" —
     but the names carry the section instead of a heading above it, so the header cells do
     the work a masthead would.
 
-    A masthead is a name and nothing else. What each dataset is used to sit here as a
+    A MASTHEAD IS A NAME AND NOTHING ELSE. What each dataset is used to sit here as a
     subtitle, which left the one claim a reader most needs as the only unlabelled thing in
     a table whose every other line says what it is answering; it is a row now, like the
-    rest.
-
-    ``status`` is a neutral chip under the name, for the one thing a reader has to know
-    before they choose rather than after: that one of these two reports is not written yet.
-    It is a chip because on this page a chip is what a state looks like, and neutral
-    because "in preparation" is a fact about the page, not a verdict on the dataset.
+    rest. A neutral chip under the name also lived here, saying one of the two reports was
+    not written yet; it went when that report was written, because a state that is no
+    longer true must not survive as an affordance nobody passes.
     """
-    cells = []
-    for col in columns:
-        name, status = (list(col) + [""])[:2]
-        cells.append(f"<th><span class='cmp-name'>{esc(name)}</span>"
-                     + (f"<span class='cmp-s'>{chip(status)}</span>" if status else "")
-                     + "</th>")
-    heads = "".join(cells)
+    heads = "".join(f"<th><span class='cmp-name'>{esc(name)}</span></th>"
+                    for (name, *_) in columns)
     body = "".join("<tr><th class='cmp-k' scope='row'>" + esc(label) + "</th>"
                    + "".join(f"<td>{esc(c)}</td>" for c in cells) + "</tr>"
                    for label, *cells in rows)
@@ -1163,7 +1155,6 @@ border-bottom:1px solid var(--hairline)}
 .cmp .cmp-corner{border:0;width:var(--cmp-label)}
 .cmp-name{display:block;font:600 1.28rem/1.2 var(--serif);letter-spacing:-.012em;
 color:var(--text-primary)}
-.cmp-s{display:block;margin-top:.5rem}
 /* Flush right, hard against the pair, and never wrapped: the labels are an index down
    the side of the comparison, and an index that breaks over two lines stops reading as
    one. --cmp-label is wide enough for the longest of them. */

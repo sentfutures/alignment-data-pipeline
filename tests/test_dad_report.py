@@ -33,6 +33,7 @@ import re
 
 import pytest
 
+from report import common as C
 from report import dad as D
 from report import page as P
 from report import render as R
@@ -655,6 +656,19 @@ class TestDegradation:
         assert "<circle" in section
         assert section.index("Substance against manner") > section.index("id='dad-appendix'")
 
+    def test_delivery_without_the_substance_measure_drops_the_pareto(self):
+        """BOTH axes have to be measured. The two-holistic-judge rework dropped the
+        considerations metric this plots on the vertical, and a run carrying only the
+        delivery half rendered the figure anyway: an empty plot reading "not measured on
+        this run" under a caption asserting the pipeline buys substance with manner — a
+        claim about a chart that was not there, and false on the pinned run, where the
+        pipeline is higher on both axes."""
+        audit = {k: v for k, v in AUDIT_FULL.items() if k != "moral_patient_reasons"}
+        section = dad_section(build(audit=audit))
+        assert "Substance against manner" not in section
+        assert "buys substance with manner" not in section
+        assert "id='dad-appendix'" in section              # the rest of the drawer survives
+
     def test_bare_audit_still_carries_the_narrative(self):
         """The process and the caveats are authored, so they survive an audit with nothing
         in it — which is the point of keeping figures out of them."""
@@ -925,7 +939,7 @@ class TestLineage:
         assert "full stage-3 rewrite diff" in appendix.lower()
 
     def test_diff_summary_reports_how_much_changed(self):
-        assert "%" in D._diff_summary("a b c d", "a b c e")
+        assert "%" in C.diff_summary("a b c d", "a b c e")
 
     def test_no_example_data_is_reported_not_crashed(self):
         assert "No worked example" in strip_tags(build(audit={"n_prompts": 1}))
@@ -978,6 +992,57 @@ class TestColourIntegrity:
             assert "<title>" in svg or "aria-hidden='true'" in svg
 
 
+class TestJudgedScale:
+    """The judges' scale is the run's, read off the audit rather than typed."""
+
+    def test_a_hundred_point_pass_is_labelled_as_one(self):
+        """The two-holistic-judge rework grades 0–100 where the pass it replaced graded
+        0–10, and six places typed "0–10" — so a mean of 92.33 printed against a scale of
+        ten."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["delivery"].update(score_max=100, pipeline_mean=92.33, plain_mean=83.01)
+        text = strip_tags(dad_section(build(audit=audit)))
+        assert "judged delivery quality, 0–100" in text
+        assert "judged 0–100" in text                      # and the checks table with it
+        assert "0–10" not in text.replace("0–100", "")      # nowhere is the old scale left
+
+    def test_a_pass_that_records_no_scale_is_a_ten_point_one(self):
+        """Which is what every pre-rework run looks like, and they are still on the page."""
+        assert "judged delivery quality, 0–10" in strip_tags(dad_section(build()))
+
+
+class TestWhichRun:
+    """A report is about a pipeline. Its worked example and its appendix are one run, and
+    the page used to leave that to be inferred — the carousel said "the same run" of a run
+    it had never introduced."""
+
+    RUN = "2026-07-29_12-26_archetype200"
+
+    def test_the_example_and_the_appendix_both_name_the_run(self):
+        """Both, and the id repeated rather than "that run": a reader arriving from the
+        rail lands in the appendix without having read the beat that introduced it."""
+        section = dad_section(build(run_id=self.RUN, rewrites=REWRITES, lineage=LINEAGE))
+        example = section[section.index("id='dad-example'"):section.index("id='dad-weak'")]
+        appendix = section[section.index("id='dad-appendix'"):]
+        assert self.RUN in example
+        assert self.RUN in appendix
+
+    def test_the_appendix_says_how_big_the_run_was(self):
+        section = dad_section(build(run_id=self.RUN))
+        assert "2 examples" in strip_tags(section[section.index("id='dad-appendix'"):])
+
+    def test_the_run_is_named_where_the_report_stops_being_general(self):
+        """Not in the pipeline beat and not in the caveats: those hold for any run, and a
+        run id in them would say the opposite."""
+        section = dad_section(build(run_id=self.RUN, rewrites=REWRITES, lineage=LINEAGE))
+        general = (section[section.index("id='dad-built'"):section.index("id='dad-example'")]
+                   + section[section.index("id='dad-weak'"):section.index("id='dad-appendix'")])
+        assert self.RUN not in general
+
+    def test_a_build_with_no_run_id_ships_no_dangling_sentence(self):
+        assert "measured on one run" not in strip_tags(build()).lower()
+
+
 class TestCandour:
     """The weaknesses floor is derived from the run, so it cannot be edited away."""
 
@@ -990,19 +1055,13 @@ class TestCandour:
         text = strip_tags(build())
         assert "40%" in text and "0%" in text
 
-    def test_non_faithful_backend_is_flagged(self):
+    def test_the_backend_and_the_tree_are_not_findings(self):
+        """Both left the floor. `bedrock` names a backend this repository no longer has,
+        and a dirty tree fires on every run there has ever been. What a reader needed from
+        them — which run these numbers are — is said by the run note instead."""
         warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
-        assert any("bedrock" in w for _, w in warnings)
-
-    def test_api_backend_removes_that_warning(self):
-        manifest = json.loads(json.dumps(MANIFEST))
-        manifest["config"]["backend"] = "api"
-        warnings = D.derived_warnings(AUDIT_FULL, manifest, D.facts(AUDIT_FULL, manifest))
-        assert not any("faithful mode" in w for _, w in warnings)
-
-    def test_dirty_git_tree_is_surfaced(self):
-        warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
-        assert any("uncommitted" in w for _, w in warnings)
+        for gone in ("bedrock", "faithful mode", "uncommitted"):
+            assert not any(gone in w for _, w in warnings), gone
 
     def test_extraction_failures_produce_an_asymmetry_note(self):
         """It moved into the judged drawer with the comparison it qualifies."""
@@ -1052,7 +1111,7 @@ class TestCandour:
         section = dad_section(build(content=content(caveats=""), manifest=MANIFEST))
         appendix = strip_tags(section[section.index("id='dad-appendix'"):])
         assert "BAD" in appendix
-        assert "What this run's audit flagged" in appendix
+        assert "What the audit flags" in appendix
         # Every row the audit produced, matched on a distinctive phrase of its own wording.
         for _, text in D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST)):
             probe = re.sub(r"\s+", " ", re.sub(r"[*`]", "", text))[:45]

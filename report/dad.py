@@ -40,8 +40,6 @@ Built by report/build_report.py. stdlib only, and deliberately no imports from v
 or shared/.
 """
 
-import difflib
-
 from report import common as C
 from report import render as R
 
@@ -68,17 +66,15 @@ SECTION_TITLE = "Difficult advice"
 # chart, every check, the derived floor — is in the appendix. How to install and run the
 # pipeline is in the repository README and is not on this page at all.
 #
-# "What it is" WAS not a beat: the <h2> plus one line under it did that job, and a heading
-# over a single sentence only names what a reader can already see. That reasoning held for a
-# heading over one sentence. It does not hold for this beat, which carries the shape of the
-# pipeline and a record of its output — the two things a reader arriving cold has no way to
-# see, and which otherwise wait ~3,000px for the worked example. It also closes a real
-# divergence: report/sdf.py has always opened on `sdf-what`, and the note beside it said the
-# dad side was the one that would change.
+# "What it is" is not a beat: the <h2> plus one line under it does that job, and a heading
+# over a single sentence only names what a reader can already see — while costing a rail
+# item and a hairline. report/sdf.py carried an `sdf-what` heading while that report was a
+# stub whose whole content was that one line and three stat tiles; it lost it when the beats
+# below it landed, so both reports now open the same way.
 BEATS = (
     ("dad-built", "The pipeline"),
     ("dad-example", "One example, end to end"),
-    ("dad-weak", "Where it is weak"),
+    ("dad-weak", "Caveats"),
     ("dad-appendix", "Appendix"),
 )
 
@@ -322,9 +318,7 @@ def facts(audit, manifest=None, diversity=None):
     if lib.get("library_size"):
         f["library_n"] = lib["library_size"]
         f["library_used"] = lib.get("used")
-        f["library_clause"] = (f"a {lib['library_size']}-entry animal-ethics reasoning library, "
-                              f"of which {lib.get('used', '?')} were pulled at least once on "
-                              f"this run")
+        f["library_clause"] = _library_clause(lib["library_size"], lib.get("used"))
     stance = (audit.get("moves") or {}).get("stance") or {}
     if stance.get("pipeline"):
         f["moralizes_pipeline"] = f"{stance['pipeline'].get('moralizes', 0):.0%}"
@@ -347,6 +341,25 @@ def facts(audit, manifest=None, diversity=None):
     ):
         f.setdefault(key, default)
     return f
+
+
+def _library_clause(size, used):
+    """The reasoning library, as a noun phrase a sentence can end on.
+
+    A phrase, not a sentence, because the prose hangs it off the end of the clause that
+    says a model does the picking — and the coverage figure has to come last, or the
+    "whose trigger conditions" it belongs to sits fifteen words from its verb.
+
+    The coverage figure is stated only when it says something. A run that reached every
+    entry printed "a 45-entry library, of which 45 were pulled at least once", which is a
+    fact with no content and reads as a measurement that failed to measure.
+    """
+    lib = f"a {size}-entry animal-ethics reasoning library"
+    if used is None:
+        return lib
+    if used >= size:
+        return f"{lib}, every entry of which was reached at least once on this run"
+    return f"{lib}, {used} entries of which were reached at least once on this run"
 
 
 def _judge_arms_clause(audit):
@@ -402,7 +415,7 @@ def _labels(audit):
 # ------------------------------------------------------------------ beats
 
 def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=(),
-                   hf_href="", repo_href=""):
+                   hf_href="", repo_href="", run_id=""):
     """One record's whole trail through the run, then the rest as a carousel.
 
     Every block here is verbatim from a file in the run directory: the cards the composer
@@ -411,13 +424,20 @@ def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=(),
     Nothing is author-supplied, and a step whose artefact is missing names the file it
     wanted rather than disappearing.
 
+    WHICH run is named here, under the heading, because this is where the report stops
+    being about the pipeline and starts being one batch's output — and it is the first of
+    the two beats that are, so the appendix and the carousel's "the same run" both have an
+    antecedent. That the blocks are verbatim from a run directory was a claim this
+    docstring made and the page did not.
+
     THE TWO WAYS OUT SIT AT THE FOOT OF THIS BEAT, and this is the only place in the report
     they appear. A reader who has just followed one record from dealt cards to shipped
     answer is as close to running this themselves as they will get; before this pass the
     whole report — ten thousand words of it — carried no link at all, so that reader had to
     scroll back past everything they had read to find one.
     """
-    blocks = [R.sub("dad-example", "One example, end to end")]
+    blocks = [R.sub("dad-example", "One example, end to end"),
+              C.run_note(run_id, lead="Every block below is verbatim from the files of run")]
     by_pid_rw = {r.get("prompt_id"): r for r in rewrites or []}
     by_pid_base = {r.get("prompt_id"): r for r in baseline or []}
     primary, extras = _picks(content, picks, by_pid_rw)
@@ -521,8 +541,8 @@ def lineage_blocks(pid, rw, base, lin, labels):
         before = rw["draft_response"]
         out.append(R.details(
             "What the constitution rewrite changed in this answer",
-            f"<p class='muted'>{_diff_summary(before, answer)} The three largest changes:</p>"
-            + _diff_hunks(before, answer),
+            f"<p class='muted'>{C.diff_summary(before, answer)} The three largest "
+            f"changes:</p>" + C.diff_hunks(before, answer),
             meta="3 largest changes · full diff in the appendix"))
     return "".join(out)
 
@@ -645,63 +665,8 @@ def _survival_rows(surv):
                                ("dropped", "dropped"), ("added", "added by the pipeline"))]
 
 
-# ------------------------------------------------------------------ diff
-
-_DIFF_CSS = ("<style>ins{background:var(--mark);text-decoration:none}"
-             "del{opacity:.5;text-decoration:line-through}</style>")
-
-
-def _opcodes(before, after):
-    a, b = before.split(), after.split()
-    return a, b, difflib.SequenceMatcher(None, a, b).get_opcodes()
-
-
-def _diff_summary(before, after):
-    a, b, ops = _opcodes(before, after)
-    changed = sum(max(i2 - i1, j2 - j1) for tag, i1, i2, j1, j2 in ops if tag != "equal")
-    return (f"The rewrite touched {changed / max(len(b), 1):.0%} of the answer's words "
-            f"({len(a):,} words in, {len(b):,} out).")
-
-
-def _render_ops(a, b, ops):
-    out = []
-    for tag, i1, i2, j1, j2 in ops:
-        if tag == "equal":
-            out.append(R.esc(" ".join(b[j1:j2])))
-        else:
-            if tag in ("replace", "delete"):
-                out.append(f"<del>{R.esc(' '.join(a[i1:i2]))}</del>")
-            if tag in ("replace", "insert"):
-                out.append(f"<ins>{R.esc(' '.join(b[j1:j2]))}</ins>")
-    return " ".join(out)
-
-
-def _word_diff(before, after):
-    """Full word-level diff. Lives in the appendix — informative, but as running text
-    it is confetti, and it was a third of the page."""
-    a, b, ops = _opcodes(before, after)
-    return _DIFF_CSS + f"<div class='resp'>{_render_ops(a, b, ops)}</div>"
-
-
-def _diff_hunks(before, after, *, top=3, context=16):
-    """The N largest changed runs, each with surrounding context.
-
-    A reader wants to know what stage 3 does, which three concrete edits answer and a
-    full diff buries.
-    """
-    a, b, ops = _opcodes(before, after)
-    changes = [op for op in ops if op[0] != "equal"]
-    if not changes:
-        return "<p class='muted'>The rewrite changed nothing in this answer.</p>"
-    biggest = sorted(changes, key=lambda op: -max(op[2] - op[1], op[4] - op[3]))[:top]
-    biggest = sorted(biggest, key=lambda op: op[3])
-    out = []
-    for tag, i1, i2, j1, j2 in biggest:
-        pre = " ".join(b[max(0, j1 - context):j1])
-        post = " ".join(b[j2:j2 + context])
-        mid = _render_ops(a, b, [(tag, i1, i2, j1, j2)])
-        out.append(f"<div class='resp'>… {R.esc(pre)} {mid} {R.esc(post)} …</div>")
-    return _DIFF_CSS + "".join(out)
+# The word diff moved to report/common.py when the document report grew a rewrite stage of
+# its own: `C.diff_summary`, `C.diff_hunks`, `C.word_diff`.
 
 
 # ------------------------------------------------------------------ results
@@ -723,7 +688,7 @@ def scoreboard(audit, f, cons):
         rows.append(("valuable welfare considerations per answer", f["considerations_plain"],
                      f["considerations_pipeline"], _verdict_chip(True)))
     if "delivery_pipeline" in f and f.get("delivery_plain") not in (None, "?"):
-        rows.append(("judged delivery quality, 0–10", f["delivery_plain"],
+        rows.append((f"judged delivery quality, 0–{_score_max(audit)}", f["delivery_plain"],
                      f["delivery_pipeline"],
                      _verdict_chip(float(f["delivery_pipeline"]) >= float(f["delivery_plain"]))))
     if "density_pipeline" in f:
@@ -798,13 +763,22 @@ def _delivery_statement(audit, f):
              if worse and len(worse) == len(dims.get("pipeline") or {}) else "")
     return R.note(
         f"**Judged delivery went the wrong way: {f['delivery_pipeline']} against the "
-        f"control's {f['delivery_plain']} out of 10.** The added substance was not free — on "
+        f"control's {f['delivery_plain']} out of {_score_max(audit)}.** The added substance "
+        f"was not free — on "
         f"manner alone, the plain answers read as more helpful.{every}", tone="bad")
 
 
 def _pareto_figure(audit, mpr, labels):
+    """Substance against manner, or nothing.
+
+    BOTH axes have to be measured. The two-holistic-judge rework dropped the substance
+    metric this plots on the vertical, and a run carrying only the delivery half rendered
+    the figure anyway: an empty plot reading "not measured on this run" under a caption
+    asserting the pipeline "buys substance with manner" — a claim about a chart that was
+    not there, and false on the pinned run, where the pipeline is higher on both axes.
+    """
     delivery = audit.get("delivery") or {}
-    if not delivery.get("per_case"):
+    if not (delivery.get("per_case") and (mpr or {}).get("per_case")):
         return ""
     n_p, n_b, fails = delivery.get("n_pipeline"), delivery.get("n_plain"), delivery.get("failures")
     asym = ""
@@ -851,6 +825,9 @@ def _survival_chart(per_case, labels):
 def _pareto(delivery, mpr, labels):
     per_d = delivery.get("per_case") or {}
     per_r = mpr.get("per_case") or {}
+    # The horizontal axis is the judges' own scale, so the domain and the tips read it off
+    # the pass rather than assuming the 0–10 the pre-rework judge graded on.
+    smax = _score_max({"delivery": delivery})
     pts, sums = [], {"plain": [0, 0, 0], "pipeline": [0, 0, 0]}
     for pid, entry in per_d.items():
         for arm in ("plain", "pipeline"):
@@ -861,24 +838,39 @@ def _pareto(delivery, mpr, labels):
             y = len(reasons)
             pts.append({"x": score, "y": y, "color": R.ARM_COLORS[arm],
                         "tip": f"{labels.get(pid, pid)} · {arm}: {y} considerations, "
-                               f"delivery {score}/10"})
+                               f"delivery {score}/{smax}"})
             sums[arm][0] += score
             sums[arm][1] += y
             sums[arm][2] += 1
     marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
-              "tip": f"{arm} mean: delivery {s[0] / s[2]:.1f}/10, "
+              "tip": f"{arm} mean: delivery {s[0] / s[2]:.1f}/{smax}, "
                      f"{s[1] / s[2]:.1f} considerations"}
              for arm, s in sums.items() if s[2]]
-    return R.scatter(pts, xdomain=(0, 10), marks=marks)
+    return R.scatter(pts, xdomain=(0, smax), marks=marks)
+
+
+def _score_max(audit):
+    """The scale this run's judges graded on, read off the audit rather than typed.
+
+    The two-holistic-judge rework grades 0–100 where the pass it replaced graded 0–10, and
+    every label on the page said "0–10" — so a mean of 92.33 printed against a scale of
+    ten. 10 is the fallback, because an audit that records no scale is a pre-rework one.
+    """
+    for key in ("delivery", "welfare_impact"):
+        smax = ((audit or {}).get(key) or {}).get("score_max")
+        if smax:
+            return int(smax) if float(smax).is_integer() else smax
+    return 10
 
 
 # The judged axes, in whichever schema the run's audit happens to carry. `delivery` is in
 # both; `welfare_impact` and `composite` arrived with the two-holistic-judge rework, which
 # also dropped the `valuable_welfare_considerations` metric they replaced. A run's audit
-# has one set or the other, so the drawer reads what is there and names it.
+# has one set or the other, so the drawer reads what is there and names it. The two judged
+# axes take the run's own scale; `composite` is a weighted ratio and carries its own.
 _JUDGED_AXES = (
-    ("welfare_impact", "welfare impact, 0–10", "{:.2f}"),
-    ("delivery", "delivery quality, 0–10", "{:.2f}"),
+    ("welfare_impact", "welfare impact, 0–{max}", "{:.2f}"),
+    ("delivery", "delivery quality, 0–{max}", "{:.2f}"),
     ("composite", "composite, 0–1", "{:.3f}"),
 )
 
@@ -886,7 +878,9 @@ _JUDGED_AXES = (
 def _judged_means(audit):
     """(label, plain, pipeline, fmt) for every judged axis this audit recorded."""
     out = []
-    for key, label, fmt in _JUDGED_AXES:
+    smax = _score_max(audit)
+    for key, label_t, fmt in _JUDGED_AXES:
+        label = label_t.format(max=smax)
         block = (audit or {}).get(key) or {}
         means = block.get("arm_means") or block
         p, b = means.get("pipeline_mean", means.get("pipeline")), \
@@ -981,7 +975,8 @@ def checks_table(audit, diversity):
          "Item by item, which of the control's considerations the pipeline kept, weakened or "
          "dropped, and what it added"),
         ("Delivery quality", bool((audit or {}).get("delivery")),
-         "How helpful, proportionate and non-preachy each answer is, judged 0–10"),
+         f"How helpful, proportionate and non-preachy each answer is, "
+         f"judged 0–{_score_max(audit)}"),
         ("Showcase examples", bool((audit or {}).get("showcase")),
          "Concrete pipeline-beats-control cases with verbatim improved spans"),
         ("Response stance", bool(((audit or {}).get("moves") or {}).get("stance")),
@@ -1009,7 +1004,7 @@ def blocks_built(content, f):
     page a reader has to skim past to reach the thing they came for.
     """
     blocks = [R.sub("dad-built", "The pipeline"), C.prose(content, "method_intro", f),
-              R.flow([("1 · the dilemma", "planned, drafted, gated"),
+              R.flow([("1 · the dilemma", "planned, drafted, gated, refined"),
                       ("2 · the reasoning", "scoped, then drafted"),
                       ("3 · the constitution rewrite", "the alignment-critical pass")],
                      branch=("the control arm", 1),
@@ -1123,9 +1118,9 @@ def _footprint_figures(audit, f):
         n_worse = sum(1 for r in rows if r[3].startswith("-"))
         blocks.append(R.figure(
             title="Delivery quality, dimension by dimension",
-            note_="Each dimension is judged 0–10 on the answer alone: did it serve the goal "
-                  "the user actually had, was it proportionate, was the tone right, was "
-                  "uncertainty calibrated.",
+            note_=f"Each dimension is judged 0–{_score_max(audit)} on the answer alone: did "
+                  f"it serve the goal the user actually had, was it proportionate, was the "
+                  f"tone right, was uncertainty calibrated.",
             chart=R.table(["dimension", "control", "pipeline", "delta"], rows, align="lrrr"),
             caption=f"**Worse on {n_worse} of {len(rows)} dimensions.**"))
     return blocks
@@ -1171,7 +1166,8 @@ def derived_warnings(audit, manifest, f):
         worse = sorted(k for k, v in (dims.get("pipeline") or {}).items()
                        if (dims.get("plain") or {}).get(k) is not None and v < dims["plain"][k])
         out.append(("BAD", f"**Delivery quality went the wrong way**: {pm:.1f} against the "
-                           f"control's {bm:.1f} out of 10. The pipeline bought welfare substance "
+                           f"control's {bm:.1f} out of {_score_max(audit)}. The pipeline "
+                           f"bought welfare substance "
                            "at a measurable cost in manner, which is the trade this method is "
                            "meant to avoid."
                            + (f" Worse on every judged dimension ({', '.join(worse)})."
@@ -1197,15 +1193,23 @@ def blocks_weak(content, f):
     """What is wrong with the method, in general — not with this run.
 
     Authored bullets, deliberately carrying no figures: a reader deciding whether to use
-    this pipeline needs to know that the judges share a model family with the generator and
-    that nothing here shows a trained model behaves better, and neither of those facts is a
-    property of one run. It takes no ``audit`` at all, so a run number cannot get in.
+    this pipeline needs to know that nothing here shows a trained model behaves better, that
+    the dilemmas are dealt rather than collected, and that the judges share a model family
+    with the generator. None of the three is a property of one run. It takes no ``audit`` at
+    all, so a run number cannot get in.
+
+    THREE, and the two that went are the test of whether this list stays honest. "Nothing
+    checks that an added point is correct" folded into the judges bullet, because it is the
+    same weakness — the evaluation, not the generation. "The answers run long" went because
+    ``derived_warnings`` already emits it WITH the run's own figure, so the authored twin was
+    a vaguer copy of a row further down the page. A cut is only allowed on one of those two
+    grounds: it is the same caveat as its neighbour, or the page states it better elsewhere.
 
     The run's own findings are not softened by this and are not gone: every BAD and OK
     verdict its audit recorded still renders, derived and unfiltered, in the appendix
     drawer built by ``audit_flags_drawer()``.
     """
-    return R.sub("dad-weak", "Where it is weak") + C.prose(content, "caveats", f)
+    return R.sub("dad-weak", "Caveats") + C.prose(content, "caveats", f)
 
 
 def audit_flags_drawer(audit, f, manifest):
@@ -1322,13 +1326,19 @@ def _moves_drawer(audit):
 
 
 def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest=None,
-                    picks=()):
+                    picks=(), run_id=""):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
     Every chart lands here — the page above carries none — and so does everything specific
     to one run: the judged comparison, and the derived floor of what this run's own audit
     flagged. The beats above are the process, the records, and caveats that hold for any
     run of this pipeline.
+
+    Which is why the run is NAMED here, in the opener: every number behind these drawers is
+    one batch's, and a drawer of verdicts and means with no run against it reads as a
+    property of the pipeline. It names the same run the worked example does, and repeats it
+    rather than saying "that run", because a reader arriving from the rail may not have
+    read the beat that introduced it.
 
     FIVE drawers, each answering a different question: what the audit flagged, how the
     dataset compares to a plain model, every chart, every check, and the worked example's
@@ -1340,6 +1350,8 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
     numbers and the gloss behind two rows of the checks table.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
+              C.run_note(run_id, n=f.get("n"),
+                         lead="Every figure and verdict below is measured on one run:"),
               audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels)]
 
@@ -1386,7 +1398,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
         blocks.append(R.details(
             "The full stage-3 rewrite diff for the worked example",
             "<p class='muted'>Struck through: stage 2's draft. Highlighted: the shipped "
-            "answer.</p>" + _word_diff(rw["draft_response"], rw["rewritten_response"]),
+            "answer.</p>" + C.word_diff(rw["draft_response"], rw["rewritten_response"]),
             meta=f"{len(rw['rewritten_response'].split()):,} words"))
     return "".join(blocks)
 
@@ -1410,7 +1422,8 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
         blocks_what(content, f),
         blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
-                       hf_href=hf_href, repo_href=repo_href),
+                       hf_href=hf_href, repo_href=repo_href, run_id=run_id),
         blocks_weak(content, f),
-        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks),
+        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks,
+                        run_id=run_id),
     ])

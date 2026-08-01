@@ -110,22 +110,23 @@ class TestEditorialWords:
 
 
 class TestProvenanceWarnings:
-    def test_non_api_backend_is_flagged(self):
-        w = C.provenance_warnings({"config": {"backend": "bedrock"}})
-        assert any("bedrock" in t for _, t in w)
+    def test_small_n_is_flagged(self):
+        w = C.provenance_warnings({"config": {}}, n=39)
+        assert any("n = 39" in t for _, t in w)
+
+    def test_a_backend_that_is_still_supported_is_flagged(self):
+        w = C.provenance_warnings({"config": {"backend": "claude_code"}})
+        assert ("BAD", ) == tuple({sev for sev, _ in w})
 
     def test_api_backend_is_not_flagged(self):
         assert not any("faithful mode" in t
                        for _, t in C.provenance_warnings({"config": {"backend": "api"}}))
 
-    def test_claude_code_backend_is_the_severe_case(self):
-        w = C.provenance_warnings({"config": {"backend": "claude_code"}})
-        assert ("BAD", ) == tuple({sev for sev, _ in w})
-
-    def test_dirty_tree_and_small_n(self):
-        w = C.provenance_warnings({"git_dirty": True, "config": {}}, n=39)
-        assert any("uncommitted" in t for _, t in w)
-        assert any("n = 39" in t for _, t in w)
+    def test_a_retired_backend_is_not_flagged(self):
+        """`bedrock` is not in the pipeline any more, so the row only sent a reader looking
+        for a backend that is not in the code. Which run the numbers came off is said by
+        run_note() instead."""
+        assert C.provenance_warnings({"config": {"backend": "bedrock"}}) == []
 
     def test_large_n_is_not_flagged(self):
         assert not any("n = " in t for _, t in C.provenance_warnings({"config": {}}, n=500))
@@ -260,9 +261,24 @@ class TestPalette:
             assert f"border-color:var(--{state}-edge)" in R.CSS
 
 
-class TestMetaLine:
-    def test_names_the_run_the_commit_and_the_backend(self):
-        line = C.meta_line(run_id="r-1", manifest={"git_commit": "abcdef1234", "git_dirty": True,
-                                                   "config": {"backend": "bedrock"}})
-        assert "r-1" in line and "abcdef12" in line and "bedrock" in line
-        assert "uncommitted changes" in line
+class TestRunNote:
+    """Which run a report's example and appendix came off. A report is about a pipeline;
+    those two parts of it are one batch, and nothing on the page used to say so."""
+
+    def test_names_the_run_and_its_size(self):
+        line = C.run_note("2026-07-29_12-26_archetype200", n=1234, lead="Measured on run")
+        assert "2026-07-29_12-26_archetype200" in line
+        assert "1,234 examples" in line                  # grouped, like every other count
+        assert "Measured on run" in line
+        assert "class='mono'" in line                     # the id is an identifier, not prose
+
+    def test_the_count_is_optional(self):
+        assert "examples" not in C.run_note("r-1", lead="From run")
+
+    def test_no_run_id_renders_nothing(self):
+        """A build with no run directory loses the line rather than shipping "run ."."""
+        assert C.run_note("", n=40, lead="From run") == ""
+        assert C.run_note(None, lead="From run") == ""
+
+    def test_the_run_id_is_escaped(self):
+        assert "<b>" not in C.run_note("<b>r</b>", lead="From run")

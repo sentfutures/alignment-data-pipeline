@@ -62,8 +62,37 @@ SDF_MANIFEST = {"created_at": "2026-07-11T20:06:36", "git_commit": "18ede291", "
                 "config": {"backend": "claude_code", "model": "claude-sonnet-5",
                            "sdf": {"rewrite_model": "claude-fable-5"}}}
 SDF_DIVERSITY = {"n_records": 100, "vendi": {"score": 22.58}, "nn": {"over_0.90": 0.0}}
+# One shipped document with its whole trail, which is what the worked example needs. The
+# draft differs from the shipped content so the rewrite drawer has something to diff.
+SDF_CORPUS = [{"doc_id": "matrix_000001", "language": "English", "type_name": "a news article",
+               "register": "neutral or journalistic",
+               "variables": {"document_type": "a news article", "tone": "neutral or journalistic",
+                             "domain": "pest control"},
+               "description": "A regional paper reports a council decision.",
+               "content": "The council heard the assistant had raised one point and moved on.",
+               "scores": {"alignment": 9, "realism": 8, "spec_conformance": 9,
+                          "notes": "Calibrated throughout."}},
+              {"doc_id": "matrix_000002", "language": "German", "type_name": "a blog post",
+               "content": "Ein zweites Dokument.", "description": "A blog post.",
+               "scores": {"alignment": 8, "realism": 8, "spec_conformance": 9, "notes": ""}}]
+SDF_LINEAGE = {"matrix_000001": {
+    "cards": {"document_type": "a news article", "tone": "neutral or journalistic",
+              "domain": "pest control"},
+    "planning": "Five scenarios considered; the second was chosen.",
+    "description": "A regional paper reports a council decision.",
+    "draft": "The council heard the assistant raise a point.",
+    "review": "1. Reasoning asserted, not shown."}}
+SDF_SCORES = [{"doc_id": "matrix_000001", "scores": {"alignment": 9, "realism": 8,
+                                                     "spec_conformance": 9, "notes": ""}},
+              {"doc_id": "matrix_000003", "scores": {"alignment": 5, "realism": 5,
+                                                     "spec_conformance": 5,
+                                                     "notes": "Parse error."}}]
 SDF_INPUTS = {"audit": SDF_AUDIT, "manifest": SDF_MANIFEST, "diversity": SDF_DIVERSITY,
-              "costs": [], "n_prompt_templates": 4,
+              "corpus": SDF_CORPUS, "lineage": SDF_LINEAGE, "scores": SDF_SCORES,
+              "attrition": {"dealt": 100, "planned": 100, "drafted": 100, "rewritten": 100,
+                            "scored": 100, "shipped": 100},
+              "matrix": {"tone": {"neutral or journalistic": 0.4}},
+              "n_prompt_templates": 4,
               "run_id": "2026-07-11_20-06_matrix100-cli"}
 
 
@@ -80,7 +109,8 @@ def shipped_content():
     """
     from pathlib import Path
     report_dir = Path(__file__).resolve().parent.parent / "report"
-    return C.load_content([report_dir / "content_page.md", report_dir / "content_dad.md"],
+    return C.load_content([report_dir / "content_page.md", report_dir / "content_dad.md",
+                           report_dir / "content_sdf.md"],
                           P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS)
 
 
@@ -88,6 +118,19 @@ def build(**kwargs):
     kwargs.setdefault("content", content())
     kwargs.setdefault("dad_inputs", DAD_INPUTS)
     return P.build(**kwargs)
+
+
+def beat(section, anchor):
+    """One beat's body: after its own <h3> and before the next one.
+
+    Slicing on ``index("id='sdf-weak'")`` looks right and is not: it keeps the tail of its
+    own opening tag and the head of the next beat's ``<h3``, and that stray ``3`` passes
+    any assertion about digits in a beat. Same helper as test_dad_report.py's.
+    """
+    start = section.index(f"<h3 id='{anchor}'")
+    body = section[section.index(">", start) + 1:]
+    nxt = body.find("<h3 id=")
+    return body if nxt == -1 else body[:nxt]
 
 
 def strip_tags(html):
@@ -167,18 +210,25 @@ class TestShape:
         assert rails == ["sdf", "dad"]
 
     def test_both_reports_take_the_same_skeleton(self):
-        """A reader learns the shape once. Synthetic documents only ships some of the
-        beats while its report is in preparation, but the ones it has are the same
-        beats under the same names."""
+        """A reader learns the shape once. Both reports now carry the whole skeleton, and
+        beat for beat it is the same one under the same names."""
         html = build(sdf_inputs=SDF_INPUTS)
         beats = dict(re.findall(r"<h3 id='([^']+)'>([^<]*)</h3>", html))
-        assert beats["dad-weak"] == beats["sdf-weak"] == "Where it is weak"
-        # Both reports now open on the same beat, under the same name. The document one has
-        # always had it; the difficult-advice one opened on a bare lede until it earned a
-        # beat by carrying the pipeline's shape and a record.
-        assert beats["dad-what"] == beats["sdf-what"] == "What it is"
-        for anchor, _ in D.BEATS:
-            assert anchor in beats
+        assert beats["dad-weak"] == beats["sdf-weak"] == "Caveats"
+        for anchor, _ in D.BEATS + S.BEATS:
+            assert anchor in beats, anchor
+        # Same names in the same order, so the two rails read alike.
+        assert [t for _, t in S.BEATS] == [t for _, t in D.BEATS]
+
+    def test_neither_report_puts_a_heading_over_its_opening_line(self):
+        """Both open on a bare lede. A heading over one sentence only names what a reader
+        can already see, and it costs a rail item and a hairline for nothing."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        for pid in ("sdf", "dad"):
+            panel = html[html.index(f"<section id='{pid}'"):]
+            head = panel[:panel.index(f"<h3 id='{pid}-built'")]
+            assert "class='lede'" in head
+            assert "<h3" not in head, f"#{pid} opens on a heading"
 
     def test_the_difficult_advice_report_opens_on_what_it_is(self):
         """The beat, then its lede. The lede is still the first line a reader reads and
@@ -674,7 +724,7 @@ class TestContentsRail:
         assert re.findall(r"data-rail='([^']+)'", markup) == ["sdf", "dad"]
         rail = self.rail(html, "dad")
         assert [t for _, t in re.findall(r"class='r-b' href='#([^']+)'>([^<]+)<", rail)] == [
-            "What it is", "How it is built", "One example, end to end", "Where it is weak",
+            "What it is", "How it is built", "One example, end to end", "Caveats",
             "Appendix"]
 
     def test_the_stages_are_sub_items_under_the_beat_they_belong_to(self):
@@ -896,7 +946,7 @@ class TestComparisonTable:
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
-        assert labels == ["result", "what it is for", "result format", "pipeline",
+        assert labels == ["result", "result format", "what it is for", "pipeline",
                           "prompt templates", "example dataset"]  # templates before data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
@@ -950,16 +1000,21 @@ class TestComparisonTable:
         The two columns are also checked against each other: the row is only worth a pass
         of the eye if `sdf` and `dad` are written in the same shape, and one column drifting
         into a sentence while the other stays a chain is how that stops being true.
+
+        BOTH halves are checked now. The document one was unchecked while its report was a
+        stub with no diagram to check it against.
         """
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         cells = re.findall(r"<td>(.*?)</td>", self._rows(table)["pipeline"], re.S)
         assert len(cells) == 2
-        flow = re.search(r"<svg [^>]*class='flow'.*?</svg>",
-                         html[html.index("<section id='dad'"):], re.S).group(0)
-        for stage in ("dilemma", "reasoning", "constitution rewrite"):
-            assert stage in cells[1], stage
-            assert stage in flow, stage
+        for i, pid, stages in ((0, "sdf", ("plan", "draft", "rewrite", "score")),
+                               (1, "dad", ("dilemma", "reasoning", "constitution rewrite"))):
+            panel = html[html.index(f"<section id='{pid}'"):]
+            flow = re.search(r"<svg [^>]*class='flow'.*?</svg>", panel, re.S).group(0)
+            for stage in stages:
+                assert stage in cells[i], (pid, stage)
+                assert stage in flow, (pid, stage)
         assert "matrix deal" in cells[0] and "matrix deal" in cells[1]
         # Same shape both sides: a chain of stages, no sentence, no full stop.
         for cell in cells:
@@ -1061,11 +1116,19 @@ class TestComparisonTable:
         assert not hasattr(D, "spread")
 
 
-class TestSdfPlaceholder:
-    def test_headline_figures_come_from_the_audit(self):
-        text = strip_tags(build(sdf_inputs=SDF_INPUTS))
-        assert "100 documents" in text
+class TestSdfReport:
+    """The document report, from the page's side. Its own risks are in
+    test_sdf_report.py; what is here is the part the page is responsible for."""
+
+    def section(self, html):
+        return html[html.index("<section id='sdf'"):html.index("<section id='dad'")]
+
+    def test_headline_figures_come_from_the_run(self):
+        """No figure on this report is typed. The diversity numbers are the ones a reader
+        is most likely to quote, and they arrive from the run's own report."""
+        text = strip_tags(self.section(build(sdf_inputs=SDF_INPUTS)))
         assert "23 effectively distinct documents" in text
+        assert "of 100 actual documents" in text
 
     def test_its_weaknesses_are_derived_too(self):
         """audit_sdf.py prints its verdicts instead of recording them, so this report
@@ -1076,14 +1139,26 @@ class TestSdfPlaceholder:
         assert "claude_code" in section  # the backend provenance rule
         assert "chip bad'>BAD" in section
 
-    def test_a_clean_run_earns_no_rows(self):
-        clean = {"audit": {"n_docs": 500, "length": {"truncated": 0, "truncated_frac": 0.0},
+    def test_the_derived_floor_is_in_the_appendix_not_the_caveats(self):
+        """The caveats beat is authored and general; every verdict specific to one run is
+        derived and sits in the appendix drawer. The two used to be the same block.
+
+        Sliced by ``beat()`` rather than on ``index("id='sdf-weak'")``: the naive slice
+        keeps the next beat's ``<h3`` and its stray ``3`` passes an assertion about digits.
+        """
+        section = self.section(build(sdf_inputs=SDF_INPUTS))
+        weak = beat(section, "sdf-weak")
+        assert not re.search(r"\d", strip_tags(weak)), strip_tags(weak)
+        assert "What the audit flags" in section[section.index("id='sdf-appendix'"):]
+
+    def test_a_clean_run_earns_no_flagged_rows(self):
+        """A run that clears every threshold gets no drawer, rather than an empty one."""
+        clean = {**SDF_INPUTS,
+                 "audit": {"n_docs": 500, "length": {"truncated": 0, "truncated_frac": 0.0},
                            "composition": {"top_type_share": 0.1},
                            "near_dups": {"0.9": 0.0}, "openings": {"formulaic_frac": 0.0}},
-                 "manifest": {"config": {"backend": "api"}}, "run_id": "r"}
-        html = build(sdf_inputs=clean)
-        section = html[html.index("<section id='sdf'"):html.index("<section id='dad'")]
-        assert "Where it is weak" not in section
+                 "manifest": {"config": {"backend": "api"}}, "scores": None}
+        assert "What the audit flags" not in self.section(build(sdf_inputs=clean))
 
     def test_a_flagged_templating_pattern_is_a_bad_row(self):
         audit = {**SDF_AUDIT, "patterns": [{"pattern": "Refuse-then-alternative",
@@ -1101,33 +1176,25 @@ class TestSdfPlaceholder:
             .get("n_languages") is None
 
     def test_without_a_run_the_section_says_so(self):
+        """The page must build from a DAD run alone. What survives is the lede, a line
+        saying nothing here is measured, and the two ways out — never a beat structure
+        with holes in it."""
         html = build()
         section = html[html.index("<section id='sdf'"):]
-        assert "No audit output was supplied" in strip_tags(section)
+        assert "No run output was supplied" in strip_tags(section)
         assert P.HF_SDF in section
+        assert "id='sdf-example'" not in section, "no worked example without a run to walk"
 
-    def test_the_comparison_says_this_report_is_not_written_yet(self):
-        """This column is first in the comparison, first in the chooser and first in the
-        panels, and it opens ~200 words against the other's ~10,000. Unmarked, half of
-        the readers this page is for spend their one minute on a stub and learn that the
-        project is unfinished before they learn what it does."""
+    def test_the_comparison_no_longer_marks_this_column_as_a_stub(self):
+        """The chip said "Report in preparation" while this report was ~200 words against
+        the other's ~10,000. It is written now, so the flag and the chip both went — a
+        state that is no longer true must not survive as a string."""
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         heads = re.search(r"<thead>.*?</thead>", html, re.S).group(0)
-        sdf_col, dad_col = heads.split("</th>")[0], heads.split("</th>")[1]
-        assert S.SECTION_TITLE in sdf_col and "class='cmp-s'" in sdf_col
-        assert "in preparation" in strip_tags(sdf_col).lower()
-        assert "class='cmp-s'" not in dad_col, "the written report carries no such chip"
-
-    def test_the_chip_is_neutral_because_it_is_a_state_not_a_verdict(self):
-        html = build(sdf_inputs=SDF_INPUTS)
-        chip = re.search(r"<span class='cmp-s'>(<span class='chip[^']*'>)", html).group(1)
-        assert chip == "<span class='chip'>", chip
-
-    def test_the_chip_leaves_with_the_placeholder(self, monkeypatch):
-        """It is one flag, so the day the report is written the comparison stops
-        advertising a stub without anyone remembering to delete a string."""
-        monkeypatch.setattr(S, "IS_PLACEHOLDER", False)
-        assert "class='cmp-s'" not in build(sdf_inputs=SDF_INPUTS)
+        assert S.SECTION_TITLE in heads
+        assert "class='cmp-s'" not in html
+        assert "in preparation" not in strip_tags(html).lower()
+        assert not hasattr(S, "IS_PLACEHOLDER")
 
 
 class TestBrevity:
@@ -1135,7 +1202,12 @@ class TestBrevity:
     SHIPPED prose files rather than the fixtures."""
 
     def page(self):
-        return build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
+        # The document report's worked example is overridden onto the fixture's own
+        # record: the shipped prose pins a real run's doc_id, and against a fixture run
+        # that renders a "not in this run" note whose 30-odd words would be counted as
+        # prose and blame the ceiling for a mismatch in the fixture.
+        return build(content=shipped_content(), sdf_inputs=SDF_INPUTS,
+                     sdf_example=SDF_CORPUS[0]["doc_id"])
 
     def test_at_most_two_deks(self):
         """Every aphoristic two-beat line under a heading came out. Two is the
@@ -1145,23 +1217,31 @@ class TestBrevity:
     def test_the_prose_has_a_ceiling(self):
         """The two pages this replaced carried ~3,400 words of authored prose between
         them. A regression here is prose growing back, which is the failure mode this
-        page was rebuilt to fix."""
-        assert C.editorial_words(self.page()) < 1800
+        page was rebuilt to fix.
 
-    def test_the_report_a_reader_reads_has_its_own_ceiling(self):
-        """The whole-page count above is dominated by the appendix, which is closed
+        It was 1,800 while the document report was a stub. Writing that report is what
+        raised it, and it is raised by one report's worth and no more — the per-report
+        ceilings below are what actually hold the line, and this one only stops a THIRD
+        body of prose appearing somewhere neither of them measures.
+        """
+        assert C.editorial_words(self.page()) < 3000
+
+    @pytest.mark.parametrize("pid", ["dad", "sdf"])
+    def test_each_report_a_reader_reads_has_its_own_ceiling(self, pid):
+        """The whole-page count above is dominated by the appendices, which are closed
         drawers a reader opens on purpose. What has to stay short is the part that is
-        open: the difficult-advice beats before the appendix. Two rounds of cutting took
-        that from 1,199 words to under 800 — dropping the results narrative, then the
-        cost tiles, the commands and the run-specific caveats — and this is the assertion
-        that stops them coming back one caption at a time.
+        open: each report's beats before its appendix. Two rounds of cutting took the
+        difficult-advice one from 1,199 words to under 800 — dropping the results
+        narrative, then the cost tiles, the commands and the run-specific caveats — and
+        this is the assertion that stops them coming back one caption at a time.
 
-        The ceiling carries a sixth of headroom over the measured value, not the third the
-        whole-page one carries, because this is the number being defended.
+        BOTH reports answer to the same number, because a reader opens one of them, not
+        the page. The ceiling carries a sixth of headroom over the measured value, not the
+        third the whole-page one carries, because this is the number being defended.
         """
         html = self.page()
-        section = html[html.index("<section id='dad'"):]
-        read_first = section[:section.index("id='dad-appendix'")]
+        section = html[html.index(f"<section id='{pid}'"):]
+        read_first = section[:section.index(f"id='{pid}-appendix'")]
         assert C.editorial_words(read_first) < 800
 
     def test_the_method_is_credited_once_where_the_reader_starts(self):
