@@ -96,7 +96,7 @@ jobs:
             escalate=""
             if [[ "$issue" =~ ^[0-9]+$ ]]; then
               if gh issue view "$issue" -R "$REPO" --json labels --jq '.labels[].name' 2>/dev/null | grep -qx 'tier-heavy'; then
-                escalate=" Recommendation: relabel issue #$issue to tier-max and re-apply claude-fix for one escalated retry."
+                escalate=" Recommendation: relabel issue #$issue to tier-max, then remove and re-add its claude-fix label (re-adding an already-present label fires no event) — or run \`gh workflow run claude-fix.yml -f issue_number=$issue\` — for one escalated retry."
               fi
             fi
             gh pr comment "$PR" -R "$REPO" --body "**Automated review-fix stopped: $cycles changes-requested cycles.** Repeated review disagreement is not something to grind through automatically — a human should take over.$escalate"

@@ -398,7 +398,7 @@ jobs:
           [ "$risk" = "LOW" ] || risk=HIGH  # fail closed
           if [ "$risk" = "HIGH" ]; then
             gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=needs-human" >/dev/null
-            gh issue comment "$ISSUE" -R "$REPO" --body "**Risk gate: HIGH — implementation blocked.** The plan above touches a HIGH-risk surface (auth, data models/migrations, public API contracts, payments, or PII), so a human must take over. To proceed anyway: review the plan, remove the \`needs-human\` label, edit the plan comment's marker to \`risk=LOW\` only if you are sure, and re-apply \`claude-fix\`."
+            gh issue comment "$ISSUE" -R "$REPO" --body "**Risk gate: HIGH — implementation blocked.** The plan above touches a HIGH-risk surface (auth, data models/migrations, public API contracts, payments, or PII), so a human must take over. To proceed anyway: review the plan, edit the plan comment's marker to \`risk=LOW\` only if you are sure, remove the \`needs-human\` label, then remove and re-add the \`claude-fix\` label (re-adding an already-present label fires no event) — or run \`gh workflow run claude-fix.yml -f issue_number=$ISSUE\`."
             echo "Risk gate: HIGH — stopping deliberately (exit 0)."
           fi
           echo "risk=$risk" >> "$GITHUB_OUTPUT"
@@ -443,7 +443,10 @@ jobs:
               `gh issue edit ${{ env.ISSUE }} --add-label needs-human`, and stop
               WITHOUT writing the PR files. If TIER is tier-heavy, the findings
               comment MUST end with: "Recommendation: relabel this issue to
-              tier-max and re-apply claude-fix for one escalated retry."
+              tier-max, then remove and re-add the claude-fix label (re-adding
+              an already-present label fires no event) — or run `gh workflow
+              run claude-fix.yml -f issue_number=${{ env.ISSUE }}` — for one
+              escalated retry."
 
             When the gate is green:
             - Write a one-line PR title to ${{ runner.temp }}/pr_title.txt
@@ -466,6 +469,15 @@ jobs:
 
       # tier-light: one pass, sonnet/medium — plan comment first, in-prompt risk
       # gate, then the same implement rules as above.
+      #
+      # Accepted tradeoff: unlike the two-phase tiers (where risk is classified
+      # in a write-blocked plan-mode session and a plain step enforces the
+      # gate), tier-light self-applies the gate inside a turn that already
+      # holds edit/push tools, so the gate is prompt discipline, not tool-level
+      # enforcement. This is deliberate — tier-light is reserved for mechanical
+      # fixes (kickoff/triage route anything else higher), and the test gate,
+      # auto-review, and human merge remain behind it. Anything worth a real
+      # gate belongs in tier-standard or above.
       - name: Fix (tier-light, single phase)
         id: light
         if: steps.route.outputs.live == 'true' && steps.params.outputs.mode == 'light'
@@ -662,7 +674,7 @@ jobs:
             manual=false; extra=""
             if [ "$TIER" = "tier-max" ] && [ "$phase" = "plan" ]; then
               manual=true
-              extra="**Auto-retry is disabled for this failure**: a Fable (tier-max) planning run draws heavily on the rolling allowance, so the cron will not relaunch it. Relaunch manually when your quota resets by re-applying the \`claude-fix\` label."
+              extra="**Auto-retry is disabled for this failure**: a Fable (tier-max) planning run draws heavily on the rolling allowance, so the cron will not relaunch it. Relaunch manually when your quota resets: remove and re-add the \`claude-fix\` label (re-adding an already-present label fires no event), or run \`gh workflow run claude-fix.yml -f issue_number=$ISSUE\`."
             fi
             gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=claude-quota-wait" >/dev/null
             body="$RUNNER_TEMP/quota_comment.md"

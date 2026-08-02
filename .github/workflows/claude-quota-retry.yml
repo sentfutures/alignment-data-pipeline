@@ -115,7 +115,7 @@ jobs:
             if [ "$manual" = "true" ] || { [ "$tier" = "tier-max" ] && [ "$phase" = "plan" ]; }; then
               if ! jq -e '[ .[] | select(.body | contains("<!-- claude-quota-frozen -->")) ] | length > 0' <<<"$comments" >/dev/null; then
                 gh issue comment "$num" -R "$REPO" --body "<!-- claude-quota-frozen -->
-          **Not auto-retrying**: this tier-max item quota-failed in its Fable planning phase. Relaunch it manually — when your quota has reset — by re-applying the \`claude-fix\` label (or \`gh workflow run claude-fix.yml -f issue_number=$num\`). The \`claude-quota-wait\` label stays on as the reminder." || true
+          **Not auto-retrying**: this tier-max item quota-failed in its Fable planning phase. Relaunch it manually — when your quota has reset — by removing and re-adding the \`claude-fix\` label (re-adding an already-present label fires no event), or with \`gh workflow run claude-fix.yml -f issue_number=$num\`. The \`claude-quota-wait\` label stays on as the reminder." || true
               fi
               echo "quota-wait $kind #$num: frozen (tier-max plan phase) — skipping."
               continue
