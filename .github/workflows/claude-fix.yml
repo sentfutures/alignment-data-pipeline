@@ -554,6 +554,13 @@ jobs:
       # so smoke and the auto-review would never run. Close+reopen with the
       # Claude App token (its events DO fire) replaces the suppressed `opened`
       # with a live `reopened`.
+      #
+      # The App token comes from the action's `github_token` OUTPUT — declared
+      # in anthropics/claude-code-action's action.yml at ref v1 (outputs:
+      # github_token — "The GitHub token used by the action (Claude App token
+      # if available)"), distinct from the same-named input. If the output ever
+      # arrives empty (e.g. the App is uninstalled and the action fell back to
+      # GITHUB_TOKEN), the warning branch below says exactly what to do.
       - name: Kick CI + auto-review (close/reopen with App token)
         if: steps.pr_open.outputs.created == 'true'
         env:
