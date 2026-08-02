@@ -577,18 +577,40 @@ jobs:
         if: steps.pr_open.outputs.created == 'true'
         env:
           APP_TOKEN: ${{ steps.implement.outputs.github_token || steps.light.outputs.github_token }}
+          FALLBACK_TOKEN: ${{ github.token }}
           PR: ${{ steps.pr_open.outputs.pr }}
         run: |
+          # Best-effort kick: every branch warns-and-continues rather than
+          # failing the job — the failure classifier and verify step must never
+          # mistake a mis-kicked (but real) PR for a failed fix. The one state
+          # this must not silently leave behind is the PR stuck closed, hence
+          # the retries + GITHUB_TOKEN fallback on reopen.
           set -euo pipefail
           if [ -z "${APP_TOKEN:-}" ]; then
             echo "::warning::No App token available from the action step — PR #$PR was created but smoke/auto-review were not triggered. Close and reopen it manually (or push any commit) to kick them."
             exit 0
           fi
-          export GH_TOKEN="$APP_TOKEN"
-          gh pr close "$PR" -R "$REPO"
+          if ! GH_TOKEN="$APP_TOKEN" gh pr close "$PR" -R "$REPO"; then
+            echo "::warning::Could not close PR #$PR for the kick — it stays open, but smoke/auto-review were not triggered (the GITHUB_TOKEN 'opened' event is suppressed). Close and reopen it manually, or push any commit."
+            exit 0
+          fi
           sleep 3
-          gh pr reopen "$PR" -R "$REPO"
-          echo "PR #$PR reopened with the App token — smoke + auto-review should now be running."
+          for i in 1 2 3; do
+            if GH_TOKEN="$APP_TOKEN" gh pr reopen "$PR" -R "$REPO"; then
+              echo "PR #$PR reopened with the App token — smoke + auto-review should now be running."
+              exit 0
+            fi
+            echo "Reopen attempt $i/3 failed; retrying..."
+            sleep $((i * 10))
+          done
+          # Last resort: reopen with GITHUB_TOKEN so the PR at least isn't
+          # stuck closed (its event won't trigger workflows).
+          if GH_TOKEN="$FALLBACK_TOKEN" gh pr reopen "$PR" -R "$REPO"; then
+            echo "::warning::Reopened PR #$PR with GITHUB_TOKEN after the App-token reopen failed 3 times — the PR is open but smoke/auto-review were not triggered. Close and reopen it manually, or push any commit."
+          else
+            echo "::warning::PR #$PR is stuck CLOSED — both the App-token and GITHUB_TOKEN reopens failed. Reopen it manually; the verify step below will flag this run."
+          fi
+          exit 0
 
       # The action reports success the moment the agent's turn ends, even if it
       # silently did nothing (see claude-code-review.yml for the original bug).
@@ -604,6 +626,11 @@ jobs:
           if [ -n "$pr" ]; then echo "✓ Terminal state: PR #$pr is open."; exit 0; fi
           if gh issue view "$ISSUE" -R "$REPO" --json labels --jq '.labels[].name' | grep -qx 'needs-human'; then
             echo "✓ Terminal state: needs-human applied (deliberate hand-off)."; exit 0
+          fi
+          closed=$(gh pr list -R "$REPO" --head "claude/issue-$ISSUE" --state closed --json number --jq '.[0].number // empty')
+          if [ -n "$closed" ]; then
+            echo "::error::PR #$closed exists but is CLOSED — the close/reopen kick failed mid-way. Reopen it manually (gh pr reopen $closed); the fix itself completed."
+            exit 1
           fi
           echo "::error::The Claude step completed but produced neither a PR nor a needs-human hand-off."
           echo "::group::Claude's last turn (likely cause)"
