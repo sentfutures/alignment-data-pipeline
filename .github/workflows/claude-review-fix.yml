@@ -10,7 +10,15 @@
 # PR to a human — by then the disagreement is not mechanical.
 #
 # workflow_dispatch exists for the quota-retry cron (GITHUB_TOKEN can't fire
-# review events, but dispatch is exempt) and for manual re-runs.
+# review events, but dispatch is exempt) and for manual re-runs. Dispatch runs
+# BYPASS the cycle cap: CHANGES_REQUESTED reviews are never dismissed by later
+# pushes (dismiss_stale_reviews clears approvals only), so the historical count
+# is a one-way ratchet — enforcing it on dispatch would permanently re-lock any
+# PR that ever hit 3, including quota-retry resumes and the manual recovery
+# path. Recovery for a capped PR: remove needs-human, then
+# `gh workflow run claude-review-fix.yml -f pr_number=<n>` — one explicit
+# retry; the next review-triggered run re-enforces the cap, so loops stay
+# bounded. The needs-human guard itself is never bypassed.
 
 name: Claude Review Fix
 
@@ -20,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to re-process (quota retries / manual)"
+        description: "PR number to re-process (quota retries / manual override — dispatch runs bypass the 3-cycle cap, not the needs-human guard)"
         required: true
         type: string
 
@@ -58,6 +66,7 @@ jobs:
         id: route
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           stop() { echo "$1"; echo "proceed=false" >> "$GITHUB_OUTPUT"; exit 0; }
@@ -72,9 +81,16 @@ jobs:
           case " $labels " in *" needs-human "*) stop "PR #$PR is labeled needs-human — a human must clear it first.";; esac
 
           # Cycle cap: 3+ changes-requested reviews (from anyone) → hand off.
+          # Review-triggered runs only: the count is cumulative for the PR's
+          # lifetime (changes-requested reviews are never dismissed), so a
+          # capped PR could otherwise never be resumed — every dispatch,
+          # including quota retries and the documented manual recovery, would
+          # just re-derive cycles>=3 and re-apply needs-human. Dispatch is an
+          # explicit write-access decision, and the next review-triggered run
+          # re-enforces the cap, so runaway loops stay bounded either way.
           cycles=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate 2>/dev/null \
             | jq -s 'add // [] | [ .[] | select(.state == "CHANGES_REQUESTED") ] | length')
-          if [ "${cycles:-0}" -ge 3 ]; then
+          if [ "$EVENT" != "workflow_dispatch" ] && [ "${cycles:-0}" -ge 3 ]; then
             gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=needs-human" >/dev/null
             issue="${head_ref#claude/issue-}"
             escalate=""
