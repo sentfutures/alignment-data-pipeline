@@ -37,10 +37,17 @@ permissions:
 
 jobs:
   fix:
+    # The reviewer's comments are fed to a Claude session with edit/push
+    # access, and submitting a review only takes READ access on a public repo —
+    # so only reviews from the auto-reviewer (claude[bot]) or accounts with
+    # repo standing (owner/org member/collaborator) may trigger this. Anyone
+    # else's change requests wait for a human to vet and dispatch manually.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.review.state == 'changes_requested' &&
-       startsWith(github.event.pull_request.head.ref, 'claude/'))
+       startsWith(github.event.pull_request.head.ref, 'claude/') &&
+       (github.event.review.user.login == 'claude[bot]' ||
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.review.author_association)))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -193,9 +200,9 @@ jobs:
             echo "✓ New commits were pushed ($OLD_SHA → $new_sha)."; exit 0
           fi
           replies=$(gh api "repos/$REPO/pulls/$PR/comments" --paginate 2>/dev/null \
-            | jq -s --arg since "$SINCE" 'add // [] | [ .[] | select(.created_at >= $since) | select(.user.login == "github-actions[bot]" or (.user.login | test("claude"; "i"))) ] | length')
+            | jq -s --arg since "$SINCE" 'add // [] | [ .[] | select(.created_at >= $since) | select(.user.login == "github-actions[bot]" or .user.login == "claude[bot]") ] | length')
           comments=$(gh api "repos/$REPO/issues/$PR/comments" --paginate 2>/dev/null \
-            | jq -s --arg since "$SINCE" 'add // [] | [ .[] | select(.created_at >= $since) | select(.user.login == "github-actions[bot]" or (.user.login | test("claude"; "i"))) ] | length')
+            | jq -s --arg since "$SINCE" 'add // [] | [ .[] | select(.created_at >= $since) | select(.user.login == "github-actions[bot]" or .user.login == "claude[bot]") ] | length')
           if [ "$((replies + comments))" -gt 0 ]; then
             echo "✓ No push, but $replies inline replies + $comments comments were posted."; exit 0
           fi
@@ -233,8 +240,10 @@ jobs:
 
           if printf '%s' "$haystack" | grep -qiE "usage limit|hit your .{0,40} limit|quota.{0,30}(exhaust|exceed|reached)|(exhaust|exceed)[a-z]*.{0,30}quota|rate.?limit.{0,30}(reached|exceeded)"; then
             reset=$(printf '%s' "$haystack" | grep -oiE "resets[^\"]{0,60}" | head -1 || true)
+            # Only count markers this pipeline posted itself (GITHUB_TOKEN →
+            # github-actions[bot]) — see the matching note in claude-fix.yml.
             count=$(gh api "repos/$REPO/issues/$PR/comments" --paginate 2>/dev/null \
-              | jq -s 'add // [] | [ .[] | select(.body | contains("<!-- claude-quota pr=")) ] | length')
+              | jq -s 'add // [] | [ .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- claude-quota pr=")) ] | length')
             count=$((count + 1))
             gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=claude-quota-wait" >/dev/null
             body="$RUNNER_TEMP/quota_comment.md"

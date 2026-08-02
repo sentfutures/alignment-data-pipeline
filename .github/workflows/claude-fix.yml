@@ -261,12 +261,15 @@ jobs:
         if: steps.route.outputs.live == 'true'
         run: |
           set -euo pipefail
-          # Only trust plan comments posted by this pipeline's identities — a
-          # human-authored lookalike comment must not steer the implement phase.
+          # Only trust plan comments posted by this pipeline's exact identities:
+          # github-actions[bot] (the post_plan step) and claude[bot] (tier-light
+          # posts via the App token). Exact matches only — a substring test
+          # would let any account with "claude" in its login forge a risk=LOW
+          # plan that the implement phase follows verbatim.
           # (--paginate emits one JSON array per page; jq -s add merges them.)
           gh api "repos/$REPO/issues/$ISSUE/comments" --paginate 2>/dev/null \
             | jq -rs 'add // []
-                | [ .[] | select((.user.login == "github-actions[bot]") or (.user.login | test("claude"; "i")))
+                | [ .[] | select(.user.login == "github-actions[bot]" or .user.login == "claude[bot]")
                         | select(.body | contains("<!-- claude-plan issue=" + env.ISSUE + " ")) ]
                 | (last // empty) | .body' \
             > "$RUNNER_TEMP/plan_comment.md" || true
@@ -643,8 +646,11 @@ jobs:
 
           if printf '%s' "$haystack" | grep -qiE "usage limit|hit your .{0,40} limit|quota.{0,30}(exhaust|exceed|reached)|(exhaust|exceed)[a-z]*.{0,30}quota|rate.?limit.{0,30}(reached|exceeded)"; then
             reset=$(printf '%s' "$haystack" | grep -oiE "resets[^\"]{0,60}" | head -1 || true)
+            # Quota markers are only ever posted by this step (GITHUB_TOKEN →
+            # github-actions[bot]); counting anyone else's would let a stranger
+            # inflate the retry counter past the cap.
             count=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate 2>/dev/null \
-              | jq -s 'add // [] | [ .[] | select(.body | contains("<!-- claude-quota issue=")) ] | length')
+              | jq -s 'add // [] | [ .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- claude-quota issue=")) ] | length')
             count=$((count + 1))
             manual=false; extra=""
             if [ "$TIER" = "tier-max" ] && [ "$phase" = "plan" ]; then

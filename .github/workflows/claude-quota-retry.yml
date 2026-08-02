@@ -77,7 +77,14 @@ jobs:
             fi
           }
           remove_label() { gh api -X DELETE "repos/$REPO/issues/$1/labels/$2" >/dev/null 2>&1 || true; }
-          comments_of() { gh api "repos/$REPO/issues/$1/comments" --paginate 2>/dev/null | jq -rs 'add // []'; }
+          # Quota markers and freeze notes are only ever posted by the pipeline
+          # itself as github-actions[bot]; filtering by that exact author keeps
+          # strangers from forging count/manual_only/reset values that would
+          # freeze an item, stall it, or shove it past the retry cap.
+          comments_of() {
+            gh api "repos/$REPO/issues/$1/comments" --paginate 2>/dev/null \
+              | jq -rs 'add // [] | [ .[] | select(.user.login == "github-actions[bot]") ]'
+          }
 
           # ---- Queue A: busy-wait -------------------------------------------
           while IFS=$'\t' read -r num kind; do
