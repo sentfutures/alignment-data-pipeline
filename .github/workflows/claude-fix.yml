@@ -97,10 +97,15 @@ jobs:
           fi
 
           # Busy gate: repo-wide cap of 2 simultaneous Claude jobs (subscription
-          # quota). Best-effort — two runs starting in the same second can both
-          # count the same peers; the cap smooths quota use, it isn't a lock.
+          # quota). Counts every workflow that runs claude-code-action on the
+          # shared CLAUDE_CODE_OAUTH_TOKEN — the two fixer workflows plus the
+          # @claude mention handler and the auto-reviewer (which this pipeline
+          # itself triggers on the PRs it opens). Only fixer runs can be
+          # deferred, but all four draw the quota being protected. Best-effort —
+          # two runs starting in the same second can both count the same peers;
+          # the cap smooths quota use, it isn't a lock.
           busy=$(gh api "repos/$REPO/actions/runs?status=in_progress&per_page=100" \
-            --jq '[.workflow_runs[] | select((.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml") and (.id != '"$GITHUB_RUN_ID"'))] | length')
+            --jq '[.workflow_runs[] | select((.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml" or .path == ".github/workflows/claude.yml" or .path == ".github/workflows/claude-code-review.yml") and (.id != '"$GITHUB_RUN_ID"'))] | length')
           if [ "${busy:-0}" -ge 2 ]; then
             gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=claude-busy-wait" >/dev/null
             gh issue comment "$ISSUE" -R "$REPO" --body "Deferred: $busy Claude jobs already in progress (repo-wide cap: 2). The retry cron will relaunch this automatically."

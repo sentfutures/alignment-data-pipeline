@@ -50,8 +50,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Capacity counts every claude-code-action workflow on the shared
+          # subscription token (fixers + @claude mentions + auto-reviewer), so a
+          # retry is never dispatched into a window another Claude job is using.
           busy=$(gh api "repos/$REPO/actions/runs?status=in_progress&per_page=100" \
-            --jq '[.workflow_runs[] | select(.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml")] | length')
+            --jq '[.workflow_runs[] | select(.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml" or .path == ".github/workflows/claude.yml" or .path == ".github/workflows/claude-code-review.yml")] | length')
           budget=$((2 - busy))
           if [ "$budget" -gt 2 ]; then budget=2; fi
           if [ "$budget" -le 0 ]; then

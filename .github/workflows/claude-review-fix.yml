@@ -84,9 +84,12 @@ jobs:
             stop "Cycle cap reached ($cycles)."
           fi
 
-          # Busy gate: repo-wide cap of 2 simultaneous Claude jobs (best effort).
+          # Busy gate: repo-wide cap of 2 simultaneous Claude jobs (best
+          # effort). Counts all four workflows that run claude-code-action on
+          # the shared subscription token, not just the fixer pair — see the
+          # matching comment in claude-fix.yml.
           busy=$(gh api "repos/$REPO/actions/runs?status=in_progress&per_page=100" \
-            --jq '[.workflow_runs[] | select((.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml") and (.id != '"$GITHUB_RUN_ID"'))] | length')
+            --jq '[.workflow_runs[] | select((.path == ".github/workflows/claude-fix.yml" or .path == ".github/workflows/claude-review-fix.yml" or .path == ".github/workflows/claude.yml" or .path == ".github/workflows/claude-code-review.yml") and (.id != '"$GITHUB_RUN_ID"'))] | length')
           if [ "${busy:-0}" -ge 2 ]; then
             gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=claude-busy-wait" >/dev/null
             gh pr comment "$PR" -R "$REPO" --body "Deferred: $busy Claude jobs already in progress (repo-wide cap: 2). The retry cron will relaunch this automatically."
