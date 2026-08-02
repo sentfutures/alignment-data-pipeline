@@ -661,6 +661,7 @@ jobs:
           O_PLAN: ${{ steps.plan.outcome }}
           O_LIGHT: ${{ steps.light.outcome }}
           O_IMPL: ${{ steps.implement.outcome }}
+          O_POST: ${{ steps.post_plan.outcome }}
           E_SIMP: ${{ steps.sim_plan.outputs.execution_file }}
           E_SIMI: ${{ steps.sim_impl.outputs.execution_file }}
           E_TRIAGE: ${{ steps.triage.outputs.execution_file }}
@@ -676,6 +677,11 @@ jobs:
           elif [ "$O_PLAN" = "failure" ];   then phase=plan;      exec_file="$E_PLAN"
           elif [ "$O_LIGHT" = "failure" ];  then phase=implement; exec_file="$E_LIGHT"
           elif [ "$O_IMPL" = "failure" ];   then phase=implement; exec_file="$E_IMPL"
+          elif [ "$O_POST" = "failure" ];   then
+            # The plan itself succeeded; only posting it as a comment failed
+            # (after 3 in-step retries). Don't read the plan's exec file here —
+            # grepping a successful transcript would misattribute the failure.
+            phase=plan-comment; exec_file=""
           else
             # A plumbing step failed, or the job was cancelled/timed out.
             phase=implement; exec_file="${E_IMPL:-${E_LIGHT:-$E_PLAN}}"; outcome=other
@@ -719,6 +725,17 @@ jobs:
             note=""
             if [ "$outcome" = "other" ]; then note=" — the failure came from a plumbing step, a timeout, or a cancellation, not a Claude step"; fi
             body="$RUNNER_TEMP/fail_comment.md"
+            if [ "$phase" = "plan-comment" ]; then
+              {
+                echo "**Automated fix run failed while posting the plan comment.** The PLAN phase itself succeeded, but the plan could not be posted as an issue comment after 3 retries, so nothing was persisted and nothing was implemented. Once GitHub comment posting is healthy again: remove the \`needs-human\` label, then remove and re-add \`claude-fix\` (or run \`gh workflow run claude-fix.yml -f issue_number=$ISSUE\`) — the run will re-plan from scratch."
+                echo ""
+                echo "Run: $GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID"
+              } > "$body"
+              gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=needs-human" >/dev/null
+              gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
+              echo "Classified as TASK FAILURE (phase=plan-comment) — needs-human applied."
+              exit 0
+            fi
             {
               echo "**Automated fix run failed** (phase: $phase — not a usage-limit failure$note). A human needs to look."
               echo ""
