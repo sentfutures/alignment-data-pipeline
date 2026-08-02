@@ -190,12 +190,13 @@ jobs:
             6. Never open, close, merge, or approve PRs; never edit labels.
           # Bash(gh api:*) is broader than ideal, but inline-thread replies have
           # no dedicated gh subcommand; the job token's permission set is the
-          # real boundary here.
+          # real boundary here. git is scoped to the subcommands the work needs
+          # (no reset/clean/branch -D) — see the matching note in claude-fix.yml.
           claude_args: |
             --model sonnet
             --effort medium
             --max-turns 50
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(pytest:*),Bash(python:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git rev-parse:*),Bash(git ls-remote:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(pytest:*),Bash(python:*)"
             --disallowedTools "Task"
 
       # The action reports success when the turn ends, even if nothing was done.
