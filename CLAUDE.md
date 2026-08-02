@@ -162,6 +162,16 @@ Every PR that adds or changes pipeline behavior must add or update tests in the 
 - **Derive, don't hardcode, constitution-shaped expectations**: counts and principle ids come from `load_segments()`/`META_PRINCIPLE_IDS`/`_PRINCIPLE_KEYWORDS` (the section count is pinned once, in `test_constitution_loader.py`) — the reading is actively edited and hardcoded ids renumber. FIFO queue stubs are for serial stages only; stages that fan out via `parallel_map` need a callable dispatcher (the stub fails loudly if violated).
 - If you change a prompt template's placeholders or add a template, update `tests/test_prompts_render.py` (and the e2e dispatcher markers in `tests/test_e2e_smoke.py` if the opening prose changed).
 
+## When running in CI
+
+Rules for Claude sessions launched by the repo's automation (`.github/workflows/claude-fix.yml`, `claude-review-fix.yml` — the pipeline that turns `claude-fix`-labeled issues into PRs on `claude/issue-<n>` branches; `scripts/kickoff.sh` files the issues):
+
+- **Test gate** (dependencies are already installed by the workflow): `python -m compileall -q shared sdf_pipeline dad_pipeline pref_pipeline evals viewer && pytest` from the repo root — the exact required `smoke` check. Run it before every push; a PR only opens when it is green.
+- **Definition of done**: the gate is green, the issue's acceptance criteria are met, and there are **no unrelated changes** — touch only files the plan names; never touch `outputs/`, `.github/workflows/`, or `code_quality/`.
+- **Incremental commits**: commit AND push after every coherent step, so a run killed by a usage limit leaves resumable state on the branch. Small commits with imperative subjects. Never force-push; never commit scratch files (plan.md, pr_body.md, review-body.md).
+- **PR body format** (the workflow opens the PR from files you write; `gh pr create --body` bypasses the PR template, so every section is written explicitly): `Closes #<n>`, `## Plan` (the plan as approved by the risk gate), `## Risk class`, `## How to test` (concrete reviewer steps + expected results — required, see PR expectations above), and a final Claude-generated callout line.
+- **Boundaries**: never merge, approve, or close PRs; never remove the `needs-human` label; when giving up, always post a comment explaining the state you left behind before ending the turn.
+
 ## Constitution
 
 Three source files, loaded by `shared/constitution_loader.py` (the two markdown files are joined in memory, never combined on disk):
