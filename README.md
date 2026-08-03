@@ -205,7 +205,7 @@ sdf:
   n_prompts: 6   # documents deck-sampled from the variables matrix
 ```
 
-This produces 6 documents and costs roughly $0.05-0.15.
+This produces 6 documents and costs roughly $3-5 with the committed default `model: claude-sonnet-5` (the layer 4/5 calls carry the full constitution as input, which dominates the cost on a sonnet-tier model). It's far cheaper with `model: claude-haiku-4-5`, or effectively free-on-subscription with `backend: claude_code` (see "Dev backends" in CLAUDE.md).
 
 **2. Run the SDF pipeline:**
 
