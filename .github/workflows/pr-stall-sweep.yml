@@ -14,6 +14,13 @@ name: PR stall sweep
 # PR comments — a sweep that chatters on month-old threads gets muted, and a
 # GITHUB_TOKEN comment cannot trigger a workflow anyway, so it would buy nothing.
 #
+# Everything it does is deduped, because it runs on a schedule and a stalled PR
+# stays stalled for many runs: the label is skipped when already present, and
+# reviewers are skipped when a request is already pending. Case 1 also carries a
+# short grace period — "review still running" is indistinguishable from "review
+# never ran" from out here, so a PR must be quiet for NEVER_REVIEWED_GRACE_MIN
+# before its missing verdict counts as missing.
+#
 # It deliberately does NOT re-run the review: claude-code-review.yml is
 # pull_request-triggered and the action needs that event's PR context. The human
 # re-trigger is to close and reopen the PR (the `reopened` type is in its trigger
@@ -29,6 +36,10 @@ on:
         description: "Days without activity before an unapproved PR is treated as stalled"
         required: false
         default: "7"
+      never_reviewed_grace_minutes:
+        description: "Minutes of quiet before a PR with no verdict counts as never reviewed (a review takes ~3 min)"
+        required: false
+        default: "60"
 
 permissions:
   contents: read
@@ -44,6 +55,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           IDLE_DAYS: ${{ github.event.inputs.idle_days || '7' }}
+          # A review takes ~3 minutes, so anything under an hour of quiet means
+          # "possibly still in flight", not "never ran". Deliberately far shorter
+          # than IDLE_DAYS: a PR that genuinely never got reviewed (#77) should
+          # surface the same morning, not a week later.
+          NEVER_REVIEWED_GRACE_MIN: ${{ github.event.inputs.never_reviewed_grace_minutes || '60' }}
           # Keep in step with ESCALATE_TO in claude-code-review.yml.
           ESCALATE_TO: "Deco354 Liconstan"
         run: |
@@ -51,11 +67,12 @@ jobs:
 
           now=$(date -u +%s)
           idle_cutoff=$(( now - IDLE_DAYS * 86400 ))
+          fresh_cutoff=$(( now - NEVER_REVIEWED_GRACE_MIN * 60 ))
 
           {
             echo "## PR stall sweep"
             echo
-            echo "Idle threshold: ${IDLE_DAYS} days. Draft PRs are skipped."
+            echo "Idle threshold: ${IDLE_DAYS} days. No-verdict grace: ${NEVER_REVIEWED_GRACE_MIN} min. Draft PRs are skipped."
             echo
             echo "| PR | Author | Reason | Action |"
             echo "|---|---|---|---|"
@@ -63,7 +80,7 @@ jobs:
 
           # jq -c over the whole list so the loop body never re-queries the list.
           gh pr list -R "$REPO" --state open --limit 100 \
-            --json number,author,headRefOid,reviewDecision,updatedAt,isDraft,labels \
+            --json number,author,headRefOid,reviewDecision,updatedAt,isDraft,labels,reviewRequests \
             --jq '.[] | select(.isDraft == false) | @json' \
           | while read -r pr; do
               num=$(jq -r '.number'          <<<"$pr")
@@ -72,6 +89,8 @@ jobs:
               decision=$(jq -r '.reviewDecision // ""' <<<"$pr")
               updated=$(jq -r '.updatedAt'    <<<"$pr")
               labels=$(jq -r '[.labels[].name] | join(" ")' <<<"$pr")
+              # Teams appear here as .name rather than .login.
+              requested=$(jq -r '[.reviewRequests[]? | (.login // .name)] | join(" ")' <<<"$pr")
 
               # Same body filter as the review workflow, and for the same reason:
               # every inline comment is also a review object with an empty body
@@ -83,9 +102,16 @@ jobs:
 
               updated_epoch=$(date -u -d "$updated" +%s)
               reason=""
-              if [ -z "$verdict" ]; then
-                reason="never reviewed at this head commit ($(echo "$sha" | cut -c1-8))"
-              elif [ "$decision" != "APPROVED" ] && [ "$updated_epoch" -lt "$idle_cutoff" ]; then
+              # The no-verdict branch needs its own grace period. Without one, a
+              # PR opened moments before the sweep — or any `workflow_dispatch`
+              # run right after a push — is flagged while its review is still in
+              # flight, since "review running" and "review never ran" look
+              # identical from here. `-n "$verdict"` on the second branch keeps a
+              # still-fresh unreviewed PR from falling through into it and being
+              # described as having a verdict it doesn't have.
+              if [ -z "$verdict" ] && [ "$updated_epoch" -lt "$fresh_cutoff" ]; then
+                reason="no verdict at this head commit ($(echo "$sha" | cut -c1-8)), quiet since ${updated%T*}"
+              elif [ -n "$verdict" ] && [ "$decision" != "APPROVED" ] && [ "$updated_epoch" -lt "$idle_cutoff" ]; then
                 reason="last verdict ${verdict}, not approved, idle since ${updated%T*}"
               fi
 
@@ -106,11 +132,20 @@ jobs:
                   ;;
               esac
 
+              # Request only maintainers who aren't the author and don't already
+              # have a pending request. Deduping matters because this runs every
+              # weekday: without it a stalled PR re-POSTs the same reviewers
+              # indefinitely, which is the chatter this sweep is meant to avoid.
+              # (Labels are deduped just above for the same reason.)
               reviewers=""
               for login in $ESCALATE_TO; do
-                if [ "$login" != "$author" ]; then
-                  reviewers="$reviewers $login"
+                if [ "$login" = "$author" ]; then
+                  continue
                 fi
+                case " $requested " in
+                  *" $login "*) continue ;;
+                esac
+                reviewers="$reviewers $login"
               done
               reviewers="$(echo "$reviewers" | tr -s ' ' | sed 's/^ //;s/ $//')"
               if [ -n "$reviewers" ]; then
@@ -124,6 +159,10 @@ jobs:
                 else
                   action="$action, review request failed"
                 fi
+              elif [ -n "$requested" ]; then
+                action="$action, review already pending from $requested"
+              else
+                action="$action, no eligible reviewer (author is the only maintainer)"
               fi
 
               echo "| [#$num](https://github.com/$REPO/pull/$num) | $author | $reason | $action |" >> "$GITHUB_STEP_SUMMARY"
