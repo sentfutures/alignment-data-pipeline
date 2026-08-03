@@ -245,9 +245,22 @@ jobs:
           # `.state` without the body filter would classify almost every
           # review, including approvals, as neutral. Take the LAST bodied
           # review: that is the formal verdict.
+          #
+          # Pages are merged by `jq -s 'add'` BEFORE filtering. `gh api
+          # --paginate --jq` applies the filter to each page separately, so
+          # `last` would run per page and the substitution would join each
+          # page's own answer — making `$verdict` a multi-line string that
+          # matches no `case` arm below, so a real verdict would be reported as
+          # "posted no verdict" and the check would fail on a healthy review.
+          # Needs >100 review objects on one PR (`--paginate` requests
+          # per_page=100); the busiest so far, #65, has 48, so this is
+          # headroom rather than a live failure — but every inline comment adds
+          # a review object, so a long-iterated PR gets there. `--slurp` cannot
+          # be used: gh rejects it when combined with `--jq`. This matches the
+          # idiom claude-review-fix.yml already uses in four places.
           for attempt in 1 2 3 4 5 6; do
             verdict=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews" --paginate \
-              --jq '[.[] | select(.commit_id==env.HEAD_SHA and .submitted_at>=env.SINCE and (.user.login|test("claude";"i")) and (.body|length) > 0)] | last | .state // ""')
+              | jq -r -s 'add // [] | [.[] | select(.commit_id==env.HEAD_SHA and .submitted_at>=env.SINCE and (.user.login|test("claude";"i")) and (.body|length) > 0)] | last | .state // ""')
             if [ -n "${verdict}" ]; then
               break
             fi
