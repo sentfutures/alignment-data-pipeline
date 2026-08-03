@@ -569,20 +569,23 @@ jobs:
           { echo "pr=${url##*/}"; echo "created=true"; } >> "$GITHUB_OUTPUT"
 
       # A GITHUB_TOKEN-created PR emits no workflow-triggering `opened` event,
-      # so smoke and the auto-review would never run. Close+reopen with the
+      # so smoke and the auto-review would never run. Close+reopen with a
       # Claude App token (its events DO fire) replaces the suppressed `opened`
       # with a live `reopened`.
       #
-      # The App token comes from the action's `github_token` OUTPUT — declared
-      # in anthropics/claude-code-action's action.yml at ref v1 (outputs:
-      # github_token — "The GitHub token used by the action (Claude App token
-      # if available)"), distinct from the same-named input. If the output ever
-      # arrives empty (e.g. the App is uninstalled and the action fell back to
-      # GITHUB_TOKEN), the warning branch below says exactly what to do.
-      - name: Kick CI + auto-review (close/reopen with App token)
+      # The action's `github_token` OUTPUT cannot be used for this: action.yml
+      # at ref v1 ends with its own "Revoke app token" step (DELETE
+      # /installation/token), so the output is a dead credential by the time
+      # any later workflow step runs — the post-merge dry run proved it
+      # (gh: HTTP 401 Bad credentials). Instead this step mints its own
+      # short-lived installation token through the exact OIDC exchange the
+      # action's src/github/token.ts performs (OIDC audience
+      # "claude-code-github-action" → api.anthropic.com's
+      # github-app-token-exchange), kicks, and revokes the token itself.
+      # Needs the job's existing id-token: write permission.
+      - name: Kick CI + auto-review (close/reopen with a fresh App token)
         if: steps.pr_open.outputs.created == 'true'
         env:
-          APP_TOKEN: ${{ steps.implement.outputs.github_token || steps.light.outputs.github_token }}
           FALLBACK_TOKEN: ${{ github.token }}
           PR: ${{ steps.pr_open.outputs.pr }}
         run: |
@@ -592,18 +595,40 @@ jobs:
           # this must not silently leave behind is the PR stuck closed, hence
           # the retries + GITHUB_TOKEN fallback on reopen.
           set -euo pipefail
-          if [ -z "${APP_TOKEN:-}" ]; then
-            echo "::warning::No App token available from the action step — PR #$PR was created but smoke/auto-review were not triggered. Close and reopen it manually (or push any commit) to kick them."
+          manual_note="Close and reopen PR #$PR manually (or push any commit) to trigger smoke/auto-review."
+          oidc=$(curl -sS --max-time 15 \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=claude-code-github-action" \
+            | jq -r '.value // empty') || oidc=""
+          if [ -z "$oidc" ]; then
+            echo "::warning::Could not obtain an OIDC token — PR #$PR was created but not kicked. $manual_note"
             exit 0
           fi
-          if ! GH_TOKEN="$APP_TOKEN" gh pr close "$PR" -R "$REPO"; then
-            echo "::warning::Could not close PR #$PR for the kick — it stays open, but smoke/auto-review were not triggered (the GITHUB_TOKEN 'opened' event is suppressed). Close and reopen it manually, or push any commit."
+          app_token=$(curl -sS --max-time 20 -X POST \
+            -H "Authorization: Bearer $oidc" \
+            "https://api.anthropic.com/api/github/github-app-token-exchange" \
+            | jq -r '.token // .app_token // empty') || app_token=""
+          if [ -z "$app_token" ]; then
+            echo "::warning::App-token exchange failed — PR #$PR was created but not kicked. $manual_note"
+            exit 0
+          fi
+          echo "::add-mask::$app_token"
+          revoke() {
+            curl -sS --max-time 10 -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $app_token" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${GITHUB_API_URL:-https://api.github.com}/installation/token" >/dev/null 2>&1 || true
+          }
+          trap revoke EXIT
+          if ! GH_TOKEN="$app_token" gh pr close "$PR" -R "$REPO"; then
+            echo "::warning::Could not close PR #$PR for the kick — it stays open, but smoke/auto-review were not triggered (the GITHUB_TOKEN 'opened' event is suppressed). $manual_note"
             exit 0
           fi
           sleep 3
           for i in 1 2 3; do
-            if GH_TOKEN="$APP_TOKEN" gh pr reopen "$PR" -R "$REPO"; then
-              echo "PR #$PR reopened with the App token — smoke + auto-review should now be running."
+            if GH_TOKEN="$app_token" gh pr reopen "$PR" -R "$REPO"; then
+              echo "PR #$PR reopened with a fresh App token — smoke + auto-review should now be running."
               exit 0
             fi
             echo "Reopen attempt $i/3 failed; retrying..."
@@ -612,7 +637,7 @@ jobs:
           # Last resort: reopen with GITHUB_TOKEN so the PR at least isn't
           # stuck closed (its event won't trigger workflows).
           if GH_TOKEN="$FALLBACK_TOKEN" gh pr reopen "$PR" -R "$REPO"; then
-            echo "::warning::Reopened PR #$PR with GITHUB_TOKEN after the App-token reopen failed 3 times — the PR is open but smoke/auto-review were not triggered. Close and reopen it manually, or push any commit."
+            echo "::warning::Reopened PR #$PR with GITHUB_TOKEN after the App-token reopen failed 3 times — the PR is open but smoke/auto-review were not triggered. $manual_note"
           else
             echo "::warning::PR #$PR is stuck CLOSED — both the App-token and GITHUB_TOKEN reopens failed. Reopen it manually; the verify step below will flag this run."
           fi
