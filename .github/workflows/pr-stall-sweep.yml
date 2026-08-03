@@ -1,0 +1,136 @@
+name: PR stall sweep
+
+# claude-code-review.yml can only notice a stall on a PR whose review actually
+# ran: its verdict check is a step inside that workflow. Two stalls are therefore
+# invisible to it, and both have happened:
+#
+#   1. The review never ran at all. PR #77 has ZERO workflow runs against its
+#      head SHA — no `smoke`, no review, no verdict, no signal — and sat open for
+#      20 days. Nothing in the repo surfaced it.
+#   2. A PR that was reviewed, isn't approved, and then nobody came back to it.
+#
+# This sweep is the outside observer for both. It surfaces only: it applies the
+# `needs-human-review` label and requests review from a maintainer, and posts no
+# PR comments — a sweep that chatters on month-old threads gets muted, and a
+# GITHUB_TOKEN comment cannot trigger a workflow anyway, so it would buy nothing.
+#
+# It deliberately does NOT re-run the review: claude-code-review.yml is
+# pull_request-triggered and the action needs that event's PR context. The human
+# re-trigger is to close and reopen the PR (the `reopened` type is in its trigger
+# list) or to comment `@claude` — both documented in git-workflow-guide.md.
+
+on:
+  schedule:
+    # Weekday mornings (08:00 UTC). Cron is UTC and never adjusts for DST.
+    - cron: "0 8 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      idle_days:
+        description: "Days without activity before an unapproved PR is treated as stalled"
+        required: false
+        default: "7"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sweep open PRs for stalls
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          IDLE_DAYS: ${{ github.event.inputs.idle_days || '7' }}
+          # Keep in step with ESCALATE_TO in claude-code-review.yml.
+          ESCALATE_TO: "Deco354 Liconstan"
+        run: |
+          set -euo pipefail
+
+          now=$(date -u +%s)
+          idle_cutoff=$(( now - IDLE_DAYS * 86400 ))
+
+          {
+            echo "## PR stall sweep"
+            echo
+            echo "Idle threshold: ${IDLE_DAYS} days. Draft PRs are skipped."
+            echo
+            echo "| PR | Author | Reason | Action |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # jq -c over the whole list so the loop body never re-queries the list.
+          gh pr list -R "$REPO" --state open --limit 100 \
+            --json number,author,headRefOid,reviewDecision,updatedAt,isDraft,labels \
+            --jq '.[] | select(.isDraft == false) | @json' \
+          | while read -r pr; do
+              num=$(jq -r '.number'          <<<"$pr")
+              author=$(jq -r '.author.login'  <<<"$pr")
+              sha=$(jq -r '.headRefOid'       <<<"$pr")
+              decision=$(jq -r '.reviewDecision // ""' <<<"$pr")
+              updated=$(jq -r '.updatedAt'    <<<"$pr")
+              labels=$(jq -r '[.labels[].name] | join(" ")' <<<"$pr")
+
+              # Same body filter as the review workflow, and for the same reason:
+              # every inline comment is also a review object with an empty body
+              # and state COMMENTED, so an unfiltered count treats a PR whose only
+              # claude activity was inline notes as if it had a verdict.
+              verdict=$(gh api "repos/$REPO/pulls/$num/reviews" --paginate \
+                --jq "[.[] | select(.commit_id==\"$sha\" and (.user.login|test(\"claude\";\"i\")) and (.body|length) > 0)] | last | .state // \"\"" \
+                2>/dev/null || echo "")
+
+              updated_epoch=$(date -u -d "$updated" +%s)
+              reason=""
+              if [ -z "$verdict" ]; then
+                reason="never reviewed at this head commit ($(echo "$sha" | cut -c1-8))"
+              elif [ "$decision" != "APPROVED" ] && [ "$updated_epoch" -lt "$idle_cutoff" ]; then
+                reason="last verdict ${verdict}, not approved, idle since ${updated%T*}"
+              fi
+
+              if [ -z "$reason" ]; then
+                continue
+              fi
+
+              action=""
+              case " $labels " in
+                *" needs-human-review "*) action="already labeled" ;;
+                *)
+                  if gh api -X POST "repos/$REPO/issues/$num/labels" \
+                       -f "labels[]=needs-human-review" >/dev/null 2>&1; then
+                    action="labeled"
+                  else
+                    action="label failed"
+                  fi
+                  ;;
+              esac
+
+              reviewers=""
+              for login in $ESCALATE_TO; do
+                if [ "$login" != "$author" ]; then
+                  reviewers="$reviewers $login"
+                fi
+              done
+              reviewers="$(echo "$reviewers" | tr -s ' ' | sed 's/^ //;s/ $//')"
+              if [ -n "$reviewers" ]; then
+                args=""
+                for login in $reviewers; do
+                  args="$args -f reviewers[]=$login"
+                done
+                # shellcheck disable=SC2086
+                if gh api -X POST "repos/$REPO/pulls/$num/requested_reviewers" $args >/dev/null 2>&1; then
+                  action="$action, review requested from $reviewers"
+                else
+                  action="$action, review request failed"
+                fi
+              fi
+
+              echo "| [#$num](https://github.com/$REPO/pull/$num) | $author | $reason | $action |" >> "$GITHUB_STEP_SUMMARY"
+              echo "flagged #$num ($author): $reason -> $action"
+            done
+
+          {
+            echo
+            echo "No rows above means nothing is stalled."
+          } >> "$GITHUB_STEP_SUMMARY"
