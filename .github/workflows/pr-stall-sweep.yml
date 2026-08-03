@@ -96,9 +96,22 @@ jobs:
               # every inline comment is also a review object with an empty body
               # and state COMMENTED, so an unfiltered count treats a PR whose only
               # claude activity was inline notes as if it had a verdict.
-              verdict=$(gh api "repos/$REPO/pulls/$num/reviews" --paginate \
-                --jq "[.[] | select(.commit_id==\"$sha\" and (.user.login|test(\"claude\";\"i\")) and (.body|length) > 0)] | last | .state // \"\"" \
-                2>/dev/null || echo "")
+              #
+              # Pages are merged by `jq -s 'add'` BEFORE filtering, matching the
+              # idiom claude-review-fix.yml already uses. `gh api --paginate --jq`
+              # would apply the filter to each page separately: `last` would then
+              # run per page and the substitution would join each page's own
+              # answer, so `$verdict` becomes a multi-line string and every test
+              # on it silently stops meaning what it says. `--paginate` requests
+              # per_page=100, so this needs >100 review objects on one PR — not
+              # reachable today (the busiest, #65, has 48) but well within reach
+              # for exactly the long-iterated PRs this sweep exists to catch,
+              # since every inline comment adds a review object. `--slurp` is not
+              # an option here: gh rejects it when combined with `--jq`.
+              verdict=$(gh api "repos/$REPO/pulls/$num/reviews" --paginate 2>/dev/null \
+                | jq -r -s --arg sha "$sha" \
+                    'add // [] | [.[] | select(.commit_id==$sha and (.user.login|test("claude";"i")) and (.body|length) > 0)] | last | .state // ""' \
+                || echo "")
 
               updated_epoch=$(date -u -d "$updated" +%s)
               reason=""
