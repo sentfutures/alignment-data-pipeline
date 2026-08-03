@@ -101,7 +101,7 @@ def ends_mid_sentence(text: str) -> bool:
 
     The narrowing gives up sensitivity only for a cut landing in the first few
     words of a line. That is an acceptable trade: the real defence is upstream,
-    where layers 3 and 4 check stop_reason and refuse to checkpoint truncated
+    where layers 2 and 4 check stop_reason and refuse to checkpoint truncated
     output, so this check is the backstop for tail loss that never reached the
     API's stop_reason — a bad extraction or a dropped rewrite tail.
 

@@ -1,4 +1,4 @@
-# Variables for the SDF prompt matrix (layers1-2.txt).
+# Variables for the SDF prompt matrix (layer1.txt).
 #
 # Format:
 #   {varname}  # optional description
@@ -16,7 +16,7 @@
 #   share of a sampled run; full enumeration ignores them.
 # - Placeholder syntax is the pipeline-standard `{name}` (Python str.format,
 #   as in every prompts/**/*.txt template) — so literal { } braces must not
-#   appear in layers1-2.txt or in values here.
+#   appear in layer1.txt or in values here.
 # - Reserved slots (injected by compose_prompts.py, never defined here):
 #   {preamble} from prompts/sdf/preamble.txt; {fictional_names} and
 #   {fictional_orgs} sampled per prompt from locale-matched entity pools
