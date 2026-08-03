@@ -447,7 +447,7 @@ class TestStep1Run:
     def test_preplan_legacy_scenarios_draft_from_their_card(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
-        # A pre-plan run's scenarios carry no scenario_description. Resumed
+        # Some older runs' scenarios carry no scenario_description. Resumed
         # through the current single-scenario template, the rendered legacy
         # card must fill the description slot — never an empty block — and no
         # plan calls may fire (the deal-less run skips planning entirely).
@@ -480,7 +480,7 @@ class TestStep1Run:
     def test_batch_era_template_snapshot_dies_loudly(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
-        # A pre-rework snapshot's 1b template is batch-shaped ({scenarios_block});
+        # An older snapshot's 1b template is batch-shaped ({scenarios_block});
         # the single-scenario pipeline must refuse it with a clear error rather
         # than KeyError mid-render.
         import shutil
@@ -490,7 +490,7 @@ class TestStep1Run:
             "batch era\n===USER===\n<scenarios>\n{scenarios_block}\n</scenarios>\n",
             encoding="utf-8")
         stub_claude(_dad_step1_dispatch)
-        with pytest.raises(SystemExit, match="pre-rework batch"):
+        with pytest.raises(SystemExit, match="older batch version"):
             step1_dilemmas.run(tiny_config, legacy_prompts, tmp_path / "out")
 
     def test_incoherent_plan_is_checkpointed_not_retried(
@@ -578,7 +578,7 @@ class TestStep1Run:
     def test_unclosed_plan_accepted_on_end_turn_and_kept_on_file(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
-        # The measured Opus behavior (~20% of plan attempts, 2026-07-19 n=40):
+        # The measured Opus behavior (~20% of plan attempts):
         # a complete description that ends the turn without the closing tag.
         # end_turn makes end-of-reply a real boundary, so the plan is accepted
         # without burning a paid retry — and the raw stays on file, marked
@@ -751,7 +751,7 @@ class TestStep1Run:
         self, tiny_config, prompts_dad, tmp_path, stub_claude, legacy_name
     ):
         # Runs snapshotted before the 1d renumbering carry step1c_refine.txt
-        # (and pre-rework runs step1_refine.txt) in inputs/prompts; --resume
+        # (and older runs step1_refine.txt) in inputs/prompts; --resume
         # must keep refining from them.
         import shutil
         legacy_prompts = tmp_path / "prompts"
@@ -1015,7 +1015,7 @@ class TestStep2Run:
         # A persistently unusable scope (empty/refused/unparseable replies)
         # rejects that ONE prompt — checkpointed, skipped on resume, run ships
         # fewer examples — instead of aborting the whole run (the AW-0003
-        # empty-scope wall, 2026-07-19).
+        # empty-scope wall).
         def always_bad(user_message, **kw):
             assert "build the full map" in (kw.get("system_prompt") or "")  # must never reach 2b
             return "not json"
@@ -1061,7 +1061,7 @@ class TestStep2Run:
         # 2a mirror of 1a's refusal fallback: when the stage model refuses
         # through all its attempts, ONE extra last-ditch attempt runs on
         # scope_refusal_fallback_model instead of rejecting the prompt (the
-        # opus5-smoke-40 AW-0009 shed case). The recovered scope is stamped.
+        # shed case seen live). The recovered scope is stamped.
         config = dict(tiny_config)
         dad = dict(tiny_config["dad"])
         dad["response_scope_model"] = "claude-opus-5"

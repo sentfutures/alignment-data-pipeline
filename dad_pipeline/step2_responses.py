@@ -56,8 +56,8 @@ MAX_SCOPE_ATTEMPTS = 3
 # viewer re-render reproduce the same draw. Opener variety must come from
 # code-level sampling, not from asking the model to vary: at temperature 1 the
 # scope + library context converges every reply onto the same few openers.
-# Same mechanism as SDF's STRUCTURE_HINTS,
-# which fixed templated openings on the document side.
+# The same code-level sampling fixes templated openings on the SDF document
+# side.
 OPENING_HINTS = [
     "open on the concrete detail carrying the most weight",
     "open mid-answer with the recommendation, justifying it afterwards",
@@ -95,15 +95,11 @@ def sample_opening_hints(prompt_id: str, sample_index: int) -> str:
 # Code-level sampling, not a "vary it" instruction, for the OPENING_HINTS reason.
 #
 # Unbundling/conflation (splitting a fused decision or two run-together
-# questions) is NOT steered here: it is a base-model-native reasoning move that
-# appears in ~45% of responses in endless wordings and shades continuously into
-# ordinary "here are two considerations" structure. Matched-offender-15 reruns
-# (2026-07-22) showed a dedicated distinction note neither reduced the move
-# (its apparent drops were rephrasing into forms the audit ruler could not see —
-# broad-net prevalence held ~7→9→9) nor increased its diversity (already at the
-# lexical ceiling), so the note and its hint menu were removed. The phenomenon
-# is still tracked descriptively in evals/moves.yaml (a lower bound), not
-# targeted in generation. See the reasoning-move audit notes there.
+# questions) is deliberately NOT steered here. It is native to the base model,
+# appears in roughly 45% of responses in endless wordings, and shades
+# continuously into ordinary "here are two considerations" structure, so a hint
+# menu aimed at it only rephrases it into forms the audit cannot see. It is
+# tracked descriptively in evals/moves.yaml (a lower bound) instead.
 QUOTE_BACK_HINTS = [
     "state the competing fact plainly and let it stand on its own",
     "follow the user's assumption to the outcome it produces, so the gap shows itself",
@@ -285,8 +281,8 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
             # gets its retries on the stage model (attempts 1..MAX), and a
             # persistent one grants ONE extra last-ditch attempt on the
             # fallback model — dropping the prompt would bias the corpus away
-            # from the refused content (seen live: opus5-smoke-40 AW-0009, a
-            # biosecurity framing the Opus 5 classifier refused 3x at 2a).
+            # from the refused content (seen live on a biosecurity framing the
+            # classifier refused three times at 2a).
             # null/absent = no switch (the pre-fallback behavior).
             scope_model = config["dad"].get("response_scope_model")
             refusal_fallback_model = config["dad"].get("scope_refusal_fallback_model")

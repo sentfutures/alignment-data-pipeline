@@ -313,12 +313,20 @@ class TestFlattenDadCorpus:
         records = [json.loads(line) for line in lines]
         assert len(records) == 2
         for i, rec in enumerate(records):
-            assert set(rec) == {"example_gid", "source_run",
-                                "user_prompt", "assistant_response"}
+            assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
             assert rec["example_gid"] == f"E-{i:04d}"
-            assert rec["source_run"] == MANIFEST["run_id"]
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
+
+    def test_published_rows_carry_no_run_column(self, tmp_path):
+        """Row-to-run attribution is the repo's job (git grep on the globally
+        unique example_gid), not a repeated run_id on every row."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "source_run" not in raw
+        assert MANIFEST["run_id"] not in raw
 
     def test_local_training_corpus_is_left_untouched(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
@@ -362,11 +370,18 @@ class TestFlattenDadCorpus:
         assert "鶏の福祉について" in raw
 
 
-def _dad_manifest(run_id, backend="api"):
-    return {"run_id": run_id, "label": run_id.split("_", 2)[-1],
-            "git_commit": "abc1234", "model": "claude-sonnet-5",
-            "config": {"backend": backend,
-                       "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+def _dad_manifest(run_id, backend="api", dirty=None, dirty_files=None):
+    """A DAD run manifest. dirty=None omits the git_dirty fields entirely (a
+    manifest predating them); pass dirty=True/False to set them, shaped as
+    shared.utils records them."""
+    m = {"run_id": run_id, "label": run_id.split("_", 2)[-1],
+         "git_commit": "abc1234", "model": "claude-sonnet-5",
+         "config": {"backend": backend,
+                    "dad": {"constitution_rewrite_model": "claude-opus-5"}}}
+    if dirty is not None:
+        m["git_dirty"] = dirty
+        m["git_dirty_files"] = list(dirty_files or [])
+    return m
 
 
 class TestCombinedPublish:
@@ -383,7 +398,12 @@ class TestCombinedPublish:
             manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
         return [run_a, run_b], corpus_name
 
-    def test_corpora_concatenate_with_per_row_source_run(self, tmp_path):
+    def test_corpora_concatenate_in_input_order(self, tmp_path):
+        """Every run's rows land in the combined corpus, in --input order. The
+        rows carry no run column — example_gid is what identifies them, and
+        _two_runs gives both runs the same gids on purpose (each run dir is
+        built independently, exactly as separate real runs would be) so the
+        assertion can't accidentally lean on distinct ids."""
         run_dirs, corpus_name = self._two_runs(tmp_path)
         staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
 
@@ -391,9 +411,32 @@ class TestCombinedPublish:
         assert [r["n_docs"] for r in staged["runs"]] == [2, 3]
         records = [json.loads(line) for line in
                    (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()]
-        assert [r["source_run"] for r in records] == (
-            ["2026-07-28_17-32_pareto200"] * 2
-            + ["2026-07-29_23-58_archetype1000"] * 3)
+        assert len(records) == 5
+        assert "source_run" not in records[0]
+        # run_a contributed 2 rows, then run_b's 3 — docs=2 and docs=3 make the
+        # user_prompt sequence restart, which is what pins the concatenation order.
+        assert [r["user_prompt"] for r in records] == [
+            "user prompt 0", "user prompt 1",
+            "user prompt 0", "user prompt 1", "user prompt 2"]
+
+    def test_per_run_table_reports_each_run_s_code_state(self, tmp_path):
+        """Mixed states must be named per run, not collapsed — a combined
+        corpus is only as reproducible as its least-reproducible run."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200",
+                                   dirty=True, dirty_files=["config.yaml"]))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000", dirty=False))
+        staged, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+
+        assert "| code state |" in card
+        assert "| `abc1234` | dirty (1 uncommitted file) |" in card
+        assert "| `abc1234` | clean |" in card
 
     def test_manifests_and_audits_are_run_scoped(self, tmp_path):
         """Several runs in one dataset dir must not collide on filenames:
@@ -416,7 +459,8 @@ class TestCombinedPublish:
         card = _one_card(dataset_dir, staged)
 
         assert "5 chat examples." in card
-        assert "`source_run`" in card
+        assert "this table is the provenance record" in card
+        assert "`source_run`" not in card
         assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
         assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
         # per-run metrics line only for the run that has an audit
@@ -424,7 +468,7 @@ class TestCombinedPublish:
         assert "dad/audit/2026-07-29_23-58_archetype1000/" in card
         # the frontmatter still declares exactly one dad config
         fm = yaml.safe_load(card.split("---")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
 
     def test_single_run_layout_is_unchanged(self, tmp_path):
         """One --input keeps the original shape: top-level run_manifest.json,
@@ -570,7 +614,7 @@ class TestBuildCard:
         # own pretty_name is the repo-level name, not one dataset's title
         assert "pretty_name: test-datasets" in card
         assert "# test-datasets" in card
-        assert "## SDF corpus audit — 477 documents (`sdf` config)" in card
+        assert "## SDF corpus audit — 477 documents (`synthetic documents` config)" in card
         assert "A test subtitle." in card
         assert "license: cc-by-4.0" in card
         # config paths are subdir-qualified now
@@ -597,7 +641,7 @@ class TestBuildCard:
                                             manifest=None)
         staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
         card = _one_card(dataset_dir, staged, content=None)
-        assert "## SDF corpus (`sdf` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
 
     def test_includes_provenance_from_manifest(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path)
@@ -617,6 +661,52 @@ class TestBuildCard:
         card = _one_card(dataset_dir, staged)
         assert "- **default model**: `claude-sonnet-5`" in card
         assert "- **per-stage models**: `claude-opus-5`" in card
+
+    def test_card_reports_dirty_tree_alongside_the_commit(self, tmp_path):
+        """A bare SHA implies the run is reproducible from that commit. It
+        isn't when the tree was dirty, so the card says so next to it."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", audit_files=[], include_html=False,
+            manifest=_dad_manifest(
+                "2026-07-29_23-58_archetype1000", dirty=True,
+                dirty_files=["dad_pipeline/run.py", "prompts/dad/step1d_refine.txt"]))
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        card = _one_card(dataset_dir, staged)
+        assert "- **git commit**: `abc1234`" in card
+        assert "- **code state**: dirty (2 uncommitted files)" in card
+
+    def test_card_reports_unknown_code_state_for_older_manifests(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)  # MANIFEST has no git_dirty
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert "- **code state**: unknown" in _one_card(dataset_dir, staged)
+
+
+class TestCodeState:
+    """The commit alone overstates reproducibility: every DAD run published so
+    far ran with uncommitted changes, several touching pipeline code and prompt
+    templates."""
+
+    def test_dirty_reports_the_file_count(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True,
+             "git_dirty_files": ["dad_pipeline/run.py", "config.yaml"]}
+        ) == "dirty (2 uncommitted files)"
+
+    def test_one_dirty_file_is_singular(self):
+        assert publish_hf.code_state(
+            {"git_dirty": True, "git_dirty_files": ["config.yaml"]}
+        ) == "dirty (1 uncommitted file)"
+
+    def test_dirty_without_a_file_list_still_reports_dirty(self):
+        assert publish_hf.code_state({"git_dirty": True}) == "dirty"
+
+    def test_clean_tree(self):
+        assert publish_hf.code_state(
+            {"git_dirty": False, "git_dirty_files": []}) == "clean"
+
+    def test_missing_fields_are_unknown_not_clean(self):
+        """A manifest predating the fields must not be advertised as clean."""
+        assert publish_hf.code_state({"git_commit": "abc1234"}) == "unknown"
 
 
 class TestModelsUsed:
@@ -703,7 +793,7 @@ class TestModelsUsed:
         assert [(l, v) for l, v, _ in rows] == [("Examples (offline audit)", "40")]
         card = _one_card(dataset_dir, staged)
         assert "40 chat examples." in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
 
 
 class TestMultiDatasetCard:
@@ -723,10 +813,32 @@ class TestMultiDatasetCard:
             {"pipeline": "dad", "dir": dad_dir, "staged": dad_staged, "content": None},
         ]
 
+    def test_intro_leads_with_what_it_is_and_where_it_came_from(self, tmp_path):
+        # The card's hand-written half lives in build_card because the card is
+        # regenerated whole on every publish; the Hub's editor would be overwritten.
+        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
+        assert "Synthetic training data that teaches a model to reason carefully" in card
+        assert "pretraining-style documents" in card
+        assert "single-turn chat exchanges" in card
+        assert "Teaching Claude Why" in card
+        # source names the repo, and leads rather than trailing the audit sections
+        assert f"[{publish_hf.REPO_NAME}]({publish_hf.REPO_URL})" in card
+        first_section = min(card.index(publish_hf.PIPELINE_NAMES[t])
+                            for t in ("sdf", "dad"))
+        assert card.index("## Source") < first_section
+
+    def test_intro_names_only_the_corpora_being_published(self, tmp_path):
+        # a publish whose sibling is absent (or a --dry-run, which cannot see it)
+        run, corpus = make_run_dir(tmp_path, pipeline="dad")
+        staged, ddir = _stage(run, corpus, tmp_path / "stage_solo")
+        card = _one_card(ddir, staged)
+        assert "single-turn chat exchanges" in card
+        assert "pretraining-style documents" not in card
+
     def test_declares_both_configs_with_sdf_default(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         assert fm["configs"][1]["data_files"][0]["path"] == "dad/dad_corpus.jsonl"
         # only the first entry is the viewer's default
@@ -763,11 +875,11 @@ class TestMultiDatasetCard:
 
     def test_both_sections_present_with_own_provenance(self, tmp_path):
         card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        assert "## SDF corpus (`sdf` config)" in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
         assert "3 documents." in card       # sdf fixture default docs=3
         assert "40 chat examples." in card
-        assert card.index("`sdf` config") < card.index("`dad` config")
+        assert card.index("`synthetic documents` config") < card.index("`difficult advice Q&A` config")
 
 
 class TestHubApiWrappers:
@@ -956,17 +1068,17 @@ class TestMainEndToEnd:
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         assert (staging_dir / "dad" / "dad_corpus.jsonl").exists()
-        assert "## DAD corpus (`dad` config)" in (staging_dir / "README.md").read_text()
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in (staging_dir / "README.md").read_text()
 
     def test_pretty_name_defaults_to_repo_id_last_segment(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir),
-                  "--repo-id", "sentientfutures/animal-welfare-mid-training-datasets",
+                  "--repo-id", "sentientfutures/animal-welfare-training-dataset",
                   "--staging-dir", str(staging_dir))
         card = (staging_dir / "README.md").read_text()
-        assert "pretty_name: animal-welfare-mid-training-datasets" in card
+        assert "pretty_name: animal-welfare-training-dataset" in card
 
     def test_explicit_pretty_name_wins(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
@@ -1009,13 +1121,13 @@ class TestSiblingPreservation:
     def test_dad_publish_keeps_sdf_config_and_section(self, tmp_path, monkeypatch, stub_hf):
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         # sdf keeps default even though dad is the one being published
         assert fm["configs"][0].get("default") is True
         # curated heading restored from the card_meta.json sidecar
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
-        assert "## DAD corpus (`dad` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
+        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
         # sdf's own measured numbers, read from its Hub-side audit files
         assert "477 documents." in card
         assert "40 chat examples." in card
@@ -1041,7 +1153,7 @@ class TestSiblingPreservation:
         title and subtitle were unrecoverable and its section silently
         downgraded to the generic 'SDF corpus' every time DAD was published."""
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
         assert REPORT_CONTENT["subtitle"] in card
 
     def test_sibling_without_card_meta_falls_back_to_generic_heading(
@@ -1051,7 +1163,7 @@ class TestSiblingPreservation:
         it must still render, just with the generic heading."""
         files = {k: v for k, v in SIBLING_SDF_FILES.items() if k != "sdf/card_meta.json"}
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, files)
-        assert "## SDF corpus (`sdf` config)" in card
+        assert "## Synthetic documents (`synthetic documents` config)" in card
 
     def test_card_meta_sidecar_is_written_for_the_published_pipeline(
         self, tmp_path, monkeypatch, stub_hf
@@ -1096,9 +1208,9 @@ class TestSiblingPreservation:
         must still be valid rather than declaring a config for missing data."""
         _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, {})
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
         assert fm["configs"][0].get("default") is True
-        assert "## SDF corpus" not in card
+        assert "## Synthetic documents" not in card
 
     def test_sibling_download_failure_keeps_config_and_does_not_abort(
         self, tmp_path, monkeypatch, stub_hf, capsys
@@ -1136,10 +1248,10 @@ class TestSiblingPreservation:
         card = (staging_dir / "README.md").read_text()
         fm = yaml.safe_load(card.split("---\n")[1])
         # sdf's config entry survives — that's what keeps its data loadable
-        assert [c["config_name"] for c in fm["configs"]] == ["sdf", "dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
         assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
         # card_meta.json downloaded fine, so the curated heading survives
-        assert f"## {REPORT_CONTENT['title']} (`sdf` config)" in card
+        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
         # the metrics row sourced from the file that failed is gone...
         assert "Documents (offline audit)" not in card
         # ...the file that DID download still contributes its row...
@@ -1168,7 +1280,7 @@ class TestSiblingPreservation:
         assert any(c["fn"] == "upload_folder" for c in calls)
         card = (staging_dir / "README.md").read_text()
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
 
     def test_sibling_dir_without_a_corpus_is_skipped(self, tmp_path, monkeypatch, stub_hf):
         """A partial sibling dir with metadata but no corpus can't be declared
@@ -1178,7 +1290,7 @@ class TestSiblingPreservation:
             {"sdf/run_manifest.json": MANIFEST, "sdf/audit/audit_report.json": AUDIT_REPORT},
         )
         fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["dad"]
+        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
 
 
 class TestUnmergedGuard:
@@ -1444,9 +1556,10 @@ class TestUnmergedGuard:
         self, tmp_path, monkeypatch, stub_hf
     ):
         """The point of per-run stamping: a combined corpus is only as merged as
-        its least-merged run, and source_run lets a reader trace a row to its
-        run — so the warning must say WHICH runs, not just that some run failed.
-        The merged run must not be smeared with the others' warning."""
+        its least-merged run, and a reader can trace a row to its run through
+        the repo (example_gid) — so the warning must say WHICH runs, or that
+        trace can't tell them whether a given row's code was reviewed. The
+        merged run must not be smeared with the others' warning."""
         runs = self._dad_runs(
             tmp_path,
             ("2026-07-01_10-00_merged", "aaaaaaa", "main"),

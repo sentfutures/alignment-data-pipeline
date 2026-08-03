@@ -121,7 +121,7 @@
       ]
     }
   ],
-  "input": "/Users/constanceli/Documents/alignment-data-pipeline/outputs/dad/runs/2026-07-26_23-02_opus5-smoke-40",
+  "input": "outputs/dad/runs/2026-07-26_23-02_opus5-smoke-40",
   "corpus": "dad_corpus.jsonl",
   "embed_model": "gemini-embedding-001",
   "n_records": 37,

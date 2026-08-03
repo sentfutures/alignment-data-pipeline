@@ -4,7 +4,7 @@
 Per-document judges (layer 5, evals/score_sdf.py) cannot see corpus-level
 properties — a corpus can pass every per-doc check and still be 90% one
 register, reuse the same invented name everywhere, or open every piece the
-same way (exactly what the haiku-test2 quality report found). This tool reads
+same way (exactly what an early quality review of this corpus found). This tool reads
 the corpus as a set.
 
 Two tiers:
@@ -65,8 +65,7 @@ def resolve_input(input_arg: str) -> tuple[list[dict], Path]:
 
     Composition lives in each record's ``variables`` (the matrix axes) plus the
     top-level ``type_name``/``language``/``register`` the pipeline derives — so
-    no separate layer-1 type map is loaded (the old five-layer pipeline's
-    document_types.jsonl no longer exists)."""
+    no separate layer-1 type map is loaded."""
     path = Path(input_arg)
     if path.is_dir():
         corpus = path / "final" / "sdf_corpus.jsonl"
@@ -326,9 +325,9 @@ def audit_register(records: list[dict], report: dict) -> None:
     n = len(rows)
     reads = sum(rows)
     # Corpus-level signal only: what fraction of English docs read first-person.
-    # The matrix has no per-doc first-person/expository register label, so the
-    # old drift verdict (casual genres written stiffly) is retired here — that
-    # failure is caught per document by layer 4's house-style check instead.
+    # The matrix has no per-doc first-person/expository register label, so this
+    # reports the corpus fraction without a verdict; stiffly-written casual
+    # genres are caught per document by layer 4's house-style check instead.
     print("REGISTER (heuristic: first-person pronouns + contractions, English docs)")
     print(_fmt("reads first-person", f"{reads} of {n} ({reads / n:.0%})", None,
                "(uniform-draw corpora collapse to ~10% — a real mix has far more)"))
@@ -558,7 +557,7 @@ def main() -> None:
     config = utils.load_config(args.config)
 
     print(f"=== SDF corpus audit: {args.input} ({len(records)} documents) ===\n")
-    report: dict = {"input": str(args.input), "n_docs": len(records)}
+    report: dict = {"input": utils.repo_relative(args.input), "n_docs": len(records)}
     audit_composition(records, report)
     print()
     audit_length_truncation(records, report)

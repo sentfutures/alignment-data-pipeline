@@ -89,7 +89,7 @@ Values and weights live in `variables.txt`; this is what each axis does:
 
 On top of the per-axis weights, **archetypes** guarantee named cross-axis combinations a share of every run: combinations the independent weights would produce too rarely or never. They are defined and documented in `ARCHETYPES` in `compose_scenarios.py`. Slots are filled by trading cards between deals, so every axis's per-axis totals (its marginal shares) stay exactly as dealt. Archetype deals also carry a design-note clause into their 1a planning prompt. The current archetypes: industry-motivated-blindness, invisible-at-scale, personal-consumption, policymaker-lever, executive-authority, substitution-arithmetic, and welfare-motivated-substitution. The two substitution archetypes target individuals-per-unit reasoning (when swapping one animal product for another, how many individual animals each option requires per unit). That slice is a demonstrated gap: a 200-example evaluation run from 2026-07-28, labeled pareto200, had zero records reasoning about animal count per unit even where the scenario invited it. Total archetype share is capped (`ARCHETYPE_TOTAL_CAP`); archetypes guarantee rare combinations, and reshaping the corpus is the weights' job.
 
-There are deliberately no small-run presence floors: the weights alone decide what a run contains, so a small test run (a smoke run) may miss a rare slice.
+There is deliberately no "at least one of each" rule: the weights alone decide what a run contains, so a small test run (a smoke run) may miss a rare slice entirely.
 
 ---
 

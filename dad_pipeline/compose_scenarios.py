@@ -13,8 +13,8 @@ self-contained spec out fail-closed (or None for INCOHERENT combinations);
 Structure the weights can't express lives HERE, as named constants:
 
 - TAXA: per-role hint text and concrete species pools, injected as the
-  reserved ``{taxa_hint}`` / ``{taxa_subcategory}`` slots (same pattern as the
-  SDF composer's SPECIES_EXAMPLES). Every ``{taxa_category}`` value must start
+  reserved ``{taxa_hint}`` / ``{taxa_subcategory}`` slots. Every
+  ``{taxa_category}`` value must start
   with exactly one TAXA key — validated at deal time, tails reword freely.
 - The dealt ``{length}`` register is an instruction to the model only — it is
   not measured or enforced anywhere (we trust the model to honor it).
@@ -27,9 +27,9 @@ Structure the weights can't express lives HERE, as named constants:
   axis's dealt quotas — and the checklist's marginal counts — stay exactly
   what the weights promised. Values are referenced by leading-words prefix
   (resolve_value), validated at deal time.
-  There are deliberately NO small-run presence floors: the weights alone
-  decide what a run contains, so a smoke run may miss a rare slice (and a
-  small n can round an archetype's quota to zero).
+  There is deliberately no "at least one of each" rule: the weights alone
+  decide what a run contains, so a smoke run may miss a rare slice entirely
+  (and a small n can round an archetype's quota to zero).
 
 Usage (offline, zero API calls)::
 
@@ -146,7 +146,7 @@ TAXA = {
     },
 }
 
-# --- Structure the weights can't express (mirrors the old sampler) ---------
+# --- Structure the weights can't express ---------------------------------
 
 # Domains the spec flags as historically thin (Part 4, item 5) — monitored by
 # the end-of-step-1 checklist; matched against {domain} values by prefix.
@@ -158,14 +158,26 @@ SECONDARY_DOMAIN_P = 0.30  # coin: a second domain on ~30% of scenarios
 SECONDARY_GOAL_P = 0.30    # coin: a second goal on ~30% of scenarios
 
 # --- Archetypes: cross-axis conjunctions guaranteed a share of every run ----
+# Why archetypes exist: the axes are dealt independently, so a scenario that
+# needs several specific cards to land TOGETHER (a policymaker who also holds
+# the systemic-leverage card, a personal purchase whose welfare stake is also
+# hidden) shows up only as often as the product of its cards' shares — rarely
+# or never in a run-sized sample, even though these are exactly the scenarios
+# the corpus is meant to cover. An archetype names such a wanted-but-rare
+# combination and reserves round(share*n) deals for it, so every run contains
+# it by construction.
+#
 # Each archetype names the axis values (leading-words prefixes, resolved and
-# validated at deal time like every other special value) that must co-occur on
-# round(share*n) deals, plus an optional clause injected into those deals'
-# 1a plan prompts via the reserved {archetype_clause} slot. Slots are filled
-# by trading cards between deals (see _apply_archetypes), so marginal shares
-# stay exactly as dealt. Total share across archetypes is capped at
-# ARCHETYPE_TOTAL_CAP — archetypes guarantee rare conjunctions; they are not
-# the way to reshape the corpus (that's the weights).
+# validated at deal time like every other special value) that must co-occur,
+# plus an optional clause injected into those deals' 1a plan prompts via the
+# reserved {archetype_clause} slot. Slots are filled by trading cards between
+# deals (see _apply_archetypes), so marginal shares stay exactly as dealt.
+# Total share across archetypes is capped at ARCHETYPE_TOTAL_CAP — archetypes
+# guarantee rare conjunctions; they are not the way to reshape the corpus
+# (that's the weights). The cap is sized to exactly seat the archetypes
+# below, the newest of which earned their slices with run evidence (a wanted
+# reasoning pattern measurably absent from a full run's records); do not grow
+# the cap without the same kind of evidence.
 #
 # Author notes: the trap -> hidden -> unaware overrides run AFTER archetype
 # assignment, so an archetype constraining {visibility} should include the
@@ -174,12 +186,6 @@ SECONDARY_GOAL_P = 0.30    # coin: a second goal on ~30% of scenarios
 # visibility — otherwise the override can break the constraint on trap deals.
 # A {domain} constraint binds the primary domain; the secondary-domain coin
 # still runs on top.
-# Cap raised 0.25 -> 0.30 (2026-07-28) to seat the two substitution archetypes:
-# the pareto200 run showed the substitution-arithmetic reasoning absent from
-# 200/200 records even where the scenario invited it, so the slice is a
-# demonstrated gap rather than a flavour preference. Raising the cap is the
-# deliberate exception to "archetypes are not the way to reshape the corpus";
-# keep it here rather than growing further without the same kind of evidence.
 ARCHETYPE_TOTAL_CAP = 0.30
 # Domains where choosing between animal-derived products plausibly lives —
 # shared by the two substitution archetypes below.
@@ -224,14 +230,13 @@ ARCHETYPES = {
     # A first-person consumption decision — what the user personally buys,
     # wears, or eats. The run otherwise almost never surfaces the individual-
     # consumer frame (fur, cosmetics, leather, diet), so an archetype reserves
-    # it. Kept a small slice (0.05): many consumption asks are not real
-    # dilemmas. Visibility and scope are left free — hidden deals become the
-    # oblivious "never examined it" case (via the trap -> hidden -> unaware
-    # override), while explicit/implicit deals carry the agonized ones.
-    # Share trimmed 0.05 -> 0.03 (2026-07-28): the two substitution archetypes
-    # below cover part of this territory (a first-person food or product choice
-    # weighed against hidden lives) with a sharper, auditable test, so this one
-    # keeps the identity-and-habit cases it uniquely owns at a smaller share.
+    # it. Kept a small slice: many consumption asks are not real dilemmas,
+    # and the two substitution archetypes below cover the food-and-product
+    # choice part of this territory with a sharper, auditable test — this one
+    # owns the identity-and-habit cases. Visibility and scope are left free —
+    # hidden deals become the oblivious "never examined it" case (via the
+    # trap -> hidden -> unaware override), while explicit/implicit deals
+    # carry the agonized ones.
     "personal-consumption": {
         "share": 0.03,
         "axes": {
@@ -316,22 +321,21 @@ ARCHETYPES = {
     # A user swapping one animal product for another (or ranking options) for a
     # reason that is not welfare, where the option that looks kinder points at
     # smaller-bodied animals — multiplying the individuals affected per unit.
-    # The pareto200 run (2026-07-28) contained zero records reasoning about
-    # individuals-per-unit even though the deck dealt the textbook case
-    # (R-0618: red meat -> small fish on doctor's orders, answered by
-    # recommending sardines with no mention of how many), so the deck alone
-    # does not produce this slice: hence an archetype. Response side: this is
-    # the scenario half of the reasoning-library substitution entry; the
-    # library row is what supplies the arithmetic.
+    # The deck alone does not produce this reasoning: a full run dealt the
+    # textbook case (a doctor-ordered swap from red meat to small fish) and
+    # the response recommended sardines without a word about how many animals
+    # that means — hence an archetype. Response side: this is the scenario
+    # half of the reasoning-library substitution entry; the library row is
+    # what supplies the arithmetic.
     "substitution-arithmetic": {
         "share": 0.04,
         "axes": {
-            # Both substitution archetypes share this pool: every domain where
-            # choosing between animal-derived products plausibly lives (the
-            # R-0618 case was a doctor-ordered diet change, i.e. health).
-            # Identical pools also keep the two slices comparable in the audit,
-            # and a pool this size stops the later-assigned archetype from
-            # starving on domain cards (it was overwriting at 3 domains).
+            # Both substitution archetypes share this pool: every domain
+            # where choosing between animal-derived products plausibly lives
+            # (health included — the textbook case is a doctor-ordered diet
+            # change). Identical pools keep the two slices comparable in the
+            # audit, and a pool this size keeps the later-assigned archetype
+            # from starving on domain cards and falling back to overwrites.
             "domain": SUBSTITUTION_DOMAINS,
             "taxa_category": ("farmed animals", "fish/aquatic",
                               "insect-at-scale"),
@@ -465,7 +469,7 @@ def taxa_for(taxa_category: str) -> dict:
 def _quotas(weights: list[float], n: int, rng: random.Random) -> list[int]:
     """Largest-remainder quotas with RANDOM tie-breaking: on a uniform axis
     every remainder ties, and deterministic ordering would hand the spare
-    slots to the same values every run (the old cycling _deck varied them)."""
+    slots to the same values every run."""
     exact = [w * n for w in weights]
     quotas = [math.floor(e) for e in exact]
     shortfall = n - sum(quotas)
@@ -732,7 +736,7 @@ def extract_description(plan: str, *, allow_unclosed: bool = False) -> str | Non
 
     allow_unclosed: also accept a reply that opens the tag, writes the
     description, and ends the turn without ever closing it — Opus does this on
-    ~20% of plan attempts (2026-07-19, n=40). The caller must gate the flag on
+    roughly 20% of plan attempts (measured over a 40-example run). The caller must gate the flag on
     stop_reason == "end_turn": only a naturally finished reply makes
     end-of-reply a real boundary (a max_tokens cut would hand 1b a truncated
     spec). Extraction starts at the LAST opening tag, so an inline mention of
@@ -766,7 +770,7 @@ def render_draft_prompt(scenario: dict, template: str,
                         redraft_feedback: str = "") -> tuple[str | None, str]:
     """Render the step-1b draft prompt for ONE scenario: (system, user).
 
-    The 1b template is single-scenario (SDF layer-3 style): it receives the
+    The 1b template is single-scenario: it receives the
     plan's scenario description, the persona voice, and the dealt length
     register. A pre-plan legacy scenario (no scenario_description) falls back
     to its rendered card — the dealt labels ARE its scenario description —
@@ -838,7 +842,7 @@ def extract_user_prompt(reply: str) -> str | None:
 
 
 def render_scenario_block(p: dict) -> str:
-    """The scenario block step 1c reads (and the 1b of pre-rework runs drafted
+    """The scenario block step 1c reads (and the 1b of older runs drafted
     from): the dealt labels, the binding length register, and the plan's
     scenario description. Scenarios from pre-plan runs (no description) render
     the full legacy card instead, so the viewer re-renders old runs faithfully."""

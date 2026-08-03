@@ -30,6 +30,23 @@ def parallel_map(fn, items: list, workers: int):
         yield from pool.map(fn, items)
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def repo_relative(path: str | Path) -> str:
+    """A path rendered relative to the repo root, for values that get WRITTEN
+    into reports and manifests. An absolute path bakes the machine it ran on
+    (a home directory, a username) into files that are committed and, for audit
+    reports, published — so anything inside the repo is recorded as
+    "outputs/dad/runs/..." instead. A path outside the repo keeps only its file
+    or directory name, since its parent directories say nothing about the run."""
+    resolved = Path(path).expanduser().resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return resolved.name
+
+
 def ensure_dir(path: str | Path) -> Path:
     p = Path(path)
     p.mkdir(parents=True, exist_ok=True)
@@ -202,8 +219,8 @@ def extract_json_array(text: str, recover: bool = False) -> list:
         # '[', sometimes no commas): extract_json legitimately parses ONE of
         # those objects, so the except-branch salvage above never runs and a
         # fully recoverable reply was being discarded. Observed live at ~14% of
-        # eval judge calls (11/79 on the scope200-40 --reasons pass, every one
-        # of this shape). Salvaging here reads the whole stream.
+        # eval judge calls in one paid pass (11 of 79), every one of this shape.
+        # Salvaging here reads the whole stream.
         if (objs := salvage_json_objects(text)) and len(objs) > 1:
             return objs
     raise json.JSONDecodeError("JSON value is not an array", text, 0)

@@ -1,22 +1,50 @@
-# Welfare Alignment Prompts
+# prompts/
 
-This directory contains the prompt templates used to generate two synthetic training datasets focused on ethical reasoning about the welfare of sentient beings. The prompts are designed to be used with any capable frontier model.
+Every instruction the pipelines send to a model lives here. The Python packages
+around this directory handle sampling, retries, checkpointing, and file layout;
+what a model actually reads is these files. Editing a template changes the data
+a run produces, so the templates, not the code, are the place to start.
 
-Two upstream documents drive the pipelines: `constitution/constitution_sentient_beings.md` — a framework describing how AI models should reason about situations involving animals and other potentially sentient beings — is the source the distilled principles CSV was built from (the CSV is what generation calls actually embed; the reading itself also supplies the rubric for `evals/compliance_sdf.py`), and `dad/README.md` documents the DAD pipeline end to end (its Parts 1-6 govern the *user side* of every DAD example).
+The directory holds two independent sets of prompts, one per dataset:
 
----
+- **`sdf/`** generates pretraining-style documents: blog posts, podcast
+  transcripts, academic abstracts, news articles, fiction, internal memos, forum
+  threads, and more. They depict a world where AI already reasons carefully about
+  the welfare of animals and other sentient beings. It runs in five stages,
+  called layers.
+- **`dad/`** generates chat transcripts: a user brings a real decision that has
+  animal welfare implications, and an assistant reasons through it. It runs in
+  three steps.
 
-## Two Datasets, Two Directories
+The two are generated independently and share no prompts. What they do share is
+the constitution.
 
-### `sdf/` — Synthetic Document Finetuning (SDF)
+## What the prompts draw on
 
-Generates pretraining-style documents: blog posts, podcast transcripts, academic abstracts, news articles, fiction, internal memos, forum threads, and more. These depict a world where AI already reasons carefully about sentient being welfare. They go into **mid-training** (pretraining-style document finetuning).
+A constitution, here, is a published document describing the values and behavior
+a model should embody. Two files outside this directory feed the templates:
 
-### `dad/` — Difficult Advice Dataset (DAD)
+- `constitution/constitution_claude.md` is that document, verbatim. SDF layers 3
+  to 5 embed it.
+- `constitution/constitution_sentient_beings.md` reads it section by section for
+  what it implies about animals and other possibly sentient beings. No generation
+  call sends this file. It is the source the distilled principles were built
+  from, and it supplies the rubric for `evals/compliance_sdf.py`.
 
-Generates chat-format transcripts where a user brings a practical goal with implicit animal welfare implications, and an AI assistant reasons through it carefully. These go into **SFT** (supervised fine-tuning on chat data).
+The distilled principles themselves (`constitution/constitution_principles.csv`,
+one row per principle with its welfare application and verbatim constitution
+excerpts) are what generation calls embed: SDF layers 3 and 4, and the DAD
+step-3 rewrite.
 
-Keep the two datasets separate — they are intended for different training stages.
+## How a template is put together
+
+Each template is one file holding both halves of the call, the system prompt and
+the user message, separated by a marker line. The pipeline renders the file,
+splits it on the marker, and sends the halves separately. SDF marks the split
+with `=== SYSTEM PROMPT ===` / `=== USER PROMPT ===`, DAD with `===USER===`.
+Placeholders are `{name}`. Static content (framing, constitution, standing
+instructions) comes first and per-item content last, which is the order prompt
+caching rewards.
 
 ---
 
@@ -37,11 +65,11 @@ Key rules it establishes:
 - Realism: no placeholder text, no generic names, no fabricated URLs; snippets of larger documents are fine.
 - Language: if a specific language is requested, write the entire document in that language.
 
-Every SDF template is a single file carrying labeled `=== SYSTEM PROMPT ===` / `=== USER PROMPT ===` sections; the pipeline renders the file, then splits on the markers (`compose_prompts.split_sections`) and sends the pieces as the system prompt and user message. Static content (preamble, constitution, instructions) sits in the SYSTEM section and the static head of the USER section; per-document content comes last — the prompt-caching-friendly order.
+`compose_prompts.split_sections` is what performs the SDF split described above. On the SDF side the static head of the USER section counts as static content too: per-document content comes last.
 
 ### `sdf/variables.txt` + `sdf/layers1-2.txt`
 
-The combinatorial matrix that replaces LLM-generated document types and subtypes. `variables.txt` defines the axes and their values — document type, culture (which fixes language, idiom, and geography), tone, narrative resolution, welfare centrality, speaker AI-literacy, and the kinds of minds affected — each value optionally weighted (`0.25 :: value`; weights per variable must sum to 1.0, unweighted = uniform).
+The combinatorial matrix that fixes composition by construction instead of asking a model to invent document types and subtypes. `variables.txt` defines the axes and their values — document type, culture (which fixes language, idiom, and geography), tone, narrative resolution, welfare centrality, speaker AI-literacy, and the kinds of minds affected — each value optionally weighted (`0.25 :: value`; weights per variable must sum to 1.0, unweighted = uniform).
 
 `compose_prompts.py` deck-samples `sdf.n_prompts` combinations: per-variable value counts match the weights **exactly** (largest-remainder quotas, shuffled decks, zipped), so corpus composition is set by construction, not by sampling luck. Each combination renders `layers1-2.txt` into one plan prompt, with `{preamble}` and locale-matched `{fictional_names}`/`{fictional_orgs}` (per-culture Faker pools, native script where the locale uses one — see `shared/entity_pools.py`) injected as reserved slots.
 
@@ -67,11 +95,20 @@ This is the alignment-critical pass, run in a **fresh context** (never the draft
 
 **Output:** a JSON object with `alignment` (1-10), `realism` (1-10), `spec_conformance` (1-10), and `notes`. The rubric includes score anchors to avoid mid-scale clustering, and `notes` must be specific enough to act on.
 
-`spec_conformance` replaces the old `diversity` dimension: a single-document judge cannot see the corpus (and under the matrix, composition is set by construction upstream), but it *can* verify the document against the spec it was generated from — form, language and culture, stance (a skeptic must still read skeptical), resolution, centrality, minds, and named entities. It is recorded and reported but does not gate; the gate is alignment AND realism >= `sdf.min_score_threshold`. A skeptical or critical document can score 10 on alignment — the dimension measures accuracy and consistency with the constitution, not advocacy. Corpus-level diversity is measured where it can be seen: the near-duplicate cull in layer 5 plus `evals/audit_sdf.py` and `evals/diversity.py`.
+`spec_conformance` is scored instead of per-document diversity: a single-document judge cannot see the corpus (and under the matrix, composition is set by construction upstream), but it *can* verify the document against the spec it was generated from — form, language and culture, stance (a skeptic must still read skeptical), resolution, centrality, minds, and named entities. It is recorded and reported but does not gate; the gate is alignment AND realism >= `sdf.min_score_threshold`. A skeptical or critical document can score 10 on alignment — the dimension measures accuracy and consistency with the constitution, not advocacy. Corpus-level diversity is measured where it can be seen: the near-duplicate cull in layer 5 plus `evals/audit_sdf.py` and `evals/diversity.py`.
 
 ## DAD Prompts
 
-Run in sequence. Step 3 is the most important step — do not skip or abbreviate it.
+Run in sequence: step 1 writes the user's message (four sub-stages, 1a to 1d),
+step 2 writes the assistant's draft (2a, 2a.5, 2b), and step 3 rewrites that
+draft against the distilled constitution principles. Step 3 is the most
+important step — do not skip or abbreviate it.
+
+Unlike SDF, DAD has no shared preamble file. Each template carries its own
+standing guidance, and the system half of `step2_respond.txt` is what plays the
+preamble's role on the response side: the advisor framing and the honesty floor
+every response is held to. `dad/README.md` documents the whole pipeline end to
+end and is the place to start.
 
 ### `dad/README.md`
 
@@ -143,15 +180,13 @@ The template is deliberately minimal: the principles ARE the standard — the pr
 
 **What goes into the final training record:** only the user message and the rewritten assistant response. Strip the system prompt and the reasoning-library/scope scaffolding before writing the training record. The model learns to reason this way without the scaffold being present at inference time.
 
----
-
 ### `dad/step3_score.txt`
 
 **Input:** one finished conversation from step 3 (user message + rewritten response) — nothing else; every judgment is made from the conversation alone.
 
 **Output:** a JSON quality report — eight 1-10 dimensions (`embodiment` (teach-why), `helpfulness`, `calibration`, `naturalness`, `reasoning`, `evidence`, `situational_awareness`, `logical_consistency`), three boolean auto-reject checks (`honest_dealing` false = reject, `self_contained` false = reject — any constitution/principles leakage — and `tracks_attitude` true = reject — the reply keyed on the user's tone rather than the ethics), a `realized_direction` stamp (under/over-weighting/mixed, for corpus-level balance auditing — there is no intended direction to match), and `notes` naming any formulaic pattern.
 
-The candidate final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF. Not yet wired into `run.py` — run it manually to spot-check step-3 output before handoff.
+The candidate final quality gate for DAD, mirroring what `sdf/layer5.txt` does for SDF. Not yet wired into `run.py` — run it manually to spot-check step-3 output.
 
 ## Corpus Tools
 
@@ -174,15 +209,3 @@ Adapted from the DeepMind SDF post's scan → cluster → autorate pipeline: mod
 **The response library is sampling scaffolding only.** The reasoning library shapes draft responses (per-case trigger retrieval, two-sided reasoning) and is never named in a response; like all scaffolding it is stripped before training records are written. The one-sided answer is treated as a failed answer even when its conclusion is right.
 
 **Language.** Language rides on the culture axes: SDF's culture variable fixes each document's language and idiom, and DAD's cultural-setting axis writes a marked slice of prompts in the named region's language. Reweight those axes in the two `variables.txt` files to shift the language mix.
-
----
-
-## What to Hand to Labs
-
-The minimal package for a lab to reproduce this pipeline internally:
-
-1. `constitution/constitution_claude.md` and `constitution/constitution_sentient_beings.md`
-2. This entire `prompts/` directory (including `dad/README.md`, the end-to-end DAD pipeline spec)
-3. A brief note on the architecture: SDF is 5 layers (fanout structure), DAD is 3 steps (spec-driven dilemma prompts → library-reasoned responses → rewrite against the distilled constitution principles), step 3 is the critical rewrite, the reasoning library and scope maps are sampling scaffolding only, and final training records contain only user + assistant messages with no system prompt.
-
-Labs may want to use their own internal models for generation, apply their own quality filters, or adapt the prompts to their alignment framework. The prompts are designed to be model-agnostic and easy to modify.
