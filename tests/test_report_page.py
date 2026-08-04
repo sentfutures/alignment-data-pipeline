@@ -413,7 +413,7 @@ class TestShape:
                    for u in re.findall(r"href='(https?://[^']+)'", html)}
         assert origins <= {"https://github.com", "https://huggingface.co",
                            "https://alignment.anthropic.com", P.MAKER_URL}
-        assert P.HF_DAD in html and P.HF_SDF in html and P.REPO_URL in html
+        assert R.esc(P.HF_DAD) in html and P.HF_SDF in html and P.REPO_URL in html
 
     def test_every_link_that_leaves_the_page_says_so(self):
         """The arrow is the only signal a reader gets that a click ends the page."""
@@ -1099,7 +1099,7 @@ class TestComparisonTable:
         assert P.PROMPTS_SDF in rows["prompt templates"]
         assert P.PROMPTS_DAD in rows["prompt templates"]
         assert P.HF_SDF in rows["example dataset"]
-        assert P.HF_DAD in rows["example dataset"]
+        assert R.esc(P.HF_DAD) in rows["example dataset"]
         assert "<tfoot>" not in table
 
     def test_the_comparison_carries_no_record_count(self):

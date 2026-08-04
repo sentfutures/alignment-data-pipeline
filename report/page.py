@@ -45,8 +45,13 @@ PROMPTS_DAD = f"{REPO_URL}/tree/main/prompts/dad"
 PROMPTS_SDF = f"{REPO_URL}/tree/main/prompts/sdf"
 HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
           "animal-welfare-training-dataset")
-HF_DAD = f"{HF_URL}/viewer/dad"
-HF_SDF = f"{HF_URL}/viewer/sdf"
+# The config names as they exist on the Hub, percent-encoded: the dataset's two configs are
+# named for the datasets rather than for the pipeline directories, so these are not `sdf` and
+# `dad`. The `&` in the difficult-advice one is escaped to `&amp;` by `esc()` when the href is
+# written, which is what makes it a valid attribute — so a test comparing against these
+# constants has to escape them too.
+HF_DAD = f"{HF_URL}/viewer/difficult%20advice%20Q&A"
+HF_SDF = f"{HF_URL}/viewer/synthetic%20documents"
 
 HERO_ALT = "A line drawing of a butterfly at the end of a looping dashed flight path."
 # Inferred from the team's own domain; one constant to change if it is wrong.

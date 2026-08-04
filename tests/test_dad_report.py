@@ -915,7 +915,9 @@ class TestLineage:
                      rewrites=REWRITES, lineage=LINEAGE)
         panel = html[html.index("<section id='dad'"):html.index("<footer")]
         assert panel.count("class='lbtn'") == 2, "two destinations, and only two"
-        assert P.HF_DAD in panel and P.REPO_URL in panel
+        # esc()d, because the config name carries an "&": the href is written &amp;, which is
+        # what makes it a valid attribute value.
+        assert R.esc(P.HF_DAD) in panel and P.REPO_URL in panel
         example = panel[panel.index("id='dad-example'"):panel.index("id='dad-appendix'")]
         assert "class='lbtns'" in example, "not in the appendix, and not before the trail"
         assert example.index("class='lbtns'") > example.index("Stage 3")
