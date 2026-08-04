@@ -1040,6 +1040,28 @@ class TestContentsRail:
         assert "getComputedStyle(el).scrollMarginTop" in script
         assert "setAttribute('aria-current','true')" in script
 
+    def test_the_last_beat_is_current_at_the_bottom_of_the_page(self):
+        """The appendix cannot reach the line the other beats reach, so the bottom decides.
+
+        The current beat is the last heading whose top has crossed its own scroll-margin-top —
+        112px. The appendix is the last beat and its drawers are closed, so there is less page
+        under it than there is screen: measured at 1440x900, the difficult-advice appendix would
+        need the page scrolled to 7,047px and 6,917px is as far as it goes — 130px short, and
+        220px short on the documents side. The rail therefore marked a stage inside the worked
+        example while the reader was looking at the appendix.
+
+        Corrected at the bottom rather than by shortening the line, because the line is the
+        CSS's own headroom for a linked heading and is right everywhere else. Measured after:
+        "Appendix" at the bottom in both reports, at 900px and 1400px of viewport and on a
+        phone, with the drawers closed and again with every drawer opened.
+        """
+        script = build(sdf_inputs=SDF_INPUTS)
+        script = script[script.index("<script>"):]
+        assert "document.documentElement.scrollHeight" in script
+        assert "heads[heads.length-1].el.id" in script
+        # It reads the live viewport and scroll, so a tall window and a phone both get it.
+        assert "innerHeight+scrollY" in script
+
     def test_the_rail_links_are_a_control_not_the_page_s_link_treatment(self):
         """Every other link on the page is mono, bold and underlined in the accent. The
         rail measures the document rather than arguing in it, so it takes the sans — with

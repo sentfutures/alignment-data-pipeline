@@ -1676,6 +1676,16 @@ flow.classList.toggle('tight',past>(flow.classList.contains('tight')?LOOSE:TIGHT
    they are not in a beat yet. */
 var cur='';
 heads.forEach(function(h){if(h.el.getBoundingClientRect().top<=h.line)cur=h.el.id;});
+/* AT THE BOTTOM, THE LAST BEAT IS THE CURRENT ONE, whether or not its heading ever reached
+   the line. It cannot: the appendix is the last beat and its drawers are closed, so there is
+   less content below it than there is screen — measured at 1440x900, 659px of page under a
+   heading that would need to climb 1,349px. So the rail marked a stage inside the worked
+   example while the reader was looking at the appendix. Correcting at the bottom rather than
+   shortening the line, because the line is the CSS's own headroom and is right everywhere
+   else; and it self-corrects when a reader opens a drawer, since the heading can then reach
+   the line the ordinary way. */
+if(heads.length&&innerHeight+scrollY>=document.documentElement.scrollHeight-2)
+cur=heads[heads.length-1].el.id;
 links.forEach(function(a){
 if(cur&&a.getAttribute('href')==='#'+cur){a.setAttribute('aria-current','true');}
 else{a.removeAttribute('aria-current');}});}
