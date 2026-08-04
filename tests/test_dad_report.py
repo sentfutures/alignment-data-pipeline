@@ -475,10 +475,12 @@ class TestJudgedComparison:
         assert "structural variety" in text
         assert "answer length" in text
 
-    def test_an_unmeasured_row_says_so_rather_than_vanishing(self):
+    def test_unmeasured_stance_adds_no_moralizing_row(self):
+        """A dashed "answers that moralize" row reads as a finding about moralizing on
+        a run that never measured stance, so the row appears only when stance ran."""
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "moves"}
         html = D.scoreboard(audit, D.facts(audit), D._considerations(audit))
-        assert "not measured" in strip_tags(html)
+        assert "moralize" not in strip_tags(html)
 
     def test_a_worse_number_gets_the_bad_chip(self):
         audit = json.loads(json.dumps(AUDIT_FULL))
@@ -495,14 +497,58 @@ class TestJudgedComparison:
             assert marker in appendix, marker
             assert marker not in section[:section.index("id='dad-appendix'")], marker
 
-    def test_the_drawer_says_why_the_report_does_not_lead_with_it(self):
-        """The reason is derived now, not authored: the drawer was renamed "Improving on
-        the control" and its lead sentence is built from the run's own arm counts, so the
-        comparison cannot be shown without the reason it is not led with."""
+    def test_the_drawer_leads_with_what_is_compared_not_a_caveat(self):
+        """The drawer is "Comparison to the control" and opens on what the judges score;
+        the arm asymmetry renders once, with the run's own numbers, in the audit-flags
+        drawer rather than as a caveat repeated here."""
         html = build(diversity=DIVERSITY)
-        assert "least sound measurement here" in html
-        # The arm asymmetry is the reason, and it arrives as a computed clause.
-        assert "over 2 pipeline and 2 control answers" in strip_tags(html)
+        assert "Comparison to the control" in html
+        assert "Improving on the control" not in html
+        assert "least sound measurement" not in html
+        assert "Both arms answer the same dilemmas" in strip_tags(html)
+
+    def test_the_two_judge_intro_defines_both_axes_and_links_the_rubrics(self):
+        """A run with the welfare-impact judge names both judges in the corpus audit's
+        words and points at the judge prompts, which are the rubrics."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["welfare_impact"] = {"pipeline_mean": 92.0, "plain_mean": 83.0,
+                                   "score_max": 100, "per_case": {}}
+        html = build(audit=audit)
+        text = strip_tags(html)
+        assert "Welfare impact" in text and "delivery quality" in text
+        assert "evals/audit_dad.py" in text
+
+    def test_the_pareto_plots_both_judges_and_computes_its_caption(self):
+        """With both judges' per-case scores the figure renders on their own scale, and
+        the caption's percentages come from the plotted answers — a delivery loss must
+        not inherit the "not bought with manner" verdict."""
+        delivery = {"score_max": 100, "per_case": {
+            "AW-0001": {"pipeline": {"score": 91, "blended_score": 91.0},
+                        "plain": {"score": 93, "blended_score": 93.0}}}}
+        welfare = {"score_max": 100, "per_case": {
+            "AW-0001": {"pipeline": {"blended_score": 85.0},
+                        "plain": {"blended_score": 60.0}}}}
+        fig = D._pareto_figure({"delivery": delivery, "welfare_impact": welfare}, {}, {})
+        assert "Substance against manner" in fig
+        assert "+42% welfare impact" in fig and "-2% delivery quality" in fig
+        assert "not bought with manner" not in fig
+        gained = json.loads(json.dumps(welfare))
+        gained["per_case"]["AW-0001"]["plain"]["blended_score"] = 85.0
+        gained["per_case"]["AW-0001"]["pipeline"]["blended_score"] = 92.0
+        flipped = D._pareto_figure(
+            {"delivery": {"score_max": 100, "per_case": {
+                "AW-0001": {"pipeline": {"blended_score": 93.0},
+                            "plain": {"blended_score": 91.0}}}},
+             "welfare_impact": gained}, {}, {})
+        assert "not bought with manner" in flipped
+
+    def test_the_example_count_is_the_shipped_corpus_not_the_step1_deck(self):
+        """The audit's n_prompts counts step-1 dilemmas; the page's "examples" is the
+        records that shipped."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["n_prompts"] = 7
+        html = build(audit=audit, rewrites=REWRITES)
+        assert "A 2-example run" in strip_tags(html)
 
     def test_no_paid_pass_says_so_instead_of_showing_a_hole(self):
         audit = {k: v for k, v in AUDIT_FULL.items()

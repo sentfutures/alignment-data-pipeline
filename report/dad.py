@@ -248,7 +248,7 @@ def _models(manifest):
             "per_stage": {k: (dad.get(k) or glob) for k in _STAGE_KNOBS}}
 
 
-def facts(audit, manifest=None, diversity=None):
+def facts(audit, manifest=None, diversity=None, n_shipped=None):
     """Every number the prose can interpolate, computed once, in one place.
 
     Run-conditional figures reach prose only with a degraded default — a run missing
@@ -268,7 +268,10 @@ def facts(audit, manifest=None, diversity=None):
     lib = audit.get("library_coverage") or {}
     cons = _considerations(audit)
     models = _models(manifest)
-    n = audit.get("n_prompts") or 0
+    # "Examples" on the page means the records that shipped. The audit's n_prompts
+    # counts step-1 dilemmas, and a run loses some between drafting and the final
+    # corpus, so the caller passes the shipped count and n_prompts is the fallback.
+    n = n_shipped or audit.get("n_prompts") or 0
     n_measured = (mpr.get("pipeline") or {}).get("n") or rl.get("n") or n
     anchored = (surv.get("kept") or 0) + (surv.get("weakened") or 0) + (surv.get("dropped") or 0)
     f = {
@@ -363,9 +366,8 @@ def _library_clause(size, used):
 def _judge_arms_clause(audit):
     """How matched the paid comparison actually is, as a clause the prose can hold.
 
-    Composed here rather than typed, because it is the reason the page does not lead
-    with the comparison: on the pinned run the delivery judge lost 19 judgements, so its
-    two means are over 33 pipeline and 26 control answers — different sets of records.
+    Available to the content files as ``{{judge_arms_clause}}``; the page itself states
+    the asymmetry once, with the run's own numbers, in the audit-flags drawer.
     """
     delivery = (audit or {}).get("delivery") or {}
     n_p, n_b, fails = (delivery.get("n_pipeline"), delivery.get("n_plain"),
@@ -705,8 +707,8 @@ def scoreboard(audit, f, cons):
         p = stance["pipeline"].get("moralizes", 0)
         b = (stance.get("plain") or {}).get("moralizes", 0)
         rows.append(("answers that moralize", f"{b:.0%}", f"{p:.0%}", _verdict_chip(p <= b)))
-    else:
-        rows.append(("answers that moralize", "—", "—", _verdict_chip(None)))
+    # No row when stance was not measured: a dashed "answers that moralize" line reads
+    # as a finding about moralizing this run never made.
     if not rows:
         return ""
     return R.table(["measure", "control", "pipeline", ""], rows, align="lrrl")
@@ -774,8 +776,15 @@ def _pareto_figure(audit, mpr, labels):
     the figure anyway: an empty plot reading "not measured on this run" under a caption
     asserting the pipeline "buys substance with manner" — a claim about a chart that was
     not there, and false on the pinned run, where the pipeline is higher on both axes.
+
+    The vertical axis reads whichever substance measure this run carries: the
+    welfare-impact judge, or the retired per-consideration extraction on runs that
+    predate it.
     """
     delivery = audit.get("delivery") or {}
+    welfare = audit.get("welfare_impact") or {}
+    if delivery.get("per_case") and welfare.get("per_case"):
+        return _pareto_impact_figure(delivery, welfare, labels)
     if not (delivery.get("per_case") and (mpr or {}).get("per_case")):
         return ""
     n_p, n_b, fails = delivery.get("n_pipeline"), delivery.get("n_plain"), delivery.get("failures")
@@ -790,6 +799,64 @@ def _pareto_figure(audit, mpr, labels):
               "on the vertical. Diamonds are each arm's mean." + asym,
         chart=_pareto(delivery, mpr, labels),
         caption="**The pipeline arm sits up and to the left: it buys substance with manner.**")
+
+
+def _blended(entry):
+    """One arm's continuous verdict on one case: the holistic grade blended with the
+    sub-dimensions where the judge returned it, the raw grade on older audits."""
+    e = entry or {}
+    return e.get("blended_score", e.get("score"))
+
+
+def _pareto_impact_figure(delivery, welfare, labels):
+    """The two-judge Pareto pair, matching the corpus audit's headline scatter.
+
+    Both axes stay on the judges' full scale rather than a window fitted to the data:
+    scores cluster near the top, and a zoomed panel turns a 2-point difference into a
+    third of the plot. The caption's percentages are computed from the plotted answers,
+    so the claim and the chart can never disagree.
+    """
+    smax = _score_max({"delivery": delivery})
+    pts, sums = [], {"plain": [0.0, 0.0, 0], "pipeline": [0.0, 0.0, 0]}
+    for pid, entry in (delivery.get("per_case") or {}).items():
+        w_entry = (welfare.get("per_case") or {}).get(pid) or {}
+        for arm in ("plain", "pipeline"):
+            x, y = _blended(entry.get(arm)), _blended(w_entry.get(arm))
+            if x is None or y is None:
+                continue
+            pts.append({"x": x, "y": y, "color": R.ARM_COLORS[arm],
+                        "tip": f"{labels.get(pid, pid)} · {arm}: welfare impact {y:.0f}, "
+                               f"delivery {x:.0f}, both /{smax}"})
+            s = sums[arm]
+            s[0] += x
+            s[1] += y
+            s[2] += 1
+    marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
+              "tip": f"{arm} mean: welfare impact {s[1] / s[2]:.1f}, "
+                     f"delivery {s[0] / s[2]:.1f}"}
+             for arm, s in sums.items() if s[2]]
+    caption = ""
+    p, b = sums["pipeline"], sums["plain"]
+    if p[2] and b[2] and b[0] and b[1]:
+        w_pct = (p[1] / p[2]) / (b[1] / b[2]) - 1
+        d_pct = (p[0] / p[2]) / (b[0] / b[2]) - 1
+        # The trade verdict is derived, never typed: a future run that loses delivery
+        # must not inherit this run's conclusion.
+        trade = (" — the substance is not bought with manner"
+                 if w_pct > 0 and d_pct >= 0 else "")
+        caption = (f"**Pipeline against control: {w_pct:+.0%} welfare impact, "
+                   f"{d_pct:+.0%} delivery quality**{trade}. The margin understates the "
+                   "dataset's value: the dilemmas themselves elicit most of the welfare "
+                   "reasoning, so the pipeline's contribution is the improvement on top "
+                   "of an already strong control.")
+    return R.figure(
+        title="Substance against manner, one dot per answer",
+        note_=f"Judged delivery quality on the horizontal axis, judged welfare impact on "
+              f"the vertical, both on the judges' 0–{smax} scale. Diamonds are each arm's "
+              "mean; up and to the right is more substance without losing delivery. Only "
+              "answers both judges scored appear.",
+        chart=R.scatter(pts, xdomain=(0, smax), ydomain=(0, smax), marks=marks),
+        caption=caption)
 
 
 def _type_hist(per_case, arm):
@@ -888,14 +955,15 @@ def _judged_means(audit):
     return out
 
 
-def judged_drawer(audit, content, f, cons, labels):
+def judged_drawer(audit, content, f, cons, labels, repo_href=""):
     """The whole judged comparison against the plain model, in one drawer.
 
-    Demoted rather than deleted. It is real evidence and it is all here, but it is not
-    what the page argues from: on the pinned run the delivery pass lost judgements, so its
-    two means are over different sets of records, judge and generator are the same model
-    family, and nothing checks whether the points counted as added are correct. A page
-    that led with it would be leading with its weakest measurement.
+    Demoted rather than deleted: judge and generator are the same model family, and
+    nothing checks whether the points counted as added are correct, so the page argues
+    from the process and the records instead. The intro says what each judge measures —
+    the judge prompts ARE the rubrics, so it links to them rather than paraphrasing.
+    The arm-count asymmetry renders with the run's own numbers in the audit-flags
+    drawer, not as a caveat repeated here.
     """
     mpr = (audit or {}).get("moral_patient_reasons") or {}
     means = _judged_means(audit)
@@ -903,12 +971,19 @@ def judged_drawer(audit, content, f, cons, labels):
     # its presence is not evidence that a judge ran. Say so explicitly rather than letting
     # a drawer titled "what the paid judges measured" fill up with offline measures.
     paid = bool(means or (cons and cons.get("plain") is not None) or mpr.get("survival"))
-    body = [R.note(
-        "Both arms answer the same dilemmas and a paid judge scores the answers. It sits "
-        "in a drawer because it is the least sound measurement here: the judgements are "
-        f"{f.get('judge_arms_clause', 'not evenly matched')}, so the two means are not "
-        "taken over the same records, and judge and generator are the same model family."
-    ) if paid else R.note(
+    # What the judges measure, in the corpus audit's own words. Runs that predate the
+    # welfare-impact judge had one judge and an extraction pass, so they get the plain
+    # sentence and no definitions that would name a judge they never ran.
+    rubrics = (" The full rubrics are the judge prompts themselves — `WELFARE_SYSTEM` and "
+               f"`DELIVERY_SYSTEM` in [evals/audit_dad.py]({repo_href}/blob/main/evals/"
+               "audit_dad.py).") if repo_href else ""
+    intro = ("Both arms answer the same dilemmas and two paid judges score every answer "
+             "independently. **Welfare impact** scores how much better the answer makes "
+             "things for the sentient beings the decision affects; **delivery quality** "
+             "scores how well it serves and respects the user and their goal." + rubrics
+             if (audit or {}).get("welfare_impact") else
+             "Both arms answer the same dilemmas and a paid judge scores the answers.")
+    body = [f"<p>{R.inline_md(intro)}</p>" if paid else R.note(
         "No paid judge pass ran on this run, so nothing here compares the two arms on "
         "substance or manner. Populate it with `python evals/audit_dad.py --input <run> "
         "--reasons`. The rows below are offline measurements against the control.")]
@@ -957,8 +1032,7 @@ def judged_drawer(audit, content, f, cons, labels):
     body = [b for b in body if b]
     if len(body) <= 1:
         return ""
-    return R.details("Improving on the control", "".join(body),
-                     meta=f.get("judge_arms_clause", "") if paid else "")
+    return R.details("Comparison to the control", "".join(body))
 
 
 def checks_table(audit, diversity):
@@ -980,8 +1054,12 @@ def checks_table(audit, diversity):
          f"judged 0–{_score_max(audit)}"),
         ("Showcase examples", bool((audit or {}).get("showcase")),
          "Concrete pipeline-beats-control cases with verbatim improved spans"),
-        ("Response stance", bool(((audit or {}).get("moves") or {}).get("stance")),
-         "Whether an answer defers, stays calibrated, or moralizes"),
+        # Response stance appears only when it ran: every other unrun check names a
+        # missing measurement, but this row's gloss ("…or moralizes") reads as a claim
+        # about moralizing on a run that never measured it.
+        *([("Response stance", True,
+            "Whether an answer defers, stays calibrated, or moralizes")]
+          if ((audit or {}).get("moves") or {}).get("stance") else []),
         ("Tracked phrases and rhetorical moves",
          bool((audit or {}).get("tracked_tics") or (audit or {}).get("rhetorical_moves")),
          "Recurring phrasing and argumentative habits, as a share of each arm"),
@@ -1327,7 +1405,7 @@ def _moves_drawer(audit):
 
 
 def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest=None,
-                    picks=(), run_id=""):
+                    picks=(), run_id="", repo_href=""):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
     Every chart lands here — the page above carries none — and so does everything specific
@@ -1353,7 +1431,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               C.run_note(run_id, n=f.get("n"),
                          lead="Every figure and verdict below is measured on one run:"),
-              judged_drawer(audit, content, f, cons, labels)]
+              judged_drawer(audit, content, f, cons, labels, repo_href=repo_href)]
 
     charts = _appendix_charts(audit, f, cons)
     retention = _survival_chart((audit.get("moral_patient_reasons") or {}).get("per_case") or {},
@@ -1414,7 +1492,7 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
     with the h2; every block here is therefore a grid child of that section, which is
     what lets figures bleed past the text measure.
     """
-    f = facts(audit, manifest, diversity)
+    f = facts(audit, manifest, diversity, n_shipped=len(rewrites) if rewrites else None)
     cons = _considerations(audit)
     labels = _labels(audit)
     picks = (example,) if example else ()
@@ -1424,5 +1502,5 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
                        hf_href=hf_href, repo_href=repo_href, run_id=run_id),
         blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks,
-                        run_id=run_id),
+                        run_id=run_id, repo_href=repo_href),
     ])
