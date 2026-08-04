@@ -38,13 +38,13 @@ CONTENT_IDS = ("title", "intro", "sdf_technique", "dad_technique", "intro_close"
                "dad_desc", "dad_use", "dad_unit")
 
 
-REPO_URL = "https://github.com/sentfutures/alignment-data-pipeline"
+REPO_URL = "https://github.com/sentfutures/animal-welfare-data-pipeline"
 # Deep links to the prompts each pipeline runs. The reader this page is written for
 # wants the templates, not the records, so the comparison links straight at them.
 PROMPTS_DAD = f"{REPO_URL}/tree/main/prompts/dad"
 PROMPTS_SDF = f"{REPO_URL}/tree/main/prompts/sdf"
 HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
-          "animal-welfare-mid-training-datasets")
+          "animal-welfare-training-dataset")
 HF_DAD = f"{HF_URL}/viewer/dad"
 HF_SDF = f"{HF_URL}/viewer/sdf"
 
