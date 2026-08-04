@@ -437,9 +437,20 @@ class TestShape:
     def test_is_self_contained(self):
         """One file. Every reference in it either stays on the page (an anchor), is
         carried inside it (a data URI), or is prose pointing at the web — never a
-        relative path to something that has to travel alongside."""
+        relative path to something that has to travel alongside.
+
+        `<link>` used to be banned outright. The tab icon is the one exception, because a
+        favicon has no other spelling — a browser will not read one out of a `<meta>` —
+        so the rule is now shape-checked instead of absent: every link on the page must be
+        an icon with a `data:` href, which lets nothing else (a stylesheet, a preload, a
+        font) in behind it.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
-        assert not re.search(r"<(link|iframe)\b", html)
+        assert not re.search(r"<iframe\b", html)
+        for tag in re.findall(r"<link\b[^>]*>", html):
+            assert re.fullmatch(
+                r"<link rel='icon' sizes='\d+x\d+' href='data:image/png;base64,[^']+'>",
+                tag), tag
         assert not re.search(r"<script[^>]*\ssrc=", html)
         assert "@import" not in html and "url(" not in html
         refs = re.findall(r"(?:src|href)='([^']+)'", html)
@@ -456,6 +467,31 @@ class TestShape:
         emailed or published on its own, which is the whole failure this format avoids."""
         with pytest.raises(ValueError, match="data: URI"):
             build(illustration="assets/hero.png")
+
+    def test_the_tab_icon_is_carried_inside_the_page(self):
+        """Inlined for the same reason the hero is: the copy that opens from disk or
+        arrives by email keeps its icon, and no new file has to travel beside the page.
+
+        Each size is declared, because each PNG is decimated for the size it names — the
+        art is hairline pencil work, and letting the browser scale one image down averages
+        the ink away. `sizes=` is what stops it.
+        """
+        html = build(icons=[(16, "data:image/png;base64,AAAA"),
+                            (32, "data:image/png;base64,BBBB")])
+        assert "<link rel='icon' sizes='16x16' href='data:image/png;base64,AAAA'>" in html
+        assert "<link rel='icon' sizes='32x32' href='data:image/png;base64,BBBB'>" in html
+
+    def test_a_page_with_no_icon_asks_for_nothing(self):
+        """A missing asset degrades to no tag, never to a tag pointing at nothing — the
+        same shape as the hero's empty slot. A `<link rel='icon'>` with an empty href is a
+        request for the page's own URL, which is not a picture."""
+        assert "rel='icon'" not in build()
+        assert "rel='icon'" not in build(icons=[(16, "")])
+
+    def test_a_tab_icon_that_would_have_to_travel_is_refused(self):
+        """Same guard as the hero, for the same failure."""
+        with pytest.raises(ValueError, match="data: URI"):
+            build(icons=[(16, "assets/favicon-16.png")])
 
     def test_is_light_mode_only(self):
         html = build()

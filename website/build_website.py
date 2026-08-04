@@ -45,6 +45,10 @@ MAKER_ICON = WEBSITE_DIR / "assets" / "sf.png"
 # The ONE file that travels beside index.html, and only for a hosted build: a card renderer
 # fetches og:image over the network, so this is the one picture the page cannot carry.
 PREVIEW = WEBSITE_DIR / "assets" / "preview.png"
+# The tab icons, one PNG per size because each is decimated for the size it names — see
+# make_preview.py, which draws these and the card from the same hero. Inlined like the
+# hero, so they are NOT among the files a deploy has to carry.
+FAVICONS = [(px, WEBSITE_DIR / "assets" / f"favicon-{px}.png") for px in (16, 32)]
 
 
 def data_uri(path, mime="image/png"):
@@ -69,13 +73,14 @@ def main():
     kwargs = page.load_inputs(args.content or CONTENT, dad_run=args.dad_run,
                               sdf_run=args.sdf_run)
     hero = data_uri(HERO)
+    icons = [(px, data_uri(p)) for px, p in FAVICONS]
     site_url = args.site_url or ""
     # A hosted build gets the card image without being asked twice: the default names the
     # file this script copies out beside index.html, resolved against the page's own URL
     # (urljoin, so both ".../" and ".../index.html" land on ".../preview.png").
     preview_url = args.preview_url or (urljoin(site_url, PREVIEW.name) if site_url else "")
     html = page.build(example=args.example, sdf_example=args.sdf_example, illustration=hero,
-                      maker_icon=data_uri(MAKER_ICON), site_url=site_url,
+                      maker_icon=data_uri(MAKER_ICON), icons=icons, site_url=site_url,
                       preview_url=preview_url, **kwargs)
     if site_url and not args.preview_url and PREVIEW.exists():
         shutil.copyfile(PREVIEW, out_dir / PREVIEW.name)
@@ -83,6 +88,7 @@ def main():
     C.write(out_dir / "index.html", html,
             label=f"{C.editorial_words(html):,} words of prose · "
                   f"hero={'inlined' if hero else 'NO'} · "
+                  f"icons={sum(1 for _, u in icons if u)}/{len(icons)} · "
                   f"dad n={audit.get('n_prompts')} "
                   f"delivery={'yes' if audit.get('delivery') else 'NO'} "
                   f"showcase={'yes' if audit.get('showcase') else 'NO'} "
