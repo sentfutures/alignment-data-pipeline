@@ -180,7 +180,7 @@ def section_explore(panels, outlines):
 # The people behind the page, in credit order, each with their institution.
 #
 # The affiliation NUMBERS are derived from this list by first appearance, never typed:
-# three of the seven share one institution, so a hand-kept numbering is exactly the sort
+# most of the names share one institution, so a hand-kept numbering is exactly the sort
 # of thing that goes quietly wrong the first time someone is added or the order changes.
 # Add a name here and the key renumbers itself.
 AUTHORS = (

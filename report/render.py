@@ -1490,7 +1490,7 @@ display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-
 footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
 /* The byline takes its own full-width line above that row rather than sitting in it: the
-   footer is "who made it left, where to go right", and seven names with an affiliation key
+   footer is "who made it left, where to go right", and a byline with an affiliation key
    is not a thing that belongs in either half. Credit, then the org, then the way out.
    `flex:0 0 100%` earns the line without needing the footer to stop being a flex row. */
 .foot-by{flex:0 0 100%;margin-bottom:.85rem}
