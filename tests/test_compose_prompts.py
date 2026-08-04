@@ -119,6 +119,14 @@ def test_split_sections():
     assert cp.split_sections("just a user prompt\n") == (None, "just a user prompt")
 
 
+def test_module_defaults_point_at_real_files():
+    """The standalone CLI's default paths must exist — a template rename that
+    misses these constants breaks `python sdf_pipeline/compose_prompts.py`
+    while every pipeline test (which passes explicit paths) stays green."""
+    for default in (cp.DEFAULT_TEMPLATE, cp.DEFAULT_VARIABLES, cp.DEFAULT_PREAMBLE):
+        assert default.is_file(), f"{default} does not exist"
+
+
 def test_real_templates_render_with_canonical_loader():
     """Both matrix templates must render through utils.load_prompt (str.format),
     like every other pipeline template — a stray literal brace fails here."""

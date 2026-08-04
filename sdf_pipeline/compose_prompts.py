@@ -6,7 +6,7 @@ variables is expanded deterministically. Offline, zero API calls.
 
 Inputs
 ------
-- Template (``prompts/sdf/matrix/layer 1.txt``): plain text with ``{name}``
+- Template (``prompts/sdf/layer1.txt``): plain text with ``{name}``
   slots — the same Python ``str.format`` syntax as every other pipeline
   template (rendered the same way ``shared.utils.load_prompt`` does), so
   literal ``{}`` braces must not appear in the template.
@@ -88,7 +88,7 @@ from shared.matrix import (  # noqa: E402,F401
     template_placeholders,
 )
 from shared import matrix as _matrix  # noqa: E402
-DEFAULT_TEMPLATE = REPO_ROOT / "prompts" / "sdf" / "layer 1.txt"
+DEFAULT_TEMPLATE = REPO_ROOT / "prompts" / "sdf" / "layer1.txt"
 DEFAULT_VARIABLES = REPO_ROOT / "prompts" / "sdf" / "variables.txt"
 DEFAULT_PREAMBLE = REPO_ROOT / "prompts" / "sdf" / "preamble.txt"
 
