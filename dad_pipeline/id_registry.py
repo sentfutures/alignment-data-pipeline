@@ -18,10 +18,28 @@ Additive — the per-run ids are untouched.
 
 The registry is a git-tracked JSON file shared across runs (one id space); in
 tests it lives under the tmp output root, so it never touches the real one.
+
+Two properties the callers depend on:
+
+- **Not safe to run concurrently.** Every run under one `outputs/dad` tree opens
+  the *same* registry file, allocates from its own in-memory copy, and persists
+  by full overwrite. Two DAD runs at once therefore hand the same number to
+  different content, and the last save wins — silently. Run them one at a time.
+  (No `fcntl` lock or per-run allocation journal: deliberately out of scope.)
+- **Ordering invariant: save before you write.** A stage must call `save()`
+  *before* appending any record that carries a freshly stamped gid. A crash may
+  then leave a number allocated but unused — a harmless gap — but never a number
+  that is already on a written record yet unallocated, which is what makes the
+  next run hand that same number to different content.
 """
 
 import hashlib
 import json
+import os
+import stat
+import sys
+import tempfile
+from collections import Counter
 from pathlib import Path
 
 
@@ -92,16 +110,69 @@ class IdRegistry:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self._data: dict[str, dict[str, int]] = {k: {} for k in self.KINDS}
-        if self.path.exists():
+        # A registry that does not exist yet is the normal first-run case: start
+        # empty. A registry that exists but cannot be read as one is NOT — see
+        # _die.
+        if not self.path.exists():
+            return
+        try:
+            raw = self.path.read_text(encoding="utf-8")
+        except OSError as exc:
+            self._die(f"it could not be read ({exc})")
+        try:
+            loaded = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            self._die(f"it is not valid JSON ({exc})", raw=raw)
+        if not isinstance(loaded, dict):
+            self._die(f"its top level is {type(loaded).__name__}, not an object", raw=raw)
+        for kind, table in loaded.items():
+            if not isinstance(table, dict):
+                self._die(f"its {kind!r} table is {type(table).__name__}, not an object",
+                          raw=raw)
             try:
-                loaded = json.loads(self.path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                loaded = {}
-            if isinstance(loaded, dict):
-                for kind in self.KINDS:
-                    table = loaded.get(kind)
-                    if isinstance(table, dict):
-                        self._data[kind] = {str(k): int(v) for k, v in table.items()}
+                self._data[kind] = {str(k): int(v) for k, v in table.items()}
+            except (TypeError, ValueError) as exc:
+                self._die(f"its {kind!r} table holds a value that is not a number ({exc})",
+                          raw=raw)
+        self._warn_on_duplicate_numbers()
+
+    def _die(self, why: str, raw: str = "") -> None:
+        """Refuse to run on a registry we cannot read. Starting over would
+        re-issue numbers that already name different artifacts in committed
+        runs, audits, and the viewer — a silent, unrecoverable collision."""
+        msg = [
+            f"Cannot read the id registry at {self.path}: {why}.",
+            "This file maps content fingerprints to the stable gids "
+            "(S-/P-/R-/C-/E-####) that committed runs, audit reports, and the "
+            "viewer are keyed by, so starting over would re-issue numbers that "
+            "already name different artifacts.",
+        ]
+        if any(m in raw for m in ("<<<<<<<", "=======", ">>>>>>>")):
+            msg.append(
+                "It looks like an unresolved merge conflict: resolve it by "
+                "keeping BOTH sides' entries (each fingerprint keeps the number "
+                "it already has), not by picking one side.")
+        msg.append(f"Otherwise restore it from git (`git checkout -- {self.path}`). "
+                   "A registry that does not exist yet is fine — that starts empty.")
+        raise SystemExit(" ".join(msg))
+
+    def _warn_on_duplicate_numbers(self) -> None:
+        """Two branches allocating from the same max independently can both mint
+        the same number, so a merged registry may map two fingerprints to one
+        gid. Warn loudly — but don't die: the only remedy is renumbering, which
+        would move gids already stamped on committed runs. New ids still
+        allocate above the maximum, so the damage never spreads."""
+        for kind, table in sorted(self._data.items()):
+            dupes = sorted(n for n, c in Counter(table.values()).items() if c > 1)
+            if dupes:
+                print(
+                    f"  WARNING: {self.path} maps two different {kind} fingerprints "
+                    f"onto the same number(s): {dupes}. A merge of two branches' "
+                    "registries does this, and those artifacts now share a gid. "
+                    "New ids still allocate above the maximum, so it does not "
+                    "spread; renumbering would move gids already committed.",
+                    file=sys.stderr,
+                )
 
     def assign(self, kind: str, fingerprint: str) -> int:
         """Return the stable number for this content, allocating the next one
@@ -116,8 +187,27 @@ class IdRegistry:
         return f"{self.PREFIXES[kind]}-{self.assign(kind, fingerprint):04d}"
 
     def save(self) -> None:
+        """Persist atomically: a same-directory temp file, fsynced, then
+        os.replace()d onto the target. An interrupted save leaves the previous
+        registry intact rather than a truncated one the next run cannot read."""
+        # Serialize first: a serialization error then cannot leave debris behind.
+        payload = json.dumps(self._data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            json.dumps(self._data, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        # mkstemp creates 0600 files; match the existing target's mode so an
+        # atomic save never silently tightens permissions on a git-tracked file.
+        try:
+            mode = stat.S_IMODE(self.path.stat().st_mode)
+        except OSError:
+            mode = 0o644
+        fd, tmp = tempfile.mkstemp(dir=self.path.parent,
+                                   prefix=self.path.name + ".", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(payload)
+                f.flush()
+                os.fsync(f.fileno())
+                os.fchmod(f.fileno(), mode)
+            os.replace(tmp, self.path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
