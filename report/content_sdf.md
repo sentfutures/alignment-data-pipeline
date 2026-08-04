@@ -74,4 +74,4 @@ Corpus-wide evals from a {{n_docs}}-document sample run using {{models}}.
 
 <!-- id: sdf_checks_intro -->
 
-Besides the layer 4 gate, we provide a set of corpus-level evals to test for diversity: register collapse, repeated openings, and other stylistic tics.
+How varied the shipped dataset is across several dimensions: the **composition axes** the matrix engineers (how central the welfare thread is, the author's stance, domain, language), the **constitution principles** it exercises, and the **meanings or topics** the documents cover (measured using embedding similarity).

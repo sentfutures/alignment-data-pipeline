@@ -256,7 +256,7 @@ def facts(audit, manifest=None, diversity=None, n_shipped=None):
     sentence survives and its claim does not. The delivery comparison is deliberately
     NOT available to prose as a clause: it is stated once, by _delivery_statement().
 
-    Everything here is consumed by the appendix or by ``derived_warnings()``. The
+    Everything here is consumed by the appendix. The
     difficult-advice prose a reader sees interpolates exactly one of them,
     ``{{library_clause}}`` — the caveats are generalised and carry no run figures at all.
     """
@@ -366,8 +366,8 @@ def _library_clause(size, used):
 def _judge_arms_clause(audit):
     """How matched the paid comparison actually is, as a clause the prose can hold.
 
-    Available to the content files as ``{{judge_arms_clause}}``; the page itself states
-    the asymmetry once, with the run's own numbers, in the audit-flags drawer.
+    Available to the content files as ``{{judge_arms_clause}}``; no prose interpolates
+    it today.
     """
     delivery = (audit or {}).get("delivery") or {}
     n_p, n_b, fails = (delivery.get("n_pipeline"), delivery.get("n_plain"),
@@ -964,8 +964,6 @@ def judged_drawer(audit, content, f, cons, labels, repo_href=""):
     nothing checks whether the points counted as added are correct, so the page argues
     from the process and the records instead. The intro says what each judge measures —
     the judge prompts ARE the rubrics, so it links to them rather than paraphrasing.
-    The arm-count asymmetry renders with the run's own numbers in the audit-flags
-    drawer, not as a caveat repeated here.
     """
     mpr = (audit or {}).get("moral_patient_reasons") or {}
     means = _judged_means(audit)
@@ -1194,54 +1192,7 @@ def _habits_caption(invented, dropped):
     return f"**The pipeline dropped `{dropped[0]}`, a move the control reaches for.**"
 
 
-# ------------------------------------------------------------------ weaknesses
-
-def derived_warnings(audit, manifest, f):
-    """The weaknesses floor: computed from the run, never author-supplied.
-
-    Anything BAD or OK in the audit, plus provenance and a set of DAD-specific rules.
-    If a future run regresses, its warning appears here whether or not the prose was
-    updated. Rows are only ever added to this list.
-    """
-    out = C.audit_verdict_warnings(audit)
-    out += C.provenance_warnings(manifest, n=f.get("n"))
-    if f.get("length_pct") != "an unmeasured amount":
-        out.append(("OK", f"Answers are {f['length_pct']} longer than the control's. Length is "
-                          "the most visible property a trained model would inherit."))
-    delivery = audit.get("delivery") or {}
-    pm, bm = delivery.get("pipeline_mean"), delivery.get("plain_mean")
-    if not delivery:
-        out.append(("BAD", "Delivery quality and the showcase pass did not run, so nothing here "
-                           "measures whether the added substance cost manner."))
-    elif pm is not None and bm is not None and pm < bm:
-        # The substance/manner trade the whole method is supposed to avoid. If it goes
-        # the wrong way it leads the weaknesses, whatever the prose says.
-        dims = delivery.get("dimensions") or {}
-        worse = sorted(k for k, v in (dims.get("pipeline") or {}).items()
-                       if (dims.get("plain") or {}).get(k) is not None and v < dims["plain"][k])
-        out.append(("BAD", f"**Delivery quality went the wrong way**: {pm:.1f} against the "
-                           f"control's {bm:.1f} out of {_score_max(audit)}. The pipeline "
-                           f"bought welfare substance "
-                           "at a measurable cost in manner, which is the trade this method is "
-                           "meant to avoid."
-                           + (f" Worse on every judged dimension ({', '.join(worse)})."
-                              if len(worse) == len(dims.get("pipeline") or {}) and worse
-                              else f" Worse on: {', '.join(worse)}." if worse else "")))
-    # Per-measure arm asymmetry. The retention rule below only reads its own failures,
-    # so an unmatched delivery comparison used to reach the page undisclosed.
-    for name, block in (("Delivery quality", delivery),):
-        n_p, n_b = block.get("n_pipeline"), block.get("n_plain")
-        if n_p is not None and n_b is not None and (n_p != n_b or block.get("failures")):
-            out.append(("BAD" if abs(n_p - n_b) > 0.15 * max(n_p, n_b, 1) else "OK",
-                        f"{name} is not a matched comparison: {n_p} pipeline against {n_b} "
-                        f"control answers, with {block.get('failures') or 0} judgements failing. "
-                        f"The two means are over different sets of records."))
-    if (audit.get("moral_patient_reasons") or {}).get("failures"):
-        out.append(("OK", f"{audit['moral_patient_reasons']['failures']} extraction failures mean "
-                          f"the arms are unequal ({f.get('n_pipeline', '?')} pipeline against "
-                          f"{f.get('n_plain', '?')} control)."))
-    return sorted(out, key=lambda w: 0 if w[0] == "BAD" else 1)
-
+# ------------------------------------------------------------------ caveats beat
 
 def blocks_weak(content, f):
     """What is wrong with the method, in general — not with this run.
@@ -1252,33 +1203,10 @@ def blocks_weak(content, f):
     with the generator. None of the three is a property of one run. It takes no ``audit`` at
     all, so a run number cannot get in.
 
-    THREE, and the two that went are the test of whether this list stays honest. "Nothing
-    checks that an added point is correct" folded into the judges bullet, because it is the
-    same weakness — the evaluation, not the generation. "The answers run long" went because
-    ``derived_warnings`` already emits it WITH the run's own figure, so the authored twin was
-    a vaguer copy of a row further down the page. A cut is only allowed on one of those two
-    grounds: it is the same caveat as its neighbour, or the page states it better elsewhere.
-
-    The run's own findings are not softened by this and are not gone: every BAD and OK
-    verdict its audit recorded still renders, derived and unfiltered, in the appendix
-    drawer built by ``audit_flags_drawer()``.
+    THREE authored bullets. A cut is only allowed on one of two grounds: it is the
+    same caveat as its neighbour, or the page states it better elsewhere.
     """
     return R.sub("dad-weak", "Caveats") + C.prose(content, "caveats", f)
-
-
-def audit_flags_drawer(audit, f, manifest):
-    """The derived floor, in the appendix with the rest of this run's own numbers.
-
-    Still computed, never authored, and never filtered — ``warnings_table`` may collapse
-    rows into a counted drawer but the list itself is whole. It sits here rather than in
-    the caveats beat because every row is specific to one run.
-    """
-    warnings = derived_warnings(audit, manifest, f)
-    if not warnings:
-        return ""
-    bad = sum(1 for sev, _ in warnings if sev == "BAD")
-    return R.details("What the audit flags", C.warnings_table(warnings),
-                     meta=f"{len(warnings)} findings · {bad} BAD")
 
 
 # ------------------------------------------------------------------ appendix
@@ -1331,68 +1259,6 @@ def _appendix_charts(audit, f, cons):
     return out + _footprint_figures(audit, f)
 
 
-def _semantic_figures(diversity):
-    """Meanings and topics: the corpus audit viewer's two-chart pair, mirrored.
-
-    Redundancy (each record's nearest-neighbour cosine, where past 0.90 is a
-    near-duplicate) and topic spread (meaning-cluster sizes, largest first), with the
-    viewer's own captions, then the Vendi effective-count as a sentence. Renders from
-    the per-record ``scopes.combined`` data, so a run whose diversity report predates
-    that field gets nothing rather than an approximation.
-    """
-    scope = ((diversity or {}).get("scopes") or {}).get("combined") or {}
-    sims, clusters = scope.get("nn_sims") or [], scope.get("clusters") or {}
-    if not sims:
-        return ""
-    over = scope.get("over") or {}
-    out = [
-        "<h4>Meanings and topics</h4>",
-        "<p class='muted'>Similarity is measured with embeddings, so two records count "
-        "as alike when they cover the same subject even in completely different words. "
-        f"Embedding model: <code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"]
-    # Fixed 0.05 buckets ending at 1.00, so the 0.90 near-duplicate threshold is a
-    # bucket edge and an empty right-hand tail stays visible rather than cropped.
-    lo = min(0.5, min(sims))
-    edges = [round(lo + i * 0.05, 2) for i in range(int(round((1.0 - lo) / 0.05)))]
-    buckets = [(f"{a:.2f}", sum(1 for s in sims if a <= s < round(a + 0.05, 2)))
-               for a in edges]
-    out.append(R.figure(
-        title="Redundancy — how close each record sits to its nearest neighbour",
-        chart=R.histogram(buckets, xlabel="nearest-neighbour cosine similarity"),
-        caption=f"**{over.get('0.90', 0):.0%} near-duplicate** (similarity above 0.90), "
-                f"{over.get('0.80', 0):.0%} similar (above 0.80). Lower is more varied."))
-    sizes = clusters.get("sizes") or []
-    if sizes:
-        k = clusters.get("k") or len(sizes)
-        out.append(R.figure(
-            title="Topic spread — the records grouped into meaning clusters",
-            chart=R.histogram([(str(i + 1), s) for i, s in enumerate(sizes)],
-                              xlabel="clusters, largest first"),
-            caption=f"**Evenness {clusters.get('evenness', 0):.3f} across {k} clusters**, "
-                    f"the largest holding {clusters.get('largest_share', 0):.0%} of "
-                    "records. Many even bars mean many distinct topics; one tall bar "
-                    "means they clump onto a single one."))
-    n, vr = scope.get("n") or 0, scope.get("vendi_ratio") or 0
-    if n and vr:
-        out.append("<p>" + R.inline_md(
-            f"**{vr * n:.1f} of {n} records effectively distinct** in meaning "
-            f"(Vendi ratio {vr:.2f}). Higher is more varied.") + "</p>")
-    detail = clusters.get("detail") or []
-    if detail:
-        out.append(R.details(
-            "What each cluster is",
-            "<p class='muted'>Clusters are unlabelled groups of records with similar "
-            "meaning, numbered to match the topic-spread bars (largest first). Each is "
-            "shown by its most central record — a typical member, not a name for the "
-            "group.</p>"
-            + R.table(["cluster", "records", "most central record"],
-                      [(f"{i + 1}", f"{d.get('size', '?')}",
-                        f"{d.get('rep_id', '?')} — “{d.get('rep', '')}”")
-                       for i, d in enumerate(detail)], align="rrl"),
-            meta=f"{len(detail)} clusters"))
-    return "".join(out)
-
-
 def diversity_drawer(audit, content, f, diversity):
     """The corpus audit viewer's Composition and Diversity Analysis, as one drawer.
 
@@ -1401,12 +1267,11 @@ def diversity_drawer(audit, content, f, diversity):
     the meanings and topics they cover), the same two semantic charts, the same
     captions — so a reader moving between this page and the viewer meets one story.
     The health-check triage material (which checks ran, per-section verdict rows) is
-    deliberately absent: it is review-tool work, and what this run's audit flagged
-    already renders in the audit-flags drawer.
+    deliberately absent: it is review-tool work, not hand-off storytelling.
     """
     moves_fig = _moves_figure(audit)
     tics_fig = _tics_figure(audit)
-    semantic = _semantic_figures(diversity)
+    semantic = C.semantic_figures(diversity)
     if not (moves_fig or tics_fig or semantic):
         return ""
     parts = [C.prose(content, "checks_intro", f), moves_fig, tics_fig,
@@ -1452,20 +1317,15 @@ def blocks_appendix(audit, content, f, cons, labels, diversity, manifest=None,
     rather than saying "that run", because a reader arriving from the rail may not have
     read the beat that introduced it.
 
-    FOUR drawers, each answering a different question: what the audit flagged, how the
-    dataset compares to a plain model, every chart, and how varied the output is. The
-    variety drawer mirrors the corpus audit viewer's Composition and Diversity Analysis
-    section; the health-check triage tables and the worked example's full rewrite diff
-    used to render here and were cut — a hand-off reader takes the three inline hunks'
-    word, and verdict-row dumps belong to the review tool.
+    THREE drawers, each answering a different question: how the dataset compares to a
+    plain model, every chart, and how varied the output is. The variety drawer mirrors
+    the corpus audit viewer's Composition and Diversity Analysis section; the
+    health-check triage tables, the derived audit-flags floor, and the worked example's
+    full rewrite diff belong to the review tool, not to a hand-off page.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               C.run_note(run_id, n=f.get("n"),
                          lead="Every figure and verdict below is measured on one run:"),
-              # The derived candour floor. Every docstring that says "the arm asymmetry
-              # renders in the audit-flags drawer" is pointing here, so this call is
-              # load-bearing: without it the drawer silently never renders.
-              audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels, repo_href=repo_href)]
 
     charts = _appendix_charts(audit, f, cons)

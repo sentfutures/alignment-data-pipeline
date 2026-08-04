@@ -152,7 +152,27 @@ def load_inputs(run_dir):
         "matrix": read_matrix(run_dir),
         "n_prompt_templates": C.prompt_count(run_dir, "layer*.txt"),
         "run_id": run_dir.name,
+        "principles": read_principles(),
     }
+
+
+def read_principles():
+    """The distilled constitution principles, from the repo this page is built in.
+
+    ``[(number, principle)]`` from ``constitution/constitution_principles.csv`` — the
+    same file the pipeline's prompts render, so the list is exactly what the pinned
+    run's audit judged against as of build time. Missing file → None, and the page
+    just links to the repo instead of listing them.
+    """
+    import csv
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "constitution" / "constitution_principles.csv"
+    try:
+        with open(path, newline="", encoding="utf-8") as fh:
+            rows = [(r.get("number", "?"), r.get("principle", "")) for r in csv.DictReader(fh)]
+    except OSError:
+        return None
+    return rows or None
 
 
 def read_lineage(run_dir):
@@ -895,37 +915,6 @@ def audit_flags_drawer(audit, manifest, f, **kw):
 
 # ------------------------------------------------------------------ appendix
 
-def attrition_table(attrition, f):
-    """What the matrix dealt and what survived each stage.
-
-    Counted rather than reported, and it is the only place a reader can see that this
-    pipeline's yield is a property of four stages rather than of the gate alone.
-    """
-    if not attrition:
-        return ""
-    labels = (("dealt", "combinations dealt from the matrix"),
-              ("planned", "plans written"),
-              ("drafted", "documents drafted"),
-              ("rewritten", "documents reviewed and rewritten"),
-              ("scored", "documents scored"),
-              ("shipped", "documents in the dataset"))
-    rows, prev = [], None
-    for key, label in labels:
-        n = attrition.get(key)
-        if n is None:
-            continue
-        rows.append((label, f"{n:,}", "—" if prev is None else f"{n - prev:+,}"))
-        prev = n
-    if not rows:
-        return ""
-    out = R.table(["stage", "records", "change"], rows, align="lrr")
-    if attrition.get("incoherent"):
-        out += (f"<p class='muted'>{attrition['incoherent']} of the plans refused their "
-                f"combination as incoherent, which is a deliberate rejection rather than a "
-                f"failure.</p>")
-    return out
-
-
 def judged_drawer(audit, f, scores, ablation, manifest):
     """The layer-5 judge, in one drawer — the structural twin of the other report's.
 
@@ -1008,11 +997,12 @@ def _ablation_figure(ablation):
                 f"cannot see the spec**, over {ablation.get('n', '?')} documents.")
 
 
-def _composition_figures(audit, matrix):
-    """What the matrix dealt against what shipped, one figure per axis it can pair.
+def _composition_figures(audit):
+    """The shipped dataset's composition, one figure per engineered axis.
 
-    Only the axes the audit counts AND the matrix weights can be compared; the rest are
-    shown as shipped shares alone rather than dropped.
+    Shipped shares only: the dealt-against-shipped pairing and its drift captions were
+    cut at Constance's call — the appendix talks about the diversity and composition of
+    what survived, not about the matrix bookkeeping that produced it.
     """
     comp = (audit or {}).get("composition") or {}
     out = []
@@ -1023,20 +1013,15 @@ def _composition_figures(audit, matrix):
         if not counts:
             continue
         n = sum(counts.values()) or 1
-        weights = (matrix or {}).get(axis) or {}
-        rows = [{"label": _trim(k), "dealt": weights.get(k), "shipped": v / n}
-                for k, v in sorted(counts.items(), key=lambda kv: -kv[1])]
-        paired = any(r["dealt"] is not None for r in rows)
+        rows = sorted(counts.items(), key=lambda kv: -kv[1])
+        top_label = _trim_words(rows[0][0], 34)
         out.append(R.figure(
             title=title,
-            note_=("The weight the matrix deals each value, against its share of the shipped "
-                   "dataset." if paired else "Share of the shipped dataset."),
-            chart=R.grouped_hbar(
-                rows,
-                series=([("dealt", DEALT), ("shipped", SHIPPED)] if paired
-                        else [("shipped", SHIPPED)]),
-                percent=True, label_w=260),
-            caption=_composition_caption(rows, paired)))
+            note_="Share of the shipped dataset.",
+            chart=R.grouped_hbar([{"label": _trim(k), "shipped": v / n} for k, v in rows],
+                                 series=[("shipped", SHIPPED)], percent=True, label_w=260),
+            caption=f"**{len(rows)} values on this axis**, the largest — `{top_label}` — "
+                    f"holding {rows[0][1] / n:.0%} of the dataset."))
     if comp.get("language"):
         n = sum(comp["language"].values()) or 1
         rows = sorted(comp["language"].items(), key=lambda kv: -kv[1])
@@ -1048,24 +1033,6 @@ def _composition_figures(audit, matrix):
             caption=f"**{len(rows)} languages**, the largest of them "
                     f"{rows[0][1] / n:.0%} of the dataset."))
     return out
-
-
-def _composition_caption(rows, paired):
-    """Say how far the shipped shares drifted from the dealt weights, or say they did not.
-
-    Always naming the axis's own largest drift is what keeps three of these from being the
-    same sentence three times: the finding is per axis, so the number has to be too.
-    """
-    if not paired:
-        return "**Dealt in code, so the shares are the matrix's rather than a model's.**"
-    drift, worst = max(((abs((r["shipped"] or 0) - r["dealt"]), r["label"]) for r in rows
-                        if r["dealt"] is not None), default=(0, ""))
-    worst = _trim_words(worst, 34)
-    if drift < 0.03:
-        return (f"**The shipped shares track the dealt weights**, the largest gap being "
-                f"{drift:.1%} on `{worst}` — attrition was not selective on this axis.")
-    return (f"**The largest drift from the dealt weight is {drift:.0%}**, on `{worst}` — "
-            f"attrition was not quite even across this axis.")
 
 
 def _trim(value, n=44):
@@ -1083,7 +1050,14 @@ def _trim_words(value, n):
     return value
 
 
-def _principle_figure(audit):
+def _principle_figure(audit, principles=None, repo_href=""):
+    """Which distilled principles the sample exercises, and what those principles are.
+
+    The bars name principles by number, so the figure carries the way to the words: a
+    link to the CSV the pipeline itself renders, and — when the build could read it —
+    the principles themselves in a drawer. Both come from the repo at build time, which
+    is the same source the pinned run's audit judged against.
+    """
     pc = (audit or {}).get("principle_coverage") or {}
     by = pc.get("by_principle") or {}
     if not by:
@@ -1092,63 +1066,43 @@ def _principle_figure(audit):
     rows = [{"label": f"principle {k}", "share": v}
             for k, v in sorted(by.items(), key=lambda kv: -kv[1])]
     starved = pc.get("starved") or []
-    return R.figure(
+    src = (f" The principles are maintained in the repository: "
+           f"[constitution/constitution_principles.csv]({repo_href}/blob/main/"
+           "constitution/constitution_principles.csv)." if repo_href else "")
+    out = R.figure(
         title="Which constitution principles the dataset exercises",
         note_=f"A judge read a sample of documents and named the distilled principles each "
-              f"one exercises. The rule marks the eval's {floor:.0%} starvation floor.",
+              f"one exercises. The rule marks the eval's {floor:.0%} starvation floor."
+              + src,
         chart=R.grouped_hbar(rows, series=[("share", MEASURE)], percent=True,
                              rule=floor, rule_label="floor", label_w=140,
                              direct_labels=False),
         caption=(f"**{len(starved)} of {len(rows)} principles fall under the floor.** That is "
                  f"fixed at the matrix's weights, not per document."
                  if starved else "**Every principle clears the floor.**"))
+    if principles:
+        out += R.details(
+            "The principles, by number",
+            "<p class='muted'>As distilled from the constitution, read from the "
+            "repository at build time.</p>"
+            + R.table(["number", "principle"], [(n, p) for n, p in principles],
+                      align="rl"),
+            meta=f"{len(principles)} principles")
+    return out
 
 
 def _compliance_block(compliance):
     """The ten welfare-reasoning failure modes, and what the pass found."""
-    if not compliance:
-        return R.note("No compliance pass was recorded for this run, so nothing here checks "
-                      "the documents against the welfare-reasoning failure modes. It would "
-                      "live in `audit/compliance_report.json`.")
     by_mode = compliance.get("by_mode") or {}
     rows = [(m.get("title", "?"), m.get("present", 0), m.get("applicable", "—"),
              f"{(m.get('share_of_applicable') or 0):.0%}")
             for m in by_mode.values()]
-    out = [f"<p class='muted'>Ten ways welfare reasoning fails while the topic is still "
-           f"technically present. {compliance.get('clean_documents', '?')} of "
-           f"{compliance.get('judged', '?')} judged documents carry none of them.</p>",
-           R.table(["failure mode", "present", "applicable", "share"], rows, align="lrrr")]
-    findings = compliance.get("findings") or []
-    if findings:
-        out.append(R.details(
-            "The findings, in full",
-            R.table(["document", "mode", "what the judge saw"],
-                    [(x.get("doc_id", "?"), x.get("mode_title", "?"),
-                      _trim(x.get("evidence", ""), 220)) for x in findings], align="lll"),
-            meta=f"{len(findings)} finding" + ("" if len(findings) == 1 else "s")))
-    return "".join(out)
-
-
-def _fidelity_block(fidelity):
-    """Whether the plan carried its dealt cards into the spec it wrote."""
-    if not fidelity:
-        return R.note("No card-fidelity pass was recorded for this run, so nothing here checks "
-                      "whether the plans honoured the combinations they were dealt. It would "
-                      "live in `audit/card_fidelity_report.json`.")
-    by_card = fidelity.get("by_card_frac") or {}
-    if not by_card:
-        return ""
-    rows = sorted(by_card.items(), key=lambda kv: kv[1])
-    return R.figure(
-        title="Whether the plan kept the cards it was dealt",
-        note_="A judge compared each plan's spec against the combination the composer dealt "
-              "it. This is the one join no pipeline stage checks: layer 5 is given the plan "
-              "as the spec.",
-        chart=R.hbar([(k.replace("_", " "), v) for k, v in rows], maxval=1.0, fmt="{:.0%}",
-                     color=MEASURE, label_w=180),
-        caption=f"**{fidelity.get('clean_frac', 0):.0%} of the "
-                f"{fidelity.get('judged', '?')} plans checked carried every card**; "
-                f"`{rows[0][0]}` is the one most often dropped.")
+    # The per-finding evidence table ("The findings, in full") was cut: the counts row
+    # is the finding, and the verbatim judge quotes are review-tool material.
+    return (f"<p class='muted'>Ten ways welfare reasoning fails while the topic is still "
+            f"technically present. {compliance.get('clean_documents', '?')} of "
+            f"{compliance.get('judged', '?')} judged documents carry none of them.</p>"
+            + R.table(["failure mode", "present", "applicable", "share"], rows, align="lrrr"))
 
 
 def _curve_block(curve):
@@ -1174,152 +1128,53 @@ def _curve_block(curve):
                 "which is what sets the ceiling on how much one matrix is worth running.")
 
 
-def _diversity_block(diversity):
-    """The numbers behind the checks table's "Semantic diversity" row."""
-    if not diversity:
-        return ""
-    vendi = diversity.get("vendi") or {}
-    nn = diversity.get("nn") or {}
-    clusters = diversity.get("clusters") or {}
-    tiles = []
-    if vendi.get("score") is not None:
-        tiles.append(R.stat(f"{vendi['score']:.0f}", "effectively distinct documents",
-                            f"of {diversity.get('n_records', '?')} actual documents; "
-                            f"near-duplicates count as fractions of a document"))
-    if nn.get("over_0.90") is not None:
-        tiles.append(R.stat(f"{nn['over_0.90']:.0%}", "near-duplicate documents",
-                            f"cosine similarity above 0.90 to their nearest neighbour; "
-                            f"{nn.get('over_0.80', 0):.0%} above 0.80"))
-    # Only when the pass recorded it. An older diversity report has no clusters block at
-    # all, and a tile reading 0.00 evenness is not a low score, it is a measurement that
-    # never happened rendered as one.
-    if clusters.get("evenness") is not None:
-        tiles.append(R.stat(f"{clusters['evenness']:.2f}", "topic-spread evenness",
-                            f"1.00 is perfectly even; the largest cluster holds "
-                            f"{clusters.get('largest_share', 0):.0%} of documents"))
-    out = ("<h4>What the diversity pass measures</h4>"
-           "<p class='muted'>Embedding-space measurements over the final dataset, from "
-           f"<code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"
-           + R.tiles(tiles))
-    pairs = diversity.get("top_pairs") or []
-    if pairs:
-        out += R.details(
-            "The most similar pairs in the dataset",
-            R.table(["a", "b", "similarity", "how a opens"],
-                    [(p.get("a", "?"), p.get("b", "?"), f"{p.get('similarity', 0):.3f}",
-                      _trim(p.get("a_snippet", ""), 90)) for p in pairs], align="llrl"),
-            meta=f"{len(pairs)} pair" + ("" if len(pairs) == 1 else "s"))
-    return out
-
-
-def _patterns_drawer(audit):
-    """The templating scan's own vocabulary, nested under the check it belongs to.
-
-    A glossary is not a finding, and as a top-level appendix row it read as one.
-    """
-    patterns = (audit or {}).get("patterns") or []
-    if not patterns:
+def _pairs_drawer(diversity):
+    """The most similar pairs, nested under the semantic charts they explain."""
+    pairs = (diversity or {}).get("top_pairs") or []
+    if not pairs:
         return ""
     return R.details(
-        "Every pattern the templating scan named",
-        R.table(["pattern", "kind", "prevalence", "judged a defect"],
-                [(p.get("pattern", "?"), p.get("kind", "—"),
-                  f"{p.get('prevalence', 0):.0%}", "yes" if p.get("is_defect") else "no")
-                 for p in sorted(patterns, key=lambda p: -(p.get("prevalence") or 0))],
-                align="llrl"),
-        meta=f"{len(patterns)} patterns")
+        "The most similar pairs in the dataset",
+        R.table(["a", "b", "similarity", "how a opens"],
+                [(p.get("a", "?"), p.get("b", "?"), f"{p.get('similarity', 0):.3f}",
+                  _trim(p.get("a_snippet", ""), 90)) for p in pairs], align="llrl"),
+        meta=f"{len(pairs)} pair" + ("" if len(pairs) == 1 else "s"))
 
 
-def checks(audit, diversity, compliance, fidelity, ablation):
-    """[(name, did it run, what it establishes)] — every measurement that could have run.
-
-    A check that did not run says so rather than vanishing, because a reader deciding
-    whether to trust the dataset needs to know which questions were never asked. Returned as
-    data rather than markup so the drawer's own summary can count them instead of naming a
-    number that stops being true the next time a check is added.
-    """
-    audit = audit or {}
-    return [
-        ("Composition", bool(audit.get("composition")),
-         "Genre, language, stance and centrality shares over the whole dataset"),
-        ("Length and truncation", bool(audit.get("length")),
-         "Document lengths, and documents that stop mid-sentence"),
-        ("Markdown tells", bool(audit.get("markdown")),
-         "Headings, bold and bullets in genres a human would write as plain text"),
-        ("Near-duplicates", bool(audit.get("near_dups")),
-         "Documents that share a skeleton with another, by character n-gram overlap"),
-        ("Invented names", bool(audit.get("names")),
-         "Whether one fictional person or organisation is reused across the dataset"),
-        ("Recurring phrasing", bool(audit.get("phrases")),
-         "Watched stock phrases, and the five-grams the dataset repeats most"),
-        ("Opening shapes", bool(audit.get("openings")),
-         "Documents that begin with the same formula"),
-        ("Templating scan", bool(audit.get("patterns")),
-         "A judge reads batches and names the shapes the generator repeats"),
-        ("Principle coverage", bool(audit.get("principle_coverage")),
-         "Which distilled constitution principles the documents exercise, and which are "
-         "starved"),
-        ("Welfare-reasoning compliance", bool(compliance),
-         "Ten ways welfare reasoning fails while the topic is technically present"),
-        ("Card fidelity", bool(fidelity),
-         "Whether each plan carried its dealt combination into the spec it wrote"),
-        ("Blind realism rerun", bool(ablation),
-         "The same realism rubric applied by a judge that cannot see the spec"),
-        ("Semantic diversity", bool(diversity),
-         "Embedding near-duplicate rate, topic spread, effective document count"),
-    ]
-
-
-def checks_table(rows):
-    return R.table(["check", "what it establishes"],
-                   [(name, what if ok else R.Raw(f"<i>not run on this run</i> — {R.esc(what)}"))
-                    for name, ok, what in rows])
-
-
-def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None, fidelity=None,
-                    ablation=None, curve=None, manifest=None, scores=None, attrition=None,
-                    matrix=None, corpus=None, lineage=None, picks=()):
+def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None,
+                    curve=None, principles=None, repo_href=""):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
-    Every chart lands here — the beats above carry none — and so does everything specific to
-    one run. FIVE drawers, each answering a different question: what the audit flagged, what
-    the judge scored, every chart, every check, and the worked example's full rewrite diff.
+    The same shape as the other report's appendix: a composition-and-diversity drawer
+    that talks about what the shipped dataset IS — its engineered composition axes, the
+    constitution principles it exercises, and how semantically varied it is — plus one
+    drawer for the compliance pass. The matrix bookkeeping (attrition, dealt-vs-shipped
+    drift, card fidelity), the health-check triage tables, the templating-scan glossary
+    and the worked example's full rewrite diff belong to the review tool, not here.
     """
     blocks = [R.sub("sdf-appendix", "Appendix"), C.prose(content, "sdf_appendix_intro", f)]
 
-    charts = []
-    table = attrition_table(attrition, f)
-    if table:
-        charts.append("<h4>What the matrix dealt, and what survived</h4>" + table)
-    charts += _composition_figures(audit, matrix)
-    charts += [b for b in (_principle_figure(audit), _fidelity_block(fidelity),
-                           _curve_block(curve)) if b]
-    if charts:
-        n_fig = sum(1 for c in charts if "<figure" in c)
-        blocks.append(R.details("Every chart", "".join(charts),
-                                meta=f"{n_fig} figures, and the stage-by-stage yield"))
-
-    rows = checks(audit, diversity, compliance, fidelity, ablation)
-    ran = sum(1 for _, ok, _ in rows if ok)
-    blocks.append(R.details(
-        "Diversity checks",
-        C.prose(content, "sdf_checks_intro", f)
-        + checks_table(rows)
-        + _diversity_block(diversity)
-        + "<h4>What the compliance pass found</h4>"
-        + _compliance_block(compliance)
-        + _patterns_drawer(audit),
-        meta=f"{len(rows)} checks · {ran} ran on this run"))
-
-    did, _ = _picks(content, picks, {d.get("doc_id"): d for d in corpus or []})
-    doc = next((d for d in corpus or [] if d.get("doc_id") == did), None)
-    draft = ((lineage or {}).get(did) or {}).get("draft")
-    if doc and draft and doc.get("content"):
+    comp_figs = _composition_figures(audit)
+    principle_fig = _principle_figure(audit, principles, repo_href)
+    semantic = (C.semantic_figures(diversity, unit="documents") or "") + (
+        _pairs_drawer(diversity) if diversity else "")
+    curve_fig = _curve_block(curve)
+    if comp_figs or principle_fig or semantic:
+        have = [name for name, part in (("composition", comp_figs),
+                                        ("principles", principle_fig),
+                                        ("meanings and topics", semantic)) if part]
         blocks.append(R.details(
-            "The full review-and-rewrite diff for the worked example",
-            "<p class='muted'>Struck through: the draft. Highlighted: the document as it "
-            "ships.</p>" + C.word_diff(draft, doc["content"]),
-            meta=f"{len(doc['content'].split()):,} words"))
+            "Composition and diversity",
+            C.prose(content, "sdf_checks_intro", f)
+            + "".join(comp_figs) + principle_fig + semantic + curve_fig,
+            meta=" · ".join(have)))
+
+    if compliance:
+        blocks.append(R.details(
+            "The compliance pass",
+            _compliance_block(compliance),
+            meta=f"{compliance.get('clean_documents', '?')} of "
+                 f"{compliance.get('judged', '?')} judged documents clean"))
     return "".join(b for b in blocks if b)
 
 
@@ -1328,7 +1183,7 @@ def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None, 
 def blocks(*, content, audit=None, diversity=None, compliance=None, fidelity=None,
            ablation=None, curve=None, manifest=None, corpus=None, scores=None, lineage=None,
            attrition=None, matrix=None, n_prompt_templates=None, run_id="", example=None,
-           f=None, hf_href="", repo_href=""):
+           principles=None, f=None, hf_href="", repo_href=""):
     """The whole ``#sdf`` section body, in skeleton order. Pure: no filesystem, no argv.
 
     Returns one flat string of blocks. report/page.py wraps it in ``<section id='sdf'>`` with
@@ -1356,7 +1211,5 @@ def blocks(*, content, audit=None, diversity=None, compliance=None, fidelity=Non
         blocks_example(content, f, corpus, lineage, manifest, picks,
                        hf_href=hf_href, repo_href=repo_href),
         blocks_appendix(content, f, audit=audit, diversity=diversity, compliance=compliance,
-                        fidelity=fidelity, ablation=ablation, curve=curve, manifest=manifest,
-                        scores=scores, attrition=attrition, matrix=matrix, corpus=corpus,
-                        lineage=lineage, picks=picks),
+                        curve=curve, principles=principles, repo_href=repo_href),
     ])

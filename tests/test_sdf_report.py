@@ -57,7 +57,11 @@ AUDIT = {
 }
 DIVERSITY = {"n_records": 100, "embed_model": "text-embedding-3-small",
              "vendi": {"score": 22.58}, "nn": {"over_0.90": 0.0, "over_0.80": 0.02},
-             "clusters": {"evenness": 0.9, "largest_share": 0.07},
+             "scopes": {"combined": {
+                 "n": 100, "nn_sims": [0.61, 0.79], "vendi_ratio": 0.23,
+                 "over": {"0.90": 0.0, "0.80": 0.02},
+                 "clusters": {"k": 2, "evenness": 0.9, "largest_share": 0.51,
+                              "sizes": [51, 49]}}},
              "top_pairs": [{"a": "matrix_000001", "b": "matrix_000002", "similarity": 0.81,
                             "a_snippet": "The council heard"}]}
 COMPLIANCE = {"judged": 100, "clean_documents": 98, "clean_frac": 0.98, "prevalence_flag": 0.1,
@@ -447,34 +451,26 @@ class TestLineage:
 # --- degradation ---------------------------------------------------------------
 
 class TestDegradation:
-    @pytest.mark.parametrize("key,wanted", [
-        ("compliance", "audit/compliance_report.json"),
-        ("fidelity", "audit/card_fidelity_report.json"),
-        # ("ablation", "audit/realism_ablation.json") — the blind-realism rerun's
-        # degrade-and-name-the-file note lived in the judged drawer, which was cut from
-        # the appendix. The ablation is still a "not run on this run" row in the checks
-        # table (test_a_missing_optional_artefact_is_a_not_run_row_in_the_checks_table),
-        # so a reader is still told; the page just no longer names the file.
-    ])
-    def test_an_optional_artefact_names_itself_when_absent(self, key, wanted):
-        """These three are not written by evals/audit_sdf.py, so most runs will not have
-        them. A reader has to know which question was never asked."""
-        sec = section(build(**{key: None}))
-        assert wanted in sec, wanted
+    def test_no_compliance_pass_means_no_compliance_drawer(self):
+        """The degrade-and-name-the-file notes went with the checks table: a hand-off
+        reader gets the drawers that measured something, not a list of files a run
+        could have carried."""
+        sec = section(build(compliance=None))
+        assert "The compliance pass" not in sec
+        assert "The compliance pass" in section(build())
 
-    def test_a_missing_optional_artefact_is_a_not_run_row_in_the_checks_table(self):
-        rows = S.checks(AUDIT, DIVERSITY, None, None, None)
-        by_name = {n: ok for n, ok, _ in rows}
-        assert by_name["Welfare-reasoning compliance"] is False
-        assert by_name["Card fidelity"] is False
-        assert by_name["Blind realism rerun"] is False
-        assert by_name["Composition"] is True
-        assert "not run on this run" in S.checks_table(rows)
+    def test_card_fidelity_no_longer_renders(self):
+        """Cut at Constance's call with the rest of the matrix bookkeeping — the
+        appendix talks about what survived, not about dealt-versus-shipped."""
+        sec = section(build())
+        assert "cards it was dealt" not in sec
+        for gone in ("checks", "checks_table", "attrition_table", "_fidelity_block",
+                     "_patterns_drawer"):
+            assert not hasattr(S, gone), gone
 
-    def test_the_checks_drawer_counts_what_ran(self):
-        s = summary(section(build(compliance=None)), "Diversity checks")
-        n, ran = (int(x) for x in re.findall(r"(\d+)", strip_tags(s)))
-        assert ran < n
+    def test_the_variety_drawer_names_its_dimensions(self):
+        s = summary(section(build()), "Composition and diversity")
+        assert "composition" in s and "principles" in s and "meanings and topics" in s
 
     def test_the_whole_section_survives_a_run_with_only_a_corpus(self):
         html = build(audit=None, diversity=None, compliance=None, fidelity=None,
@@ -491,12 +487,14 @@ class TestDegradation:
         assert P.HF_SDF in sec
         assert "id='sdf-example'" not in sec
 
-    def test_a_diversity_report_with_no_clusters_omits_the_tile(self):
+    def test_a_diversity_report_with_no_clusters_omits_the_topic_spread(self):
         """0.00 evenness is not a low score, it is a measurement that never happened
-        rendered as one — an older diversity report has no clusters block at all."""
-        html = build(diversity={k: v for k, v in DIVERSITY.items() if k != "clusters"})
-        assert "topic-spread evenness" not in strip_tags(section(html))
-        assert "topic-spread evenness" in strip_tags(section(build()))
+        rendered as one — an older diversity report has no cluster sizes at all."""
+        import json as _json
+        d = _json.loads(_json.dumps(DIVERSITY))
+        del d["scopes"]["combined"]["clusters"]
+        assert "Topic spread" not in strip_tags(section(build(diversity=d)))
+        assert "Topic spread" in strip_tags(section(build()))
 
 
 # --- facts and prose -----------------------------------------------------------
