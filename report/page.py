@@ -111,8 +111,8 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
         ("result", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
         ("result format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
         ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
-        ("prompt templates", _prompts_cell(sdf_kwargs, PROMPTS_SDF),
-         _prompts_cell(dad_kwargs, PROMPTS_DAD)),
+        ("pipeline", _with_button("", REPO_URL, "Pipeline", "github"),
+         _with_button("", REPO_URL, "Pipeline", "github")),
         ("example dataset",
          _with_button("" if sdf_kwargs else "not published yet", HF_SDF,
                       "Example dataset", "hf"),
@@ -122,14 +122,6 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     # The heading is heard, not seen: the two mastheads are the heading on screen.
     return C.section("datasets", "The two datasets", R.compare(columns, rows),
                      heading_class="vh")
-
-
-def _prompts_cell(kwargs, href):
-    """How many prompt templates the pipeline is — the figure a reader who wants to run
-    it against their own model is after, rather than how much data we happened to make.
-    Counted from the run's own inputs/prompts snapshot; see common.prompt_count."""
-    n = (kwargs or {}).get("n_prompt_templates")
-    return _with_button(f"{n}" if n else "—", href, "Templates", "github")
 
 
 def _with_button(value, href, label, icon):
@@ -185,6 +177,48 @@ def section_explore(panels, outlines):
                          rails, panels))
 
 
+# The people behind the page, in credit order, each with their institution.
+#
+# The affiliation NUMBERS are derived from this list by first appearance, never typed:
+# three of the seven share one institution, so a hand-kept numbering is exactly the sort
+# of thing that goes quietly wrong the first time someone is added or the order changes.
+# Add a name here and the key renumbers itself.
+AUTHORS = (
+    ("Constance Li", "Sentient Futures"),
+    ("Aidan Kankyoku", "Anima International"),
+    ("Oscar Horta", "University of Santiago de Compostela"),
+    ("Declan McKenna", "Sentient Futures"),
+    ("Andrew Blackwood", "Sentient Futures"),
+    ("Allen Lu", "NYU Center for Mind, Ethics, and Policy"),
+    ("Thomas Giovinazzo", "Sentient Futures"),
+    ("Arda Enfiyeci", "Sentient Futures"),
+)
+
+
+def byline(authors=AUTHORS):
+    """The author list and its numbered affiliation key, paper-style.
+
+    One number per institution, assigned by first appearance — the convention a reader
+    arriving from a paper already knows, and the one in the screenshot this was specified
+    from. Both halves come off ``AUTHORS``.
+
+    The key follows the names in DOM order, so a screen reader reads "Constance Li 1,
+    ... 1 Sentient Futures" — the same sequence, in the same order, that a sighted reader
+    gets. Bare superscript digits carry no meaning on their own, so each marker also
+    names its institution in a ``title`` for a hover.
+    """
+    seen = []
+    for _, inst in authors:
+        if inst not in seen:
+            seen.append(inst)
+    num = {inst: i + 1 for i, inst in enumerate(seen)}
+    names = ", ".join(f"{R.esc(name)}<sup title='{R.esc(inst)}'>{num[inst]}</sup>"
+                      for name, inst in authors)
+    key = "".join(f"<span><sup>{num[inst]}</sup>{R.esc(inst)}</span>" for inst in seen)
+    return (f"<div class='foot-by'><p class='foot-authors'>{names}</p>"
+            f"<p class='foot-affil'>{key}</p></div>")
+
+
 def footer(maker_icon=""):
     """Who made it and where to go.
 
@@ -196,7 +230,8 @@ def footer(maker_icon=""):
     as an unfinished draft.
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
-    return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
+    return (byline()
+            + f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
             f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
