@@ -113,13 +113,16 @@ def _cite_markers(text):
     The marker promises a note at the foot of the page and there is none — it links straight
     out. That is a borrowed convention, and the title attribute is the disclosure: hovering
     names the work.
+
+    Each marker is preceded by a ``WORD_JOINER``, which is what stops a line breaking between
+    two of them or between a marker and its word — see that constant.
     """
     n = [0]
 
     def one(m):
         name, href = m.group(1), m.group(2)
         n[0] += 1
-        return (f"<a class='cite-n' href='{href}'{NEW_TAB} aria-label='{name}' "
+        return (f"{WORD_JOINER}<a class='cite-n' href='{href}'{NEW_TAB} aria-label='{name}' "
                 f"title='{name}'><sup>{n[0]}{CITE_ARROW}</sup></a>")
 
     return _MD_CITE.sub(one, text)
@@ -136,6 +139,17 @@ NEW_TAB = " target='_blank' rel='noopener noreferrer'"
 # The marker's own arrow: same path, drawn smaller and a touch heavier in stroke, because at
 # the marker's .72em a 9px glyph is wider than the numeral it follows and 2px of stroke on a
 # 6px box reads as a blob.
+# A marker never starts a line, and two of them never split. The arrow inside each one is
+# `display:inline-block` — an ATOMIC INLINE, which UAX#14 treats as an object replacement and
+# allows a line to break either side of. Measured at 390px: the intro broke after marker 1,
+# leaving marker 2 to open the next line. A word joiner before each marker forbids exactly
+# that, because LB11 (`× WJ`, `WJ ×`) is applied ahead of LB20's break-around-CB, and it also
+# glues the marker to the word it hangs off, which is the ordinary setting for a footnote
+# mark. Its pair is `.cite-n{white-space:nowrap}`, which holds the numeral to its own arrow.
+# Written as an entity: it is invisible in the source either way, and this says which
+# character it is.
+WORD_JOINER = "&#8288;"
+
 CITE_ARROW = ("<svg class='ext-c' viewBox='0 0 12 12' width='7' height='7' aria-hidden='true' "
               "fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' "
               "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
@@ -1021,8 +1035,13 @@ section+section{margin-top:5rem}
    pair is centred too. Its own margin is the ENTIRE gap between the intro and the table — the
    hero's bottom padding is zero — so "equally spaced" is one value here rather than arithmetic
    across two rules that each restate at a breakpoint. Drawn as a grid child, because a border
-   on the section itself runs the full shell column. */
-#datasets::before{content:'';grid-column:1/-1;width:30rem;margin:3rem auto;
+   on the section itself runs the full shell column.
+
+   CAPPED, or it is the widest thing on the page: 30rem is 480px, and below 760px the section
+   is one minmax(0,1fr) track — ~358px on a 390px phone — so a bare width overflowed it by
+   122px and gave the whole document a horizontal scroll with blank paper to the right of
+   every section. min() keeps the 30rem wherever there is room for it. */
+#datasets::before{content:'';grid-column:1/-1;width:min(100%,30rem);margin:3rem auto;
 border-top:1px solid var(--hairline)}
 /* The panel is a section, so its own display:grid would beat the browser's default
    [hidden] rule. It has to be said out loud. */
@@ -1483,8 +1502,13 @@ text-decoration-color:var(--accent)}
    sits in. The padding is hit area — inline padding enlarges the target without moving
    anything — and the negative margin gives back the space it would otherwise add. WCAG 2.5.8
    exempts a target inside a sentence from the 24px minimum, so this is comfort, not
-   conformance. */
-.cite-n{text-decoration:none;padding:.22em .25em;margin:0 -.25em}
+   conformance.
+
+   nowrap holds the numeral to its own arrow: the arrow is an atomic inline, so a line was
+   free to break between the digit and the mark that belongs to it. Breaking BETWEEN two
+   markers, or before one, is forbidden by the word joiner the renderer emits — see
+   WORD_JOINER. */
+.cite-n{text-decoration:none;padding:.22em .25em;margin:0 -.25em;white-space:nowrap}
 /* The raise happens ONCE, here, and not on the anchor: <sup> already carries the UA's own
    vertical-align:super and font-size:smaller, so raising and shrinking the anchor too shifted
    the digits twice — measured at 4x, they sat above the cap line at ~10px while the separating
@@ -1584,10 +1608,15 @@ z-index:9;max-width:320px}
 .railcol,.panels{grid-column:1}
 /* Held to the reading measure and given air, so it reads as the head of the document
    rather than as more of the bar. Its own margin places it here, so the padding that lines
-   it up with a title beside it goes. */
-.railcol{border-bottom:1px solid var(--hairline);max-width:38rem;
-padding-bottom:.6rem;margin-top:3.6rem;padding-top:0}
-.rail{position:static;max-height:none;padding:0;
+   it up with a title beside it goes.
+   THE RULE AND THE AIR BELONG TO THE RAIL, NOT TO ITS COLUMN. On the column they were drawn
+   whether or not a rail was in it: with no report open, both rails are hidden and the empty
+   column still put a hairline and 4rem of space under the chooser — a line across the page
+   above the footer, on narrow screens only, separating nothing. .rail[hidden] is display:none,
+   so hung on the rail itself they arrive with the contents they belong to. */
+.railcol{padding-top:0}
+.rail{position:static;max-height:none;padding:0 0 .6rem;margin-top:3.6rem;
+max-width:38rem;border-bottom:1px solid var(--hairline);
 display:flex;flex-wrap:wrap;column-gap:.4rem}
 .rail a{padding:.2rem .5rem;border-left:0;border-bottom:2px solid transparent}
 /* The stages go, and the contents become the four beats. Beside the report the two levels
@@ -1625,9 +1654,21 @@ h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06re
 .lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 0}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
-/* One column: two of them inside a 390px viewport are ~16 characters each. Each item keeps
-   its own hairline, so the pair reads as the hanging list it would have been anyway. */
-.npair{grid-template-columns:minmax(0,1fr);gap:1.8rem;margin-top:1.8rem}
+/* One column: two of them inside a 390px viewport are ~16 characters each.
+   AND IT CENTRES, which the two-column form must not. The reason the pair goes flush left up
+   there is that centring two columns leaves four ragged edges; one column has two, and the
+   hero either side of it — title, both paragraphs, the closing pair — is centred, so flush
+   left made the stack read as a different kind of block instead of the same one narrower.
+   It also comes off the edges: its own inset plus the shell's is the air the centred prose
+   above it has at the ends of its lines, which the stack had none of.
+   The hairline goes with it — 3/4 and centred, as a rule drawn under the item's own width
+   read as a line across the page rather than the head of an item. Drawn as a pseudo-element
+   for the same reason #datasets::before is: it is a rule with a width, not a box's border. */
+.npair{grid-template-columns:minmax(0,1fr);gap:1.8rem;margin:1.8rem auto 0;
+padding:0 1rem;max-width:32rem;text-align:center}
+.npair>li{padding-top:0;border-top:0}
+.npair>li::before{content:'';display:block;width:75%;margin:0 auto 1.1rem;
+border-top:1px solid var(--hairline)}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .illo{aspect-ratio:16/9}}
 @media print{

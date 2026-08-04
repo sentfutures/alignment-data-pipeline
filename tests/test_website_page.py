@@ -179,6 +179,28 @@ def _rail_top_rem(html, t):
 
 
 class TestShape:
+    def test_every_comment_in_the_stylesheet_closes_the_one_it_opened(self):
+        """The stylesheet is two thirds prose, and an unbalanced delimiter is silent.
+
+        This shipped for one build: a rationale added above `#datasets::before` left a stray
+        `*/` in front of the rule, so the parser read the whole thing as one invalid selector
+        and DROPPED the declaration — the divider and the 3rem of air above the comparison
+        both vanished, and nothing in the built HTML looked wrong. Nothing else here can
+        catch that, because every other test reads the CSS as text.
+        """
+        css = re.search(r"<style>(.*?)</style>", build(), re.S).group(1)
+        depth, i = 0, 0
+        while i < len(css):
+            if css.startswith("/*", i):
+                assert depth == 0, f"nested /* at {css[i:i + 60]!r}"
+                depth, i = 1, i + 2
+            elif css.startswith("*/", i):
+                assert depth == 1, f"unopened */ before {css[i + 2:i + 62]!r}"
+                depth, i = 0, i + 2
+            else:
+                i += 1
+        assert depth == 0, "a comment is left open"
+
     def test_the_page_is_three_sections_and_two_reports(self):
         html = build(sdf_inputs=SDF_INPUTS)
         ids = re.findall(r"<section id='([^']+)'", html)
@@ -339,6 +361,35 @@ class TestShape:
         html = build()
         narrow = html[html.index("@media (max-width:620px)"):]
         assert re.search(r"\.npair\{grid-template-columns:minmax\(0,1fr\)", narrow)
+
+    def test_stacked_it_centres_and_the_rule_over_each_item_does_too(self):
+        """Flush left is a property of the two-column form, not of the pair.
+
+        Centring is wrong across two columns — it leaves four ragged edges — and that is the
+        reason the pair goes flush left. Stacked there is one column with two edges, inside a
+        hero whose title, both paragraphs and closing lines are all centred, so flush left
+        made the stack read as a different kind of block rather than the same one narrower.
+        It also comes off the screen edges, which is the air the centred prose above it has at
+        the ends of its lines. The hairline follows: at the item's own width it read as a rule
+        across the page, so it is 3/4 and centred under the block it heads — drawn as a
+        pseudo-element, because a rule with a width is not a box's border.
+        """
+        html = build()
+        wide = html[:html.index("@media (max-width:620px)")]
+        narrow = html[html.index("@media (max-width:620px)"):]
+        assert "text-align:left" in re.search(r"\.npair\{[^}]*\}", wide).group(0)
+        stacked = re.search(r"\.npair\{[^}]*\}", narrow).group(0)
+        assert "text-align:center" in stacked
+        assert re.search(r"padding:0 [\d.]+rem", stacked), stacked      # off the edges
+        rule = re.search(r"\.npair>li::before\{[^}]*\}", narrow).group(0)
+        assert "width:75%" in rule and "margin:0 auto" in rule, rule
+        # and the border it replaces is off, or the item carries two hairlines.
+        assert "border-top:0" in re.search(r"\.npair>li\{[^}]*\}", narrow).group(0)
+        # The two-column form keeps the border on the item: the rule is as wide as the column
+        # it heads there, which is what a two-up wants.
+        assert not re.search(r"\.npair[^{]*::before", wide)
+        assert "border-top:1px solid var(--hairline)" in re.search(r"\.npair>li\{[^}]*\}",
+                                                                  wide).group(0)
 
     def test_the_intro_carries_two_measures(self):
         """The paragraphs keep the measure a centred line can be read at; the container is
@@ -944,6 +995,25 @@ class TestNarrowLayout:
         for line in ("[text-start]", "text-end", "full-end"):
             assert line in rule, rule
 
+    def test_no_bare_width_is_wider_than_a_phone(self):
+        """A fixed width wide enough to overflow the narrowest track is the bug that shipped:
+        the hairline above the comparison was `width:30rem`, 480px in a ~358px track on a
+        390px viewport, so the whole document scrolled 122px to the right with blank paper
+        beside every section — and a border-top is invisible past the edge, so nothing on
+        screen said what was doing it.
+
+        Written as the invariant rather than against that one rule, and deliberately blind to
+        which block a declaration sits in: a media query is no defence, since the widest
+        viewport a phone rule applies to is still a phone. Anything this wide has to be
+        wrapped — `min()`, `clamp()`, a percentage — which is what every other width on the
+        page already is. 320px is the narrowest viewport the page is expected to survive.
+        """
+        css = re.search(r"<style>(.*?)</style>", build(sdf_inputs=SDF_INPUTS), re.S).group(1)
+        css = re.sub(r"/\*.*?\*/", " ", css, flags=re.S)
+        for value, unit in re.findall(r"[^-]width:\s*([\d.]+)(rem|px)\b", css):
+            px = float(value) * (16 if unit == "rem" else 1)
+            assert px < 320, f"width:{value}{unit} cannot fit a phone — cap it with min()"
+
     def test_the_narrow_block_does_not_re_place_children_with_a_weaker_selector(self):
         """`section>*{grid-column:1}` is (0,0,1). It loses to `section>figure` (0,0,2) and
         to `section>.explore-body` (0,1,1) — the chooser, both rails and both reports —
@@ -1178,8 +1248,25 @@ class TestContentsRail:
         assert ".explore-body{grid-template-columns:minmax(0,1fr)}" in small
         assert re.search(r"\.rail\{[^}]*position:static", small)
         assert re.search(r"\.rail\{[^}]*flex-wrap:wrap", small)
-        assert ".railcol{border-bottom:1px solid var(--hairline)" in small
+        assert re.search(r"\.rail\{[^}]*border-bottom:1px solid var\(--hairline\)", small)
         assert "border-right" not in re.search(r"\.railcol\{[^}]*\}", html).group(0)
+
+    def test_the_separator_belongs_to_the_contents_and_not_to_their_column(self):
+        """Nothing is drawn for contents that are not there.
+
+        The rule and the 3.6rem above it were on ``.railcol``, which is in the markup whether
+        or not a rail is inside it — and on load neither report is open, so both rails are
+        hidden. Measured at 390px: a hairline right across the page under the two buttons,
+        above the footer, separating nothing, on narrow screens only. ``.rail[hidden]`` is
+        ``display:none``, so on the rail itself they arrive with the contents they belong to.
+        """
+        html = build(sdf_inputs=SDF_INPUTS)
+        small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
+        col = re.search(r"\.railcol\{[^}]*\}", small).group(0)
+        for drawn in ("border", "margin", "padding-bottom"):
+            assert drawn not in col, col
+        assert re.search(r"\.rail\{[^}]*margin-top:", small)
+        assert "[hidden]{display:none}" in re.search(r"\.rail\[hidden\]\{[^}]*\}", html).group(0)
 
     def test_neither_control_prints(self):
         """Paper has nothing to press and no links to follow."""
@@ -1580,6 +1667,20 @@ class TestBrevity:
         # comma did that until the arrows arrived; they separate them now.
         assert re.search(r"\.cite-n\+\.cite-n\{margin-left:", html)
         assert "content:','" not in html
+
+    def test_two_markers_cannot_be_split_across_two_lines(self):
+        """Separated is not the same as breakable, and both markers are one word's worth.
+
+        The arrow inside each marker is `display:inline-block` — an atomic inline, which
+        UAX#14 lets a line break either side of. Measured at 390px: the intro's first
+        paragraph ended on marker 1 and opened the next line with marker 2. Two halves fix
+        it, one per break opportunity: a word joiner before each marker (so it cannot start
+        a line, which glues it both to its word and to the marker before it) and nowrap
+        inside the anchor (so the numeral cannot part from its own arrow).
+        """
+        html = self.page()
+        assert html.count(f"{R.WORD_JOINER}<a class='cite-n'") == 2
+        assert "white-space:nowrap" in re.search(r"\.cite-n\{[^}]*\}", html).group(0)
 
     def test_the_page_does_not_argue_a_third_route(self):
         """The belief-implantation comparison is a decision record, not something a
