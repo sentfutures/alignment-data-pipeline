@@ -1093,12 +1093,10 @@ def _tics_figure(audit):
         return ""
     return R.figure(
         title="Tracked phrases",
-        note_="Phrases the eval watches by name because earlier runs turned them into "
-              "habits. Share of each arm's answers containing one at least once.",
+        note_="Phrases the eval watches by name to avoid turning certain word choices "
+              "into tics.",
         chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
-                             percent=True, label_w=210),
-        caption="**The pipeline's most common tracked phrase stays well under half of "
-                "its answers**, which is where a word choice becomes a tic.")
+                             percent=True, label_w=210))
 
 
 def _moves_figure(audit):
