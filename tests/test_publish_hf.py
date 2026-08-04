@@ -993,8 +993,19 @@ class TestMainEndToEnd:
                     for p in staging_dir.rglob("*") if p.is_file()}
         assert f"sdf/{corpus_name}" in uploaded
         assert "sdf/run_manifest.json" in uploaded
-        assert "README.md" in uploaded
+        # The card is NOT staged by default: it is hand-written and edited on
+        # the Hub, and upload_folder overwrites every path it finds, so leaving
+        # README.md out of the staging dir is what protects that edit.
+        assert "README.md" not in uploaded
         assert not any("report_content.json" in u for u in uploaded)
+
+    def test_regenerate_card_stages_the_card_for_upload(self, tmp_path, monkeypatch, stub_hf):
+        run_dir, _ = make_run_dir(tmp_path)
+        stub_hf()
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir),
+                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
+        assert (staging_dir / "README.md").exists()
 
     def test_delete_patterns_are_scoped_to_the_published_pipeline(
         self, tmp_path, monkeypatch, stub_hf
@@ -1065,7 +1076,7 @@ class TestMainEndToEnd:
                                             include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         assert (staging_dir / "dad" / "dad_corpus.jsonl").exists()
         assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in (staging_dir / "README.md").read_text()
@@ -1074,7 +1085,7 @@ class TestMainEndToEnd:
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir),
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir),
                   "--repo-id", "sentientfutures/animal-welfare-training-dataset",
                   "--staging-dir", str(staging_dir))
         card = (staging_dir / "README.md").read_text()
@@ -1084,7 +1095,7 @@ class TestMainEndToEnd:
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--pretty-name", "Animal-welfare midtraining datasets",
                   "--staging-dir", str(staging_dir))
         card = (staging_dir / "README.md").read_text()
@@ -1114,7 +1125,7 @@ class TestSiblingPreservation:
         )
         staging_dir = tmp_path / "staged"
         calls = stub_hf(repo_files=repo_files)
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         return calls, staging_dir, (staging_dir / "README.md").read_text()
 
@@ -1237,7 +1248,7 @@ class TestSiblingPreservation:
             extra_audit_files={"audit_report.json": {"n_prompts": 40}},
         )
         staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
 
         out = capsys.readouterr().out
@@ -1275,7 +1286,7 @@ class TestSiblingPreservation:
         run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
                                   include_html=False)
         staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         assert any(c["fn"] == "upload_folder" for c in calls)
         card = (staging_dir / "README.md").read_text()
@@ -1312,7 +1323,7 @@ class TestUnmergedGuard:
         run_dir, _ = make_run_dir(tmp_path)
         calls = stub_hf()
         staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
 
         err = capsys.readouterr().err
@@ -1372,7 +1383,7 @@ class TestUnmergedGuard:
         staging_dir = tmp_path / "staged"
         self._unmerged(monkeypatch, branch="declan/wip", commit="deadbee")
 
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         err = capsys.readouterr().err
@@ -1403,7 +1414,7 @@ class TestUnmergedGuard:
         staging_dir = tmp_path / "staged"
         self._unmerged(monkeypatch)
 
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
@@ -1511,7 +1522,7 @@ class TestUnmergedGuard:
         self._unmerged(monkeypatch, branch="declan/publishing-from-here",
                        commit="cafe123")
 
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         card = (staging_dir / "README.md").read_text()
@@ -1535,7 +1546,7 @@ class TestUnmergedGuard:
         staging_dir = tmp_path / "staged"
         self._unmerged(monkeypatch, branch="declan/wip")
 
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
         assert "`declan/wip`" in (staging_dir / "README.md").read_text()
 
@@ -1577,7 +1588,7 @@ class TestUnmergedGuard:
 
         monkeypatch.setattr(publish_hf, "merge_state", per_run)
 
-        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+        _run_main(monkeypatch, "--regenerate-card", "--input", *[str(r) for r in runs],
                   "--repo-id", "org/repo", "--staging-dir", str(staging_dir),
                   "--allow-unmerged")
 
@@ -1608,7 +1619,7 @@ class TestUnmergedGuard:
         staging_dir = tmp_path / "staged"
         stub_hf()
 
-        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
+        _run_main(monkeypatch, "--regenerate-card", "--input", *[str(r) for r in runs],
                   "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
 
         assert "NOT been merged" not in capsys.readouterr().err
@@ -1659,7 +1670,7 @@ class TestUnmergedGuard:
         }
         stub_hf(repo_files=sibling)
 
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
 
         card = (staging_dir / "README.md").read_text()
