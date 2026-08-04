@@ -109,17 +109,14 @@ _PARSE_ERROR = "parse error"
 DEFAULT_THRESHOLD = 7
 
 # This report has no control arm, so it must NOT borrow ``R.PLAIN`` / ``R.PIPELINE``: those
-# two hues mean "control" and "pipeline" in the other report on this page, and reusing them
-# here for dealt-against-shipped would put a third meaning on the same two colours in one
-# document. This report has exactly ONE pair — the matrix's weight against what came out —
-# so it spends two hues and no more; every other chart is a single series and takes the
-# palette's default, where a colour carries no meaning to confuse.
+# two hues mean "control" and "pipeline" in the other report on this page. Every chart
+# here is a single series and spends this one hue, where a colour carries no meaning to
+# confuse.
 #
 # The greens are all avoided deliberately: ``--series-6`` is #008300 against ``--good``'s
 # #0ca30c, so a magnitude drawn in it reads as a verdict, and ``--series-3`` is the other
 # report's "pipeline".
-MEASURE = DEALT = R.PAL[0]
-SHIPPED = R.PAL[4]
+MEASURE = R.PAL[0]
 
 
 # ------------------------------------------------------------------ loading
@@ -1014,14 +1011,10 @@ def _composition_figures(audit):
             continue
         n = sum(counts.values()) or 1
         rows = sorted(counts.items(), key=lambda kv: -kv[1])
-        top_label = _trim_words(rows[0][0], 34)
         out.append(R.figure(
             title=title,
-            note_="Share of the shipped dataset.",
-            chart=R.grouped_hbar([{"label": _trim(k), "shipped": v / n} for k, v in rows],
-                                 series=[("shipped", SHIPPED)], percent=True, label_w=260),
-            caption=f"**{len(rows)} values on this axis**, the largest — `{top_label}` — "
-                    f"holding {rows[0][1] / n:.0%} of the dataset."))
+            chart=R.hbar([(_trim(k), v / n) for k, v in rows], maxval=1.0,
+                         fmt="{:.0%}", color=MEASURE, label_w=260)))
     if comp.get("language"):
         n = sum(comp["language"].values()) or 1
         rows = sorted(comp["language"].items(), key=lambda kv: -kv[1])
@@ -1029,9 +1022,7 @@ def _composition_figures(audit):
             title="Language",
             note_="Derived from the culture axis, which fixes the language a document is "
                   "written in along with its idiom and its institutions.",
-            chart=R.hbar([(k, v) for k, v in rows], color=SHIPPED, label_w=180),
-            caption=f"**{len(rows)} languages**, the largest of them "
-                    f"{rows[0][1] / n:.0%} of the dataset."))
+            chart=R.hbar([(k, v) for k, v in rows], color=MEASURE, label_w=180)))
     return out
 
 

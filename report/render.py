@@ -356,7 +356,9 @@ def grouped_hbar(rows, *, series, width=W, group_gap=13, bar_h=13, percent=False
         out.append(f"<line x1='{x:.1f}' x2='{x:.1f}' y1='2' y2='{h - 20}' class='rule'/>"
                    f"<text x='{x + 5:.1f}' y='{h - 7}' class='muted-svg'>{esc(rule_label)}</text>")
     out.append("</svg>")
-    return "".join(out) + _legend(series)
+    # A legend exists to tell two colours apart; with one series it is a dot that
+    # labels nothing, so it only renders when there is a mapping to learn.
+    return "".join(out) + (_legend(series) if len(series) > 1 else "")
 
 
 def _legend(series):
