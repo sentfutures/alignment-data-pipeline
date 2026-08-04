@@ -1,4 +1,4 @@
-# Git Workflow Guide — animal-welfare-data-pipeline
+# Git Workflow Guide — alignment-data-pipeline
 
 A simple step-by-step process for making changes and pushing them to the repo.
 
@@ -54,7 +54,7 @@ After pushing, GitHub will print a link in your terminal like:
 
 ```
 Create a pull request for '<branch-name>' on GitHub by visiting:
-     https://github.com/sentfutures/animal-welfare-data-pipeline/pull/new/<branch-name>
+     https://github.com/sentfutures/alignment-data-pipeline/pull/new/<branch-name>
 ```
 
 Click that link (or go to the repo on GitHub — it usually shows a "Compare & pull request" banner) and open the PR. Add a short description of what you changed, then submit it for review.

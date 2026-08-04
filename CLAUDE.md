@@ -1,4 +1,4 @@
-# animal-welfare-data-pipeline
+# alignment-data-pipeline
 
 Synthetic training data pipeline for animal/sentient-being welfare alignment, modeled on Anthropic's "Teaching Claude Why" midtraining technique.
 

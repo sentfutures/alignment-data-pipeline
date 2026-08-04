@@ -598,8 +598,8 @@ def _intro_lines(datasets: list[dict]) -> list[str]:
     ]
 
 
-REPO_NAME = "animal-welfare-data-pipeline"
-REPO_URL = "https://github.com/sentfutures/animal-welfare-data-pipeline"
+REPO_NAME = "alignment-data-pipeline"
+REPO_URL = "https://github.com/sentfutures/alignment-data-pipeline"
 
 
 def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:

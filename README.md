@@ -151,8 +151,8 @@ Install the dependencies into a virtual environment so they stay isolated from y
 ### Clone the repo
 Open your terminal app and `cd` to a directory where you want the repo (i.e. `cd ~/projects`), then run:
 ```bash
-git clone https://github.com/sentfutures/animal-welfare-data-pipeline.git
-cd animal-welfare-data-pipeline
+git clone https://github.com/sentfutures/alignment-data-pipeline.git
+cd alignment-data-pipeline
 ```
 
 ### Create a virtual environment and install dependencies
