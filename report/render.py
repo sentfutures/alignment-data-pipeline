@@ -464,13 +464,15 @@ def histogram(counts, *, width=W, height=170, color=None, xlabel=""):
     return "".join(out)
 
 
-def scatter(points, *, xdomain=None, ydomain=None, marks=(), width=W, height=330):
+def scatter(points, *, xdomain=None, ydomain=None, marks=(), width=W, height=330,
+            xlabel="", ylabel=""):
     """points/marks: [{"x","y","color","tip"}]. marks draw larger and ringed (the
-    per-arm means the dots scatter around). Axis names belong in figure()'s note."""
+    per-arm means the dots scatter around). ``xlabel``/``ylabel`` draw on the chart
+    itself, so the axes need no describing sentence above it."""
     pts = [p for p in points if p.get("x") is not None and p.get("y") is not None]
     if not pts:
         return _no_data()
-    left, right, top, bottom = 44, 14, 12, 26
+    left, right, top, bottom = 44 + (18 if ylabel else 0), 14, 12, 26 + (16 if xlabel else 0)
     xs = [p["x"] for p in pts] + [m["x"] for m in marks]
     ys = [p["y"] for p in pts] + [m["y"] for m in marks]
     x0, x1 = xdomain or (min(xs), max(xs))
@@ -496,17 +498,26 @@ def scatter(points, *, xdomain=None, ydomain=None, marks=(), width=W, height=330
                f"class='axis'/>")
     for k in range(6):
         gx = x0 + (x1 - x0) * k / 5
-        out.append(f"<text x='{px(gx):.1f}' y='{height - 10}' class='val' "
+        out.append(f"<text x='{px(gx):.1f}' y='{height - bottom + 16}' class='val' "
                    f"text-anchor='middle'>{gx:.0f}</text>")
+    if xlabel:
+        out.append(f"<text x='{left + pw / 2:.0f}' y='{height - 4}' class='muted-svg' "
+                   f"text-anchor='middle'>{esc(xlabel)}</text>")
+    if ylabel:
+        out.append(f"<text x='14' y='{top + ph / 2:.0f}' class='muted-svg' "
+                   f"text-anchor='middle' transform='rotate(-90 14 {top + ph / 2:.0f})'>"
+                   f"{esc(ylabel)}</text>")
     for p in pts:
         out.append(f"<circle cx='{px(p['x']):.1f}' cy='{py(p['y']):.1f}' r='4.5' "
                    f"fill='{p.get('color', PAL[0])}' stroke='var(--surface-0)' "
                    f"stroke-width='1.2' opacity='.82' data-tip='{esc(p.get('tip', ''))}'/>")
     for m in marks:
+        # The mean markers ring in ink, not surface: on a dense cloud a
+        # background-coloured ring reads as a gap, not as an outline.
         out.append(f"<rect x='{px(m['x']) - 7:.1f}' y='{py(m['y']) - 7:.1f}' width='14' "
                    f"height='14' transform='rotate(45 {px(m['x']):.1f} {py(m['y']):.1f})' "
-                   f"fill='{m.get('color', PAL[0])}' stroke='var(--surface-0)' "
-                   f"stroke-width='2' data-tip='{esc(m.get('tip', ''))}'/>")
+                   f"fill='{m.get('color', PAL[0])}' stroke='var(--text-primary)' "
+                   f"stroke-width='1.5' data-tip='{esc(m.get('tip', ''))}'/>")
     out.append("</svg>")
     return "".join(out)
 
