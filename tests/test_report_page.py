@@ -565,6 +565,20 @@ class TestChooser:
         # every panel opens with its own <h2>, and the panels are inside #explore.
         assert "#explore h2{" not in html
 
+    def test_the_instruction_does_not_set_level_with_the_reports_it_points_at(self):
+        """"Walk through either pipeline" is the one h2 on the page that is not a name. At
+        the h2's own 2rem it was the same size as "Synthetic documents" and "Difficult
+        advice" — both h2s INSIDE this section — so the label was as loud as the thing, and
+        with #datasets' heading visually hidden it was the only visible h2 before a report
+        opened. It stays an <h2>, so the outline and the H key are unchanged."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"#explore>h2\{[^}]*\}", html).group(0)
+        head = float(re.search(r"font-size:([\d.]+)rem", rule).group(1))
+        h2 = float(re.search(r"(?m)^h2\{font:600 ([\d.]+)rem", html).group(1))
+        h3 = float(re.search(r"(?m)^h3\{font:600 ([\d.]+)rem", html).group(1))
+        assert head < h2 and head <= h3
+        assert "<h2>Walk through either pipeline</h2>" in html
+
     def test_a_report_ends_where_its_content_ends(self):
         """There was a filled button here offering the other dataset, from when the
         chooser scrolled away behind the reader. The bar is pinned now, so the way across
@@ -689,9 +703,14 @@ class TestStickyBar:
             assert found, f"{name} does not interpolate off --t: {block}"
             for f in found:
                 assert 0 < float(f) < 1, f"{name} factor {f} does not shrink the bar"
-        # Tight has to be markedly lighter than loose, or the change is not worth animating:
-        # measured 83px -> 52px in Chromium.
-        assert _bar_rem(html, 1) < 0.7 * _bar_rem(html, 0)
+        # Tight has to be lighter than loose, or the change is not worth animating — but the
+        # RANGE is deliberately narrow: ~72px -> ~52px. It was 83px -> 52px, and the pinned
+        # size is the one measured to sit beside prose, so a resting bar 61% taller than it
+        # was oversized on arrival by the design's own evidence, and the collapse read as a
+        # layout event rather than the bar settling. The floor is what matters and it has not
+        # moved: the coefficients were re-derived to hold the pinned size where it was.
+        assert _bar_rem(html, 1) < 0.8 * _bar_rem(html, 0)
+        assert 3.1 < _bar_rem(html, 1) < 3.4, "the pinned size is the measured one"
         # The pair narrows too, and its floor is measured rather than chosen: below 27.5rem
         # "Synthetic documents" wraps and the tight bar ends up TALLER than the loose one
         # (measured at 202px per button in Chromium).

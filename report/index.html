@@ -180,7 +180,15 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    The child combinator is load-bearing: both reports live INSIDE #explore now (that is
    what gives the sticky bar its travel), and each opens with its own <h2>, so a
    descendant selector here centres and stretches both report titles too. */
-#explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem}
+/* The one h2 on the page that is not a name. It is an instruction, and at the h2's own 2rem
+   it set level with "Synthetic documents" and "Difficult advice" — the two documents it
+   points at, both of which are h2s INSIDE this section — so the label was as loud as the
+   thing. Since #datasets' heading is visually hidden, it was also the only visible h2 before
+   a report opens: on arrival the page's second voice after the title was a caption for two
+   buttons. Dropped to the beat size, which puts it under the names and above the prose.
+   Still an <h2>, so the outline and the H key are unchanged. */
+#explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem;
+font-size:1.4rem}
 /* The travel, for both the bar and the rail. min-width:0 for the reason main has it: it is
    a grid item, and a grid track takes its automatic minimum from the item's min-content
    size.
@@ -256,18 +264,26 @@ border-left:2px solid transparent;padding:.28rem 0 .28rem .7rem}
    It TIGHTENS ONCE, at a trigger point, because at rest it is right and pinned over a
    report it is heavy: --t is a flag, 0 loose and 1 tight, the script sets it when the
    reader is past the trigger, and every dimension below is one interpolation off it, so
-   the two states are one set of numbers. Measured in Chromium: 83px tall and 40rem wide
-   loose, 52px and 30rem tight. A size that tracked the scroll continuously read as
-   distracting — the bar moved whenever the page did — so this crosses once and settles.
-   The six sizes are tokens, so each breakpoint restates only the tokens.
+   the two states are one set of numbers. ~72px tall and 40rem wide loose, ~52px and 30rem
+   tight. A size that tracked the scroll continuously read as distracting — the bar moved
+   whenever the page did — so this crosses once and settles. The six sizes are tokens, so
+   each breakpoint restates only the tokens.
+
+   THE HEIGHT RANGE IS NARROW ON PURPOSE, and it used to be 83px. The pinned size is the
+   one measured to sit comfortably beside prose, so a resting size 61% taller than it was
+   oversized on arrival by its own evidence — and the collapse read as a layout event
+   rather than the bar settling. Only the height came down: the WIDTH stays 40rem because
+   that is exactly the comparison's two 20rem columns, so each button sits under the column
+   it opens. The interpolation coefficients were re-derived to hold the pinned size where it
+   was, not left to shrink with the base.
 
    The transition lives on the concrete properties rather than on --t (a custom property
    is discrete unless it is registered), which is also what lets the reduced-motion rule
    at the foot of this stylesheet turn the animation off with the same transition:none it
    applies to everything else. */
-.choicebar{--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
+.choicebar{--pad:.7rem;--gap:1.2rem;--btn-y:.8rem;--btn-x:1.25rem;--label:1.05rem;
 --w:40rem;grid-column:1/-1;position:sticky;top:0;z-index:5;background:var(--surface-0);
-padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease;
+padding:calc(var(--pad)*(1 - .4*var(--t))) 0;transition:padding .2s ease;
 /* The wrapper's pull is for the contents, not the chooser. The bar spans both columns, so
    left to itself it widens leftwards with the block and takes its centred pair of buttons
    1.125rem off the page's centre line, out of step with the hero and the comparison. */
@@ -283,10 +299,10 @@ transition:width .2s ease,gap .2s ease}
    a button, a card, a chip and a code block at once, and had stopped meaning anything;
    an outline in the accent that fills when you choose says "this is a control". */
 .choice{display:flex;align-items:center;justify-content:space-between;gap:1rem;
-padding:calc(var(--btn-y)*(1 - .5*var(--t))) calc(var(--btn-x)*(1 - .2*var(--t)));
+padding:calc(var(--btn-y)*(1 - .35*var(--t))) calc(var(--btn-x)*(1 - .2*var(--t)));
 background:none;border:1px solid var(--accent-edge);
 border-radius:4px;cursor:pointer;font:650 var(--label)/1.3 var(--serif);
-font-size:calc(var(--label)*(1 - .12*var(--t)));color:var(--accent);text-align:left;
+font-size:calc(var(--label)*(1 - .08*var(--t)));color:var(--accent);text-align:left;
 transition:padding .2s ease,font-size .2s ease}
 .choice:hover{background:var(--accent-wash)}
 .choice[aria-expanded=true]{background:var(--accent);border-color:var(--accent);
@@ -294,7 +310,7 @@ color:var(--surface-0)}
 /* The arrow goes as the bar tightens: it means "the report is below", which is stale once
    the reader is inside the report, and losing it is half of why the shrunk bar reads as
    lighter. */
-.choice-a{font:400 1.1rem/1 var(--sans);font-size:calc(1.1rem*(1 - .2*var(--t)));
+.choice-a{font:400 1rem/1 var(--sans);font-size:calc(1rem*(1 - .2*var(--t)));
 opacity:calc(.8 - .8*var(--t));transition:font-size .2s ease,opacity .2s ease}
 .panel{margin-top:3.2rem;scroll-margin-top:7rem}
 /* A report's title needs room under it: the h2's default half-rem is set for a heading
