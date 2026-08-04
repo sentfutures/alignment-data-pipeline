@@ -69,6 +69,14 @@ section>figure,section>.tiles,section>.scroll,section>.pair,section>details,
 section>.explore-body,section>.lbtns,section>.cmp-wrap,
 section>.carousel{grid-column:text-start/full-end}
 section+section{margin-top:5rem}
+/* One centred rule, above the comparison and nowhere else. 30rem is three quarters of the two
+   dataset columns (2 x --cmp-col = 40rem), and it is centred on the page, which is where the
+   pair is centred too. Its own margin is the ENTIRE gap between the intro and the table — the
+   hero's bottom padding is zero — so "equally spaced" is one value here rather than arithmetic
+   across two rules that each restate at a breakpoint. Drawn as a grid child, because a border
+   on the section itself runs the full shell column. */
+#datasets::before{content:'';grid-column:1/-1;width:30rem;margin:3rem auto;
+border-top:1px solid var(--hairline)}
 /* The panel is a section, so its own display:grid would beat the browser's default
    [hidden] rule. It has to be said out loud. */
 .panel[hidden]{display:none}
@@ -77,7 +85,7 @@ section+section{margin-top:5rem}
    enough air to separate them from the page and no more. The two datasets are two
    things, so they are two things here as well as in the table below. */
 .hero{display:flex;flex-direction:column;align-items:center;
-padding:2.6rem 28px 5rem;text-align:center}
+padding:2.6rem 28px 0;text-align:center}
 /* 3rem above the art and 3rem above the title, not the 6rem each carried. The art is a
    186px band inside a 36rem box, so 12rem of stacked margin spent ~190px of the first
    screen on paper with nothing on it and pushed the comparison — the section that does
@@ -122,7 +130,9 @@ font-size:1.1rem;line-height:1.68}
 .npair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2.75rem;
 list-style:none;margin:2.6rem 0 0;padding:0;text-align:left}
 .npair>li{margin:0;padding-top:1.1rem;border-top:1px solid var(--hairline)}
-.npair-h{display:block;font:650 1.12rem/1.3 var(--serif);color:var(--text-primary);
+/* Muted and a step smaller, so the two technique names recede rather than reading as a first
+   run at the comparison's mastheads below them. */
+.npair-h{display:block;font:650 1.05rem/1.3 var(--serif);color:var(--text-muted);
 margin:0 0 .7rem}
 .npair-b{font-size:1rem;line-height:1.68;color:var(--text-secondary)}
 /* Type: the serif argues, the sans measures. */
@@ -649,7 +659,7 @@ section{grid-template-columns:[text-start] minmax(0,1fr) [text-end full-end]}
 .choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06rem}
 .lede{font-size:1.1rem}
-.hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
+.hero{padding:1.8rem 16px 0}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
 /* One column: two of them inside a 390px viewport are ~16 characters each. Each item keeps
    its own hairline, so the pair reads as the hanging list it would have been anyway. */
