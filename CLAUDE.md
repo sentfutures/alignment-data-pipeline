@@ -356,8 +356,16 @@ typed (as a glyph it is a hairline that differs per font, and this page gets pri
 Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
 allows a `data:` src and nothing else off-page.
 
-**Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links (mono,
-600, 2px accent underline) and outline buttons (`.lbtn`, `.choice`, `.tab`, 4px radius).
+**Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links and outline
+buttons (`.lbtn`, `.choice`, `.tab`, 4px radius). **A link is marked, never re-faced**: it
+inherits its context's face and size — serif in prose, sans in the footer and the rail — and
+the mark is weight 600, the accent, and a 2px accent underline at a .2em offset — mono came off links page-wide, because mono means a literal
+string (an id, a path, code) and a work's title is language. Controls are serif at their own
+size; `.tab` is the one mono control, and for its content (a record id), not for being a
+control. The intro's two sources are **raised citation markers** (`.cite-n`): the prose file
+authors the work's name, the renderer draws the number and carries the name in `aria-label`,
+because a link whose accessible name is "1" tells a screen reader nothing. They borrow the
+footnote convention without a footnote and link straight out.
 An accent fill means *selected* — the open tab, the open pane — and nothing else; there is
 no primary button. Cream fills with a border are not a control style. Status
 colours (`--good/--warn/--bad`) and the chart series hues stay reserved; the palette
