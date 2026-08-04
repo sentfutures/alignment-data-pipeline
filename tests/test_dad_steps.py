@@ -18,6 +18,7 @@ import pytest
 from conftest import dad_scenario_plan_reply, dad_scenario_reply
 from dad_pipeline import (baseline, compose_scenarios, reasoning_library,
                           step1_dilemmas, step2_responses, step3_rewrite)
+from dad_pipeline.id_registry import IdRegistry, registry_path, response_fingerprint
 from shared import utils
 
 
@@ -1570,6 +1571,92 @@ class TestBaselineRun:
         results = baseline.run(tiny_config, tmp_path, [_dilemma()])
         assert calls == []
         assert len(results) == 1
+
+    def test_crash_mid_stage_never_re_allocates_a_written_gid(
+        self, tiny_config, tmp_path, stub_claude
+    ):
+        # The collision the ordering invariant exists to prevent: a stage dies
+        # after a record carrying a fresh gid is on disk. If the registry had
+        # not been saved first, the next run would hand that same number to
+        # different content, and the audit/diversity joins would merge two
+        # artifacts under one C-####.
+        def dispatch(user_message, **kw):
+            if user_message == "First dilemma.":
+                return "Plain answer one."
+            raise RuntimeError("run died mid-stage")
+
+        stub_claude(dispatch)
+        dilemmas = [
+            {**_dilemma("AW-0001"), "user_message": "First dilemma."},
+            {**_dilemma("AW-0002"), "user_message": "Second dilemma."},
+        ]
+        # parallel_map yields in input order, so the first record is written and
+        # its allocation persisted before the second item's exception surfaces
+        with pytest.raises(RuntimeError):
+            baseline.run(tiny_config, tmp_path, dilemmas)
+
+        stored = utils.load_jsonl(tmp_path / "baseline_responses.jsonl")
+        assert len(stored) == 1
+        reg = IdRegistry(registry_path(tmp_path))
+        assert reg.gid("plain", response_fingerprint(stored[0]["baseline_response"])) \
+            == stored[0]["plain_gid"]                      # survived the crash
+        assert reg.gid("plain", response_fingerprint("Different content.")) \
+            != stored[0]["plain_gid"]                      # and is not re-issued
+
+
+# --- The registry's save-before-write ordering invariant -------------------
+
+def _no_save(*args, **kwargs):
+    raise RuntimeError("registry save failed")
+
+
+class TestSaveBeforeWriteOrdering:
+    """One proof per stamp site: with IdRegistry.save() failing, no record
+    carrying a freshly minted gid may reach disk. Patched on the class (the
+    same object every stage imports), so each stage is exercised through its
+    real run()."""
+
+    def test_step1_writes_no_deal_before_the_registry_is_saved(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, monkeypatch
+    ):
+        monkeypatch.setattr(IdRegistry, "save", _no_save)
+        calls = stub_claude(_dad_step1_dispatch)
+        with pytest.raises(RuntimeError):
+            step1_dilemmas.run(tiny_config, prompts_dad, tmp_path)
+        # the deal is stamped before any API call, so the run dies unpaid
+        assert calls == []
+        assert not (tmp_path / "scenario_deals.jsonl").exists()
+
+    def test_step2_writes_no_response_before_the_registry_is_saved(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, monkeypatch
+    ):
+        monkeypatch.setattr(IdRegistry, "save", _no_save)
+        stub_claude(_dad_step2_dispatch)
+        with pytest.raises(RuntimeError):
+            step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+        assert utils.load_jsonl(tmp_path / "responses.jsonl") == []
+        # nothing is checkpointed either, so --resume redraws the response;
+        # the paid scope work is deliberately kept (scopes.jsonl carries no gid)
+        assert not utils.Checkpoint(tmp_path / "_checkpoint.json").is_done("AW-0001_s0")
+
+    def test_step3_writes_no_rewrite_before_the_registry_is_saved(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, monkeypatch
+    ):
+        monkeypatch.setattr(IdRegistry, "save", _no_save)
+        stub_claude(["Rewritten careful answer."])
+        with pytest.raises(RuntimeError):
+            step3_rewrite.run(tiny_config, prompts_dad, tmp_path / "step3",
+                              tmp_path / "final", [_response_record()])
+        assert utils.load_jsonl(tmp_path / "step3" / "rewrites.jsonl") == []
+
+    def test_baseline_writes_no_record_before_the_registry_is_saved(
+        self, tiny_config, tmp_path, stub_claude, monkeypatch
+    ):
+        monkeypatch.setattr(IdRegistry, "save", _no_save)
+        stub_claude(["Plain model answer."])
+        with pytest.raises(RuntimeError):
+            baseline.run(tiny_config, tmp_path, [_dilemma()])
+        assert utils.load_jsonl(tmp_path / "baseline_responses.jsonl") == []
 
 
 # --- Per-stage model knobs + cost-log stage tags ---------------------------
