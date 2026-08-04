@@ -992,7 +992,7 @@ def _ablation_figure(ablation):
                 f"cannot see the spec**, over {ablation.get('n', '?')} documents.")
 
 
-def _composition_figures(audit):
+def _composition_figures(audit, repo_href=""):
     """The shipped dataset's composition, one figure per engineered axis.
 
     Shipped shares only: the dealt-against-shipped pairing and its drift captions were
@@ -1001,9 +1001,9 @@ def _composition_figures(audit):
     """
     comp = (audit or {}).get("composition") or {}
     out = []
-    for axis, title in (("centrality", "How central the welfare thread is"),
-                        ("tone", "The author's stance"),
-                        ("domain", "Domain")):
+    for axis, title in (("centrality", "How central the welfare thread is *"),
+                        ("tone", "The author's stance *"),
+                        ("domain", "Domain *")):
         counts = comp.get(axis)
         if not counts:
             continue
@@ -1017,10 +1017,16 @@ def _composition_figures(audit):
         n = sum(comp["language"].values()) or 1
         rows = sorted(comp["language"].items(), key=lambda kv: -kv[1])
         out.append(R.figure(
-            title="Language",
+            title="Language *",
             note_="Derived from the culture axis, which fixes the language a document is "
                   "written in along with its idiom and its institutions.",
             chart=R.hbar([(k, v) for k, v in rows], color=MEASURE, label_w=180)))
+    if out:
+        link = (f"[prompts/sdf/variables.txt]({repo_href}/blob/main/prompts/sdf/"
+                "variables.txt)" if repo_href else "`prompts/sdf/variables.txt`")
+        out.append("<p class='muted'>" + R.inline_md(
+            f"* These shares are set by weights in {link} — retargeting one (say, 90% "
+            "English) is an edit to that file.") + "</p>")
     return out
 
 
@@ -1054,8 +1060,10 @@ def _principle_figure(audit, principles=None, repo_href=""):
     floor = pc.get("floor") or 0.05
     rows = [{"label": f"principle {k}", "share": v}
             for k, v in sorted(by.items(), key=lambda kv: -kv[1])]
+    gloss = {f"principle {n}": text for n, text in (principles or [])}
     starved = pc.get("starved") or []
-    src = (f" The principles are maintained in the repository: "
+    src = ((" Hover a bar for the principle." if gloss else "")
+           + f" The principles are maintained in the repository: "
            f"[constitution/constitution_principles.csv]({repo_href}/blob/main/"
            "constitution/constitution_principles.csv)." if repo_href else "")
     out = R.figure(
@@ -1065,7 +1073,7 @@ def _principle_figure(audit, principles=None, repo_href=""):
               + src,
         chart=R.grouped_hbar(rows, series=[("share", MEASURE)], percent=True,
                              rule=floor, rule_label="floor", label_w=140,
-                             direct_labels=False),
+                             direct_labels=False, glossary=gloss or None),
         caption=(f"**{len(starved)} of {len(rows)} principles fall under the floor.** That is "
                  f"fixed at the matrix's weights, not per document."
                  if starved else "**Every principle clears the floor.**"))
@@ -1116,7 +1124,7 @@ def blocks_appendix(content, f, *, audit=None, diversity=None,
     """
     blocks = [R.sub("sdf-appendix", "Appendix"), C.prose(content, "sdf_appendix_intro", f)]
 
-    comp_figs = _composition_figures(audit)
+    comp_figs = _composition_figures(audit, repo_href)
     principle_fig = _principle_figure(audit, principles, repo_href)
     semantic = C.semantic_figures(diversity, unit="documents")
     curve_fig = _curve_block(curve)

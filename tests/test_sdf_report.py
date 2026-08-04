@@ -471,6 +471,18 @@ class TestDegradation:
         s = summary(section(build()), "Composition and diversity")
         assert "composition" in s and "principles" in s and "meanings and topics" in s
 
+    def test_the_composition_shares_carry_one_retargeting_footnote(self):
+        """Four asterisked figures, one line: these shares are weights in the variables
+        file, so a lab wanting 90% English changes that file, not the pipeline."""
+        sec = section(build())
+        assert sec.count("These shares are set by weights") == 1
+        assert "How central the welfare thread is *" in sec
+
+    def test_hovering_a_principle_bar_shows_the_principle(self):
+        sec = section(build(principles=[("1", "Sentient beings are inside the moral "
+                                              "circle")]))
+        assert "Sentient beings are inside the moral circle" in sec
+
     def test_the_whole_section_survives_a_run_with_only_a_corpus(self):
         html = build(audit=None, diversity=None, compliance=None, fidelity=None,
                      ablation=None, curve=None, scores=None, attrition=None, matrix=None)
