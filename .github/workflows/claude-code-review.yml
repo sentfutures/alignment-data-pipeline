@@ -228,7 +228,17 @@ jobs:
             exit 0
           fi
           if [ -z "${EXEC_FILE}" ]; then
-            echo "::notice::Claude action produced no execution output — it self-skipped (e.g. this PR edits the review workflow, which the action only runs from the default branch). Not a review failure; skipping verdict check."
+            # A self-skip means this PR got NO automated review at all. The check
+            # deliberately stays green (663c7e2: a red X the author cannot act on
+            # is noise), but staying silent is what made this indistinguishable
+            # from a reviewed PR: on the PR page a self-skip reads as a fast
+            # green `claude-review`, and a guard-skipped no-op re-run after a
+            # real review reads as `skipping`. Neither tells you whether anyone
+            # looked. So record it as a verdict state and let the escalation step
+            # label the PR and request a human — the same routing a neutral
+            # verdict gets, for the same reason: a human has to do the reviewing.
+            echo "verdict=NOT_REVIEWED" >> "$GITHUB_OUTPUT"
+            echo "::warning::This PR received no automated review — the action self-skipped, which happens when a PR edits the review workflow (the action only runs the copy on the default branch). Requesting a human reviewer instead."
             exit 0
           fi
           if [ -z "${SINCE}" ]; then
@@ -316,32 +326,64 @@ jobs:
           echo "::endgroup::"
           exit 1
 
-      # A neutral verdict means a human has to decide something. Route it to one
-      # so it lands in a review queue and an inbox instead of sitting inert: a
-      # comment-only review is the one outcome that neither blocks nor unblocks,
-      # and nothing here previously notified anyone it had happened.
+      # Two states need a human, and neither used to say so anywhere the author
+      # would see it:
+      #
+      #   COMMENTED    - the reviewer looked but wouldn't commit to a verdict. A
+      #                  comment-only review neither blocks nor unblocks, so it
+      #                  sat inert with nobody notified.
+      #   NOT_REVIEWED - the action self-skipped, so nothing was reviewed at all.
+      #                  This reads on the PR page as a fast green `claude-review`
+      #                  and is therefore worse: it looks like a pass.
+      #
+      # Both route the same way, because the remedy is the same — a human has to
+      # review this PR. The check's colour is left alone in both cases (a neutral
+      # verdict fails it, a self-skip does not, per 663c7e2); this step is about
+      # making the state visible on the PR itself rather than only in a run log.
       #
       # The label is `needs-human-review`, NOT the existing `needs-human`:
       # claude-review-fix.yml treats `needs-human` on a PR as an absolute stop
       # for the auto-fixer ("a human must clear it first"), so reusing it would
       # permanently disarm automated fixes for every escalated PR.
-      - name: Request human review for a neutral verdict
-        if: always() && !cancelled() && steps.verdict.outputs.verdict == 'COMMENTED'
+      - name: Request human review when the bot cannot supply one
+        if: >-
+          always() && !cancelled() &&
+          (steps.verdict.outputs.verdict == 'COMMENTED' ||
+           steps.verdict.outputs.verdict == 'NOT_REVIEWED')
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          VERDICT: ${{ steps.verdict.outputs.verdict }}
           # Maintainers who adjudicate judgment calls. Both repo admins, and the
           # only two humans who have ever reviewed here.
           ESCALATE_TO: "Deco354 Liconstan"
         run: |
-          # GitHub rejects a review request naming the PR's own author (422), so
-          # drop them from the list — that is why this is a list and not one name.
+          case "${VERDICT}" in
+            NOT_REVIEWED) why="no automated review ran on this PR (the action self-skipped)" ;;
+            *)            why="the automated review reached no binary verdict" ;;
+          esac
+          echo "Escalating: ${why}."
+
+          # Skip maintainers who already have a pending request. This matters more
+          # than it used to: NOT_REVIEWED fires on every push to a PR that edits
+          # this workflow, so without deduping a long-running workflow PR would
+          # re-POST the same reviewers on each push. (pr-stall-sweep.yml deduped
+          # for the same reason.)
+          pending=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/requested_reviewers" \
+            --jq '[.users[].login] | join(" ")' 2>/dev/null || echo "")
+
+          # GitHub also rejects a request naming the PR's own author (422), so
+          # drop them too — that is why this is a list and not one name.
           reviewers=""
           for login in ${ESCALATE_TO}; do
-            if [ "${login}" != "${PR_AUTHOR}" ]; then
-              reviewers="${reviewers} ${login}"
+            if [ "${login}" = "${PR_AUTHOR}" ]; then
+              continue
             fi
+            case " ${pending} " in
+              *" ${login} "*) continue ;;
+            esac
+            reviewers="${reviewers} ${login}"
           done
           reviewers="$(echo "${reviewers}" | tr -s ' ' | sed 's/^ //;s/ $//')"
 
@@ -351,7 +393,11 @@ jobs:
             || echo "::warning::Could not apply the needs-human-review label."
 
           if [ -z "${reviewers}" ]; then
-            echo "::warning::No eligible reviewer to request (PR author ${PR_AUTHOR} is the only configured maintainer). The label and the failed check are the only signals."
+            if [ -n "${pending}" ]; then
+              echo "✓ ${why}; review already pending from ${pending}, so nothing to re-request."
+            else
+              echo "::warning::${why}, but there is no eligible reviewer to request (PR author ${PR_AUTHOR} is the only configured maintainer). The needs-human-review label is the only signal."
+            fi
             exit 0
           fi
           # Re-requesting an already-pending reviewer is a harmless no-op, which
@@ -362,8 +408,8 @@ jobs:
           done
           # shellcheck disable=SC2086
           if gh api -X POST "repos/${{ github.repository }}/pulls/${PR_NUMBER}/requested_reviewers" ${args} >/dev/null 2>&1; then
-            echo "✓ Requested review from: ${reviewers}"
+            echo "✓ Requested review from: ${reviewers} (${why})"
           else
-            echo "::warning::Could not request review from ${reviewers}; the label and the failed check still stand."
+            echo "::warning::Could not request review from ${reviewers}; the needs-human-review label still stands."
           fi
 
