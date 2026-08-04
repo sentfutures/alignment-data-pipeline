@@ -22,14 +22,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      # The pinned lock, not requirements.txt: the gate then tests the exact
-      # dependency set a run reproduces, and an upstream release cannot turn
-      # this check red on its own. Regenerate the lock when requirements.txt
-      # changes (command in the lock's header).
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.lock
+          pip install -r requirements.txt
 
       - name: Byte-compile (syntax check)
         run: python -m compileall -q shared sdf_pipeline dad_pipeline pref_pipeline evals viewer

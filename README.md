@@ -165,13 +165,6 @@ cp .env.example .env           # then add your ANTHROPIC_API_KEY
 
 `GEMINI_API_KEY` (or `OPENAI_API_KEY`) in `.env` is optional; only `evals/diversity.py` (the embedding-based diversity audit) reads them. The pipelines run on `ANTHROPIC_API_KEY` alone.
 
-> **Reproducing an exact environment.** `requirements.txt` carries a floor per
-> dependency, so the command above installs current versions. To install the
-> precise set CI tests and the published corpora were generated with, use the
-> lockfile instead: `pip install -r requirements.lock`. Regenerate it after
-> editing `requirements.txt` with the `uv pip compile` command recorded in its
-> header.
-
 > **Activate it every time.** The virtual environment only applies to the terminal where you ran `source .venv/bin/activate`. Open a new terminal and you'll need to activate again.
 
 ### Authentication
