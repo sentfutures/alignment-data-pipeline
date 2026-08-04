@@ -343,28 +343,31 @@ class TestShape:
     def hero(html):
         return re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
 
-    def test_the_footer_names_the_runs_the_page_was_built_from(self):
-        """Provenance was taken off the page entirely, and then appeared nowhere: no run
-        id, no commit, no backend, anywhere. A page whose every figure is derived from two
-        run directories has to name them or nothing on it can be located or cited. It
-        belongs at the foot, under the maker line — not inside a report."""
+    def test_the_footer_carries_no_provenance(self):
+        """Who made it and where to go, and nothing else.
+
+        One line per run — id, commit, dirty flag, backend — was here twice, and was
+        removed twice. It was restored on the argument that provenance otherwise "appeared
+        nowhere", which is not so: `common.run_note()` names the run inside the report,
+        where the reader who wants it is. What the footer added on top of that was a commit
+        sha, a dirty flag and a backend name, none of which a reader can act on, and
+        "+ uncommitted changes" on the last line of a handoff page reads as a draft.
+        """
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
         assert f"A project by <a href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
-        assert foot.index("A project by") < foot.index("class='foot-run'")
-        text = strip_tags(foot)
-        for run in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"]):
-            assert run in text
-        assert text.count("run ") == 2 and "git " in text
-
-    def test_a_dataset_with_no_run_gets_no_half_provenance_line(self):
-        """Built without a run, the page says nothing about it rather than printing a
-        line of question marks."""
-        html = P.build(content=content())          # no dad run, no sdf run
-        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
         assert "class='foot-run'" not in foot
-        assert P.MAKER in foot                     # the rest of the footer is unchanged
+        text = strip_tags(foot)
+        for gone in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"], "git ", "backend"):
+            assert gone not in text, gone
+
+    def test_the_run_is_still_named_where_the_reader_needs_it(self):
+        """The footer carrying nothing is only correct because the report carries it. If
+        both stopped, the page's figures would come off a batch nobody could identify."""
+        html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
+        panel = html[html.index("<section id='dad'"):]
+        assert DAD_INPUTS["run_id"] in panel
 
     def test_the_footer_links_are_links_not_buttons(self):
         """Two destinations, each with its mark and the outbound arrow, floated right."""

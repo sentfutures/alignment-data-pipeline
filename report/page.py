@@ -15,7 +15,7 @@ Structure:
     #explore    Walk through either pipeline — two buttons
       #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
       #dad      Difficult advice     (report/dad.py, hidden until chosen)
-    footer      repo, viewers, run ids, commits, build provenance
+    footer      repo and both viewers, and nothing else
 
 Nothing is open on load; ``#dad`` or ``#sdf`` in the URL opens that report, so the
 dataset card's deep links land where they say they will, and printing expands both. The
@@ -180,29 +180,21 @@ def section_explore(panels, outlines):
                          rails, panels))
 
 
-def footer(maker_icon="", runs=()):
-    """Who made it, where to go, and which runs this page was built from.
+def footer(maker_icon=""):
+    """Who made it and where to go.
 
-    The provenance was taken off the page once, on the grounds that a run id is for a
-    reader already deep in a report rather than for the last line — right about where it
-    belongs, wrong about the consequence, because it then appeared nowhere at all. A page
-    whose every figure is derived from two run directories has to name them, or nothing on
-    it can be located in the repository, reproduced, or cited. Here is where a reader
-    looks for that, and it stays out of the reports themselves.
-
-    ``runs`` is [(dataset name, run_id, manifest)]; a dataset with no run is skipped, so a
-    page built without one carries no half-line about it.
+    No run ids, no commits, no dirty flag, no backend. This was restored once on the
+    grounds that provenance had otherwise "appeared nowhere" — untrue: ``common.run_note()``
+    names the run inside the report, twice, where the reader who wants it is. What the
+    footer added on top was a commit sha, a dirty flag and a backend name, none of which a
+    reader can act on, and "+ uncommitted changes" on the last line of a handoff page reads
+    as an unfinished draft.
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
-    provenance = "".join(
-        f"<p class='foot-run'>{R.esc(name)} — "
-        f"{C.meta_line(run_id=run_id, manifest=manifest)}</p>"
-        for name, run_id, manifest in runs if run_id)
     return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>"
-            + provenance)
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
 
 
 # ------------------------------------------------------------------ assembly
@@ -244,10 +236,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
     head = {
         "title": title,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
-        "footer": footer(maker_icon, runs=[
-            (sdf.SECTION_TITLE, sdf_kwargs.get("run_id"), sdf_kwargs.get("manifest")),
-            (dad.SECTION_TITLE, dad_kwargs.get("run_id"), dad_kwargs.get("manifest")),
-        ]),
+        "footer": footer(maker_icon),
     }
     return "".join(sections), head
 
