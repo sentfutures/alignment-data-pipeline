@@ -1827,8 +1827,36 @@ def head_meta(*, title, description="", site_url="", preview_url=""):
     return tags
 
 
+def icon_links(icons=()):
+    """The tab icon, carried inside the page like every other picture on it.
+
+    ``icons``: ``[(px, data_uri)]``, one link each. This is the page's only ``<link>``,
+    and the one hole in the rule that ``test_is_self_contained`` enforces — a favicon has
+    no other spelling, since a browser will not read one out of a ``<meta>`` and the
+    implicit ``/favicon.ico`` lookup exists only for a hosted copy. So it is inlined for
+    the same reason the hero is: the file that opens from disk or arrives by email keeps
+    its icon, and nothing new has to travel beside the page.
+
+    Deliberately NOT part of ``head_meta()``, which is what a crawler and a link preview
+    see. An icon is neither.
+
+    Sizes are declared rather than left to the browser. The art is hairline pencil work
+    and each PNG is decimated for the size it names (see ``make_preview.py``); handing
+    over one image and letting the browser scale it re-averages the ink and throws that
+    away, which is the whole reason there is more than one file.
+    """
+    tags = ""
+    for px, uri in icons:
+        if not uri:
+            continue
+        if not uri.startswith("data:"):
+            raise ValueError("a tab icon must be a data: URI — the page is one file")
+        tags += f"<link rel='icon' sizes='{int(px)}x{int(px)}' href='{uri}'>\n"
+    return tags
+
+
 def document(*, title, masthead, body, footer="", description="", site_url="",
-             preview_url=""):
+             preview_url="", icons=()):
     """The shell. One file, one theme, no external anything.
 
     There is no contents rail: the page is a hero, three short sections and a choice, and
@@ -1840,6 +1868,7 @@ def document(*, title, masthead, body, footer="", description="", site_url="",
             f"<meta name='color-scheme' content='only light'>\n"
             + head_meta(title=title, description=description, site_url=site_url,
                         preview_url=preview_url)
+            + icon_links(icons)
             + f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
             f"<a class='skip' href='#intro'>Skip to content</a>\n"
             f"{masthead}"

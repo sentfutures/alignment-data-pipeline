@@ -372,12 +372,43 @@ are English, and a first worked example a reader cannot read, or one from a rese
 teaches the wrong default. The two extras are the interesting slices — a skeptical author,
 and the arc where there is no welfare stake and the AI correctly raises nothing.
 
-**Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero
-and the Sentient Futures mark are inlined as data URIs from `website/assets/`, the
-GitHub and Hugging Face marks are inline SVG, and the outbound `↗` is drawn rather than
-typed (as a glyph it is a hairline that differs per font, and this page gets printed).
-Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
-allows a `data:` src and nothing else off-page.
+**Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero,
+the Sentient Futures mark and the two tab icons are inlined as data URIs from
+`website/assets/`, the GitHub and Hugging Face marks are inline SVG, and the outbound `↗`
+is drawn rather than typed (as a glyph it is a hairline that differs per font, and this
+page gets printed). Every outbound link opens in a new tab. Enforced by
+`test_is_self_contained`, which allows a `data:` src and nothing else off-page. **The tab
+icon is the one `<link>` on the page**, and the one hole in that rule: a favicon has no
+other spelling — a browser will not read one out of a `<meta>`, and the implicit
+`/favicon.ico` lookup only exists for a hosted copy, so it would leave the emailed file
+without an icon. The test no longer bans `<link>` outright; it requires every one to be
+`rel='icon'` with a `data:` href, so a stylesheet or a font cannot follow it in.
+`render.icon_links()` emits them and, like `illustration()`, raises on a non-`data:` value.
+It is deliberately **not** part of `head_meta()`, which is what a crawler and a link
+preview see — an icon is neither.
+
+**The icons are decimated per size, and that is why there are two.** `make_preview.py`
+draws `favicon-16.png` and `favicon-32.png` alongside the card, cropping the butterfly
+*without* its dashed trail (derived from column alpha density, not a hardcoded box) and
+squaring it on the page's paper — paper rather than transparency, because dark line work
+on dark browser chrome is an invisible icon. The hero is hairline pencil, so a straight
+LANCZOS to 16px leaves 14 of 256 pixels inked with the darkest at 3.9:1 on the paper: a
+blank cream square in the tab. A `MinFilter` (darkest-pixel-wins) pass before the resize
+is the ordinary decimation for line art and takes it to 149 inked pixels at full strength.
+That is a resampling choice and changes nothing about `hero.png`. `sizes=` is declared for
+the same reason: hand a browser one 32×32 and it averages the ink back out scaling to 16.
+The two radii in `ICONS` are eye-tuned constants, not a formula — a fit to two points would
+only dress the eye up as arithmetic.
+
+**The page is deployed by `.github/workflows/pages.yml`, which does not run the builder.**
+It copies the committed `website/index.html` and `website/assets/preview.png` into the site
+root on a push to `main` touching either, so **the committed HTML is what is live** and a
+rebuild is an ordinary commit. `preview.png` is staged by the workflow rather than by
+`--site-url`'s copy-out, so the hosted build passes `--preview-url` naming the same URL to
+suppress that copy; `/website/preview.png` is gitignored in case someone forgets. The live
+build is made with `--site-url https://reasoning.sentientfutures.ai/`, so unlike every
+earlier committed copy it carries the `og:`/`twitter:` tags — which it must, since the page
+is `noindex` and a pasted link is the only way anyone arrives.
 
 **The page is unlisted, and that is a meta tag, not a `robots.txt`.** Every build carries
 `<meta name="robots" content="noindex,nofollow">` unconditionally (`render.head_meta()`): the

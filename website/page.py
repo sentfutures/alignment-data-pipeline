@@ -241,7 +241,7 @@ def footer(maker_icon=""):
 # ------------------------------------------------------------------ assembly
 
 def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
-         illustration="", maker_icon="", site_url="", preview_url=""):
+         illustration="", maker_icon="", icons=(), site_url="", preview_url=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
     f = dict(PAGE_FACTS)
@@ -283,6 +283,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         "description": R.plain_md(C.fill(content["description"], f)),
         "site_url": site_url,
         "preview_url": preview_url,
+        "icons": icons,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
         "footer": footer(maker_icon),
     }

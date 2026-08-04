@@ -55,9 +55,16 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 
 ## Hosting
 
-The page is one file with nothing beside it, so serving it is an upload: nothing in it
-refers to its own URL, every asset is inlined and every outbound link is absolute. It stays
-that way — a hosted copy is never a second, un-self-contained build.
+The page is one file with **one** file beside it, so serving it is an upload: nothing in it
+refers to its own URL apart from the preview tags, every other asset is inlined and every
+outbound link is absolute. It stays that way — a hosted copy is never a second,
+un-self-contained build.
+
+`.github/workflows/pages.yml` is the deploy. It publishes to `reasoning.sentientfutures.ai`
+on a push to `main` that touches the built page or the card image, and it does **not** run
+the builder: it copies `website/index.html` and `website/assets/preview.png` into the site
+root and hands them to Pages. So the committed `index.html` is what is live, and rebuilding
+it is a commit like any other.
 
 **It is unlisted, and that is a meta tag rather than a `robots.txt`.** Every build carries
 `<meta name="robots" content="noindex,nofollow">`, unconditionally. The two files do
@@ -76,25 +83,44 @@ Because a pasted link is then the *only* way anyone arrives, a hosted build carr
 tags. They need to know where the page lives, so naming the site is what turns them on:
 
 ```bash
-python website/build_website.py --dad-run <run> --sdf-run <run> --site-url https://<host>/
-# -> website/index.html + website/preview.png   (upload both)
+python website/build_website.py --dad-run <run> --sdf-run <run> \
+    --site-url    https://reasoning.sentientfutures.ai/ \
+    --preview-url https://reasoning.sentientfutures.ai/preview.png
+# -> website/index.html   (the workflow serves the card image from assets/)
 ```
 
-`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card`, points
-`og:image` at `preview.png` beside the page, and copies that file into the output directory
-— **the one file that travels with the HTML**, because a card renderer fetches the image out
-of band and a data URI is no use to it. `--preview-url` overrides the URL to point at an
-image hosted elsewhere, and then nothing is copied out; with no image at all the card
-declares `summary` rather than promising a large image it has not got. With neither flag the
-build says nothing about where it lives and ships nothing beside itself, which is right for
-the copy that opens from disk or arrives attached to an email; the build line prints
-`preview=no`.
+`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card` and points
+`og:image` at `preview.png` beside the page, because a card renderer fetches the image out
+of band and a data URI is no use to it. On its own it also **copies** that file into the
+output directory. The command above passes `--preview-url` naming the same URL, which
+suppresses the copy: the deploy already stages the image from `website/assets/`, so a second
+one committed next to the page would be a drifting duplicate. (`.gitignore` covers it if
+someone rebuilds without the flag.) `--preview-url` is otherwise for an image hosted
+somewhere else entirely; with no image at all the card declares `summary` rather than
+promising a large image it has not got. With neither flag the build says nothing about where
+it lives, which is right for the copy that opens from disk or arrives attached to an email;
+the build line prints `preview=no`.
 
-**The card image is the hero.** `website/assets/preview.png` is the butterfly trimmed to its
-own bounds and centred on the page's paper at 1200×630 — no crop through the drawing, no
-filter, no text baked over it. `python website/make_preview.py` redraws it from
-`assets/hero.png`; it needs Pillow, which is why it is a separate script and not part of
-`build_website.py`, and its output is committed.
+**The card image and the tab icons are the hero.** `python website/make_preview.py` redraws
+all three from `assets/hero.png` and their output is committed; it needs Pillow, which is
+why it is a separate script and not part of the stdlib-only `build_website.py`.
+
+- `assets/preview.png` — the butterfly trimmed to its own bounds and centred on the page's
+  paper at 1200×630. No crop through the drawing, no filter, no text baked over it.
+- `assets/favicon-16.png`, `assets/favicon-32.png` — the butterfly *alone*, without the
+  dashed trail, squared up on the same paper. These are inlined as data URIs, so they are
+  not among the files a deploy carries, and they are the one `<link>` on the page: a
+  favicon has no other spelling, and `test_is_self_contained` allows that shape and no
+  other.
+
+Two sizes rather than one, and the ink is thickened before each is shrunk. Both fall out of
+the same fact — the hero is hairline pencil work. A straight resize to 16px leaves 14 of 256
+pixels carrying any ink, the darkest at 3.9:1 on the paper, which is a blank cream square in
+a tab; a darkest-pixel-wins pass first is the ordinary way to decimate line art and holds the
+strokes at full strength. That is a resampling choice and changes nothing about `hero.png`.
+It is also why `sizes=` is declared: hand a browser one 32 and it scales to 16 itself,
+averaging the ink straight back out. The two filter radii in `ICONS` were tuned by eye
+against a contact sheet — lower reads washed out, higher smears the wing veins into a blob.
 
 The `description` those tags use is prose, authored in `content_page.md` under the
 `description` id like every other word on the page. It is the one id that never renders in
