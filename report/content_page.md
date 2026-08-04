@@ -19,6 +19,13 @@ The arrow on an outbound link is added by the renderer — do not type one here.
 has forty seconds: let the comparison do the comparing. Deks are rationed: the page carries
 at most two.
 
+**A link's text is the name of the thing it points at, never a number.** The two sources in
+`intro` were once `[1]` and `[2]`: citation furniture with no reference list on the page to
+resolve it against, which left "Teaching Claude Why" — the one name that places this whole
+project for the reader it is written for — reachable only by hovering to read a URL. It also
+announces as "link, 1" to a screen reader (WCAG 2.4.4), and the renderer's 2px underline and
+drawn arrow are a lot of apparatus to hang on a single glyph.
+
 A technique block's **leading bold run is its name** and the rest is its sentence; that is
 the only markup it takes, and the column's index ("Technique 1") and the dataset it produced
 are both supplied by `page.py` — the index off the enumeration, the dataset off
@@ -50,7 +57,7 @@ Teaching models to reason about harm to animals
 
 <!-- id: intro -->
 
-Research on alignment midtraining ([1](https://alignment.anthropic.com/2026/teaching-claude-why/), [2](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits)) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
+Research on alignment midtraining[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
 
 Two complementary techniques proved especially effective:
 

@@ -466,12 +466,14 @@ def blocks_example(content, f, corpus, lineage, manifest, picks=(),
 
 def _ways_out(hf_href, repo_href):
     """The records themselves, and the pipeline that made them."""
+    # No meta on either: "dataset viewer" and "every stage template" restated the label and
+    # the mark beside it. A meta earns its place where it names a size the reader is deciding
+    # whether to spend — a drawer's word count — not where it glosses a destination.
     links = []
     if hf_href:
-        links.append(R.linkbutton(hf_href, "Browse the records", "hf", meta="dataset viewer"))
+        links.append(R.linkbutton(hf_href, "Browse the records", "hf"))
     if repo_href:
-        links.append(R.linkbutton(repo_href, "The pipeline", "github",
-                                  meta="every stage template"))
+        links.append(R.linkbutton(repo_href, "The pipeline", "github"))
     return f"<div class='lbtns'>{''.join(links)}</div>" if links else ""
 
 

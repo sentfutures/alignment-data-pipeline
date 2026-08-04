@@ -484,9 +484,27 @@ before you email it.
   reserves — far from `--good`, `--warn` and `--bad`, so a selection can never read as a
   verdict, and deeper than `--series-7`, which only appears inside charts. There is no
   separate `--link` token; two names for one hex is how a palette drifts.
-- **A link is a typographic object**: `var(--mono)` at `.92em`, weight 600, accent
-  coloured, with a 2px accent underline. Buttons are not links — `.lbtn`, `.choice` and
-  `.tab` each set their own `font:` shorthand, which beats the bare `a` rule.
+- **A link is marked, never re-faced**: it inherits its context's face and size — serif in
+  prose, sans in the footer and the rail — and the mark is **weight 600**, accent ink and a
+  2px accent underline at a `.2em` offset. The `a` rule sets no face and no size. Weight is
+  part of the mark: inherited, a link in a long report read faint, and a bare link in the
+  sans footer sat at 400 beside icon links that declared 600. It was `var(--mono)` at `.92em`/600,
+  on the reasoning that mono carries identity; mono now means **a literal string** (an id, a
+  path, code) and nothing else, because a work's title is language and setting it in mono
+  changed x-height and letterfit mid-sentence in every paragraph of both reports. The offset
+  is in em because a link sets at five sizes on this page and one px value cannot clear a
+  descender at all of them.
+- **A citation marker is authored as a name and drawn as a number.** `[^Teaching Claude
+  Why](url)` in a prose file renders `<a class='cite-n'><sup>1</sup></a>` with the name in
+  `aria-label` and `title`, numbered per prose block. The visible numeral keeps the sentence
+  readable; the name is what the link announces, because "link, 1" tells a screen-reader user
+  nothing (WCAG 2.4.4). It borrows the footnote convention without a footnote — the marker
+  links straight out, and hovering is the only disclosure of which work it is.
+- **A control declares the serif**, at its own size. Buttons are not links — `.lbtn`,
+  `.choice` and `.ilink` each set their own `font:` shorthand, which beats the bare `a` rule,
+  and that matters more now that the `a` rule sets no face: a control that forgets inherits
+  whatever it sits in. `.tab` is the only mono control, and for its content — a record id —
+  rather than for being a control.
 - **Filled means selected, not important.** Every control is an outline button (`.lbtn`,
   `.choice`, `.tab`), a plain icon link (`.ilink`, in the footer), or prose; the accent
   ground with cream text appears only on the tab or pane that is currently open. There is
