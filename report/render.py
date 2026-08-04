@@ -1489,6 +1489,18 @@ font:.85rem/1.6 var(--sans);color:var(--text-muted);
 display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
 footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
+/* The byline takes its own full-width line above that row rather than sitting in it: the
+   footer is "who made it left, where to go right", and seven names with an affiliation key
+   is not a thing that belongs in either half. Credit, then the org, then the way out.
+   `flex:0 0 100%` earns the line without needing the footer to stop being a flex row. */
+.foot-by{flex:0 0 100%;margin-bottom:.85rem}
+.foot-authors{color:var(--text-secondary)}
+footer.foot .foot-by p+p{margin-top:.3rem}
+/* Row-gap 0: the key wraps to as many lines as it needs, and column-gap does the
+   separating so no comma or bullet has to be typed between institutions. */
+.foot-affil{display:flex;flex-wrap:wrap;gap:0 1.15rem}
+/* line-height 0 keeps a superscript from stretching the line it sits on. */
+.foot-by sup{font-size:.74em;line-height:0;padding-right:.06em}
 /* Which runs this page was built from. Its own line under the two above, at the size the
    rest of the footer takes: a reader looking for it is looking deliberately. */
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so

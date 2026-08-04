@@ -530,14 +530,15 @@ class TestShape:
         for m in re.finditer(r"<a href='#[^']+'([^>]*)>", html):
             assert "target=" not in m.group(1)
 
-    def test_the_comparison_links_at_the_prompts_not_just_the_records(self):
-        """The reader is here to run the pipeline, so each column links at the templates
-        that column's pipeline runs, next to its dataset viewer."""
+    def test_the_comparison_links_at_the_pipeline_not_just_the_records(self):
+        """The reader is here to run the pipeline, so each column offers the code before
+        its dataset viewer. Both columns point at the repository root rather than at each
+        pipeline's own prompts directory: one repository holds both, and a reader who
+        wants a specific template is already inside it by then."""
         table = re.search(r"<section id='datasets'>.*?</section>",
                           build(sdf_inputs=SDF_INPUTS), re.S).group(0)
-        assert P.PROMPTS_SDF.endswith("/prompts/sdf") and P.PROMPTS_DAD.endswith("/prompts/dad")
-        assert table.count(">Templates</span>") == 2
-        assert table.index(P.PROMPTS_SDF) < table.index(P.HF_SDF)  # templates, then data
+        assert table.count(">Pipeline</span>") == 2
+        assert table.index(P.REPO_URL) < table.index(P.HF_SDF)  # pipeline, then data
 
     def test_the_buttons_are_accent_outlines_not_cream_panels(self):
         """One filled surface was doing duty as a button, a card and a code block at
@@ -1157,7 +1158,7 @@ class TestComparisonTable:
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
         assert labels == ["result", "result format", "what it is for",
-                          "prompt templates", "example dataset"]  # templates before data
+                          "pipeline", "example dataset"]  # the code before the data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
                      "licence"):
@@ -1171,16 +1172,18 @@ class TestComparisonTable:
         assert re.search(r"\.cmp th\.cmp-k\{[^}]*text-align:right", html)
         assert re.search(r"\.cmp-k\{[^}]*white-space:nowrap", html)
 
-    def test_the_one_figure_carries_the_way_to_the_thing_it_counts(self):
-        """The prompt count is the datapoint for someone who wants to generate their own
-        data — read off the run's own inputs/prompts snapshot — and it sits next to the
-        link to those templates. The last row is that link and nothing else."""
+    def test_the_last_two_rows_are_the_way_out_and_carry_no_figure(self):
+        """Both link rows are button-only now. The prompt-template count used to sit in
+        the `pipeline` row; it was cut with the row's deep links, so neither row states a
+        number and their buttons line up under each other."""
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         rows = self._rows(table)
-        assert strip_tags(rows["prompt templates"]).split()[0] == "4"
-        assert P.PROMPTS_SDF in rows["prompt templates"]
-        assert P.PROMPTS_DAD in rows["prompt templates"]
+        for label in ("pipeline", "example dataset"):
+            assert not re.search(r"\d", strip_tags(rows[label])), label
+            # The empty figure slot stays, so the two rows' buttons stay aligned.
+            assert rows[label].count("<span class='cmp-fig'><span></span>") == 2
+        assert P.REPO_URL in rows["pipeline"]
         assert P.HF_SDF in rows["example dataset"]
         assert R.esc(P.HF_DAD) in rows["example dataset"]
         assert "<tfoot>" not in table
@@ -1206,10 +1209,13 @@ class TestComparisonTable:
         return dict(re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>(.*?)</tr>",
                                table, re.S))
 
-    def test_a_run_that_kept_no_prompt_snapshot_says_so(self):
-        html = build(dad_inputs={**DAD_INPUTS, "n_prompt_templates": None})
-        table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
-        assert "8 templates" not in table
+    def test_the_comparison_states_no_template_count_either_way(self):
+        """It used to show one, and "—" when a run kept no prompts snapshot. The count
+        went with the `pipeline` row's deep links, so neither case renders a figure."""
+        for n in (8, None):
+            html = build(dad_inputs={**DAD_INPUTS, "n_prompt_templates": n})
+            table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
+            assert "templates" not in strip_tags(table).lower()
 
     def test_synthetic_documents_comes_first_everywhere(self):
         """One order for the whole page: the comparison, the chooser and the panels."""
@@ -1518,3 +1524,80 @@ class TestFacts:
         assert P._date({}) == "—"
         assert P._date({"created_at": "not-a-date"}) == "not-a-date"
         assert P._date({"created_at": "2026-07-01T09:00:00"}) == "1 July 2026"
+
+
+class TestByline:
+    """The author list and its affiliation key.
+
+    The numbering is derived from ``P.AUTHORS`` by first appearance, so what these pin is
+    the derivation, not a typed result: four of the seven authors share one institution,
+    and a hand-kept key is what silently breaks when someone is added.
+    """
+
+    def _byline(self, html=None):
+        html = html or build(sdf_inputs=SDF_INPUTS)
+        return re.search(r"<div class='foot-by'>.*?</div>", html, re.S).group(0)
+
+    def test_every_author_is_named(self):
+        by = strip_tags(self._byline())
+        for name, _ in P.AUTHORS:
+            assert name in by, name
+
+    def test_one_number_per_institution_by_first_appearance(self):
+        by = self._byline()
+        names = re.search(r"<p class='foot-authors'>(.*?)</p>", by, re.S).group(1)
+        marked = re.findall(r"([A-Z][^,<]*)<sup title='([^']*)'>(\d+)</sup>", names)
+        assert len(marked) == len(P.AUTHORS)
+        # Same institution -> same number, every time it recurs.
+        by_inst = {}
+        for _, inst, n in marked:
+            by_inst.setdefault(inst, set()).add(n)
+        assert all(len(v) == 1 for v in by_inst.values()), by_inst
+        # Numbered 1..N in order of first appearance, with no gaps.
+        first_seen, order = [], []
+        for _, inst, n in marked:
+            if inst not in first_seen:
+                first_seen.append(inst)
+                order.append(int(n))
+        assert order == list(range(1, len(first_seen) + 1))
+
+    def test_the_key_lists_each_institution_exactly_once(self):
+        key = re.search(r"<p class='foot-affil'>(.*?)</p>", self._byline(), re.S).group(1)
+        listed = re.findall(r"<sup>(\d+)</sup>([^<]*)", key)
+        institutions = [inst for _, inst in P.AUTHORS]
+        expected = list(dict.fromkeys(institutions))       # dedup, order kept
+        assert [inst for _, inst in listed] == expected
+        assert [n for n, _ in listed] == [str(i + 1) for i in range(len(expected))]
+        # Four people, one institution: the key is shorter than the author list.
+        assert len(listed) < len(P.AUTHORS)
+
+    def test_a_shared_institution_is_not_repeated_in_the_key(self):
+        """The specific failure a typed key invites."""
+        key = re.search(r"<p class='foot-affil'>(.*?)</p>", self._byline(), re.S).group(1)
+        assert key.count("Sentient Futures") == 1
+
+    def test_the_key_follows_the_names_so_it_reads_in_order(self):
+        """A bare superscript digit means nothing alone, so the key has to come after the
+        names in DOM order — that is what a screen reader reads, in that sequence."""
+        by = self._byline()
+        assert by.index("foot-authors") < by.index("foot-affil")
+
+    def test_each_marker_names_its_institution_for_a_hover(self):
+        by = self._byline()
+        for _, inst in P.AUTHORS:
+            assert f"<sup title='{inst}'>" in by, inst
+
+    def test_the_byline_sits_above_the_maker_line_not_in_the_hero(self):
+        """Credit belongs with the other "who made this" furniture. The hero is the
+        illustration, the title and the intro, and nothing else."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
+        assert "foot-by" not in hero
+        assert P.AUTHORS[0][0] not in hero
+        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
+        assert foot.index("foot-by") < foot.index("A project by")
+
+    def test_names_and_institutions_are_escaped(self):
+        out = P.byline((("Ada <script>", "Inst & Co"),))
+        assert "<script>" not in out and "&lt;script&gt;" in out
+        assert "Inst &amp; Co" in out
