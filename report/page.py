@@ -191,6 +191,7 @@ AUTHORS = (
     ("Andrew Blackwood", "Sentient Futures"),
     ("Allen Lu", "NYU Center for Mind, Ethics, and Policy"),
     ("Thomas Giovinazzo", "Sentient Futures"),
+    ("Arda Enfiyeci", "Sentient Futures"),
 )
 
 
