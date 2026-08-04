@@ -1086,10 +1086,10 @@ class TestMainEndToEnd:
         staging_dir = tmp_path / "staged"
         stub_hf()
         _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir),
-                  "--repo-id", "sentientfutures/animal-welfare-training-dataset",
+                  "--repo-id", "sentientfutures/animal-welfare-training-claude",
                   "--staging-dir", str(staging_dir))
         card = (staging_dir / "README.md").read_text()
-        assert "pretty_name: animal-welfare-training-dataset" in card
+        assert "pretty_name: animal-welfare-training-claude" in card
 
     def test_explicit_pretty_name_wins(self, tmp_path, monkeypatch, stub_hf):
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)

@@ -1,5 +1,5 @@
 <!-- The published dataset card for
-     https://huggingface.co/datasets/sentientfutures/animal-welfare-training-dataset
+     https://huggingface.co/datasets/sentientfutures/animal-welfare-training-claude
 
      This is a tracked copy of what is live on the Hub, kept so the card is
      recoverable and reviewable. The Hub is where it is EDITED: publish_hf.py
