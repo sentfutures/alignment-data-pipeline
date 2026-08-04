@@ -42,9 +42,15 @@ templates`, `example dataset`) are counted and linked in code rather than writte
 `pipeline` row of stage chains used to sit here too; it went with the row, so there are no
 `*_pipeline` ids — adding prose under one now fails the build.
 
-No licence is set for either dataset, and the page says nothing about it — the row that
-would have carried it was removed. When one is set it belongs in the comparison, as a row
-in `page.section_datasets()`, not as prose here.
+`description` is the ONE id that never renders in the document: it is the page's meta
+description and the text of a link preview, so it is one flat sentence — markdown in it is
+stripped by `render.plain_md()`, and it should read to someone who has not opened the page
+yet. It is not a dek and it is not the intro's first line.
+
+The datasets are CC-BY-4.0 (set by `evals/publish_hf.py` and carried in the Hugging Face
+card's frontmatter, beside the files it governs) and the page deliberately says nothing
+about it — the row that would have carried it was removed. If it ever belongs here it
+belongs in the comparison, as a row in `page.section_datasets()`, not as prose.
 
 Each report's own prose lives in its own file — `content_dad.md` and `content_sdf.md`.
 Moving an id between prose files is a rename, never a copy: the build fails if both files
@@ -54,6 +60,10 @@ define one.
 <!-- id: title -->
 
 Teaching models to reason about harm to animals
+
+<!-- id: description -->
+
+Two open midtraining datasets that teach a model to reason carefully about the welfare of animals and other sentient beings, with the pipeline that produced them.
 
 <!-- id: intro -->
 

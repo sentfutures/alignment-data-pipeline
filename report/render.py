@@ -82,6 +82,21 @@ def inline_md(text):
     return out
 
 
+def plain_md(text):
+    """The same prose as flat text, for an attribute where markup cannot render.
+
+    Not a general converter: it undoes exactly the subset ``inline_md`` renders, so one
+    authored sentence can serve both the document and a head tag. Whitespace collapses,
+    because a ``content`` attribute is one line however the prose file wrapped it.
+    """
+    out = _MD_CITE.sub(r"\1", text or "")
+    out = _MD_LINK.sub(r"\1", out)
+    out = _MD_CODE.sub(r"\1", out)
+    out = _MD_BOLD.sub(r"\1", out)
+    out = _MD_ITAL.sub(r"\1", out)
+    return " ".join(out.split())
+
+
 def _cite_markers(text):
     """``[^Name of the work](url)`` -> a raised, numbered citation marker.
 
@@ -1503,7 +1518,7 @@ display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-
 footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
 /* The byline takes its own full-width line above that row rather than sitting in it: the
-   footer is "who made it left, where to go right", and seven names with an affiliation key
+   footer is "who made it left, where to go right", and a byline with an affiliation key
    is not a thing that belongs in either half. Credit, then the org, then the way out.
    `flex:0 0 100%` earns the line without needing the footer to stop being a flex row. */
 .foot-by{flex:0 0 100%;margin-bottom:.85rem}
@@ -1522,9 +1537,14 @@ footer.foot .foot-by p+p{margin-top:.3rem}
    The mark has to sit CLOSER to the name it belongs to than to the sentence it follows, or it
    reads as punctuation after "A project by". Measured: a bare word space put it ~3.6px from
    "by" and 4px from "Sentient Futures" — the same on both sides, so proximity said nothing.
-   The left margin is the word boundary, the right one groups the mark with the name. */
+   The word boundary is a margin on the LINK, not on the mark: a margin inside the anchor is
+   inside its background box, so the hover wash and the underline both began .4rem left of the
+   mark, on space that belongs to the sentence. On the anchor the same gap sits outside the
+   hit area, and the wash starts where the link starts. The right margin stays on the mark —
+   it is inside the link on both sides, and it is what groups the mark with the name. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
-margin-left:.4rem;margin-right:.25rem;flex:0 0 auto}
+margin-right:.25rem;flex:0 0 auto}
+.maker{margin-left:.4rem}
 /* An icon link declares NO face and no size, on purpose: it is not a control — there is
    nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
    the footer's own size, like the maker link beside it, and the bare `a` rule gives both the
@@ -1770,7 +1790,45 @@ else window.addEventListener('load',fromHash);})();
 """
 
 
-def document(*, title, masthead, body, footer=""):
+def _meta(name, content, prop=False):
+    """One head tag, or "" for an empty value.
+
+    Double-quoted, unlike the rest of the page: ``esc()`` escapes ``"`` and deliberately
+    does not escape ``'``, and these carry authored prose, where an apostrophe is a matter
+    of time. Everything else on the page writes attributes the renderer itself composes.
+    """
+    key = "property" if prop else "name"
+    return f'<meta {key}="{esc(name)}" content="{esc(content)}">\n' if content else ""
+
+
+def head_meta(*, title, description="", site_url="", preview_url=""):
+    """What a crawler and a link preview see.
+
+    ``noindex`` is unconditional. The page is handed to a reader by whoever sends it, not
+    found — and a ``robots.txt`` ``Disallow`` does not carry that on its own, since a URL
+    that is linked can still be indexed by reference. It costs nothing offline and comes
+    off in one line if the page is ever announced.
+
+    The preview tags need the hosted URL, so they are emitted only when one is supplied:
+    a build with no ``--site-url`` is the file that opens from disk or arrives by email,
+    and it says nothing about where it lives. ``og:image`` is the one reference on this
+    page that cannot be a data URI — a preview image is fetched out of band by whoever is
+    rendering the card — so without one the card declares itself ``summary`` rather than
+    promising a large image it has not got.
+    """
+    tags = '<meta name="robots" content="noindex,nofollow">\n' + _meta("description", description)
+    if site_url:
+        tags += (_meta("og:type", "website", prop=True)
+                 + _meta("og:title", title, prop=True)
+                 + _meta("og:url", site_url, prop=True)
+                 + _meta("og:description", description, prop=True)
+                 + _meta("og:image", preview_url, prop=True)
+                 + _meta("twitter:card", "summary_large_image" if preview_url else "summary"))
+    return tags
+
+
+def document(*, title, masthead, body, footer="", description="", site_url="",
+             preview_url=""):
     """The shell. One file, one theme, no external anything.
 
     There is no contents rail: the page is a hero, three short sections and a choice, and
@@ -1780,7 +1838,9 @@ def document(*, title, masthead, body, footer=""):
     return (f"<!DOCTYPE html>\n<html lang='en'>\n<meta charset='utf-8'>\n"
             f"<meta name='viewport' content='width=device-width,initial-scale=1'>\n"
             f"<meta name='color-scheme' content='only light'>\n"
-            f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
+            + head_meta(title=title, description=description, site_url=site_url,
+                        preview_url=preview_url)
+            + f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
             f"<a class='skip' href='#intro'>Skip to content</a>\n"
             f"{masthead}"
             f"<div class='shell'>\n<main id='main'>\n{body}\n"

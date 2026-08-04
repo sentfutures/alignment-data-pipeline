@@ -33,7 +33,8 @@ from report import dad
 from report import render as R
 from report import sdf
 
-CONTENT_IDS = ("title", "intro", "sdf_technique", "dad_technique", "intro_close",
+CONTENT_IDS = ("title", "description", "intro", "sdf_technique", "dad_technique",
+               "intro_close",
                "sdf_desc", "sdf_use", "sdf_unit",
                "dad_desc", "dad_use", "dad_unit")
 
@@ -180,7 +181,7 @@ def section_explore(panels, outlines):
 # The people behind the page, in credit order, each with their institution.
 #
 # The affiliation NUMBERS are derived from this list by first appearance, never typed:
-# three of the seven share one institution, so a hand-kept numbering is exactly the sort
+# most of the names share one institution, so a hand-kept numbering is exactly the sort
 # of thing that goes quietly wrong the first time someone is added or the order changes.
 # Add a name here and the key renumbers itself.
 AUTHORS = (
@@ -191,6 +192,7 @@ AUTHORS = (
     ("Andrew Blackwood", "Sentient Futures"),
     ("Allen Lu", "NYU Center for Mind, Ethics, and Policy"),
     ("Thomas Giovinazzo", "Sentient Futures"),
+    ("Arda Enfiyeci", "Sentient Futures"),
 )
 
 
@@ -230,7 +232,7 @@ def footer(maker_icon=""):
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
     return (byline()
-            + f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
+            + f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
             f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
@@ -239,7 +241,7 @@ def footer(maker_icon=""):
 # ------------------------------------------------------------------ assembly
 
 def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
-         illustration="", maker_icon=""):
+         illustration="", maker_icon="", site_url="", preview_url=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
     f = dict(PAGE_FACTS)
@@ -274,6 +276,13 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
              + C.prose(content, "intro_close", f))
     head = {
         "title": title,
+        # The one sentence a link preview gets, authored beside the title rather than typed
+        # into code — same rule as every other word on the page. It never renders in the
+        # document, so it is stripped to plain text: markdown in a `content` attribute is
+        # asterisks in someone's Slack.
+        "description": R.plain_md(C.fill(content["description"], f)),
+        "site_url": site_url,
+        "preview_url": preview_url,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
         "footer": footer(maker_icon),
     }

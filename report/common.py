@@ -463,6 +463,15 @@ def cli_parser(doc):
     p.add_argument("--example", default=None, help="prompt_id to feature as the worked example")
     p.add_argument("--sdf-example", dest="sdf_example", default=None,
                    help="doc_id to feature as the document report's worked example")
+    # Where the built page is served from, for the link-preview tags only. Without it the
+    # page says nothing about where it lives, which is right for the copy that opens from
+    # disk or arrives attached to an email.
+    p.add_argument("--site-url", dest="site_url", default=None,
+                   help="public URL of the hosted page; adds og:/twitter: preview tags")
+    p.add_argument("--preview-url", dest="preview_url", default=None,
+                   help="absolute URL of the preview image (og:image). Defaults to "
+                        "preview.png beside the page, which build_report.py copies out; "
+                        "pass one to point at an image hosted elsewhere instead")
     return p
 
 
