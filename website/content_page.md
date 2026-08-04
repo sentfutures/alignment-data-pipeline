@@ -63,7 +63,7 @@ Teaching models to reason about harm to animals
 
 <!-- id: description -->
 
-Two open midtraining datasets that teach a model to reason carefully about the welfare of animals and other sentient beings, with the pipeline that produced them.
+Two open pipelines for alignment finetuning data teaching AI models to reason responsibly about the welfare of animals and other sentient beings, with sample datasets.
 
 <!-- id: intro -->
 
