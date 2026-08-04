@@ -51,7 +51,7 @@ CONTENT_IDS = (
 )
 
 SECTION_ID = "dad"
-SECTION_TITLE = "Difficult advice"
+SECTION_TITLE = "Difficult advice Q&A"
 
 # The skeleton, in order. The document corpus's section takes the same one, so a reader
 # learns it once; the ids are prefixed because both sections live in one document.
@@ -82,6 +82,8 @@ _STAGE_KNOBS = ("scenario_model", "prompt_draft_model", "prompt_gate_model",
                 "response_draft_model", "constitution_rewrite_model")
 
 _DELIVERY_DIMS = ("goal_responsiveness", "proportionality", "tone", "calibration")
+_WELFARE_DIMS = ("patient_scope", "magnitude_sizing", "counterfactual_impact",
+                 "harm_contribution", "epistemic_accuracy", "bottom_line_coherence")
 
 
 # ------------------------------------------------------------------ loading
@@ -256,7 +258,7 @@ def facts(audit, manifest=None, diversity=None, n_shipped=None):
     sentence survives and its claim does not. The delivery comparison is deliberately
     NOT available to prose as a clause: it is stated once, by _delivery_statement().
 
-    Everything here is consumed by the appendix or by ``derived_warnings()``. The
+    Everything here is consumed by the appendix. The
     difficult-advice prose a reader sees interpolates exactly one of them,
     ``{{library_clause}}`` — the caveats are generalised and carry no run figures at all.
     """
@@ -330,7 +332,6 @@ def facts(audit, manifest=None, diversity=None, n_shipped=None):
         f["vendi"] = f"{vendi.get('score', 0):.1f}"
         f["vendi_ratio"] = f"{vendi.get('ratio', 0):.2f}"
         f["near_dup_pct"] = f"{nn.get('over_0.90', 0):.0%}"
-    f["footprint_regressions"] = _footprint_regressions(audit)
     f = {k: v for k, v in f.items() if v is not None}
     # Degraded defaults. A run that never had the measurement gets a sentence that says
     # so, in the same place the finding would have been.
@@ -366,8 +367,8 @@ def _library_clause(size, used):
 def _judge_arms_clause(audit):
     """How matched the paid comparison actually is, as a clause the prose can hold.
 
-    Available to the content files as ``{{judge_arms_clause}}``; the page itself states
-    the asymmetry once, with the run's own numbers, in the audit-flags drawer.
+    Available to the content files as ``{{judge_arms_clause}}``; no prose interpolates
+    it today.
     """
     delivery = (audit or {}).get("delivery") or {}
     n_p, n_b, fails = (delivery.get("n_pipeline"), delivery.get("n_plain"),
@@ -376,33 +377,6 @@ def _judge_arms_clause(audit):
         return None
     clause = f"over {n_p} pipeline and {n_b} control answers"
     return f"{clause}, with {fails} judgements failing" if fails else clause
-
-
-def _footprint_regressions(audit):
-    """Which footprint measures actually moved the wrong way, as a prose clause.
-
-    The old prose asserted "one of these measures is an outright regression" in a
-    section whose blocks are all conditional — on a run where none of them regressed
-    the sentence was simply false. Deriving it means it cannot be.
-    """
-    bad = []
-    rl = audit.get("response_lengths") or {}
-    if (rl.get("mean_ratio") or 0) > 1.15:
-        bad.append("length")
-    st = audit.get("structure") or {}
-    p, b = (st.get("pipeline") or {}), (st.get("plain") or {})
-    if p.get("effective_shapes") and b.get("effective_shapes") \
-            and p["effective_shapes"] < b["effective_shapes"]:
-        bad.append("structural variety")
-    stance = (audit.get("moves") or {}).get("stance") or {}
-    if (stance.get("pipeline") or {}).get("moralizes", 0) > (stance.get("plain") or {}) \
-            .get("moralizes", 0):
-        bad.append("moralizing")
-    if not bad:
-        return "None of these measures moved the wrong way on this run"
-    if len(bad) == 1:
-        return f"On this run {bad[0]} moved the wrong way"
-    return f"On this run {', '.join(bad[:-1])} and {bad[-1]} moved the wrong way"
 
 
 def _labels(audit):
@@ -528,7 +502,7 @@ def lineage_blocks(pid, rw, base, lin, labels):
                                   fallback=lin.get("selection_fallback")))
     if base.get("baseline_response"):
         out.append(R.details(
-            "The first take stage 2 is shown · plain model, no system prompt",
+            "The first take stage 2 is shown · control model, no system prompt",
             R.highlight(base["baseline_response"], []),
             meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
 
@@ -767,7 +741,7 @@ def _delivery_statement(audit, f):
         f"**Judged delivery went the wrong way: {f['delivery_pipeline']} against the "
         f"control's {f['delivery_plain']} out of {_score_max(audit)}.** The added substance "
         f"was not free — on "
-        f"manner alone, the plain answers read as more helpful.{every}", tone="bad")
+        f"manner alone, the control's answers read as more helpful.{every}", tone="bad")
 
 
 def _pareto_figure(audit, mpr, labels):
@@ -797,8 +771,7 @@ def _pareto_figure(audit, mpr, labels):
                 f"records.")
     return R.figure(
         title="Substance against manner, one dot per answer",
-        note_="Judged delivery quality on the horizontal axis, valuable welfare considerations "
-              "on the vertical. Diamonds are each arm's mean." + asym,
+        note_="Diamonds are each arm's mean." + asym,
         chart=_pareto(delivery, mpr, labels),
         caption="**The pipeline arm sits up and to the left: it buys substance with manner.**")
 
@@ -826,16 +799,17 @@ def _pareto_impact_figure(delivery, welfare, labels):
             x, y = _blended(entry.get(arm)), _blended(w_entry.get(arm))
             if x is None or y is None:
                 continue
+            shown = "control" if arm == "plain" else arm
             pts.append({"x": x, "y": y, "color": R.ARM_COLORS[arm],
-                        "tip": f"{labels.get(pid, pid)} · {arm}: welfare impact {y:.0f}, "
+                        "tip": f"{labels.get(pid, pid)} · {shown}: welfare impact {y:.0f}, "
                                f"delivery {x:.0f}, both /{smax}"})
             s = sums[arm]
             s[0] += x
             s[1] += y
             s[2] += 1
     marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
-              "tip": f"{arm} mean: welfare impact {s[1] / s[2]:.1f}, "
-                     f"delivery {s[0] / s[2]:.1f}"}
+              "tip": f"{'control' if arm == 'plain' else arm} mean: "
+                     f"welfare impact {s[1] / s[2]:.1f}, delivery {s[0] / s[2]:.1f}"}
              for arm, s in sums.items() if s[2]]
     caption = ""
     p, b = sums["pipeline"], sums["plain"]
@@ -851,14 +825,14 @@ def _pareto_impact_figure(delivery, welfare, labels):
                    "dataset's value: the dilemmas themselves elicit most of the welfare "
                    "reasoning, so the pipeline's contribution is the improvement on top "
                    "of an already strong control.")
+    gloss = (f" One dot per answer on the judges' 0–{smax} scale — only answers both "
+             "judges scored appear — and the diamonds are each arm's mean; up and to "
+             "the right is more substance without losing delivery.")
     return R.figure(
         title="Substance against manner, one dot per answer",
-        note_=f"Judged delivery quality on the horizontal axis, judged welfare impact on "
-              f"the vertical, both on the judges' 0–{smax} scale. Diamonds are each arm's "
-              "mean; up and to the right is more substance without losing delivery. Only "
-              "answers both judges scored appear.",
-        chart=R.scatter(pts, xdomain=(0, smax), ydomain=(0, smax), marks=marks),
-        caption=caption)
+        chart=R.scatter(pts, xdomain=(0, smax), ydomain=(0, smax), marks=marks,
+                        xlabel="delivery quality", ylabel="welfare impact"),
+        caption=(caption + gloss) if caption else gloss.strip())
 
 
 def _type_hist(per_case, arm):
@@ -903,17 +877,20 @@ def _pareto(delivery, mpr, labels):
             if score is None or reasons is None:
                 continue
             y = len(reasons)
+            shown = "control" if arm == "plain" else arm
             pts.append({"x": score, "y": y, "color": R.ARM_COLORS[arm],
-                        "tip": f"{labels.get(pid, pid)} · {arm}: {y} considerations, "
+                        "tip": f"{labels.get(pid, pid)} · {shown}: {y} considerations, "
                                f"delivery {score}/{smax}"})
             sums[arm][0] += score
             sums[arm][1] += y
             sums[arm][2] += 1
     marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
-              "tip": f"{arm} mean: delivery {s[0] / s[2]:.1f}/{smax}, "
+              "tip": f"{'control' if arm == 'plain' else arm} mean: "
+                     f"delivery {s[0] / s[2]:.1f}/{smax}, "
                      f"{s[1] / s[2]:.1f} considerations"}
              for arm, s in sums.items() if s[2]]
-    return R.scatter(pts, xdomain=(0, smax), marks=marks)
+    return R.scatter(pts, xdomain=(0, smax), marks=marks,
+                     xlabel="delivery quality", ylabel="welfare considerations")
 
 
 def _score_max(audit):
@@ -957,6 +934,48 @@ def _judged_means(audit):
     return out
 
 
+def _dims_figure(audit, key, title, note_, dim_keys):
+    """One judge's per-dimension breakdown, control against pipeline."""
+    dims = (audit.get(key) or {}).get("dimensions") or {}
+    if not dims.get("pipeline"):
+        return ""
+    keys = [k for k in dim_keys if k in dims["pipeline"]]
+    rows = []
+    for k in keys:
+        p, b = dims["pipeline"].get(k), (dims.get("plain") or {}).get(k)
+        rows.append((k.replace("_", " "), f"{b:.2f}" if b is not None else "—",
+                     f"{p:.2f}" if p is not None else "—",
+                     f"{p - b:+.2f}" if p is not None and b is not None else "—"))
+    n_worse = sum(1 for r in rows if r[3].startswith("-"))
+    return R.figure(
+        title=title, note_=note_,
+        chart=R.table(["dimension", "control", "pipeline", "delta"], rows, align="lrrr"),
+        caption=f"**Worse on {n_worse} of {len(rows)} dimensions.**")
+
+
+def _judge_section(audit, key, heading, note_, dim_keys, statement=""):
+    """One judge's own section: its heading, its finding, its dimension table.
+
+    ``statement`` is a pre-composed finding (the delivery regression note) that OWNS
+    the numbers when it fires — the neutral means sentence only renders in its
+    absence, so the regression is stated in prose exactly once.
+    """
+    block = audit.get(key) or {}
+    pm, bm = block.get("pipeline_mean"), block.get("plain_mean")
+    if pm is None and not (block.get("dimensions") or {}).get("pipeline"):
+        return ""
+    out = [f"<h4>{R.esc(heading)}</h4>"]
+    if statement:
+        out.append(statement)
+    elif pm is not None and bm is not None:
+        out.append("<p>" + R.inline_md(
+            f"The pipeline's answers score **{pm:.1f}** against the control's "
+            f"**{bm:.1f}**, out of {_score_max(audit)}.") + "</p>")
+    out.append(_dims_figure(audit, key, f"{heading}, dimension by dimension",
+                            note_, dim_keys))
+    return "".join(b for b in out if b)
+
+
 def judged_drawer(audit, content, f, cons, labels, repo_href=""):
     """The whole judged comparison against the plain model, in one drawer.
 
@@ -964,8 +983,6 @@ def judged_drawer(audit, content, f, cons, labels, repo_href=""):
     nothing checks whether the points counted as added are correct, so the page argues
     from the process and the records instead. The intro says what each judge measures —
     the judge prompts ARE the rubrics, so it links to them rather than paraphrasing.
-    The arm-count asymmetry renders with the run's own numbers in the audit-flags
-    drawer, not as a caveat repeated here.
     """
     mpr = (audit or {}).get("moral_patient_reasons") or {}
     means = _judged_means(audit)
@@ -989,6 +1006,33 @@ def judged_drawer(audit, content, f, cons, labels, repo_href=""):
         "No paid judge pass ran on this run, so nothing here compares the two arms on "
         "substance or manner. Populate it with `python evals/audit_dad.py --input <run> "
         "--reasons`. The rows below are offline measurements against the control.")]
+
+    body.append(_pareto_figure(audit, mpr, labels))
+    # _delivery_statement is the one place a delivery regression (or the pass never
+    # running) is written out in prose; it belongs with the comparison it is about.
+    # With delivery missing entirely the section is empty, so the note stands alone.
+    delivery_section = _judge_section(
+        audit, "delivery", "Delivery quality",
+        f"Each dimension is judged 0–{_score_max(audit)} on the answer alone: did it "
+        "serve the goal the user actually had, was it proportionate, was the tone "
+        "right, was uncertainty calibrated.",
+        _DELIVERY_DIMS, statement=_delivery_statement(audit, f))
+    body.append(delivery_section or _delivery_statement(audit, f))
+    body.append(_judge_section(
+        audit, "welfare_impact", "Welfare impact",
+        f"Each dimension is judged 0–{_score_max(audit)}: who counts as a patient, "
+        "whether the stake is sized, what actually changes for the animals, whether "
+        "the answer adds to or reduces harm, whether its claims are accurate, and "
+        "whether the bottom line follows from its own reasoning.",
+        _WELFARE_DIMS))
+    body += _appendix_charts(audit, f, cons)
+    retention = _survival_chart(mpr.get("per_case") or {}, labels)
+    if retention:
+        body.append(R.figure(
+            title="Considerations kept, weakened, dropped and added, per record",
+            chart=retention,
+            caption="**Every record keeps most of the control's considerations**, so the "
+                    "average is not hiding one where the pipeline threw them away."))
 
     if means:
         body.append(R.table(["judged axis", "control", "pipeline"],
@@ -1015,15 +1059,10 @@ def judged_drawer(audit, content, f, cons, labels, repo_href=""):
             f"control answers: {mpr['failures']} extractions failed and are excluded, so the "
             "comparison is not fully matched."))
 
-    # The one place the delivery regression is written out in prose. It belongs with the
-    # comparison it is about, rather than in the caveats beat, which is generalised.
-    body.append(_delivery_statement(audit, f))
-
     board = scoreboard(audit, f, cons)
     if board:
         body.append("<h4>Measure by measure</h4>")
         body.append(board)
-    body.append(_pareto_figure(audit, mpr, labels))
 
     surv = mpr.get("survival") or {}
     if surv.get("anchored") or surv.get("added"):
@@ -1045,7 +1084,7 @@ def _tics_figure(audit):
     if not (watch and n_pipe):
         return ""
     rows = sorted(({"label": phrase,
-                    "plain": (d.get("plain") or 0) / n_plain if n_plain else 0,
+                    "control": (d.get("plain") or 0) / n_plain if n_plain else 0,
                     "pipeline": (d.get("pipeline") or 0) / n_pipe}
                    for phrase, d in watch.items()
                    if (d.get("pipeline") or d.get("plain"))),
@@ -1054,12 +1093,10 @@ def _tics_figure(audit):
         return ""
     return R.figure(
         title="Tracked phrases",
-        note_="Phrases the eval watches by name because earlier runs turned them into "
-              "habits. Share of each arm's answers containing one at least once.",
-        chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
-                             percent=True, label_w=210),
-        caption="**The pipeline's most common tracked phrase stays well under half of "
-                "its answers**, which is where a word choice becomes a tic.")
+        note_="Phrases the eval watches by name to avoid turning certain word choices "
+              "into tics.",
+        chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
+                             percent=True, label_w=210))
 
 
 def _moves_figure(audit):
@@ -1067,19 +1104,19 @@ def _moves_figure(audit):
     moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
     if not moves:
         return ""
-    rows = sorted(({"label": name, "plain": d.get("plain_share"),
+    rows = sorted(({"label": name, "control": d.get("plain_share"),
                     "pipeline": d.get("pipeline_share")} for name, d in moves.items()),
                   key=lambda r: -(r["pipeline"] or 0))
     gloss = {name: (d.get("description") or "") for name, d in moves.items()}
     invented = [r["label"] for r in rows
-                if (r["pipeline"] or 0) > 0.25 and not (r["plain"] or 0)]
+                if (r["pipeline"] or 0) > 0.25 and not (r["control"] or 0)]
     dropped = [r["label"] for r in rows
-               if (r["plain"] or 0) > 0.25 and not (r["pipeline"] or 0)]
+               if (r["control"] or 0) > 0.25 and not (r["pipeline"] or 0)]
     return R.figure(
         title="Rhetorical habits",
         note_="Argumentative moves, as a share of each arm's answers. Hover a bar for "
               "what the move is; the definitions are below.",
-        chart=R.grouped_hbar(rows[:6], series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+        chart=R.grouped_hbar(rows[:6], series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                              percent=True, label_w=210, glossary=gloss),
         caption=(_habits_caption(invented, dropped) if (invented or dropped) else
                  "**Both arms reach for the same moves at similar rates.**"))
@@ -1102,7 +1139,7 @@ def blocks_built(content, f):
                      title="The pipeline, top to bottom: a weighted matrix deals each case "
                            "in code, then three model stages — the dilemma, the reasoning, "
                            "and the constitution rewrite — turn it into one training record "
-                           "of a user message and an assistant answer. A plain model with no "
+                           "of a user message and an assistant answer. A control model with no "
                            "system prompt answers the same dilemma, and stage 2 is shown "
                            "that answer as a first take.")]
     for key, heading in (("stage1", "Stage 1 · the dilemma"),
@@ -1134,13 +1171,13 @@ def _footprint_figures(audit, f):
                     f"most visible property a model would inherit, and the judges see it too."))
     stance = (audit.get("moves") or {}).get("stance") or {}
     if stance.get("pipeline"):
-        rows = [{"label": k, "plain": (stance.get("plain") or {}).get(k),
+        rows = [{"label": k, "control": (stance.get("plain") or {}).get(k),
                  "pipeline": stance["pipeline"].get(k)}
                 for k in ("defers", "calibrated", "moralizes")
                 if stance["pipeline"].get(k) is not None]
         blocks.append(R.figure(
             title="Stance",
-            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+            chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                                  percent=True),
             caption=f"**The pipeline moralizes more than the control** "
                     f"({f.get('moralizes_pipeline', '?')} against "
@@ -1160,23 +1197,6 @@ def _footprint_figures(audit, f):
                      f"({f.get('shapes_pipeline', '?')} against {f.get('shapes_plain', '?')} "
                      f"effective shapes)."
                      if worse else "**Structural range holds up against the control.**")))
-    dims = (audit.get("delivery") or {}).get("dimensions") or {}
-    if dims.get("pipeline"):
-        keys = [k for k in _DELIVERY_DIMS if k in dims["pipeline"]]
-        rows = []
-        for k in keys:
-            p, b = dims["pipeline"].get(k), (dims.get("plain") or {}).get(k)
-            rows.append((k.replace("_", " "), f"{b:.2f}" if b is not None else "—",
-                         f"{p:.2f}" if p is not None else "—",
-                         f"{p - b:+.2f}" if p is not None and b is not None else "—"))
-        n_worse = sum(1 for r in rows if r[3].startswith("-"))
-        blocks.append(R.figure(
-            title="Delivery quality, dimension by dimension",
-            note_=f"Each dimension is judged 0–{_score_max(audit)} on the answer alone: did "
-                  f"it serve the goal the user actually had, was it proportionate, was the "
-                  f"tone right, was uncertainty calibrated.",
-            chart=R.table(["dimension", "control", "pipeline", "delta"], rows, align="lrrr"),
-            caption=f"**Worse on {n_worse} of {len(rows)} dimensions.**"))
     return blocks
 
 
@@ -1194,54 +1214,7 @@ def _habits_caption(invented, dropped):
     return f"**The pipeline dropped `{dropped[0]}`, a move the control reaches for.**"
 
 
-# ------------------------------------------------------------------ weaknesses
-
-def derived_warnings(audit, manifest, f):
-    """The weaknesses floor: computed from the run, never author-supplied.
-
-    Anything BAD or OK in the audit, plus provenance and a set of DAD-specific rules.
-    If a future run regresses, its warning appears here whether or not the prose was
-    updated. Rows are only ever added to this list.
-    """
-    out = C.audit_verdict_warnings(audit)
-    out += C.provenance_warnings(manifest, n=f.get("n"))
-    if f.get("length_pct") != "an unmeasured amount":
-        out.append(("OK", f"Answers are {f['length_pct']} longer than the control's. Length is "
-                          "the most visible property a trained model would inherit."))
-    delivery = audit.get("delivery") or {}
-    pm, bm = delivery.get("pipeline_mean"), delivery.get("plain_mean")
-    if not delivery:
-        out.append(("BAD", "Delivery quality and the showcase pass did not run, so nothing here "
-                           "measures whether the added substance cost manner."))
-    elif pm is not None and bm is not None and pm < bm:
-        # The substance/manner trade the whole method is supposed to avoid. If it goes
-        # the wrong way it leads the weaknesses, whatever the prose says.
-        dims = delivery.get("dimensions") or {}
-        worse = sorted(k for k, v in (dims.get("pipeline") or {}).items()
-                       if (dims.get("plain") or {}).get(k) is not None and v < dims["plain"][k])
-        out.append(("BAD", f"**Delivery quality went the wrong way**: {pm:.1f} against the "
-                           f"control's {bm:.1f} out of {_score_max(audit)}. The pipeline "
-                           f"bought welfare substance "
-                           "at a measurable cost in manner, which is the trade this method is "
-                           "meant to avoid."
-                           + (f" Worse on every judged dimension ({', '.join(worse)})."
-                              if len(worse) == len(dims.get("pipeline") or {}) and worse
-                              else f" Worse on: {', '.join(worse)}." if worse else "")))
-    # Per-measure arm asymmetry. The retention rule below only reads its own failures,
-    # so an unmatched delivery comparison used to reach the page undisclosed.
-    for name, block in (("Delivery quality", delivery),):
-        n_p, n_b = block.get("n_pipeline"), block.get("n_plain")
-        if n_p is not None and n_b is not None and (n_p != n_b or block.get("failures")):
-            out.append(("BAD" if abs(n_p - n_b) > 0.15 * max(n_p, n_b, 1) else "OK",
-                        f"{name} is not a matched comparison: {n_p} pipeline against {n_b} "
-                        f"control answers, with {block.get('failures') or 0} judgements failing. "
-                        f"The two means are over different sets of records."))
-    if (audit.get("moral_patient_reasons") or {}).get("failures"):
-        out.append(("OK", f"{audit['moral_patient_reasons']['failures']} extraction failures mean "
-                          f"the arms are unequal ({f.get('n_pipeline', '?')} pipeline against "
-                          f"{f.get('n_plain', '?')} control)."))
-    return sorted(out, key=lambda w: 0 if w[0] == "BAD" else 1)
-
+# ------------------------------------------------------------------ caveats beat
 
 def blocks_weak(content, f):
     """What is wrong with the method, in general — not with this run.
@@ -1252,33 +1225,10 @@ def blocks_weak(content, f):
     with the generator. None of the three is a property of one run. It takes no ``audit`` at
     all, so a run number cannot get in.
 
-    THREE, and the two that went are the test of whether this list stays honest. "Nothing
-    checks that an added point is correct" folded into the judges bullet, because it is the
-    same weakness — the evaluation, not the generation. "The answers run long" went because
-    ``derived_warnings`` already emits it WITH the run's own figure, so the authored twin was
-    a vaguer copy of a row further down the page. A cut is only allowed on one of those two
-    grounds: it is the same caveat as its neighbour, or the page states it better elsewhere.
-
-    The run's own findings are not softened by this and are not gone: every BAD and OK
-    verdict its audit recorded still renders, derived and unfiltered, in the appendix
-    drawer built by ``audit_flags_drawer()``.
+    THREE authored bullets. A cut is only allowed on one of two grounds: it is the
+    same caveat as its neighbour, or the page states it better elsewhere.
     """
     return R.sub("dad-weak", "Caveats") + C.prose(content, "caveats", f)
-
-
-def audit_flags_drawer(audit, f, manifest):
-    """The derived floor, in the appendix with the rest of this run's own numbers.
-
-    Still computed, never authored, and never filtered — ``warnings_table`` may collapse
-    rows into a counted drawer but the list itself is whole. It sits here rather than in
-    the caveats beat because every row is specific to one run.
-    """
-    warnings = derived_warnings(audit, manifest, f)
-    if not warnings:
-        return ""
-    bad = sum(1 for sev, _ in warnings if sev == "BAD")
-    return R.details("What the audit flags", C.warnings_table(warnings),
-                     meta=f"{len(warnings)} findings · {bad} BAD")
 
 
 # ------------------------------------------------------------------ appendix
@@ -1288,13 +1238,13 @@ def _appendix_charts(audit, f, cons):
     out = []
     mpr = audit.get("moral_patient_reasons") or {}
     if cons and cons.get("plain") is not None:
-        subset_rows = [{"label": name, "plain": b, "pipeline": p}
+        subset_rows = [{"label": name, "control": b, "pipeline": p}
                        for name, b, p in cons["subsets"] if p is not None]
         if subset_rows:
             out.append(R.figure(
                 title="Split by kind of consideration",
                 chart=R.grouped_hbar(subset_rows,
-                                     series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+                                     series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                                      fmt="{:.2f}"),
                 caption="**The gain is in the reasoning as well as in the alternatives "
                         "offered.**"))
@@ -1318,79 +1268,17 @@ def _appendix_charts(audit, f, cons):
     if types_p and types_b:
         gloss = (audit.get("reason_composition") or {}).get("type_gloss") or {}
         keys = list(dict(types_p, **types_b))
-        rows = [{"label": k, "plain": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
+        rows = [{"label": k, "control": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
                 for k in keys]
         out.append(R.figure(
             title="Kinds of consideration raised",
-            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)]),
+            chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)]),
             caption="**The pipeline's largest gains are in the kinds of point the control "
                     "raises least.**",
             table_html=R.table(["kind", "what it is", "control", "pipeline"],
                                [(k, gloss.get(k, "—"), types_b.get(k, 0), types_p.get(k, 0))
                                 for k in keys], align="llrr") if gloss else None))
     return out + _footprint_figures(audit, f)
-
-
-def _semantic_figures(diversity):
-    """Meanings and topics: the corpus audit viewer's two-chart pair, mirrored.
-
-    Redundancy (each record's nearest-neighbour cosine, where past 0.90 is a
-    near-duplicate) and topic spread (meaning-cluster sizes, largest first), with the
-    viewer's own captions, then the Vendi effective-count as a sentence. Renders from
-    the per-record ``scopes.combined`` data, so a run whose diversity report predates
-    that field gets nothing rather than an approximation.
-    """
-    scope = ((diversity or {}).get("scopes") or {}).get("combined") or {}
-    sims, clusters = scope.get("nn_sims") or [], scope.get("clusters") or {}
-    if not sims:
-        return ""
-    over = scope.get("over") or {}
-    out = [
-        "<h4>Meanings and topics</h4>",
-        "<p class='muted'>Similarity is measured with embeddings, so two records count "
-        "as alike when they cover the same subject even in completely different words. "
-        f"Embedding model: <code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"]
-    # Fixed 0.05 buckets ending at 1.00, so the 0.90 near-duplicate threshold is a
-    # bucket edge and an empty right-hand tail stays visible rather than cropped.
-    lo = min(0.5, min(sims))
-    edges = [round(lo + i * 0.05, 2) for i in range(int(round((1.0 - lo) / 0.05)))]
-    buckets = [(f"{a:.2f}", sum(1 for s in sims if a <= s < round(a + 0.05, 2)))
-               for a in edges]
-    out.append(R.figure(
-        title="Redundancy — how close each record sits to its nearest neighbour",
-        chart=R.histogram(buckets, xlabel="nearest-neighbour cosine similarity"),
-        caption=f"**{over.get('0.90', 0):.0%} near-duplicate** (similarity above 0.90), "
-                f"{over.get('0.80', 0):.0%} similar (above 0.80). Lower is more varied."))
-    sizes = clusters.get("sizes") or []
-    if sizes:
-        k = clusters.get("k") or len(sizes)
-        out.append(R.figure(
-            title="Topic spread — the records grouped into meaning clusters",
-            chart=R.histogram([(str(i + 1), s) for i, s in enumerate(sizes)],
-                              xlabel="clusters, largest first"),
-            caption=f"**Evenness {clusters.get('evenness', 0):.3f} across {k} clusters**, "
-                    f"the largest holding {clusters.get('largest_share', 0):.0%} of "
-                    "records. Many even bars mean many distinct topics; one tall bar "
-                    "means they clump onto a single one."))
-    n, vr = scope.get("n") or 0, scope.get("vendi_ratio") or 0
-    if n and vr:
-        out.append("<p>" + R.inline_md(
-            f"**{vr * n:.1f} of {n} records effectively distinct** in meaning "
-            f"(Vendi ratio {vr:.2f}). Higher is more varied.") + "</p>")
-    detail = clusters.get("detail") or []
-    if detail:
-        out.append(R.details(
-            "What each cluster is",
-            "<p class='muted'>Clusters are unlabelled groups of records with similar "
-            "meaning, numbered to match the topic-spread bars (largest first). Each is "
-            "shown by its most central record — a typical member, not a name for the "
-            "group.</p>"
-            + R.table(["cluster", "records", "most central record"],
-                      [(f"{i + 1}", f"{d.get('size', '?')}",
-                        f"{d.get('rep_id', '?')} — “{d.get('rep', '')}”")
-                       for i, d in enumerate(detail)], align="rrl"),
-            meta=f"{len(detail)} clusters"))
-    return "".join(out)
 
 
 def diversity_drawer(audit, content, f, diversity):
@@ -1401,12 +1289,11 @@ def diversity_drawer(audit, content, f, diversity):
     the meanings and topics they cover), the same two semantic charts, the same
     captions — so a reader moving between this page and the viewer meets one story.
     The health-check triage material (which checks ran, per-section verdict rows) is
-    deliberately absent: it is review-tool work, and what this run's audit flagged
-    already renders in the audit-flags drawer.
+    deliberately absent: it is review-tool work, not hand-off storytelling.
     """
     moves_fig = _moves_figure(audit)
     tics_fig = _tics_figure(audit)
-    semantic = _semantic_figures(diversity)
+    semantic = C.semantic_figures(diversity)
     if not (moves_fig or tics_fig or semantic):
         return ""
     parts = [C.prose(content, "checks_intro", f), moves_fig, tics_fig,
@@ -1452,37 +1339,18 @@ def blocks_appendix(audit, content, f, cons, labels, diversity, manifest=None,
     rather than saying "that run", because a reader arriving from the rail may not have
     read the beat that introduced it.
 
-    FOUR drawers, each answering a different question: what the audit flagged, how the
-    dataset compares to a plain model, every chart, and how varied the output is. The
-    variety drawer mirrors the corpus audit viewer's Composition and Diversity Analysis
-    section; the health-check triage tables and the worked example's full rewrite diff
-    used to render here and were cut — a hand-off reader takes the three inline hunks'
-    word, and verdict-row dumps belong to the review tool.
+    TWO drawers, each answering a different question: how the dataset compares to a
+    plain model (the pareto pair first, then each judge's own section, then every
+    supporting chart), and how varied the output is. The variety drawer mirrors the
+    corpus audit viewer's Composition and Diversity Analysis section; the health-check
+    triage tables, the derived audit-flags floor, and the worked example's full rewrite
+    diff belong to the review tool, not to a hand-off page.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               C.run_note(run_id, n=f.get("n"),
                          lead="Every figure and verdict below is measured on one run:"),
-              # The derived candour floor. Every docstring that says "the arm asymmetry
-              # renders in the audit-flags drawer" is pointing here, so this call is
-              # load-bearing: without it the drawer silently never renders.
-              audit_flags_drawer(audit, f, manifest),
-              judged_drawer(audit, content, f, cons, labels, repo_href=repo_href)]
-
-    charts = _appendix_charts(audit, f, cons)
-    retention = _survival_chart((audit.get("moral_patient_reasons") or {}).get("per_case") or {},
-                                labels)
-    if retention:
-        charts.append(R.figure(
-            title="Considerations kept, weakened, dropped and added, per record",
-            chart=retention,
-            caption="**Every record keeps most of the control's considerations**, so the "
-                    "average is not hiding one where the pipeline threw them away."))
-    if charts:
-        blocks.append(R.details(
-            "Every chart", "".join(charts),
-            meta=f"{len(charts)} figures · {f.get('footprint_regressions', '')}"))
-
-    blocks.append(diversity_drawer(audit, content, f, diversity))
+              judged_drawer(audit, content, f, cons, labels, repo_href=repo_href),
+              diversity_drawer(audit, content, f, diversity)]
     return "".join(blocks)
 
 

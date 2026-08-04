@@ -372,6 +372,72 @@ def warnings_table(warnings, *, inline=3, drawer_label="more findings at this le
     return out
 
 
+# ------------------------------------------------------------------ semantic diversity
+
+def semantic_figures(diversity, *, unit="records"):
+    """Meanings and topics: the corpus audit viewer's two-chart pair, mirrored.
+
+    Redundancy (each record's nearest-neighbour cosine, where past 0.90 is a
+    near-duplicate) and topic spread (meaning-cluster sizes, largest first), with the
+    viewer's own captions, then the Vendi effective-count as a sentence. Renders from
+    the per-record ``scopes.combined`` data, so a run whose diversity report predates
+    that field gets nothing rather than an approximation. Both reports use this;
+    ``unit`` is the word for one record ("records" / "documents").
+    """
+    scope = ((diversity or {}).get("scopes") or {}).get("combined") or {}
+    sims, clusters = scope.get("nn_sims") or [], scope.get("clusters") or {}
+    if not sims:
+        return ""
+    one = unit.rstrip("s")
+    over = scope.get("over") or {}
+    out = [
+        "<h4>Meanings and topics</h4>",
+        f"<p class='muted'>Similarity is measured with embeddings, so two {unit} count "
+        "as alike when they cover the same subject even in completely different words. "
+        f"Embedding model: <code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"]
+    # Fixed 0.05 buckets ending at 1.00, so the 0.90 near-duplicate threshold is a
+    # bucket edge and an empty right-hand tail stays visible rather than cropped.
+    lo = min(0.5, min(sims))
+    edges = [round(lo + i * 0.05, 2) for i in range(int(round((1.0 - lo) / 0.05)))]
+    buckets = [(f"{a:.2f}", sum(1 for s in sims if a <= s < round(a + 0.05, 2)))
+               for a in edges]
+    out.append(R.figure(
+        title=f"Redundancy — how close each {one} sits to its nearest neighbour",
+        chart=R.histogram(buckets, xlabel="nearest-neighbour cosine similarity"),
+        caption=f"**{over.get('0.90', 0):.0%} near-duplicate** (similarity above 0.90), "
+                f"{over.get('0.80', 0):.0%} similar (above 0.80). Lower is more varied."))
+    sizes = clusters.get("sizes") or []
+    if sizes:
+        k = clusters.get("k") or len(sizes)
+        out.append(R.figure(
+            title=f"Topic spread — the {unit} grouped into meaning clusters",
+            chart=R.histogram([(str(i + 1), s) for i, s in enumerate(sizes)],
+                              xlabel="clusters, largest first"),
+            caption=f"**Evenness {clusters.get('evenness', 0):.3f} across {k} clusters**, "
+                    f"the largest holding {clusters.get('largest_share', 0):.0%} of "
+                    f"{unit}. Many even bars mean many distinct topics; one tall bar "
+                    "means they clump onto a single one."))
+    n, vr = scope.get("n") or 0, scope.get("vendi_ratio") or 0
+    if n and vr:
+        out.append("<p>" + R.inline_md(
+            f"**{vr * n:.1f} of {n} {unit} effectively distinct** in meaning "
+            f"(Vendi ratio {vr:.2f}). Higher is more varied.") + "</p>")
+    detail = clusters.get("detail") or []
+    if detail:
+        out.append(R.details(
+            "What each cluster is",
+            f"<p class='muted'>Clusters are unlabelled groups of {unit} with similar "
+            "meaning, numbered to match the topic-spread bars (largest first). Each is "
+            "shown by its most central record — a typical member, not a name for the "
+            "group.</p>"
+            + R.table(["cluster", unit, "most central record"],
+                      [(f"{i + 1}", f"{d.get('size', '?')}",
+                        f"{d.get('rep_id', '?')} — “{d.get('rep', '')}”")
+                       for i, d in enumerate(detail)], align="rrl"),
+            meta=f"{len(detail)} clusters"))
+    return "".join(out)
+
+
 # ------------------------------------------------------------------ shell bits
 
 # ------------------------------------------------------------------ CLI

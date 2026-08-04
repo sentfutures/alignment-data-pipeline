@@ -61,7 +61,13 @@ SDF_AUDIT = {"n_docs": 100,
 SDF_MANIFEST = {"created_at": "2026-07-11T20:06:36", "git_commit": "18ede291", "git_dirty": True,
                 "config": {"backend": "claude_code", "model": "claude-sonnet-5",
                            "sdf": {"rewrite_model": "claude-fable-5"}}}
-SDF_DIVERSITY = {"n_records": 100, "vendi": {"score": 22.58}, "nn": {"over_0.90": 0.0}}
+SDF_DIVERSITY = {"n_records": 100, "vendi": {"score": 22.58}, "nn": {"over_0.90": 0.0},
+                 "embed_model": "text-embedding-3-small",
+                 "scopes": {"combined": {
+                     "n": 100, "nn_sims": [0.61, 0.79], "vendi_ratio": 0.23,
+                     "over": {"0.90": 0.0, "0.80": 0.02},
+                     "clusters": {"k": 2, "evenness": 0.9, "largest_share": 0.51,
+                                  "sizes": [51, 49]}}}}
 # One shipped document with its whole trail, which is what the worked example needs. The
 # draft differs from the shipped content so the rewrite drawer has something to diff.
 SDF_CORPUS = [{"doc_id": "matrix_000001", "language": "English", "type_name": "a news article",
@@ -175,7 +181,7 @@ class TestShape:
         ids = re.findall(r"<section id='([^']+)'", html)
         assert ids == ["datasets", "explore", "sdf", "dad"]
         assert re.findall(r"<h2>([^<]*)</h2>", html) == [
-            "Walk through either pipeline", S.SECTION_TITLE, D.SECTION_TITLE]
+            "Walk through either pipeline", R.esc(S.SECTION_TITLE), R.esc(D.SECTION_TITLE)]
         # The comparison is titled by its own two mastheads on screen — and by a heading
         # a screen reader can find, because heading navigation skipped it entirely.
         assert re.match(r"<section id='datasets'><h2 class='vh'>[^<]+</h2><div class='cmp-wrap'>",
@@ -630,7 +636,7 @@ class TestChooser:
         html = build(sdf_inputs=SDF_INPUTS)
         choices = re.search(r"<div class='choices'[^>]*>.*?</div>", html, re.S).group(0)
         assert "role='tablist'" not in choices and "role='tab'" not in choices
-        for pid, label in (("dad", D.SECTION_TITLE), ("sdf", S.SECTION_TITLE)):
+        for pid, label in (("dad", R.esc(D.SECTION_TITLE)), ("sdf", S.SECTION_TITLE)):
             assert f"aria-controls='{pid}'" in choices
             assert f"id='choose-{pid}'" in choices
             assert label in choices
@@ -657,7 +663,7 @@ class TestChooser:
         choices = re.search(r"<div class='choices'[^>]*>.*?</div>",
                             build(sdf_inputs=SDF_INPUTS), re.S).group(0)
         assert strip_tags(choices).split() == [*S.SECTION_TITLE.split(), "&darr;",
-                                               *D.SECTION_TITLE.split(), "&darr;"]
+                                               *R.esc(D.SECTION_TITLE).split(), "&darr;"]
 
     def test_the_choice_lines_up_with_what_is_being_chosen(self):
         """At rest, 40rem centred is exactly the two dataset columns above (2 x 20rem), so
@@ -1267,7 +1273,7 @@ class TestComparisonTable:
         """One order for the whole page: the comparison, the chooser and the panels."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         assert re.findall(r"<span class='cmp-name'>([^<]*)</span>", html) == [
-            S.SECTION_TITLE, D.SECTION_TITLE]
+            S.SECTION_TITLE, R.esc(D.SECTION_TITLE)]
         assert re.findall(r"data-panel='(\w+)' id='choose", html) == ["sdf", "dad"]
         assert html.index("<section id='sdf'") < html.index("<section id='dad'")
 
@@ -1279,7 +1285,7 @@ class TestComparisonTable:
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         head = re.search(r"<thead>.*?</thead>", table, re.S).group(0)
-        assert f"<span class='cmp-name'>{D.SECTION_TITLE}</span>" in head
+        assert f"<span class='cmp-name'>{R.esc(D.SECTION_TITLE)}</span>" in head
         assert f"<span class='cmp-name'>{S.SECTION_TITLE}</span>" in head
         assert "cmp-d" not in html  # the subtitle slot, and its rule, are gone
         # Derived from the prose file, not typed here: this line is edited, and a hardcoded
@@ -1360,8 +1366,8 @@ class TestSdfReport:
         """No figure on this report is typed. The diversity numbers are the ones a reader
         is most likely to quote, and they arrive from the run's own report."""
         text = strip_tags(self.section(build(sdf_inputs=SDF_INPUTS)))
-        assert "23 effectively distinct documents" in text
-        assert "of 100 actual documents" in text
+        assert "23.0 of 100 documents effectively distinct" in text
+        assert "Vendi ratio 0.23" in text
 
     def test_its_weaknesses_are_derived_too(self):
         """audit_sdf.py prints its verdicts instead of recording them, so this report

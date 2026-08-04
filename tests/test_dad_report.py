@@ -315,15 +315,11 @@ class TestFacts:
         assert "delivery_clause" not in D.facts(AUDIT_FULL)
         assert "substance_clause" not in D.facts(AUDIT_FULL)
 
-    def test_footprint_regressions_are_derived(self):
-        """The prose used to assert 'one of these is an outright regression' about a
-        section whose every block is conditional."""
-        assert "structural variety" in D.facts(AUDIT_FULL)["footprint_regressions"]
-        clean = json.loads(json.dumps(AUDIT_FULL))
-        clean["structure"]["pipeline"]["effective_shapes"] = 20.0
-        clean["response_lengths"]["mean_ratio"] = 1.0
-        clean["moves"]["stance"]["pipeline"]["moralizes"] = 0.0
-        assert D.facts(clean)["footprint_regressions"].startswith("None of these")
+    def test_the_footprint_regressions_fact_went_with_its_drawer(self):
+        """It existed only for the "Every chart" drawer's meta line; the charts now
+        live inside the comparison drawer, and a fact nothing renders is a fact that
+        drifts."""
+        assert "footprint_regressions" not in D.facts(AUDIT_FULL)
 
     def test_facts_carry_no_cost_or_scale_figures(self):
         """Cost per example and the dealt spread came off the page with the descriptive
@@ -421,8 +417,8 @@ class TestBuildSection:
         """"The dilemma corpus" told a reader nothing they could act on, and "corpora"
         was the wrong register for the whole page."""
         html = build()
-        assert f"<h2>{D.SECTION_TITLE}</h2>" in html
-        assert D.SECTION_TITLE == "Difficult advice"
+        assert f"<h2>{R.esc(D.SECTION_TITLE)}</h2>" in html
+        assert D.SECTION_TITLE == "Difficult advice Q&A"
         headings = re.findall(r"<h2>([^<]*)</h2>", html)
         assert headings and not any(h[0].isdigit() for h in headings)
         assert "corpus" not in strip_tags(html).lower().replace("dad_corpus.jsonl", "")
@@ -629,7 +625,8 @@ class TestChartsAreEvidence:
         assert re.findall(r"<figcaption class='fig-t'>([^<]*)</figcaption>", lead) == []
 
     def test_every_chart_is_still_on_the_page(self):
-        """Moved, not dropped — and the drawer names how many it holds."""
+        """Moved, not dropped: the "Every chart" drawer folded into the comparison
+        drawer, so every chart lives with the comparison it supports."""
         html = build(diversity=DIVERSITY, manifest=MANIFEST, baseline=BASELINE)
         appendix = dad_section(html)[dad_section(html).index("id='dad-appendix'"):]
         for title in ("Answer length", "Stance", "Structural variety",
@@ -638,11 +635,24 @@ class TestChartsAreEvidence:
                       "Valuable welfare considerations per answer",
                       "Substance against manner"):
             assert title in appendix, title
-        assert re.search(r"\d+ figures", appendix)
+        assert "Every chart" not in html
 
-    def test_the_drawer_says_which_measures_went_the_wrong_way(self):
-        html = build(diversity=DIVERSITY, manifest=MANIFEST)
-        assert "figures · On this run" in html
+    def test_the_pareto_leads_and_each_judge_gets_a_section(self):
+        """The scatter is the drawer's first figure, right after the intro paragraph,
+        and each judge's dimension table sits under its own heading."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["welfare_impact"] = {
+            "pipeline_mean": 92.0, "plain_mean": 83.0, "score_max": 100,
+            "dimensions": {"pipeline": {"patient_scope": 82.0},
+                           "plain": {"patient_scope": 45.0}},
+            "per_case": {"AW-0001": {"pipeline": {"blended_score": 85.0},
+                                     "plain": {"blended_score": 60.0}}}}
+        section = dad_section(build(audit=audit))
+        drawer = section[section.index("Comparison to the control"):]
+        assert (drawer.index("Substance against manner")
+                < drawer.index("Delivery quality, dimension by dimension")
+                < drawer.index("Welfare impact, dimension by dimension")
+                < drawer.index("Answer length"))
 
     def test_the_report_opens_on_a_lede_and_measures_nothing_there(self):
         """The report opens on a bare lede — one sentence saying what this is.
@@ -1062,67 +1072,28 @@ class TestWhichRun:
 
 
 class TestCandour:
-    """The weaknesses floor is derived from the run, so it cannot be edited away."""
+    """What candour the page carries: disclosed asymmetries and unhidden regressions.
 
-    def test_bad_verdicts_reach_the_report(self):
-        text = strip_tags(build(manifest=MANIFEST))
-        assert "Response stance" in text
-        assert "BAD" in text
+    The derived weaknesses floor (``derived_warnings`` + the "What the audit flags"
+    drawer) was cut at Constance's call — review-tool triage, not hand-off
+    storytelling — so candour now lives with the measurements it qualifies.
+    """
 
     def test_moralizing_regression_is_shown_in_both_arms(self):
         text = strip_tags(build())
         assert "40%" in text and "0%" in text
 
-    def test_the_backend_and_the_tree_are_not_findings(self):
-        """Both left the floor. `bedrock` names a backend this repository no longer has,
-        and a dirty tree fires on every run there has ever been. What a reader needed from
-        them — which run these numbers are — is said by the run note instead."""
-        warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
-        for gone in ("bedrock", "faithful mode", "uncommitted"):
-            assert not any(gone in w for _, w in warnings), gone
+    def test_the_audit_flags_drawer_is_gone_machinery_and_all(self):
+        html = build(diversity=DIVERSITY, manifest=MANIFEST)
+        assert "What the audit flags" not in html
+        assert not hasattr(D, "derived_warnings")
+        assert not hasattr(D, "audit_flags_drawer")
 
     def test_extraction_failures_produce_an_asymmetry_note(self):
         """It moved into the judged drawer with the comparison it qualifies."""
         section = dad_section(build())
         appendix = section[section.index("id='dad-appendix'"):]
         assert "not fully matched" in strip_tags(appendix)
-
-    def test_delivery_arm_asymmetry_is_disclosed(self):
-        """The bedrock-40 case: the one BAD headline was a mean over 33 pipeline
-        answers against 26 different control answers, with 19 judgements dropped, and
-        the page said nothing. The retention rule reads its own failures, not
-        delivery's, so this needed its own rule."""
-        audit = json.loads(json.dumps(AUDIT_FULL))
-        audit["delivery"].update(n_pipeline=33, n_plain=26, failures=19)
-        warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
-        assert any("not a matched comparison" in w and "19" in w for _, w in warnings)
-        # derived_warnings still computes it, but the drawer that rendered them was cut;
-        # the comparison drawer discloses the same asymmetry in its own words.
-        assert "not fully matched" in strip_tags(build(audit=audit, manifest=MANIFEST))
-
-    def test_matched_arms_are_not_flagged(self):
-        warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
-        assert not any("not a matched comparison" in w for _, w in warnings)
-
-    def test_delivery_regression_leads_the_weaknesses(self):
-        """The substance/manner trade this method exists to avoid, going the wrong
-        way, must surface as BAD and first — the bedrock-40 case."""
-        audit = json.loads(json.dumps(AUDIT_FULL))
-        audit["delivery"]["pipeline_mean"] = 7.0
-        audit["delivery"]["plain_mean"] = 7.9
-        warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
-        severities = [sev for sev, _ in warnings]
-        assert severities == sorted(severities, key=lambda s: s != "BAD")  # BADs first
-        assert any(sev == "BAD" and "wrong way" in w for sev, w in warnings)
-
-    def test_delivery_gain_is_not_flagged(self):
-        warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
-        assert not any("wrong way" in w for _, w in warnings)
-
-    def test_missing_delivery_is_a_derived_weakness(self):
-        audit = {k: v for k, v in AUDIT_FULL.items() if k != "delivery"}
-        warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
-        assert any(sev == "BAD" and "showcase" in w for sev, w in warnings)
 
     def test_the_health_check_triage_tables_do_not_render(self):
         """The variety drawer mirrors the corpus audit viewer's diversity section; the
