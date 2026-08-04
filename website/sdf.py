@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The document dataset's section of the handoff page: the ``#sdf`` beats.
 
-Same audience and same job as report/dad.py — a technical reader at another lab deciding
+Same audience and same job as website/dad.py — a technical reader at another lab deciding
 whether the method is sound and worth running — so it takes the same skeleton, in the same
 order, under the same names: what it is → the pipeline → one record's whole trail → caveats
 → appendix. A reader who has read one report should not have to learn a second shape.
@@ -39,8 +39,8 @@ stdlib only, and no imports from viewer/ or shared/.
 
 import re
 
-from report import common as C
-from report import render as R
+from website import common as C
+from website import render as R
 
 CONTENT_IDS = (
     "sdf_what",
@@ -52,7 +52,7 @@ CONTENT_IDS = (
 SECTION_ID = "sdf"
 SECTION_TITLE = "Synthetic documents"
 
-# The skeleton, in order, and the same one report/dad.py uses — the ids are prefixed
+# The skeleton, in order, and the same one website/dad.py uses — the ids are prefixed
 # because both reports live in one document. The stages come before the worked example
 # because the chooser above promises a walk, and a walk needs its steps named first.
 #
@@ -1149,7 +1149,7 @@ def blocks(*, content, audit=None, diversity=None, compliance=None, fidelity=Non
            principles=None, f=None, hf_href="", repo_href=""):
     """The whole ``#sdf`` section body, in skeleton order. Pure: no filesystem, no argv.
 
-    Returns one flat string of blocks. report/page.py wraps it in ``<section id='sdf'>`` with
+    Returns one flat string of blocks. website/page.py wraps it in ``<section id='sdf'>`` with
     the h2; every block here is therefore a grid child of that section, which is what lets
     figures bleed past the text measure.
 

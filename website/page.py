@@ -13,8 +13,8 @@ Structure:
                 it names (as two columns), and what we built on them
     #datasets   the two datasets, compared row by row
     #explore    Walk through either pipeline — two buttons
-      #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
-      #dad      Difficult advice     (report/dad.py, hidden until chosen)
+      #sdf      Synthetic documents  (website/sdf.py, hidden until chosen)
+      #dad      Difficult advice     (website/dad.py, hidden until chosen)
     footer      repo and both viewers, and nothing else
 
 Nothing is open on load; ``#dad`` or ``#sdf`` in the URL opens that report, so the
@@ -28,10 +28,10 @@ stdlib only, and no imports from viewer/ or shared/.
 import datetime
 import re
 
-from report import common as C
-from report import dad
-from report import render as R
-from report import sdf
+from website import common as C
+from website import dad
+from website import render as R
+from website import sdf
 
 CONTENT_IDS = ("title", "description", "intro", "sdf_technique", "dad_technique",
                "intro_close",

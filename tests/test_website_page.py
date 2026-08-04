@@ -1,4 +1,4 @@
-"""Tests for report/page.py — the handoff page that carries both corpora.
+"""Tests for website/page.py — the handoff page that carries both corpora.
 
 This replaces test_report_hub.py: there is no landing page and no second file any more,
 so the risks that page had (a link to a report nobody built, a card whose numbers
@@ -21,11 +21,11 @@ import re
 
 import pytest
 
-from report import common as C
-from report import dad as D
-from report import page as P
-from report import render as R
-from report import sdf as S
+from website import common as C
+from website import dad as D
+from website import page as P
+from website import render as R
+from website import sdf as S
 
 CONTENT = {k: f"Prose for {k}." for k in P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS}
 CONTENT["title"] = "Two corpora"
@@ -114,9 +114,12 @@ def shipped_content():
     a section renamed in a module and not in its prose file fails here.
     """
     from pathlib import Path
-    report_dir = Path(__file__).resolve().parent.parent / "report"
-    return C.load_content([report_dir / "content_page.md", report_dir / "content_dad.md",
-                           report_dir / "content_sdf.md"],
+    # Off the package's own __file__, not a path spelled out here: the directory was
+    # called report/ until it was renamed, and this was one of two places outside it
+    # that had to be found and changed.
+    website_dir = Path(P.__file__).resolve().parent
+    return C.load_content([website_dir / "content_page.md", website_dir / "content_dad.md",
+                           website_dir / "content_sdf.md"],
                           P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS)
 
 
@@ -131,7 +134,7 @@ def beat(section, anchor):
 
     Slicing on ``index("id='sdf-weak'")`` looks right and is not: it keeps the tail of its
     own opening tag and the head of the next beat's ``<h3``, and that stray ``3`` passes
-    any assertion about digits in a beat. Same helper as test_dad_report.py's.
+    any assertion about digits in a beat. Same helper as test_website_dad.py's.
     """
     start = section.index(f"<h3 id='{anchor}'")
     body = section[section.index(">", start) + 1:]
@@ -945,7 +948,7 @@ class TestContentsRail:
         This fixture ships no rewrite records, so the worked example has no stages to
         list — which is the other half of the contract, and why the beats with no anchored
         stage under them get no sub-items rather than borrowing the ones above.
-        (tests/test_dad_report.py checks the example's three against a run that has them.)
+        (tests/test_website_dad.py checks the example's three against a run that has them.)
         """
         rail = self.rail(build(sdf_inputs=SDF_INPUTS), "dad")
         by_beat, current = {}, None
@@ -1357,7 +1360,7 @@ class TestComparisonTable:
 
 class TestSdfReport:
     """The document report, from the page's side. Its own risks are in
-    test_sdf_report.py; what is here is the part the page is responsible for."""
+    test_website_sdf.py; what is here is the part the page is responsible for."""
 
     def section(self, html):
         return html[html.index("<section id='sdf'"):html.index("<section id='dad'")]

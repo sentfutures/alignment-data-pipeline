@@ -1,7 +1,7 @@
-"""Tests for report/sdf.py — the document dataset's section of the handoff page.
+"""Tests for website/sdf.py — the document dataset's section of the handoff page.
 
 The section never renders alone, so every test here builds the whole page around it
-(report/page.py owns the shell) and asserts on the ``#sdf`` beats.
+(website/page.py owns the shell) and asserts on the ``#sdf`` beats.
 
 The same six risks the difficult-advice report is covered against, because it is the same
 artefact under the same rules:
@@ -22,7 +22,7 @@ artefact under the same rules:
     stage either renders or names the file it wanted, and the pin lives in the prose file.
   * **The loader.** ``read_matrix`` and ``read_attrition`` parse the run's own snapshot, and
     both are the source of figures the prose interpolates.
-  * **Self-containment and colour** are asserted once, on the page, in test_report_page.py.
+  * **Self-containment and colour** are asserted once, on the page, in test_website_page.py.
 
 Fully offline — the generator touches no network and no API.
 """
@@ -32,9 +32,9 @@ import re
 
 import pytest
 
-from report import common as C
-from report import page as P
-from report import sdf as S
+from website import common as C
+from website import page as P
+from website import sdf as S
 
 # --- fixtures, shaped like the real audit JSON --------------------------------
 
@@ -138,7 +138,7 @@ def content(**overrides):
 
 
 def _dad_ids():
-    from report import dad as D
+    from website import dad as D
     return D.CONTENT_IDS
 
 

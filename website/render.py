@@ -688,8 +688,8 @@ def illustration(data_uri="", alt="", label="Illustration"):
     keeps the shape the finished page will have.
     """
     if not data_uri:
-        return ("\n<!-- TODO: hero illustration. Drop a PNG into report/assets/hero.png; "
-                "build_report.py inlines it as a data URI. No external asset may be "
+        return ("\n<!-- TODO: hero illustration. Drop a PNG into website/assets/hero.png; "
+                "build_website.py inlines it as a data URI. No external asset may be "
                 "referenced: this page has to open offline from the filesystem. -->\n"
                 f"<div class='illo'><span>{esc(label)}</span></div>\n")
     if not data_uri.startswith("data:"):
@@ -953,7 +953,7 @@ def explore_body(bar, rails, panels):
 
 CSS = """
 /* Aged paper, one theme. Every text-on-surface pair below clears WCAG AA (4.5:1) and
-   tests/test_report_common.py::test_text_contrast_meets_wcag_aa recomputes them from
+   tests/test_website_common.py::test_text_contrast_meets_wcag_aa recomputes them from
    these tokens, so darkening a surface without darkening its ink fails the suite. On
    cream the rules and the chip washes both need to be markedly stronger than they were
    on white, where a 1.1:1 wash still read as a chip. */

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build the handoff page: both corpora, one self-contained HTML file.
 
-    python report/build_report.py --dad-run outputs/dad/runs/<run_id> \\
+    python website/build_website.py --dad-run outputs/dad/runs/<run_id> \\
                                   --sdf-run outputs/sdf/runs/<run_id>
-    # -> report/index.html
+    # -> website/index.html
 
 ``--run`` still works as an alias for ``--dad-run``, which keeps the command printed in
 the page's own "Running it yourself" block true. ``--sdf-run`` is optional: without it
@@ -18,11 +18,11 @@ installed.
 For a HOSTED build, name the URL it will be served from — that adds the link-preview tags
 and copies the card image out beside the page, the one file that travels with it:
 
-    python report/build_report.py --dad-run <run> --sdf-run <run> \\
+    python website/build_website.py --dad-run <run> --sdf-run <run> \\
                                   --site-url https://<host>/
-    # -> report/index.html + report/preview.png
+    # -> website/index.html + website/preview.png
 
-Every build is `noindex` either way; see "Hosting" in report/README.md.
+Every build is `noindex` either way; see "Hosting" in website/README.md.
 """
 
 import base64
@@ -33,18 +33,18 @@ from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from report import common as C  # noqa: E402
-from report import page  # noqa: E402
+from website import common as C  # noqa: E402
+from website import page  # noqa: E402
 
-REPORT_DIR = Path(__file__).resolve().parent
-CONTENT = [REPORT_DIR / "content_page.md", REPORT_DIR / "content_dad.md",
-           REPORT_DIR / "content_sdf.md"]
-HERO = REPORT_DIR / "assets" / "hero.png"
-MAKER_ICON = REPORT_DIR / "assets" / "sf.png"
+WEBSITE_DIR = Path(__file__).resolve().parent
+CONTENT = [WEBSITE_DIR / "content_page.md", WEBSITE_DIR / "content_dad.md",
+           WEBSITE_DIR / "content_sdf.md"]
+HERO = WEBSITE_DIR / "assets" / "hero.png"
+MAKER_ICON = WEBSITE_DIR / "assets" / "sf.png"
 # The link preview's image — the hero on the page's own paper, drawn by make_preview.py.
 # The ONE file that travels beside index.html, and only for a hosted build: a card renderer
 # fetches og:image over the network, so this is the one picture the page cannot carry.
-PREVIEW = REPORT_DIR / "assets" / "preview.png"
+PREVIEW = WEBSITE_DIR / "assets" / "preview.png"
 
 
 def data_uri(path, mime="image/png"):
@@ -52,7 +52,7 @@ def data_uri(path, mime="image/png"):
 
     Inlining is not an optimisation here, it is the format: the page has to be one file
     that opens offline, so the only picture it can carry is one encoded into it. The
-    source art lives in report/assets/ and never ships next to the HTML.
+    source art lives in website/assets/ and never ships next to the HTML.
     """
     try:
         raw = Path(path).read_bytes()
@@ -65,7 +65,7 @@ def main():
     args = C.cli_parser(__doc__).parse_args()
     if not args.dad_run:
         C.die("--dad-run is required")
-    out_dir = Path(args.out_dir or REPORT_DIR)
+    out_dir = Path(args.out_dir or WEBSITE_DIR)
     kwargs = page.load_inputs(args.content or CONTENT, dad_run=args.dad_run,
                               sdf_run=args.sdf_run)
     hero = data_uri(HERO)

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Draw the link-preview image from the hero: report/assets/preview.png.
+"""Draw the link-preview image from the hero: website/assets/preview.png.
 
-    python report/make_preview.py        # -> report/assets/preview.png (1200x630)
+    python website/make_preview.py        # -> website/assets/preview.png (1200x630)
 
 Run it when `assets/hero.png` changes, and commit the result. It is NOT part of
-`build_report.py`, which is stdlib-only on purpose — this needs Pillow, and the preview is
+`build_website.py`, which is stdlib-only on purpose — this needs Pillow, and the preview is
 an asset, not a build product.
 
 The card image cannot be carried inside the page. `og:image` is fetched out of band by
 whoever renders the link, so a data URI is not an option: this file is uploaded beside
-index.html and named by `--preview-url` (see "Hosting" in report/README.md).
+index.html and named by `--preview-url` (see "Hosting" in website/README.md).
 
 What it does to the art: nothing. The hero is trimmed to its own alpha bounds, scaled to
 fit, and centred on the page's paper — no crop through the drawing, no filter, no text
