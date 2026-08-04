@@ -1509,9 +1509,14 @@ footer.foot .foot-by p+p{margin-top:.3rem}
    The mark has to sit CLOSER to the name it belongs to than to the sentence it follows, or it
    reads as punctuation after "A project by". Measured: a bare word space put it ~3.6px from
    "by" and 4px from "Sentient Futures" — the same on both sides, so proximity said nothing.
-   The left margin is the word boundary, the right one groups the mark with the name. */
+   The word boundary is a margin on the LINK, not on the mark: a margin inside the anchor is
+   inside its background box, so the hover wash and the underline both began .4rem left of the
+   mark, on space that belongs to the sentence. On the anchor the same gap sits outside the
+   hit area, and the wash starts where the link starts. The right margin stays on the mark —
+   it is inside the link on both sides, and it is what groups the mark with the name. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
-margin-left:.4rem;margin-right:.25rem;flex:0 0 auto}
+margin-right:.25rem;flex:0 0 auto}
+.maker{margin-left:.4rem}
 /* An icon link declares NO face and no size, on purpose: it is not a control — there is
    nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
    the footer's own size, like the maker link beside it, and the bare `a` rule gives both the

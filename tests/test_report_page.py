@@ -355,12 +355,24 @@ class TestShape:
         """
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
-        assert f"A project by <a href='{P.MAKER_URL}'" in foot
+        assert f"A project by <a class='maker' href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
         assert "class='foot-run'" not in foot
         text = strip_tags(foot)
         for gone in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"], "git ", "backend"):
             assert gone not in text, gone
+
+    def test_the_gap_before_the_maker_mark_sits_outside_the_link(self):
+        """The word boundary is a margin on the anchor, never on the mark inside it.
+
+        A margin on the mark is inside the anchor's background box, so the hover wash and
+        the underline both started .4rem left of the mark, over space that belongs to the
+        sentence before it. Same gap, drawn from outside.
+        """
+        html = build()
+        mark = re.search(r"\.ico-img\{[^}]*\}", html).group(0)
+        assert "margin-left" not in mark, mark
+        assert re.search(r"\.maker\{[^}]*margin-left:\.4rem", html)
 
     def test_the_run_is_still_named_where_the_reader_needs_it(self):
         """The footer carrying nothing is only correct because the report carries it. If
