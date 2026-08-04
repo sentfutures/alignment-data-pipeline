@@ -229,11 +229,11 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         section_datasets(content, f, dad_kwargs, sdf_kwargs),
         section_explore(panels, outlines),
     ]
-    # The intro is four blocks, not one: the finding and the sentence that introduces the
-    # pair, the two techniques as two columns, then what we built on them. The pair is a
-    # figure between two runs of prose rather than a list inside one, because the two
-    # techniques ARE the two datasets below — same things, same order — and ~90 words of
-    # definitional prose with two digits in front of it did not say so.
+    # The intro is four blocks, not one: the finding and its two sources, the sentence that
+    # introduces the pair, the two techniques as two columns, then what we built on them.
+    # The pair is a figure between two runs of prose rather than a list inside one, because
+    # the two techniques ARE the two datasets below — same things, same order — and ~90 words
+    # of definitional prose with two digits in front of it did not say so.
     intro = (C.prose(content, "intro", f)
              + R.named_pair([_technique(content, "sdf_technique", f),
                              _technique(content, "dad_technique", f)])

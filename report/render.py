@@ -60,12 +60,15 @@ _MD_CODE = re.compile(r"`([^`]+)`")
 _MD_BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _MD_ITAL = re.compile(r"(?<![*\w])\*([^*\n]+)\*(?!\*)")
 _MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+# `[^Name of the work](url)` — a citation marker. The name is the accessible
+# name; the visible mark is a number the renderer counts out.
+_MD_CITE = re.compile(r"\[\^([^\]]+)\]\(([^)\s]+)\)")
 # "1. ", "2) " — the marker of a numbered list line, stripped before the item renders.
 _MD_ORDERED = re.compile(r"^\d+[.)]\s+")
 
 
 def inline_md(text):
-    """Escape, then apply a bold/italic/code/link subset of markdown.
+    """Escape, then apply a bold/italic/code/link/citation subset of markdown.
 
     Used on prose only — editorial copy and LLM-written judge notes, which contain
     ``**bold**``. NEVER used on corpus text, which must render verbatim.
@@ -74,8 +77,37 @@ def inline_md(text):
     out = _MD_CODE.sub(r"<code>\1</code>", out)
     out = _MD_BOLD.sub(r"<b>\1</b>", out)
     out = _MD_ITAL.sub(r"<i>\1</i>", out)
+    out = _cite_markers(out)          # before _MD_LINK, or it eats the [^Name](url) form
     out = _MD_LINK.sub(_link, out)
     return out
+
+
+def _cite_markers(text):
+    """``[^Name of the work](url)`` -> a raised, numbered citation marker.
+
+    THE AUTHOR WRITES THE NAME AND THE RENDERER DRAWS THE NUMBER, which is the whole point of
+    the form: the visible mark is a superscript numeral, so the claim it hangs off reads
+    uninterrupted, while the work's name becomes the marker's accessible name. Written as
+    ``[1](url)`` instead, the link announces as "link, 1" and a links list gets a row that
+    says nothing — the number is a position, not a name.
+
+    Numbered per call, which is per prose block: two markers in one paragraph are 1 and 2. A
+    page-wide sequence would need state threaded through every renderer, and nothing here
+    cites across blocks.
+
+    The marker promises a note at the foot of the page and there is none — it links straight
+    out. That is a borrowed convention, and the title attribute is the disclosure: hovering
+    names the work.
+    """
+    n = [0]
+
+    def one(m):
+        name, href = m.group(1), m.group(2)
+        n[0] += 1
+        return (f"<a class='cite-n' href='{href}'{NEW_TAB} aria-label='{name}' "
+                f"title='{name}'><sup>{n[0]}{CITE_ARROW}</sup></a>")
+
+    return _MD_CITE.sub(one, text)
 
 
 # Leaving the page means leaving it in a NEW TAB: this is a long read whose chooser
@@ -86,6 +118,14 @@ NEW_TAB = " target='_blank' rel='noopener noreferrer'"
 # The outbound mark, drawn rather than typed. As a glyph (U+2197) it is a hairline in
 # most faces and a different shape in every one; this page is printed and screenshotted,
 # so the mark has to be the same weight as the type it sits beside, everywhere.
+# The marker's own arrow: same path, drawn smaller and a touch heavier in stroke, because at
+# the marker's .72em a 9px glyph is wider than the numeral it follows and 2px of stroke on a
+# 6px box reads as a blob.
+CITE_ARROW = ("<svg class='ext-c' viewBox='0 0 12 12' width='7' height='7' aria-hidden='true' "
+              "fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' "
+              "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
+              "<path d='M4.6 3.1h4.3v4.3'/></svg>")
+
 EXT_ARROW = ("<svg class='ext' viewBox='0 0 12 12' width='9' height='9' aria-hidden='true' "
              "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' "
              "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
@@ -1250,12 +1290,15 @@ vertical-align:middle}
 .lbtns{display:flex;flex-wrap:wrap;gap:.7rem;margin:1.1rem 0}
 .lbtn{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .8rem;
 border:1px solid var(--accent-edge);border-radius:4px;background:none;text-decoration:none;
-font:600 .8rem/1.3 var(--mono);letter-spacing:-.01em;color:var(--accent)}
+font:600 .92rem/1.3 var(--serif);color:var(--accent)}
 .lbtn:hover{background:var(--accent-wash)}
 .lbtn .ico{flex:0 0 auto}
 .lbtn-m{font-weight:400;color:var(--text-muted)}
 .lbtn:hover .lbtn-m{color:var(--text-secondary)}
-svg.ext{margin-left:.22em;vertical-align:-.05em;flex:0 0 auto}
+/* inline-block so the link's underline stops at the last letter: the arrow is inside
+   the <a>, and a text-decoration cannot be removed by a descendant — only escaped by
+   one that is not inline. Measured at 4x, the underline ran on beneath it. */
+svg.ext{display:inline-block;margin-left:.22em;vertical-align:-.05em;flex:0 0 auto}
 
 /* Numbers. Direction is a labelled chip, never a colored numeral. */
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;
@@ -1350,7 +1393,11 @@ summary .sum-m{color:var(--text-muted);font-weight:400}
 .carousel{margin:1.1rem 0}
 .tabs{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem}
 .tab{padding:.4rem .75rem;background:none;border:1px solid var(--accent-edge);
-border-radius:4px;cursor:pointer;font:600 .88rem/1.3 var(--mono);color:var(--accent)}
+border-radius:4px;cursor:pointer;font:600 .88rem/1.3 var(--mono);
+color:var(--accent)}
+/* The only mono control on the page, and mono for its CONTENT rather than
+   because it is a control: a carousel tab's label is a record id, so it
+   matches the ids in the run notes rather than the buttons beside it. */
 .tab:hover{background:var(--accent-wash)}
 .tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);
 color:var(--surface-0)}
@@ -1367,9 +1414,59 @@ mark{background:var(--mark);color:inherit;padding:0 .1em}
    enough to hold the accent, and underlined in the accent rather than in a tint of it.
    Buttons are unaffected — .lbtn, .choice, .tab and .skip each set their own font
    shorthand, which beats a bare element selector. */
-a{font-family:var(--mono);font-weight:600;font-size:.92em;letter-spacing:-.01em;
-color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
-text-underline-offset:3px;text-decoration-color:var(--accent)}
+/* A LINK IS MARKED, NEVER RE-FACED. It takes the typography of the text around it — serif
+   in prose, sans in the rail — and the mark is the accent plus the 2px accent underline.
+   Nothing here sets a face, a size or a weight, which is the whole rule.
+
+   It used to be mono 600 at .92em, on the reasoning that mono carries IDENTITY and a link is
+   a thing you go and fetch. That conflated two different kinds of content: a run id or a path
+   IS a literal string, and mono is right for it; "Teaching Claude Why" is language, and
+   setting it in mono changed x-height and letterfit mid-sentence in every paragraph of both
+   reports. Mono now means a literal string and nothing else, which makes it mean more.
+
+   WEIGHT IS PART OF THE MARK, not part of the face: 600 against the surrounding text, which
+   is what a link inherits its face and size from. At the inherited weight the mark was colour
+   and an underline only, and a link in a long report read faint.
+
+   Colour is not carrying this alone: a 2px underline survives greyscale, print (where the
+   print rule turns links black and keeps the underline) and colour-blindness. */
+a{font-weight:600;color:var(--accent);text-decoration:underline;
+text-decoration-thickness:2px;text-underline-offset:.2em;
+text-decoration-color:var(--accent)}
+/* A citation marker: the source, raised, so the sentence it hangs off reads uninterrupted.
+   It carries the accent underline like every other link — it was the one link on the page
+   without one — but THINNER (the brand's 2px under a ~9px numeral is proportionally what 4px
+   would be under body text) and drawn on the <sup> RATHER THAN THE ANCHOR. That is not tidying:
+   a text-decoration is positioned from the element's own baseline, and the anchor's baseline is
+   the paragraph's, so underlining .cite-n put two dashes below and left of the raised numerals,
+   measured at 6x. On the <sup> it tracks the digit. The arrow escapes it, as on every other
+   link, because inline-block breaks the propagation. line-height:0
+   keeps it out of the line box, so a marker cannot open up the leading of the paragraph it
+   sits in. The padding is hit area — inline padding enlarges the target without moving
+   anything — and the negative margin gives back the space it would otherwise add. WCAG 2.5.8
+   exempts a target inside a sentence from the 24px minimum, so this is comfort, not
+   conformance. */
+.cite-n{text-decoration:none;padding:.5em .25em;margin:0 -.25em}
+/* The raise happens ONCE, here, and not on the anchor: <sup> already carries the UA's own
+   vertical-align:super and font-size:smaller, so raising and shrinking the anchor too shifted
+   the digits twice — measured at 4x, they sat above the cap line at ~10px while the separating
+   comma, which had only the anchor's single shift, sat below them. Stating the size and the
+   shift explicitly on the <sup> also replaces `smaller`, which is a relative keyword no two
+   engines have to agree on. */
+.cite-n sup{font-size:.72em;vertical-align:super;line-height:0;
+text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:.18em;
+text-decoration-color:var(--accent)}
+/* The marker's arrow. `vertical-align:.12em` lifts it off the <sup>'s own baseline to sit
+   against the numeral's body — measured at 6x, on the baseline it read as dropped below the
+   digit it belongs to. inline-block for the same reason as svg.ext: a text-decoration cannot
+   be removed by a descendant, only escaped by one that is not inline. */
+svg.ext-c{display:inline-block;margin-left:.08em;vertical-align:.12em}
+.cite-n:hover{background:var(--accent-wash)}
+/* Consecutive markers need separating, or two adjacent numerals read as one number — 1 and 2
+   side by side is "12". A raised comma did that job before each marker carried an arrow; the
+   arrow now separates them, so this is a hair of space instead of another glyph. It has to
+   beat the marker's own -.25em, which is there to give back what its hit-area padding adds. */
+.cite-n+.cite-n{margin-left:-.08em}
 a:hover{background:var(--accent-wash)}
 /* button is in this list because the page HAS buttons — the chooser and the carousel —
    and without it the only controls on the page fall back to the UA's own ring, which is
@@ -1388,9 +1485,12 @@ footer.foot p{margin:0;color:inherit}
    the page stays one file. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
 margin-right:.5rem;flex:0 0 auto}
-.ilink{display:inline-flex;align-items:center;gap:.45rem;font:600 .82rem/1.3 var(--mono);
-color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
-text-underline-offset:3px;text-decoration-color:var(--accent)}
+/* An icon link declares NO face and no size, on purpose: it is not a control — there is
+   nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
+   the footer's own size, like the maker link beside it, and the bare `a` rule gives both the
+   accent, the underline and the 600. Declaring serif here put a serif 600 link next to a sans
+   400 one in the same row; measured, that was the whole of the mismatch. */
+.ilink{display:inline-flex;align-items:center;gap:.45rem}
 .ilink:hover{background:var(--accent-wash)}
 /* The hero's illustration. Dashed while empty, so an unfilled slot reads as deliberate
    rather than as a broken asset; once filled it is line art on the paper, with no frame
