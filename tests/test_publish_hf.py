@@ -299,6 +299,73 @@ class TestStageRun:
         assert staged["corpus_file"] == corpus_name
         assert (run_dir / "final" / corpus_name).exists()
 
+    def test_staging_dir_pointing_at_a_sibling_run_is_rejected(self, tmp_path):
+        """A --staging-dir that typo'd onto a DIFFERENT run dir (a very
+        plausible mistake — both live under outputs/*/runs/) must be refused
+        rather than wiped, or the sibling run's corpus/manifest are gone."""
+        run_a, corpus_a = make_run_dir(tmp_path, run_name="run-a")
+        run_b, _ = make_run_dir(tmp_path, run_name="run-b")
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run([run_a], corpus_a, run_b, "sdf")
+        assert (run_b / "final" / "sdf_corpus.jsonl").exists()
+        assert (run_b / "run_manifest.json").exists()
+
+    def test_populated_foreign_staging_dir_is_rejected(self, tmp_path):
+        """A non-empty --staging-dir with no marker and no legacy staging
+        shape wasn't created by this script — refuse rather than wipe it."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        foreign = tmp_path / "foreign"
+        foreign.mkdir()
+        (foreign / "notes.txt").write_text("keep me", encoding="utf-8")
+        (foreign / "subdir").mkdir()
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run([run_dir], corpus_name, foreign, "sdf")
+        assert (foreign / "notes.txt").exists()
+        assert (foreign / "subdir").exists()
+
+    def test_empty_pre_existing_staging_dir_is_accepted(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_dir = tmp_path / "staged"
+        staging_dir.mkdir()
+        staged, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
+        assert (dataset_dir / corpus_name).exists()
+
+    def test_tool_created_staging_dir_carries_the_marker_and_is_reusable(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_dir = tmp_path / "staged"
+        _stage(run_dir, corpus_name, staging_dir)
+        assert (staging_dir / publish_hf.STAGING_MARKER).exists()
+        # a second call must not be refused just because it now owns the dir
+        staged, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
+        assert (dataset_dir / corpus_name).exists()
+
+    def test_legacy_staging_dir_without_the_marker_is_still_reused(self, tmp_path):
+        """A staging dir created by a pre-marker version of this script has no
+        STAGING_MARKER, but its shape (README.md + sdf/ and/or dad/ dirs) is
+        recognizable — don't force a manual delete on every existing local
+        staging dir just because the script grew a marker file."""
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_dir = tmp_path / "staged"
+        staging_dir.mkdir()
+        (staging_dir / "README.md").write_text("old card", encoding="utf-8")
+        legacy_sdf = staging_dir / "sdf"
+        legacy_sdf.mkdir()
+        (legacy_sdf / "sdf_corpus.jsonl").write_text("stale", encoding="utf-8")
+
+        staged, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
+        assert (dataset_dir / corpus_name).exists()
+        # the stale legacy content is gone, replaced by this run's corpus
+        assert (dataset_dir / corpus_name).read_text(encoding="utf-8") != "stale"
+
+    def test_staging_dir_that_is_a_file_is_rejected(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path)
+        staging_file = tmp_path / "staged"
+        staging_file.write_text("not a directory", encoding="utf-8")
+        with pytest.raises(SystemExit):
+            publish_hf.stage_run([run_dir], corpus_name, staging_file, "sdf")
+        assert staging_file.is_file()
+        assert staging_file.read_text(encoding="utf-8") == "not a directory"
+
 
 class TestFlattenDadCorpus:
     def test_staged_dad_records_are_flat_columns(self, tmp_path):
@@ -923,6 +990,21 @@ class TestHubApiWrappers:
         assert calls[0]["repo_id"] == "sentientfutures/x"
         assert calls[0]["folder_path"] == "/tmp/staged"
 
+    def test_upload_folder_never_uploads_the_staging_marker(self, monkeypatch):
+        """huggingface_hub only ignores .git*/.cache/huggingface by default,
+        so without an explicit ignore_patterns the local ownership marker
+        would ship to the Hub as dataset content."""
+        calls = []
+
+        class FakeHfApi:
+            def upload_folder(self, **kwargs):
+                calls.append(kwargs)
+                return "fake-commit"
+
+        monkeypatch.setattr("huggingface_hub.HfApi", FakeHfApi)
+        publish_hf._upload_folder("/tmp/staged", "sentientfutures/x", "msg", [])
+        assert calls[0]["ignore_patterns"] == [publish_hf.STAGING_MARKER]
+
 
 def _run_main(monkeypatch, *args):
     monkeypatch.setattr(sys, "argv", ["publish_hf.py", *args])
@@ -938,6 +1020,21 @@ class TestMainEndToEnd:
         out = capsys.readouterr().out
         assert "no Hub API calls made" in out
         assert "README.md" in out
+
+    def test_dry_run_refuses_a_foreign_staging_dir(self, tmp_path, monkeypatch, stub_hf):
+        """The ownership check runs inside stage_run, which --dry-run calls
+        before its early return — so --dry-run must refuse a foreign
+        --staging-dir too, deleting nothing."""
+        run_dir, _ = make_run_dir(tmp_path)
+        foreign = tmp_path / "foreign"
+        foreign.mkdir()
+        (foreign / "notes.txt").write_text("keep me", encoding="utf-8")
+        stub_hf(raise_on_call=True)
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, "--input", str(run_dir),
+                      "--repo-id", "sentientfutures/sdf-corpus", "--dry-run",
+                      "--staging-dir", str(foreign))
+        assert (foreign / "notes.txt").exists()
 
     def test_dry_run_without_staging_dir_leaves_files_on_disk(
         self, tmp_path, monkeypatch, stub_hf, capsys
@@ -1211,8 +1308,13 @@ class TestSiblingPreservation:
                         for p in staging_dir.rglob("*") if p.is_file()}
         assert not any(p.startswith("sdf/") for p in staged_paths)
         assert not any(".cache" in p for p in staged_paths)
+        # STAGING_MARKER is local bookkeeping (proves this script owns the
+        # staging dir on reuse) — excluded from the upload itself by
+        # _upload_folder's ignore_patterns, see
+        # test_upload_folder_never_uploads_the_staging_marker.
         assert staged_paths == {"README.md", "dad/dad_corpus.jsonl",
-                                "dad/run_manifest.json", "dad/audit/audit_report.json"}
+                                "dad/run_manifest.json", "dad/audit/audit_report.json",
+                                publish_hf.STAGING_MARKER}
 
     def test_no_sibling_yet_gives_a_single_config_card(self, tmp_path, monkeypatch, stub_hf):
         """First publish into a fresh repo: nothing to preserve, and the card
