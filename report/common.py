@@ -374,6 +374,22 @@ def warnings_table(warnings, *, inline=3, drawer_label="more findings at this le
 
 # ------------------------------------------------------------------ shell bits
 
+def meta_line(*, run_id, manifest, pairs=()):
+    """The provenance line. ``pairs`` is [(label, value_html)] appended in order.
+
+    Derived from the run directory's own name and its manifest, so a page that cannot
+    locate a run says nothing rather than printing a line of question marks.
+    """
+    m = manifest or {}
+    cfg = m.get("config") or {}
+    bits = [f"run <span class='mono'>{R.esc(run_id or m.get('run_id', '?'))}</span>",
+            f"git <span class='mono'>{R.esc(str(m.get('git_commit', '?'))[:8])}</span>"
+            + (" <span class='mono'>+ uncommitted changes</span>" if m.get("git_dirty") else ""),
+            f"backend <code>{R.esc(cfg.get('backend', '?'))}</code>"]
+    bits += [f"{R.esc(k)} {v}" for k, v in pairs]
+    return " · ".join(bits)
+
+
 # ------------------------------------------------------------------ CLI
 
 def write(path, html, *, label=""):

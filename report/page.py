@@ -180,19 +180,29 @@ def section_explore(panels, outlines):
                          rails, panels))
 
 
-def footer(maker_icon=""):
-    """Who made it and where to go.
+def footer(maker_icon="", runs=()):
+    """Who made it, where to go, and which runs this page was built from.
 
-    No run ids, no commits, no backend. The page reads as the pipeline running now rather
-    than as a report on one batch that finished, and a footer naming two run directories
-    dates it to that batch. What a reader needs to locate the data is the two links, and
-    what they need to reproduce it is the repository.
+    The provenance was taken off the page once, on the grounds that a run id is for a
+    reader already deep in a report rather than for the last line — right about where it
+    belongs, wrong about the consequence, because it then appeared nowhere at all. A page
+    whose every figure is derived from two run directories has to name them, or nothing on
+    it can be located in the repository, reproduced, or cited. Here is where a reader
+    looks for that, and it stays out of the reports themselves.
+
+    ``runs`` is [(dataset name, run_id, manifest)]; a dataset with no run is skipped, so a
+    page built without one carries no half-line about it.
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
+    provenance = "".join(
+        f"<p class='foot-run'>{R.esc(name)} — "
+        f"{C.meta_line(run_id=run_id, manifest=manifest)}</p>"
+        for name, run_id, manifest in runs if run_id)
     return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>"
+            + provenance)
 
 
 # ------------------------------------------------------------------ assembly
@@ -234,7 +244,10 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
     head = {
         "title": title,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
-        "footer": footer(maker_icon),
+        "footer": footer(maker_icon, runs=[
+            (sdf.SECTION_TITLE, sdf_kwargs.get("run_id"), sdf_kwargs.get("manifest")),
+            (dad.SECTION_TITLE, dad_kwargs.get("run_id"), dad_kwargs.get("manifest")),
+        ]),
     }
     return "".join(sections), head
 

@@ -1109,7 +1109,10 @@ column-gap:3rem}
    the <h2> it belongs to. 3rem here plus the rail's own .2rem is that margin — the two
    numbers have to add up to it, which is what the test recomputes. Only at rest: once the
    rail pins, its own `top` places it. */
-.railcol{grid-column:rail-col;padding-top:9rem}
+/* The contents start level with the report's <h2>, not with the top of the row: the panel
+   carries a 3.2rem top margin the rail does not, so without this the first beat sat ~48px
+   above the heading it is the contents of. This plus the rail's own .2rem is that margin. */
+.railcol{grid-column:rail-col;padding-top:3rem}
 .panels{grid-column:read-col;min-width:0}
 /* One report's contents, held on screen for as long as that report is being read.
    Its travel is .railcol, which stretches to the row's height — the height of the open
@@ -1379,6 +1382,9 @@ font:.85rem/1.6 var(--sans);color:var(--text-muted);
 display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
 footer.foot p{margin:0;color:inherit}
 .foot-links{display:flex;gap:1.6rem}
+/* One line per run, below the maker line and the two ways out: the footer is a flex row, so
+   these take a row of their own rather than being squeezed in beside the links. */
+.foot-run{flex:1 0 100%;font-size:.8rem}
 /* Which runs this page was built from. Its own line under the two above, at the size the
    rest of the footer takes: a reader looking for it is looking deliberately. */
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so

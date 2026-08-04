@@ -237,14 +237,10 @@ class TestShape:
             assert "class='lede'" in head
             assert "<h3" not in head, f"#{pid} opens on a heading"
 
-    def test_the_difficult_advice_report_opens_on_what_it_is(self):
-        """The beat, then its lede. The lede is still the first line a reader reads and
-        still the comparison's own masthead sentence — someone who arrived on #dad from a
-        deep link never saw that table — but it now sits under a heading, above the flow
-        and one record."""
-        panel = build(sdf_inputs=SDF_INPUTS).split("<section id='dad'")[1]
-        head = panel[:panel.index("<h3 id='dad-built'")]
-        assert head.index("<h3 id='dad-what'>") < head.index("class='lede'")
+    # A `test_the_difficult_advice_report_opens_on_what_it_is` sat here, requiring
+    # `<h3 id='dad-what'>` above the lede. It was the exact opposite of
+    # test_neither_report_puts_a_heading_over_its_opening_line above, which is the current
+    # rule and covers the same ground — both cannot hold, and the beat is gone.
 
     def test_the_hero_is_the_image_the_title_and_the_lines_that_follow(self):
         """Image, title, intro, centred, and nothing else. A lede, a meta line or a set
@@ -819,9 +815,11 @@ class TestContentsRail:
         markup = html[:html.index("<script>")]
         assert re.findall(r"data-rail='([^']+)'", markup) == ["sdf", "dad"]
         rail = self.rail(html, "dad")
+        # Three beats, the report's own. "What it is" and "Caveats" were both cut — the
+        # report opens on a bare lede with no heading, so it earns no rail item, and
+        # test_both_reports_take_the_same_skeleton holds the caveats beat gone on both sides.
         assert [t for _, t in re.findall(r"class='r-b' href='#([^']+)'>([^<]+)<", rail)] == [
-            "What it is", "How it is built", "One example, end to end", "Caveats",
-            "Appendix"]
+            "The pipeline", "One example, end to end", "Appendix"]
 
     def test_the_stages_are_sub_items_under_the_beat_they_belong_to(self):
         """The point of the sub-items: a report's stages are where a reader is going, and
@@ -842,11 +840,11 @@ class TestContentsRail:
                 by_beat[current].append(target)
         assert by_beat["dad-built"] == ["dad-built-stage1", "dad-built-stage2",
                                        "dad-built-stage3", "dad-built-control"]
-        assert by_beat["dad-weak"] == [] and by_beat["dad-appendix"] == []
-        # The opening beat names its two halves — "The pipeline" and "The result" — and
-        # they take no id, so they stay out of the rail. "The pipeline" listed here,
-        # directly above "How it is built", is exactly the ambiguity the labels remove.
-        assert by_beat["dad-what"] == []
+        assert by_beat["dad-appendix"] == []
+        # The two cut beats are not in the rail because they are not in the report: a rail
+        # item naming a beat that did not render is the failure render.outline() exists to
+        # prevent, so their absence is asserted here rather than assumed.
+        assert "dad-weak" not in by_beat and "dad-what" not in by_beat
 
     def test_the_appendix_drawers_are_not_in_the_rail(self):
         """An <h4> becomes a rail item by having an id, and the appendix's headings live

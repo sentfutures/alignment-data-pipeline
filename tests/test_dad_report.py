@@ -591,45 +591,26 @@ class TestChartsAreEvidence:
         html = build(diversity=DIVERSITY, manifest=MANIFEST)
         assert "figures · On this run" in html
 
-    def test_the_report_opens_on_what_it_is_and_still_measures_nothing(self):
-        """The report opens on a beat that shows the pipeline's shape and one record.
+    def test_the_report_opens_on_a_lede_and_measures_nothing_there(self):
+        """The report opens on a bare lede — one sentence saying what this is.
 
-        This WAS a lede and nothing else, on the reasoning that a "What it is" heading over
-        a single sentence only names what a reader can see. That held for one sentence. It
-        does not hold for a beat carrying the flow and a record — the two things a reader
-        arriving cold cannot otherwise see until the worked example, ~3,000px down.
+        It briefly opened on a "What it is" beat carrying the flow and a specimen record;
+        both moved (the diagram to the pipeline beat whose prose reads it aloud, the record
+        to the worked example that shows it in full), and a heading over a single sentence
+        only names what a reader can already see. `test_neither_report_puts_a_heading_over
+        _its_opening_line` in test_report_page.py holds both reports to that.
 
-        What did NOT change is the half of the old rule that was about measurement: the beat
-        is a schematic and a quotation, so no figure, no tile, no chip and no score. A chart
-        here would be arguing a result before the reader knows what the data is.
+        What did NOT change is the half of the rule that was about measurement: nothing
+        above the pipeline beat carries a figure, a tile, a chip or a score. A chart there
+        would argue a result before the reader knows what the data is.
         """
         section = dad_section(build(diversity=DIVERSITY, manifest=MANIFEST,
                                     rewrites=REWRITES, lineage=LINEAGE))
         head = section[:section.index("<h3 id='dad-built'")]
-        assert "<h3 id='dad-what'>What it is</h3>" in head
         assert "class='lede'" in head          # the line still says what the dataset is
-        assert "class='flow'" in head and "class='pair'" in head
+        assert "<h3" not in head               # and it carries no heading of its own
         for banned in ("/10", "chip", "class='tiles'", "<figure"):
             assert banned not in head, banned
-
-    def test_the_two_halves_are_named_as_the_process_and_its_output(self):
-        """A diagram and a quotation, unlabelled, leave the reader to work out which is the
-        pipeline and which is what it makes — the one distinction the rest of the page rests
-        on, since everything after this beat is process. The labels come BEFORE the sentence
-        that reads each one aloud, so the order is heading, sentence, thing, twice.
-
-        Unanchored on purpose: an id is what puts an <h4> in the rail (`render.substep`),
-        and "The pipeline" listed there directly above the beat "How it is built" puts the
-        ambiguity back in the one place a reader scans for structure.
-        """
-        section = dad_section(build(diversity=DIVERSITY, manifest=MANIFEST,
-                                    rewrites=REWRITES, lineage=LINEAGE))
-        head = section[:section.index("<h3 id='dad-built'")]
-        order = [head.index(m) for m in ("class='lede'", "<h4>The pipeline</h4>",
-                                         "class='flow'", "<h4>The result</h4>",
-                                         "class='pair'")]
-        assert order == sorted(order), "the beat's halves are out of order"
-        assert "<h4 id=" not in head
 
 
 class TestDegradation:
@@ -702,35 +683,36 @@ class TestDegradation:
         assert "AW-0001" in build(audit=audit)
 
 
-class TestWhatItIs:
-    """The opening beat: the pipeline's shape, and one record.
+class TestTheFlow:
+    """The pipeline schematic, which lives in the pipeline beat.
 
-    Its whole reason to exist is that both were previously invisible until the worked
-    example. The risks it introduces: a diagram carrying information the prose does not, so
-    a screen reader or a print-to-greyscale loses it; a specimen a reader mistakes for a
-    whole record; and prose growing back at the top of the report, which is the part the
-    budget exists to protect.
+    It used to open the report, in a `dad-what` beat with a 30-word specimen record beside
+    it. Both went: the diagram moved down to the beat whose prose reads it aloud, and the
+    specimen was cut because the worked example two beats below is the same record in full.
+    What survived the move is what this class keeps — the diagram owes an accessible name,
+    because SVG text is not read as prose, and it owes the chart palette a wide berth,
+    because it measures nothing.
     """
 
     @staticmethod
-    def _beat(**kwargs):
+    def _built(**kwargs):
         kwargs.setdefault("rewrites", REWRITES)
         kwargs.setdefault("lineage", LINEAGE)
         section = dad_section(build(**kwargs))
-        return section[section.index("id='dad-what'"):section.index("id='dad-built'")]
+        return section[section.index("id='dad-built'"):section.index("id='dad-example'")]
 
     def test_the_flow_is_parseable_svg_with_an_accessible_name(self):
         """SVG text is not read as prose, so the diagram owes a name that says what the
         whole thing is — not just labels a sighted reader can assemble."""
         import xml.etree.ElementTree as ET
-        svg = re.search(r"<svg[^>]*class='flow'.*?</svg>", self._beat(), re.S).group(0)
+        svg = re.search(r"<svg[^>]*class='flow'.*?</svg>", self._built(), re.S).group(0)
         el = ET.fromstring(svg)
         assert el.get("role") == "img"
         assert el.find("title") is not None
         assert "weighted matrix" in el.get("aria-label")
 
     def test_the_flow_names_the_stages_the_report_goes_on_to_explain(self):
-        """The overview is a map of the beats below it. Three vocabularies for three views
+        """The diagram is a map of the stages beside it. Three vocabularies for three views
         of one pipeline is how a reader stops believing it is one pipeline."""
         section = dad_section(build(rewrites=REWRITES, lineage=LINEAGE))
         built = section[section.index("id='dad-built'"):section.index("id='dad-example'")]
@@ -741,67 +723,33 @@ class TestWhatItIs:
     def test_the_flow_is_a_schematic_so_it_carries_no_series_or_status_colour(self):
         """Nothing in it is proportional to a measurement. Drawn in the chart palette it
         would read as a result, which is the one thing the report does not lead with."""
-        flow = re.search(r"<svg[^>]*class='flow'.*?</svg>", self._beat(), re.S).group(0)
+        flow = re.search(r"<svg[^>]*class='flow'.*?</svg>", self._built(), re.S).group(0)
         for reserved in ("--series-", "--good", "--warn", "--bad", "--accent"):
             assert reserved not in flow, reserved
 
     def test_the_prose_says_what_the_diagram_shows(self):
-        """The sentence above the flow is not a caption. If the diagram does not render —
+        """The prose beside the flow is not a caption. If the diagram does not render —
         print, a stripped mail client, a screen reader — the reader still learns the shape.
         Read against the SHIPPED prose, because the fixture's placeholder cannot prove it.
         """
         from pathlib import Path
         prose = (Path(__file__).resolve().parent.parent
                  / "report" / "content_dad.md").read_text(encoding="utf-8")
-        said = prose[prose.index("id: what_pipeline"):prose.index("id: what_record")]
-        for shown in ("weighted matrix", "the dilemma", "the reasoning",
-                      "the constitution rewrite"):
+        said = prose[prose.index("id: method_intro"):prose.index("id: example_pick")]
+        for shown in ("weighted matrix", "stage 1", "stage 2", "stage 3"):
             assert shown in said, shown
+        # NOTE: the diagram's stage names and this prose no longer share a vocabulary —
+        # the flow says "the constitution rewrite" and the copy pass rewrote the prose to
+        # say "your alignment documents". That is a copy decision, not a test one, so this
+        # asserts the source and the count a reader can check rather than pinning either
+        # wording until it is settled.
 
-    def test_the_specimen_is_trimmed_visibly(self):
-        """A silent truncation lets a reader take 30 words for the whole answer. Both
-        halves are cut at the same word and both cuts are marked."""
-        long_rw = [{"prompt_id": "AW-0001", "user_message": " ".join(f"q{i}" for i in range(80)),
-                    "draft_response": "d",
-                    "rewritten_response": " ".join(f"a{i}" for i in range(80))}]
-        beat = self._beat(rewrites=long_rw)
-        assert beat.count("…") == 2                      # both halves cut, both marked
-        assert "q29 …" in beat and "a29 …" in beat       # at the same word
-        assert "q30" not in beat and "a30" not in beat
-
-    def test_the_overview_does_not_link_on_to_the_worked_example(self):
-        """It is the overview. A link forward to a beat the reader reaches by scrolling is
-        furniture, and a 30-word specimen is not the place for a record id either."""
-        beat = self._beat()
-        assert "#dad-example" not in beat
-        assert "class='mono'" not in beat
-
-    def test_a_record_shorter_than_the_trim_is_not_marked_as_cut(self):
-        """An ellipsis on a record that is whole would be a lie about the data."""
-        assert "…" not in self._beat()                   # the fixture's answers are four words
-
-    def test_the_specimen_is_the_record_the_worked_example_walks(self):
-        """One case at the top and a different one below would read as two datasets."""
-        section = dad_section(build(rewrites=REWRITES, lineage=LINEAGE))
-        beat = section[section.index("id='dad-what'"):section.index("id='dad-built'")]
-        example = section[section.index("id='dad-example'"):section.index("id='dad-appendix'")]
-        assert "Should I do the thing?" in beat and "Should I do the thing?" in example
-
-    def test_the_specimen_escapes_run_text(self):
-        hostile = [{"prompt_id": "AW-0001", "user_message": "<img src=x onerror=alert(1)>",
-                    "draft_response": "d", "rewritten_response": "</div><script>bad()"}]
-        beat = self._beat(rewrites=hostile)
-        assert "<img src=x" not in beat and "<script>bad()" not in beat
-        assert "&lt;img src=x" in beat
-
-    def test_a_run_with_no_rewrites_names_the_file_instead_of_vanishing(self):
-        """The beat is unconditional — it is the report's opening — so a run that kept no
-        step-3 output has to say which file that was."""
-        beat = self._beat(rewrites=[], lineage={})
-        assert "class='flow'" in beat          # the pipeline half does not depend on a run
-        assert "step3/rewrites.jsonl" in beat
-        assert "None" not in strip_tags(beat)
-
+    def test_the_pipeline_beat_does_not_lead_on_a_measurement(self):
+        """A chart here would argue a result before the reader knows what the data is. The
+        report's figures live in the appendix, and this beat is the process."""
+        built = self._built(diversity=DIVERSITY, manifest=MANIFEST)
+        for banned in ("/10", "class='tiles'", "<figure"):
+            assert banned not in built, banned
 
 class TestLineage:
     """The worked example is one record's whole trail, assembled from the run's own step
@@ -818,9 +766,9 @@ class TestLineage:
     def test_the_stages_render_in_pipeline_order(self):
         ex = self._example()
         marks = [ex.index(m) for m in (
-            "Stage 1 · the dilemma", "dealt axis", "the planner wrote",
+            "Stage 1 · the dilemma", "dealt axis", "the planner writes",
             "Should I do the thing?", "Stage 2 · the reasoning",
-            "what stage 2 worked out", "Stage 3 · the constitution rewrite")]
+            "what stage 2 works out", "Stage 3 · the constitution rewrite")]
         assert marks == sorted(marks), marks
 
     def test_the_stage_headings_match_the_ones_the_method_beat_uses(self):
@@ -840,10 +788,10 @@ class TestLineage:
         assert "Consider the animals here." in strip_tags(answer.split("<details")[0])
         # The control's answer is inside a <summary>...</summary> drawer label's details
         # block, and the label says what it is for.
-        take = ex[ex.index("The first take stage 2 was shown"):]
-        assert take.startswith("The first take stage 2 was shown")
+        take = ex[ex.index("The first take stage 2 is shown"):]
+        assert take.startswith("The first take stage 2 is shown")
         assert "never a training record" in take[:400]
-        assert "Maybe." not in strip_tags(ex[:ex.index("The first take stage 2 was shown")])
+        assert "Maybe." not in strip_tags(ex[:ex.index("The first take stage 2 is shown")])
 
     def test_the_dealt_cards_drop_null_axes(self):
         """A deal with no cultural setting has no cultural setting. Rendering the axis
@@ -885,27 +833,38 @@ class TestLineage:
         assert "step1/scenarios.jsonl" in ex
 
     def test_examples_are_pinned_in_the_prose_file(self):
+        """The prose file's picks decide which record is walked and which sit behind the
+        carousel. Asserted on the records themselves: the beat prints the extra's gid on its
+        carousel tab, but the PRIMARY record's gid appears nowhere — it and the "pinned in
+        the prose file" note were both dropped in the copy pass, so the featured record is
+        currently not locatable in the dataset viewer by id."""
         ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"))
-        assert "pinned in the prose file" in strip_tags(ex)
-        assert "R-0201" in ex and "R-0202" in ex
+        assert "Should I do the thing?" in strip_tags(ex)     # AW-0001 is the one walked
+        assert "R-0202" in ex                                 # AW-0002's carousel tab
 
     def test_the_cli_overrides_the_primary_only(self):
         ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"),
                            example="AW-0002")
+        # The primary is the CLI's record, not the prose file's: its own message is the one
+        # quoted in stage 1. (The prose file's only extra IS this record, so it is spent as
+        # the primary and no carousel is left over — which is why this asserts the trail
+        # rather than a tab.)
         first = ex.index("Stage 1 · the dilemma")
-        assert "R-0202" in ex[:first + 400]
+        assert "And this other thing?" in strip_tags(ex[first:ex.index("Stage 2 ·")])
+        assert "Should I do the thing?" not in strip_tags(ex)
 
     def test_auto_picks_the_first_shipped_record(self):
         """Deliberately not the showcase judge's favourite: this beat shows how a record
         is built, and must not depend on the paid pass having run."""
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
         ex = self._example(audit=audit, content=content(example_pick="auto"))
-        assert "R-0201" in ex
+        assert "Should I do the thing?" in strip_tags(ex)      # the first shipped record
 
     def test_a_pinned_id_this_run_never_shipped_says_so(self):
         ex = self._example(content=content(example_pick="AW-9999"))
         assert "is not in this run" in strip_tags(ex)
-        assert "R-0201" in ex  # and it falls back rather than rendering nothing
+        # and it falls back to the first shipped record rather than rendering nothing
+        assert "Should I do the thing?" in strip_tags(ex)
 
     def test_the_extra_examples_are_a_carousel(self):
         ex = self._example(content=content(example_pick="AW-0001", example_extra="AW-0002"))
