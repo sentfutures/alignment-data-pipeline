@@ -41,7 +41,7 @@ permissions:
   issues: write # labels + comments (PRs are issues to those APIs)
   pull-requests: write
   id-token: write # claude-code-action auth
-  actions: read # busy gate
+  actions: write # busy gate reads runs; the backfill tick dispatches workflows
 
 jobs:
   fix:
@@ -195,7 +195,7 @@ jobs:
           claude_args: |
             --model sonnet
             --effort medium
-            --max-turns 50
+            --max-turns 75
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git rev-parse:*),Bash(git ls-remote:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(pytest:*),Bash(python:*)"
             --disallowedTools "Task"
 
@@ -298,3 +298,11 @@ jobs:
             gh pr comment "$PR" -R "$REPO" --body-file "$body"
             echo "Classified as TASK FAILURE — needs-human applied."
           fi
+
+      # Backfill: see the matching step in claude-fix.yml — freed capacity
+      # immediately re-checks the wait queues instead of idling until the cron.
+      - name: Trigger a requeue tick
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run claude-quota-retry.yml -R "$REPO" || true
