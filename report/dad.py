@@ -502,7 +502,7 @@ def lineage_blocks(pid, rw, base, lin, labels):
                                   fallback=lin.get("selection_fallback")))
     if base.get("baseline_response"):
         out.append(R.details(
-            "The first take stage 2 is shown · plain model, no system prompt",
+            "The first take stage 2 is shown · control model, no system prompt",
             R.highlight(base["baseline_response"], []),
             meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
 
@@ -741,7 +741,7 @@ def _delivery_statement(audit, f):
         f"**Judged delivery went the wrong way: {f['delivery_pipeline']} against the "
         f"control's {f['delivery_plain']} out of {_score_max(audit)}.** The added substance "
         f"was not free — on "
-        f"manner alone, the plain answers read as more helpful.{every}", tone="bad")
+        f"manner alone, the control's answers read as more helpful.{every}", tone="bad")
 
 
 def _pareto_figure(audit, mpr, labels):
@@ -799,16 +799,17 @@ def _pareto_impact_figure(delivery, welfare, labels):
             x, y = _blended(entry.get(arm)), _blended(w_entry.get(arm))
             if x is None or y is None:
                 continue
+            shown = "control" if arm == "plain" else arm
             pts.append({"x": x, "y": y, "color": R.ARM_COLORS[arm],
-                        "tip": f"{labels.get(pid, pid)} · {arm}: welfare impact {y:.0f}, "
+                        "tip": f"{labels.get(pid, pid)} · {shown}: welfare impact {y:.0f}, "
                                f"delivery {x:.0f}, both /{smax}"})
             s = sums[arm]
             s[0] += x
             s[1] += y
             s[2] += 1
     marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
-              "tip": f"{arm} mean: welfare impact {s[1] / s[2]:.1f}, "
-                     f"delivery {s[0] / s[2]:.1f}"}
+              "tip": f"{'control' if arm == 'plain' else arm} mean: "
+                     f"welfare impact {s[1] / s[2]:.1f}, delivery {s[0] / s[2]:.1f}"}
              for arm, s in sums.items() if s[2]]
     caption = ""
     p, b = sums["pipeline"], sums["plain"]
@@ -876,14 +877,16 @@ def _pareto(delivery, mpr, labels):
             if score is None or reasons is None:
                 continue
             y = len(reasons)
+            shown = "control" if arm == "plain" else arm
             pts.append({"x": score, "y": y, "color": R.ARM_COLORS[arm],
-                        "tip": f"{labels.get(pid, pid)} · {arm}: {y} considerations, "
+                        "tip": f"{labels.get(pid, pid)} · {shown}: {y} considerations, "
                                f"delivery {score}/{smax}"})
             sums[arm][0] += score
             sums[arm][1] += y
             sums[arm][2] += 1
     marks = [{"x": s[0] / s[2], "y": s[1] / s[2], "color": R.ARM_COLORS[arm],
-              "tip": f"{arm} mean: delivery {s[0] / s[2]:.1f}/{smax}, "
+              "tip": f"{'control' if arm == 'plain' else arm} mean: "
+                     f"delivery {s[0] / s[2]:.1f}/{smax}, "
                      f"{s[1] / s[2]:.1f} considerations"}
              for arm, s in sums.items() if s[2]]
     return R.scatter(pts, xdomain=(0, smax), marks=marks,
@@ -1081,7 +1084,7 @@ def _tics_figure(audit):
     if not (watch and n_pipe):
         return ""
     rows = sorted(({"label": phrase,
-                    "plain": (d.get("plain") or 0) / n_plain if n_plain else 0,
+                    "control": (d.get("plain") or 0) / n_plain if n_plain else 0,
                     "pipeline": (d.get("pipeline") or 0) / n_pipe}
                    for phrase, d in watch.items()
                    if (d.get("pipeline") or d.get("plain"))),
@@ -1092,7 +1095,7 @@ def _tics_figure(audit):
         title="Tracked phrases",
         note_="Phrases the eval watches by name because earlier runs turned them into "
               "habits. Share of each arm's answers containing one at least once.",
-        chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+        chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                              percent=True, label_w=210),
         caption="**The pipeline's most common tracked phrase stays well under half of "
                 "its answers**, which is where a word choice becomes a tic.")
@@ -1103,19 +1106,19 @@ def _moves_figure(audit):
     moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
     if not moves:
         return ""
-    rows = sorted(({"label": name, "plain": d.get("plain_share"),
+    rows = sorted(({"label": name, "control": d.get("plain_share"),
                     "pipeline": d.get("pipeline_share")} for name, d in moves.items()),
                   key=lambda r: -(r["pipeline"] or 0))
     gloss = {name: (d.get("description") or "") for name, d in moves.items()}
     invented = [r["label"] for r in rows
-                if (r["pipeline"] or 0) > 0.25 and not (r["plain"] or 0)]
+                if (r["pipeline"] or 0) > 0.25 and not (r["control"] or 0)]
     dropped = [r["label"] for r in rows
-               if (r["plain"] or 0) > 0.25 and not (r["pipeline"] or 0)]
+               if (r["control"] or 0) > 0.25 and not (r["pipeline"] or 0)]
     return R.figure(
         title="Rhetorical habits",
         note_="Argumentative moves, as a share of each arm's answers. Hover a bar for "
               "what the move is; the definitions are below.",
-        chart=R.grouped_hbar(rows[:6], series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+        chart=R.grouped_hbar(rows[:6], series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                              percent=True, label_w=210, glossary=gloss),
         caption=(_habits_caption(invented, dropped) if (invented or dropped) else
                  "**Both arms reach for the same moves at similar rates.**"))
@@ -1138,7 +1141,7 @@ def blocks_built(content, f):
                      title="The pipeline, top to bottom: a weighted matrix deals each case "
                            "in code, then three model stages — the dilemma, the reasoning, "
                            "and the constitution rewrite — turn it into one training record "
-                           "of a user message and an assistant answer. A plain model with no "
+                           "of a user message and an assistant answer. A control model with no "
                            "system prompt answers the same dilemma, and stage 2 is shown "
                            "that answer as a first take.")]
     for key, heading in (("stage1", "Stage 1 · the dilemma"),
@@ -1170,13 +1173,13 @@ def _footprint_figures(audit, f):
                     f"most visible property a model would inherit, and the judges see it too."))
     stance = (audit.get("moves") or {}).get("stance") or {}
     if stance.get("pipeline"):
-        rows = [{"label": k, "plain": (stance.get("plain") or {}).get(k),
+        rows = [{"label": k, "control": (stance.get("plain") or {}).get(k),
                  "pipeline": stance["pipeline"].get(k)}
                 for k in ("defers", "calibrated", "moralizes")
                 if stance["pipeline"].get(k) is not None]
         blocks.append(R.figure(
             title="Stance",
-            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+            chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                                  percent=True),
             caption=f"**The pipeline moralizes more than the control** "
                     f"({f.get('moralizes_pipeline', '?')} against "
@@ -1237,13 +1240,13 @@ def _appendix_charts(audit, f, cons):
     out = []
     mpr = audit.get("moral_patient_reasons") or {}
     if cons and cons.get("plain") is not None:
-        subset_rows = [{"label": name, "plain": b, "pipeline": p}
+        subset_rows = [{"label": name, "control": b, "pipeline": p}
                        for name, b, p in cons["subsets"] if p is not None]
         if subset_rows:
             out.append(R.figure(
                 title="Split by kind of consideration",
                 chart=R.grouped_hbar(subset_rows,
-                                     series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+                                     series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)],
                                      fmt="{:.2f}"),
                 caption="**The gain is in the reasoning as well as in the alternatives "
                         "offered.**"))
@@ -1267,11 +1270,11 @@ def _appendix_charts(audit, f, cons):
     if types_p and types_b:
         gloss = (audit.get("reason_composition") or {}).get("type_gloss") or {}
         keys = list(dict(types_p, **types_b))
-        rows = [{"label": k, "plain": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
+        rows = [{"label": k, "control": types_b.get(k, 0), "pipeline": types_p.get(k, 0)}
                 for k in keys]
         out.append(R.figure(
             title="Kinds of consideration raised",
-            chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)]),
+            chart=R.grouped_hbar(rows, series=[("control", R.PLAIN), ("pipeline", R.PIPELINE)]),
             caption="**The pipeline's largest gains are in the kinds of point the control "
                     "raises least.**",
             table_html=R.table(["kind", "what it is", "control", "pipeline"],
