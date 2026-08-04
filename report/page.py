@@ -9,7 +9,8 @@ which one they want to read about.
 
 Structure:
 
-    hero        the illustration, the title, and #intro — what this is, in three lines
+    hero        the illustration, the title, and #intro — the finding, the two techniques
+                it names (as two columns), and what we built on them
     #datasets   the two datasets, compared row by row
     #explore    Walk through either pipeline — two buttons
       #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
@@ -32,7 +33,8 @@ from report import dad
 from report import render as R
 from report import sdf
 
-CONTENT_IDS = ("title", "intro", "sdf_desc", "sdf_use", "sdf_unit",
+CONTENT_IDS = ("title", "intro", "sdf_technique", "dad_technique", "intro_close",
+               "sdf_desc", "sdf_use", "sdf_unit",
                "dad_desc", "dad_use", "dad_unit")
 
 
@@ -138,6 +140,21 @@ def _cell(content, key, f):
     return R.Raw(R.inline_md(C.fill(content.get(key, ""), f)))
 
 
+_LEAD_BOLD = re.compile(r"^\s*\*\*(.+?)\*\*\s*")
+
+
+def _technique(content, key, f):
+    """One technique, as ``named_pair()`` wants it: (name, sentence).
+
+    The prose block's leading ``**bold**`` run is the technique's name — the convention the
+    intro's list already used, so the copy moves across without being rewritten.
+    """
+    text = C.fill(content.get(key, ""), f).strip()
+    m = _LEAD_BOLD.match(text)
+    name, body = (m.group(1), text[m.end():]) if m else ("", text)
+    return name, R.inline_md(body)
+
+
 
 
 
@@ -205,10 +222,18 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         section_datasets(content, f, dad_kwargs, sdf_kwargs),
         section_explore(panels, outlines),
     ]
+    # The intro is four blocks, not one: the finding and the sentence that introduces the
+    # pair, the two techniques as two columns, then what we built on them. The pair is a
+    # figure between two runs of prose rather than a list inside one, because the two
+    # techniques ARE the two datasets below — same things, same order — and ~90 words of
+    # definitional prose with two digits in front of it did not say so.
+    intro = (C.prose(content, "intro", f)
+             + R.named_pair([_technique(content, "sdf_technique", f),
+                             _technique(content, "dad_technique", f)])
+             + C.prose(content, "intro_close", f))
     head = {
         "title": title,
-        "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT),
-                           intro=C.prose(content, "intro", f)),
+        "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
         "footer": footer(maker_icon),
     }
     return "".join(sections), head

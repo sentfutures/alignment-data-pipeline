@@ -631,6 +631,27 @@ def illustration(data_uri="", alt="", label="Illustration"):
 
 
 
+def named_pair(items):
+    """A short list set as columns: a name and a sentence each.
+
+    ``items``: ``[(name, body_html)]``, drawn left to right.
+
+    An ``<ol>``, because these are ordered items and a reader on a screen reader should
+    hear "list, 2 items" — but it carries no visible index. A small uppercase label over
+    each name ("Technique 1") was tried and cut: an eyebrow over a heading names what the
+    heading already says, and the ordinal is not information a reader needs.
+
+    NOT A CARD, and the CSS is where that is held: a hairline over each column, a serif
+    name, and no fill, border box or radius anywhere. This is the page's only two-up block
+    outside a table, and a card here would be the first one on it.
+    """
+    if not items:
+        return ""
+    out = "".join(f"<li><span class='npair-h'>{esc(name)}</span>"
+                  f"<div class='npair-b'>{body}</div></li>" for name, body in items)
+    return f"<ol class='npair'>{out}</ol>"
+
+
 def hero(title, art="", intro=""):
     """The opening: the illustration, the title, and the lines that follow from it.
 
@@ -953,17 +974,36 @@ padding:2.6rem 28px 5rem;text-align:center}
    exactly as it was supplied. */
 .hero .illo.art img{max-width:36rem;margin:0 auto;aspect-ratio:1318/425;
 object-fit:cover;object-position:50% 48.5%}
-.hero-intro{max-width:60ch;margin:2.4rem auto 0}
-.hero-intro p{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
-.hero-intro p+p{margin-top:1.05rem}
-/* The hero centres, but a numbered list cannot: centred items leave the markers
-   stranded down the left while the text ragged-edges around them, and the eye loses
-   which line belongs to which number. So the list alone goes flush left, indented
-   enough to hang its markers, and stays centred as a BLOCK within the measure. */
-.hero-intro ol{max-width:52ch;margin:1.05rem auto 0;padding-left:1.6rem;text-align:left}
-.hero-intro ol li{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
-.hero-intro ol li+li{margin-top:.7rem}
-.hero-intro ol+p{margin-top:1.05rem}
+/* TWO MEASURES, NOT ONE. The paragraphs keep the 60ch a centred line can be read at; the
+   pair below them needs its container wider than that, because two columns inside 60ch are
+   ~24ch each and a 48-word item comes out fourteen lines deep. */
+.hero-intro{max-width:min(100%,48rem);margin:2.4rem auto 0}
+.hero-intro>p{max-width:60ch;margin-left:auto;margin-right:auto}
+.hero-intro p{margin-top:0;margin-bottom:0;color:var(--text-secondary);
+font-size:1.1rem;line-height:1.68}
+.hero-intro p+p{margin-top:1.4rem}
+/* Every paragraph in here wraps the same way, on the global text-wrap:pretty. `balance` was
+   tried on the two above the pair and is wrong: it evens the lines by SHRINKING the block's
+   used width, so those two set visibly narrower than the two below them and the centred
+   column stopped having one edge. */
+.hero-intro>.npair+p{margin-top:2.6rem}
+/* The two techniques, as two columns in the page's own order — synthetic documents left,
+   difficult advice right, the same order the comparison, the chooser and both panels use —
+   so the pair a reader meets in the hero is the pair the rest of the page keeps.
+
+   The hero centres and this does not: a list cannot, and centring these two columns would
+   leave four ragged edges. It goes flush left and stays centred as a BLOCK, which reads as
+   deliberate now that it is visibly a figure rather than a paragraph with digits in front
+   of it.
+
+   A hairline over each column and nothing else. No fill, no border box, no radius: a card
+   here would be the first one on the page, and 4px is reserved for things you press. */
+.npair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2.75rem;
+list-style:none;margin:2.6rem 0 0;padding:0;text-align:left}
+.npair>li{margin:0;padding-top:1.1rem;border-top:1px solid var(--hairline)}
+.npair-h{display:block;font:650 1.12rem/1.3 var(--serif);color:var(--text-primary);
+margin:0 0 .7rem}
+.npair-b{font-size:1rem;line-height:1.68;color:var(--text-secondary)}
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
 text-wrap:balance;font-variant-numeric:proportional-nums}
@@ -1406,6 +1446,9 @@ h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06re
 .lede{font-size:1.1rem}
 .hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
+/* One column: two of them inside a 390px viewport are ~16 characters each. Each item keeps
+   its own hairline, so the pair reads as the hanging list it would have been anyway. */
+.npair{grid-template-columns:minmax(0,1fr);gap:1.8rem;margin-top:1.8rem}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .illo{aspect-ratio:16/9}}
 @media print{

@@ -268,20 +268,84 @@ class TestShape:
         assert "aspect-ratio:1318/425" in rule
         assert "object-fit:cover" in rule and "object-position:50% 48.5%" in rule
 
-    def test_the_intro_stops_after_three_paragraphs(self):
-        """The two DATASETS are named once, in the comparison's mastheads — listing them
-        here as well was the same two names twice within a screen, and `<ul>` staying out
-        is what stops that coming back. Three paragraphs: the finding, how it was taught,
-        and what we built on it.
+    def test_the_intro_stops_after_four_paragraphs(self):
+        """Four paragraphs of intro prose and it stops: the finding, the sentence that
+        introduces the pair, then what we built on it in two. A bulleted list here is the
+        two DATASETS listed a second time within a screen of the comparison's mastheads,
+        and `<ul>` staying out is what stops that coming back.
 
-        The middle paragraph now counts off the two TECHNIQUES as an ordered list, which is
-        a different thing from the two datasets and is why `<ol>` is allowed where `<ul>`
-        is not."""
+        The two TECHNIQUES are a different thing from the two datasets, which is why an
+        `<ol>` is allowed where a `<ul>` is not — and it is a FIGURE between the second
+        paragraph and the third, not a list inside one, so the count is of the intro's own
+        top-level paragraphs and the pair's own blocks are not paragraphs at all."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
         assert "<ul>" not in hero
-        assert hero.count("<ol>") == 1 and hero.count("<li>") == 2
-        assert hero.count("<p>") == 3
+        assert hero.count("<ol class='npair'>") == 1 and hero.count("<li>") == 2
+        # Two before the pair, one after, and nothing inside it: the body and tie lines are
+        # divs, so a paragraph in here is authored prose and can be counted as such.
+        before, after = hero.split("<ol class='npair'>")
+        assert before.count("<p>") == 2 and after.count("<p>") == 2
+        assert "<p>" not in after[:after.index("</ol>")]
+
+    def test_the_two_techniques_read_in_the_page_s_own_order(self):
+        """Synthetic documents first, here as in the comparison, the chooser and the
+        panels. The hero is where a reader meets the pair, so an order that disagreed with
+        the rest of the page would teach the wrong one first."""
+        hero = self.hero(build(content=shipped_content(), sdf_inputs=SDF_INPUTS))
+        pair = re.search(r"<ol class='npair'>.*?</ol>", hero, re.S).group(0)
+        assert pair.index("Synthetic document finetuning") < pair.index("Difficult advice")
+
+    def test_the_pair_carries_no_eyebrow_over_either_name(self):
+        """A small uppercase "Technique 1" over each name was tried and cut: an eyebrow
+        names what the heading under it already says, and the ordinal is not information a
+        reader needs. The <ol> keeps the semantics without drawing a marker."""
+        hero = self.hero(build(content=shipped_content(), sdf_inputs=SDF_INPUTS))
+        assert "Technique 1" not in hero and "npair-i" not in hero
+
+    def test_the_technique_s_name_is_its_own_heading_not_the_start_of_its_sentence(self):
+        """The prose file's convention: a technique block's leading bold run is its name.
+        Promoted to the column's heading, so it is not also the first two words of the
+        sentence under it."""
+        hero = self.hero(build(content=shipped_content(), sdf_inputs=SDF_INPUTS))
+        assert "<span class='npair-h'>Synthetic document finetuning</span>" in hero
+        body = re.search(r"<span class='npair-h'>Synthetic document finetuning</span>"
+                         r"<div class='npair-b'>(.*?)</div>", hero, re.S).group(1)
+        assert "Synthetic document finetuning" not in body
+        assert "<b>" not in body                        # the bold run was consumed, not kept
+
+    def test_the_pair_is_a_list_and_not_a_pair_of_cards(self):
+        """Two columns under two hairlines. A fill, a border box or a radius here would be
+        the first card on a page that has none, and 4px is reserved for things you press.
+        It also stays an <ol>, so it is still heard as a list of two ordered items."""
+        html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
+        rules = "".join(re.findall(r"\.npair[^{]*\{[^}]*\}", html))
+        assert rules
+        for banned in ("box-shadow", "border-radius", "background"):
+            assert banned not in rules, banned
+        assert "border-top:1px solid var(--hairline)" in rules
+        assert "list-style:none" in rules
+        # Never a bare 1fr: a wide child would grow the track past the page.
+        assert "grid-template-columns:repeat(2,minmax(0,1fr))" in rules
+
+    def test_the_pair_stacks_on_a_phone(self):
+        """Two columns inside a 390px viewport are ~16 characters each. It becomes one
+        column at the same breakpoint the type scale restates at."""
+        html = build()
+        narrow = html[html.index("@media (max-width:620px)"):]
+        assert re.search(r"\.npair\{grid-template-columns:minmax\(0,1fr\)", narrow)
+
+    def test_the_intro_carries_two_measures(self):
+        """The paragraphs keep the measure a centred line can be read at; the container is
+        wider because the pair is two columns inside it, and two columns inside 60ch are
+        ~24 characters each. Widening the container must not widen the prose with it."""
+        html = build()
+        assert re.search(r"\.hero-intro\{max-width:min\(100%,4[0-9]rem\)", html)
+        assert re.search(r"\.hero-intro>p\{max-width:60ch", html)
+
+    @staticmethod
+    def hero(html):
+        return re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
 
     def test_the_footer_names_the_runs_the_page_was_built_from(self):
         """Provenance was taken off the page entirely, and then appeared nowhere: no run
@@ -961,6 +1025,20 @@ class TestTypeScale:
         small = html[html.index("@media (max-width:620px)"):]
         for level in ("h1", "h2", "h3", "h4"):
             assert re.search(rf"[;{{}}\n]{level}\{{font-size:[\d.]+rem\}}", small), level
+
+
+class TestNamedPair:
+    """The component itself, apart from the hero that is its only caller today."""
+
+    def test_nothing_to_pair_renders_nothing(self):
+        assert R.named_pair([]) == ""
+
+    def test_the_name_is_escaped_and_the_body_is_not(self):
+        """The body arrives already rendered — it went through `inline_md`, so it carries
+        the markup prose is allowed. The name is a plain string."""
+        html = R.named_pair([("A & B", "<i>already</i> markup")])
+        assert "A &amp; B" in html
+        assert "<i>already</i> markup" in html
 
 
 class TestComparisonTable:

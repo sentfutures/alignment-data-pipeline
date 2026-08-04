@@ -11,23 +11,29 @@ fails the build. The page's own prose has NO facts available at all — every fi
 is rendered by a section from its run — so any {{placeholder}} here fails the build.
 
 The hero is the illustration, the title and `intro`, centred — so `title` has to stand up
-on its own, and `intro` reads as its second half rather than as a section. Three paragraphs
-and it stops: the two datasets are named once, below, as the comparison's masthead. The
-arrow on an outbound link is added by the renderer — do not type one here. The reader has
-forty seconds: let the comparison do the comparing. Deks are rationed: the page carries
+on its own, and `intro` reads as its second half rather than as a section. It is FOUR
+blocks in three ids, and it stops there: `intro` is the finding and the one sentence that
+introduces the pair, then the two techniques (`sdf_technique` / `dad_technique`, rendered
+as two columns by `render.numbered_pair()`), then `intro_close` — what we built on them.
+The arrow on an outbound link is added by the renderer — do not type one here. The reader
+has forty seconds: let the comparison do the comparing. Deks are rationed: the page carries
 at most two.
 
-The comparison is six rows, and each one says whether it is describing the data or the
+A technique block's **leading bold run is its name** and the rest is its sentence; that is
+the only markup it takes, and the column's index ("Technique 1") and the dataset it produced
+are both supplied by `page.py` — the index off the enumeration, the dataset off
+`sdf.SECTION_TITLE` / `dad.SECTION_TITLE`. So the two datasets' names are still not typed
+here. Synthetic documents is FIRST, as it is in the comparison, the chooser and the panels.
+
+The comparison is five rows, and each one says whether it is describing the data or the
 process that makes it. `dad_desc` / `sdf_desc` are the `result` row — what each dataset
 *is*, in one sentence. `dad_unit` / `sdf_unit` are the `result format` — what one record
 is. `dad_use` / `sdf_use` are what each is *for*: both are midtraining, and the difference
-is the format they are consumed in. `dad_pipeline` / `sdf_pipeline` are the stages that
-produce it, as a chain, in the same shape on both sides so the two columns can be read
-across. One short line each; a row's LABEL lives in `page.section_datasets()`, only its
-cells are here. The `*_pipeline` chains carry a NON-BREAKING space after each arrow, so a
-wrap puts the arrow at the head of the next line rather than orphaning it at the end of
-the last one — it is invisible in an editor, so copy an existing arrow rather than typing
-a new one.
+is the format they are consumed in. One short line each; a row's LABEL lives in
+`page.section_datasets()`, only its cells are here, and the last two rows (`prompt
+templates`, `example dataset`) are counted and linked in code rather than written. A
+`pipeline` row of stage chains used to sit here too; it went with the row, so there are no
+`*_pipeline` ids — adding prose under one now fails the build.
 
 No licence is set for either dataset, and the page says nothing about it — the row that
 would have carried it was removed. When one is set it belongs in the comparison, as a row
@@ -48,10 +54,19 @@ Research on alignment midtraining ([1](https://alignment.anthropic.com/2026/teac
 
 Two complementary techniques proved especially effective:
 
-1. **Synthetic document finetuning** using pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model in training while increasing the number of aligned propensities associated with it.
-2. **Difficult advice Q&A** depicting an AI assistant coaching users through ethical dilemmas analogous to those the target model might eventually encounter in deployment. This teaches ethical reasoning skills while teaching the model to identify with the responsible persona.
+<!-- id: sdf_technique -->
 
-Following this research, we built pipelines for synthesizing training data on a subject currently absent from the training corpus: welfare considerations of nonhuman sentient beings. We developed scenarios and reasoning principles in consultation with leading animal ethicists to create a robust training set that mirrors situations where real AI systems will take actions beneficial or detrimental to animal welfare.
+**Synthetic document finetuning** Uses pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model in training while increasing the number of aligned propensities associated with it.
+
+<!-- id: dad_technique -->
+
+**Difficult advice Q&A** Depicts an AI assistant coaching users through ethical dilemmas analogous to those the target model might eventually encounter in deployment. This teaches ethical reasoning skills while teaching the model to identify with the responsible persona.
+
+<!-- id: intro_close -->
+
+Following this research, we built pipelines for synthesizing training data on a subject currently absent from the training corpus: welfare considerations of nonhuman sentient beings.
+
+We developed scenarios and reasoning principles in consultation with leading animal ethicists to create a robust training set that mirrors situations where real AI systems will take actions beneficial or detrimental to animal welfare.
 
 <!-- id: dad_desc -->
 
