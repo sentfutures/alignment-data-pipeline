@@ -486,13 +486,13 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
         preamble_t = tpl("preamble.txt")
         preamble = preamble_t.text or ""
 
-        if stage == "layer1":
+        if stage == "document_types":
             count = cfg.get("sdf", {}).get("document_types_count", 0)
             r.variables = {"preamble": preamble, "count": count,
                            "min_ai_character": math.ceil(count / 3) if count else 0}
             r.user = _format(tpl("layer1.txt"), r.variables, r)
 
-        elif stage == "layer2":
+        elif stage == "subtypes":
             dt = lineage.get("doc_type") or {}
             lang_dist = cfg.get("language_distribution", {"en": 1.0})
             r.variables = {
@@ -506,7 +506,7 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
             }
             r.user = _format(tpl("layer2.txt"), r.variables, r)
 
-        elif stage == "layer3":
+        elif stage == "draft":
             st = lineage.get("subtype") or {}
             claude = get_constitution(run_dir, commit, "claude")
             welfare = get_constitution(run_dir, commit, "welfare")
@@ -524,7 +524,7 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
             }
             r.user = _format(tpl("layer3.txt"), r.variables, r)
 
-        elif stage == "layer4":
+        elif stage == "rewrite":
             rw = lineage.get("rewrite") or {}
             r.variables = {"preamble": preamble, "document": rw.get("original", "")}
             r.user = _format(tpl("layer4.txt"), r.variables, r)
@@ -533,7 +533,7 @@ def render_prompt(pipeline: str, stage: str, run_dir: Path, manifest: dict, line
             r.system = full.text
             r.system_label = "system prompt (full constitution)"
 
-        elif stage == "layer5":
+        elif stage == "score":
             rw = lineage.get("rewrite") or {}
             r.variables = {"preamble": preamble, "document": rw.get("rewritten", "")}
             r.user = _format(tpl("layer5.txt"), r.variables, r)
