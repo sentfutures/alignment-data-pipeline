@@ -379,18 +379,23 @@ typed (as a glyph it is a hairline that differs per font, and this page gets pri
 Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
 allows a `data:` src and nothing else off-page.
 
-**The page is unlisted, and the head says so.** Every build carries
-`<meta name="robots" content="noindex,nofollow">` unconditionally (`render.head_meta()`): it
-is handed to a reader by whoever sends it, not found, and a `robots.txt` `Disallow` does not
-carry that alone — a linked URL can still be indexed by reference — nor does it exist at all
-for the copy that opens from disk or arrives by email. Because a pasted link is then the only
-way in, a **hosted** build takes preview tags, opt-in behind `--site-url` (and `--preview-url`
-for `og:image`, the one reference here that cannot be a data URI, since a card renderer
-fetches it out of band; without it the card declares `summary`, not `summary_large_image`).
-With neither flag the file says nothing about where it lives, and that is the copy committed
-to the repo. The `description` those tags carry is authored prose like everything else —
-`content_page.md`'s `description` id, the one id that never renders in the document, flattened
-by `render.plain_md()`. Hosting notes are in `report/README.md`.
+**The page is unlisted, and that is a meta tag, not a `robots.txt`.** Every build carries
+`<meta name="robots" content="noindex,nofollow">` unconditionally (`render.head_meta()`): the
+page is handed to a reader by whoever sends it, not found. `robots.txt` governs crawling and
+the tag governs indexing — `noindex` is not a `robots.txt` directive at all — so **the hosted
+copy must not be `Disallow`ed**: a crawler refused the file never reads the tag asking it not
+to index, while a linked URL can still be indexed by reference, which is the worse of the two
+outcomes. Because a pasted link is then the only way in, a **hosted** build takes preview
+tags, opt-in behind `--site-url`; that also points `og:image` at `preview.png` and copies
+`report/assets/preview.png` (the hero on the page's paper at 1200×630, drawn by
+`report/make_preview.py`, which needs Pillow and so is not part of the stdlib-only builder)
+out beside the HTML — **the one file that travels with the page**, since a card renderer
+fetches the image over the network and cannot use a data URI. `--preview-url` overrides it and
+copies nothing; with no image the card declares `summary`, not `summary_large_image`. With
+neither flag the file says nothing about where it lives and ships nothing beside itself, and
+that is the copy committed to the repo. The `description` those tags carry is authored prose
+like everything else — `content_page.md`'s `description` id, the one id that never renders in
+the document, flattened by `render.plain_md()`. Hosting notes are in `report/README.md`.
 
 **Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links and outline
 buttons (`.lbtn`, `.choice`, `.tab`, 4px radius). **A link is marked, never re-faced**: it
