@@ -379,6 +379,19 @@ typed (as a glyph it is a hairline that differs per font, and this page gets pri
 Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
 allows a `data:` src and nothing else off-page.
 
+**The page is unlisted, and the head says so.** Every build carries
+`<meta name="robots" content="noindex,nofollow">` unconditionally (`render.head_meta()`): it
+is handed to a reader by whoever sends it, not found, and a `robots.txt` `Disallow` does not
+carry that alone — a linked URL can still be indexed by reference — nor does it exist at all
+for the copy that opens from disk or arrives by email. Because a pasted link is then the only
+way in, a **hosted** build takes preview tags, opt-in behind `--site-url` (and `--preview-url`
+for `og:image`, the one reference here that cannot be a data URI, since a card renderer
+fetches it out of band; without it the card declares `summary`, not `summary_large_image`).
+With neither flag the file says nothing about where it lives, and that is the copy committed
+to the repo. The `description` those tags carry is authored prose like everything else —
+`content_page.md`'s `description` id, the one id that never renders in the document, flattened
+by `render.plain_md()`. Hosting notes are in `report/README.md`.
+
 **Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links and outline
 buttons (`.lbtn`, `.choice`, `.tab`, 4px radius). **A link is marked, never re-faced**: it
 inherits its context's face and size — serif in prose, sans in the footer and the rail — and
@@ -519,8 +532,9 @@ stay declared, and nothing in that block re-places a child or reaches for `!impo
 Measured in Chromium at 390×844: panel 358px in a 390px viewport, prose at ~45 characters
 a line, no horizontal page scroll, bar one row at 57px.
 
-**Open TODOs.** No licence is set for either
-dataset, and the licence row was removed, so the page now says nothing about it. **The
+**Open TODOs.** The datasets are CC-BY-4.0 — set by `evals/publish_hf.py`'s `--license`
+default and carried in the Hugging Face card's frontmatter, beside the files it governs — and
+the page deliberately says nothing about it, the licence row having been removed. **The
 pinned DAD run is `2026-07-29_12-26_archetype200`** (191 examples), a matrix-dealt Opus-5
 run that carries `step1/scenario_deals.jsonl` and `step1/scenarios.jsonl` and is on
 `main`. It replaced `2026-07-20_20-51_bedrock-40`, which PR #108 pruned along with the

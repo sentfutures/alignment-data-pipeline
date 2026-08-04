@@ -82,6 +82,21 @@ def inline_md(text):
     return out
 
 
+def plain_md(text):
+    """The same prose as flat text, for an attribute where markup cannot render.
+
+    Not a general converter: it undoes exactly the subset ``inline_md`` renders, so one
+    authored sentence can serve both the document and a head tag. Whitespace collapses,
+    because a ``content`` attribute is one line however the prose file wrapped it.
+    """
+    out = _MD_CITE.sub(r"\1", text or "")
+    out = _MD_LINK.sub(r"\1", out)
+    out = _MD_CODE.sub(r"\1", out)
+    out = _MD_BOLD.sub(r"\1", out)
+    out = _MD_ITAL.sub(r"\1", out)
+    return " ".join(out.split())
+
+
 def _cite_markers(text):
     """``[^Name of the work](url)`` -> a raised, numbered citation marker.
 
@@ -1762,7 +1777,45 @@ else window.addEventListener('load',fromHash);})();
 """
 
 
-def document(*, title, masthead, body, footer=""):
+def _meta(name, content, prop=False):
+    """One head tag, or "" for an empty value.
+
+    Double-quoted, unlike the rest of the page: ``esc()`` escapes ``"`` and deliberately
+    does not escape ``'``, and these carry authored prose, where an apostrophe is a matter
+    of time. Everything else on the page writes attributes the renderer itself composes.
+    """
+    key = "property" if prop else "name"
+    return f'<meta {key}="{esc(name)}" content="{esc(content)}">\n' if content else ""
+
+
+def head_meta(*, title, description="", site_url="", preview_url=""):
+    """What a crawler and a link preview see.
+
+    ``noindex`` is unconditional. The page is handed to a reader by whoever sends it, not
+    found — and a ``robots.txt`` ``Disallow`` does not carry that on its own, since a URL
+    that is linked can still be indexed by reference. It costs nothing offline and comes
+    off in one line if the page is ever announced.
+
+    The preview tags need the hosted URL, so they are emitted only when one is supplied:
+    a build with no ``--site-url`` is the file that opens from disk or arrives by email,
+    and it says nothing about where it lives. ``og:image`` is the one reference on this
+    page that cannot be a data URI — a preview image is fetched out of band by whoever is
+    rendering the card — so without one the card declares itself ``summary`` rather than
+    promising a large image it has not got.
+    """
+    tags = '<meta name="robots" content="noindex,nofollow">\n' + _meta("description", description)
+    if site_url:
+        tags += (_meta("og:type", "website", prop=True)
+                 + _meta("og:title", title, prop=True)
+                 + _meta("og:url", site_url, prop=True)
+                 + _meta("og:description", description, prop=True)
+                 + _meta("og:image", preview_url, prop=True)
+                 + _meta("twitter:card", "summary_large_image" if preview_url else "summary"))
+    return tags
+
+
+def document(*, title, masthead, body, footer="", description="", site_url="",
+             preview_url=""):
     """The shell. One file, one theme, no external anything.
 
     There is no contents rail: the page is a hero, three short sections and a choice, and
@@ -1772,7 +1825,9 @@ def document(*, title, masthead, body, footer=""):
     return (f"<!DOCTYPE html>\n<html lang='en'>\n<meta charset='utf-8'>\n"
             f"<meta name='viewport' content='width=device-width,initial-scale=1'>\n"
             f"<meta name='color-scheme' content='only light'>\n"
-            f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
+            + head_meta(title=title, description=description, site_url=site_url,
+                        preview_url=preview_url)
+            + f"<title>{esc(title)}</title>\n<style>{CSS}</style>\n"
             f"<a class='skip' href='#intro'>Skip to content</a>\n"
             f"{masthead}"
             f"<div class='shell'>\n<main id='main'>\n{body}\n"

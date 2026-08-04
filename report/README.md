@@ -53,6 +53,44 @@ To run the evals on the shared AWS Bedrock credits instead of an Anthropic API k
 `--config config.bedrock.yaml` (identical to `config.yaml` but `backend: bedrock`, which
 reads `CHAD_AWS_BEDROCK_KEY`).
 
+## Hosting
+
+The page is one file with nothing beside it, so serving it is an upload: nothing in it
+refers to its own URL, every asset is inlined and every outbound link is absolute. It stays
+that way — a hosted copy is never a second, un-self-contained build.
+
+**It is unlisted.** Every build carries `<meta name="robots" content="noindex,nofollow">`,
+unconditionally. The page is handed to a reader by whoever sends it rather than found, and a
+`robots.txt` `Disallow` does not carry that on its own — a URL that is linked can still be
+indexed by reference. Serve a `robots.txt` too if the host makes it easy; the tag is the part
+that works. Removing it is one line in `render.head_meta()` if the page is ever announced.
+
+Because a pasted link is then the *only* way anyone arrives, a hosted build should carry
+preview tags. They need to know where the page lives, so they are opt-in:
+
+```bash
+python report/build_report.py --dad-run <run> --sdf-run <run> \
+  --site-url https://<host>/ --preview-url https://<host>/preview.png
+```
+
+`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card`; `--preview-url`
+adds `og:image`, and without it the card declares `summary` rather than promising a large
+image it has not got. `og:image` is the one reference on this page that cannot be a data
+URI — whoever renders the card fetches it out of band — so the preview PNG is uploaded
+beside the HTML. With neither flag the build says nothing about where it lives, which is
+right for the copy that opens from disk or arrives attached to an email; the build line
+prints `preview=no`.
+
+The `description` those tags use is prose, authored in `content_page.md` under the
+`description` id like every other word on the page. It is the one id that never renders in
+the document, so it is flat text — `render.plain_md()` strips the markdown subset.
+
+The datasets' licence is **not** on the page: CC-BY-4.0 is set by `evals/publish_hf.py` and
+lives in the Hugging Face card's frontmatter, beside the files it governs.
+
+Deploy from `main` rather than from a laptop, so the repo stays the source of truth and the
+hosted copy is never edited in place.
+
 ## The page
 
 | Anchor      | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |

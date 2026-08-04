@@ -391,6 +391,40 @@ class TestShape:
         assert foot.index("A project by") < foot.index("foot-links")
         assert re.search(r"footer\.foot\{[^}]*justify-content:space-between", html)
 
+    def test_the_page_asks_not_to_be_indexed(self):
+        """It is handed to a reader, not found.
+
+        Unconditional, and not left to a robots.txt: a URL that is disallowed but linked
+        can still be indexed by reference, and the file is also served from disk and by
+        email, where there is no robots.txt to serve.
+        """
+        assert '<meta name="robots" content="noindex,nofollow">' in build()
+
+    def test_the_page_carries_a_description_as_flat_text(self):
+        """The one authored line that never renders in the document.
+
+        A link preview is the whole first impression of a page nothing links to, and
+        markdown in a `content` attribute is asterisks in someone's Slack.
+        """
+        html = build(content=content(description="Two **open** [datasets](https://x.test)."))
+        assert '<meta name="description" content="Two open datasets.">' in html
+
+    def test_the_preview_tags_need_the_hosted_url(self):
+        """Where the page lives is not a property of the page — it is a property of a
+        deployment, so the copy that opens from disk says nothing about it."""
+        assert "og:" not in build()
+        html = build(site_url="https://x.test/", preview_url="https://x.test/p.png")
+        assert '<meta property="og:url" content="https://x.test/">' in html
+        assert '<meta property="og:image" content="https://x.test/p.png">' in html
+        assert '<meta name="twitter:card" content="summary_large_image">' in html
+
+    def test_a_card_with_no_image_does_not_promise_one(self):
+        """og:image cannot be a data URI — it is fetched out of band — so with no hosted
+        image the card declares the size it can actually fill."""
+        html = build(site_url="https://x.test/")
+        assert "og:image" not in html
+        assert '<meta name="twitter:card" content="summary">' in html
+
     def test_is_self_contained(self):
         """One file. Every reference in it either stays on the page (an anchor), is
         carried inside it (a data URI), or is prose pointing at the web — never a

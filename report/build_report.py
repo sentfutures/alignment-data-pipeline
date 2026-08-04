@@ -55,7 +55,8 @@ def main():
                               sdf_run=args.sdf_run)
     hero = data_uri(HERO)
     html = page.build(example=args.example, sdf_example=args.sdf_example, illustration=hero,
-                      maker_icon=data_uri(MAKER_ICON), **kwargs)
+                      maker_icon=data_uri(MAKER_ICON), site_url=args.site_url or "",
+                      preview_url=args.preview_url or "", **kwargs)
     audit = (kwargs.get("dad_inputs") or {}).get("audit") or {}
     C.write(out_dir / "index.html", html,
             label=f"{C.editorial_words(html):,} words of prose · "
@@ -63,7 +64,8 @@ def main():
                   f"dad n={audit.get('n_prompts')} "
                   f"delivery={'yes' if audit.get('delivery') else 'NO'} "
                   f"showcase={'yes' if audit.get('showcase') else 'NO'} "
-                  f"sdf={'yes' if kwargs.get('sdf_inputs') else 'NO'}")
+                  f"sdf={'yes' if kwargs.get('sdf_inputs') else 'NO'} "
+                  f"preview={'yes' if args.site_url else 'no'}")
 
 
 if __name__ == "__main__":
