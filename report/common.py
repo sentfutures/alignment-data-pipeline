@@ -403,8 +403,9 @@ def cli_parser(doc):
     p.add_argument("--site-url", dest="site_url", default=None,
                    help="public URL of the hosted page; adds og:/twitter: preview tags")
     p.add_argument("--preview-url", dest="preview_url", default=None,
-                   help="absolute URL of the preview image (og:image). It is fetched by "
-                        "whoever renders the card, so it cannot be carried in the page")
+                   help="absolute URL of the preview image (og:image). Defaults to "
+                        "preview.png beside the page, which build_report.py copies out; "
+                        "pass one to point at an image hosted elsewhere instead")
     return p
 
 

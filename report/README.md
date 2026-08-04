@@ -59,27 +59,42 @@ The page is one file with nothing beside it, so serving it is an upload: nothing
 refers to its own URL, every asset is inlined and every outbound link is absolute. It stays
 that way — a hosted copy is never a second, un-self-contained build.
 
-**It is unlisted.** Every build carries `<meta name="robots" content="noindex,nofollow">`,
-unconditionally. The page is handed to a reader by whoever sends it rather than found, and a
-`robots.txt` `Disallow` does not carry that on its own — a URL that is linked can still be
-indexed by reference. Serve a `robots.txt` too if the host makes it easy; the tag is the part
-that works. Removing it is one line in `render.head_meta()` if the page is ever announced.
+**It is unlisted, and that is a meta tag rather than a `robots.txt`.** Every build carries
+`<meta name="robots" content="noindex,nofollow">`, unconditionally. The two files do
+different jobs and are easy to mix up: `robots.txt` governs **crawling**, the tag governs
+**indexing**. `noindex` is not a `robots.txt` directive at all — Google dropped support for
+the unofficial one in 2019 — so a `Disallow` cannot say it.
 
-Because a pasted link is then the *only* way anyone arrives, a hosted build should carry
-preview tags. They need to know where the page lives, so they are opt-in:
+**Do not `Disallow` this page.** A crawler that is refused the file never reads the tag
+asking it not to index, and a URL someone links to can still be indexed with no content
+behind it — the `Disallow` makes the outcome *worse*, not better. Let it be crawled and let
+it say `noindex`. (A host that sets `X-Robots-Tag: noindex` as a header does the same job for
+consumers that only read headers; it is a belt to the tag's braces, unlike a `Disallow`.)
+Removing the tag is one line in `render.head_meta()` if the page is ever announced.
+
+Because a pasted link is then the *only* way anyone arrives, a hosted build carries preview
+tags. They need to know where the page lives, so naming the site is what turns them on:
 
 ```bash
-python report/build_report.py --dad-run <run> --sdf-run <run> \
-  --site-url https://<host>/ --preview-url https://<host>/preview.png
+python report/build_report.py --dad-run <run> --sdf-run <run> --site-url https://<host>/
+# -> report/index.html + report/preview.png   (upload both)
 ```
 
-`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card`; `--preview-url`
-adds `og:image`, and without it the card declares `summary` rather than promising a large
-image it has not got. `og:image` is the one reference on this page that cannot be a data
-URI — whoever renders the card fetches it out of band — so the preview PNG is uploaded
-beside the HTML. With neither flag the build says nothing about where it lives, which is
-right for the copy that opens from disk or arrives attached to an email; the build line
-prints `preview=no`.
+`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card`, points
+`og:image` at `preview.png` beside the page, and copies that file into the output directory
+— **the one file that travels with the HTML**, because a card renderer fetches the image out
+of band and a data URI is no use to it. `--preview-url` overrides the URL to point at an
+image hosted elsewhere, and then nothing is copied out; with no image at all the card
+declares `summary` rather than promising a large image it has not got. With neither flag the
+build says nothing about where it lives and ships nothing beside itself, which is right for
+the copy that opens from disk or arrives attached to an email; the build line prints
+`preview=no`.
+
+**The card image is the hero.** `report/assets/preview.png` is the butterfly trimmed to its
+own bounds and centred on the page's paper at 1200×630 — no crop through the drawing, no
+filter, no text baked over it. `python report/make_preview.py` redraws it from
+`assets/hero.png`; it needs Pillow, which is why it is a separate script and not part of
+`build_report.py`, and its output is committed.
 
 The `description` those tags use is prose, authored in `content_page.md` under the
 `description` id like every other word on the page. It is the one id that never renders in

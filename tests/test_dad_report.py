@@ -1322,6 +1322,47 @@ class TestCLI:
         B.main()
         assert "not published yet" in (tmp_path / "index.html").read_text(encoding="utf-8")
 
+    def test_a_hosted_build_carries_its_card_image_out(self, tmp_path, monkeypatch):
+        """The one file that travels beside the page.
+
+        `og:image` is fetched over the network by whoever renders the link, so it cannot be
+        a data URI like everything else here — which makes it the one thing a deploy can
+        leave behind. Naming the site is enough to get both files.
+        """
+        from report import build_report as B
+        run_dir, content_file = make_run_dir(tmp_path)
+        out = tmp_path / "site"
+        out.mkdir()
+        monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, out)
+                            + ["--site-url", "https://x.test/"])
+        B.main()
+        assert (out / "preview.png").read_bytes() == B.PREVIEW.read_bytes()
+        html = (out / "index.html").read_text(encoding="utf-8")
+        assert '<meta property="og:image" content="https://x.test/preview.png">' in html
+
+    def test_an_image_hosted_elsewhere_is_not_copied_out(self, tmp_path, monkeypatch):
+        """--preview-url points at someone else's file, so shipping ours would be litter."""
+        from report import build_report as B
+        run_dir, content_file = make_run_dir(tmp_path)
+        out = tmp_path / "site"
+        out.mkdir()
+        monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, out)
+                            + ["--site-url", "https://x.test/",
+                               "--preview-url", "https://cdn.test/card.png"])
+        B.main()
+        assert not (out / "preview.png").exists()
+        assert '"https://cdn.test/card.png"' in (out / "index.html").read_text(encoding="utf-8")
+
+    def test_a_local_build_ships_nothing_beside_the_page(self, tmp_path, monkeypatch):
+        """No site URL, no deploy: the file that opens from disk stands alone."""
+        from report import build_report as B
+        run_dir, content_file = make_run_dir(tmp_path)
+        out = tmp_path / "local"
+        out.mkdir()
+        monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, out))
+        B.main()
+        assert [p.name for p in out.iterdir()] == ["index.html"]
+
     def test_no_dad_run_exits_with_guidance(self, tmp_path, monkeypatch):
         from report import build_report as B
         monkeypatch.setattr("sys.argv", ["build_report.py", "--out-dir", str(tmp_path)])
