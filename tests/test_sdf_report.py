@@ -451,13 +451,12 @@ class TestLineage:
 # --- degradation ---------------------------------------------------------------
 
 class TestDegradation:
-    def test_no_compliance_pass_means_no_compliance_drawer(self):
-        """The degrade-and-name-the-file notes went with the checks table: a hand-off
-        reader gets the drawers that measured something, not a list of files a run
-        could have carried."""
-        sec = section(build(compliance=None))
+    def test_the_compliance_pass_and_pairs_table_no_longer_render(self):
+        """Both cut: the failure-mode counts and the most-similar pairs are review-tool
+        reading, and the appendix keeps to composition and diversity."""
+        sec = section(build())
         assert "The compliance pass" not in sec
-        assert "The compliance pass" in section(build())
+        assert "most similar pairs" not in sec
 
     def test_card_fidelity_no_longer_renders(self):
         """Cut at Constance's call with the rest of the matrix bookkeeping — the

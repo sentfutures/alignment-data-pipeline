@@ -364,8 +364,6 @@ def facts(audit=None, diversity=None, manifest=None, *, attrition=None, matrix=N
     g = gate(scores, cut)
     if g:
         f.update({f"gate_{k}": v for k, v in g.items()})
-    if (compliance or {}).get("clean_frac") is not None:
-        f["compliance_clean_pct"] = f"{compliance['clean_frac']:.0%}"
     if (fidelity or {}).get("clean_frac") is not None:
         f["fidelity_clean_pct"] = f"{fidelity['clean_frac']:.0%}"
     if (ablation or {}).get("mean_drop") is not None:
@@ -1082,20 +1080,6 @@ def _principle_figure(audit, principles=None, repo_href=""):
     return out
 
 
-def _compliance_block(compliance):
-    """The ten welfare-reasoning failure modes, and what the pass found."""
-    by_mode = compliance.get("by_mode") or {}
-    rows = [(m.get("title", "?"), m.get("present", 0), m.get("applicable", "—"),
-             f"{(m.get('share_of_applicable') or 0):.0%}")
-            for m in by_mode.values()]
-    # The per-finding evidence table ("The findings, in full") was cut: the counts row
-    # is the finding, and the verbatim judge quotes are review-tool material.
-    return (f"<p class='muted'>Ten ways welfare reasoning fails while the topic is still "
-            f"technically present. {compliance.get('clean_documents', '?')} of "
-            f"{compliance.get('judged', '?')} judged documents carry none of them.</p>"
-            + R.table(["failure mode", "present", "applicable", "share"], rows, align="lrrr"))
-
-
 def _curve_block(curve):
     """How the dataset's effective distinctness grows with its size."""
     points = (curve or {}).get("points") or []
@@ -1119,36 +1103,22 @@ def _curve_block(curve):
                 "which is what sets the ceiling on how much one matrix is worth running.")
 
 
-def _pairs_drawer(diversity):
-    """The most similar pairs, nested under the semantic charts they explain."""
-    pairs = (diversity or {}).get("top_pairs") or []
-    if not pairs:
-        return ""
-    return R.details(
-        "The most similar pairs in the dataset",
-        R.table(["a", "b", "similarity", "how a opens"],
-                [(p.get("a", "?"), p.get("b", "?"), f"{p.get('similarity', 0):.3f}",
-                  _trim(p.get("a_snippet", ""), 90)) for p in pairs], align="llrl"),
-        meta=f"{len(pairs)} pair" + ("" if len(pairs) == 1 else "s"))
-
-
-def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None,
+def blocks_appendix(content, f, *, audit=None, diversity=None,
                     curve=None, principles=None, repo_href=""):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
-    The same shape as the other report's appendix: a composition-and-diversity drawer
-    that talks about what the shipped dataset IS — its engineered composition axes, the
-    constitution principles it exercises, and how semantically varied it is — plus one
-    drawer for the compliance pass. The matrix bookkeeping (attrition, dealt-vs-shipped
-    drift, card fidelity), the health-check triage tables, the templating-scan glossary
-    and the worked example's full rewrite diff belong to the review tool, not here.
+    The same shape as the other report's appendix: one composition-and-diversity
+    drawer that talks about what the shipped dataset IS — its engineered composition
+    axes, the constitution principles it exercises, and how semantically varied it is.
+    The matrix bookkeeping (attrition, dealt-vs-shipped drift, card fidelity), the
+    compliance pass, the health-check triage tables, the templating-scan glossary and
+    the worked example's full rewrite diff belong to the review tool, not here.
     """
     blocks = [R.sub("sdf-appendix", "Appendix"), C.prose(content, "sdf_appendix_intro", f)]
 
     comp_figs = _composition_figures(audit)
     principle_fig = _principle_figure(audit, principles, repo_href)
-    semantic = (C.semantic_figures(diversity, unit="documents") or "") + (
-        _pairs_drawer(diversity) if diversity else "")
+    semantic = C.semantic_figures(diversity, unit="documents")
     curve_fig = _curve_block(curve)
     if comp_figs or principle_fig or semantic:
         have = [name for name, part in (("composition", comp_figs),
@@ -1160,12 +1130,6 @@ def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None,
             + "".join(comp_figs) + principle_fig + semantic + curve_fig,
             meta=" · ".join(have)))
 
-    if compliance:
-        blocks.append(R.details(
-            "The compliance pass",
-            _compliance_block(compliance),
-            meta=f"{compliance.get('clean_documents', '?')} of "
-                 f"{compliance.get('judged', '?')} judged documents clean"))
     return "".join(b for b in blocks if b)
 
 
@@ -1201,6 +1165,6 @@ def blocks(*, content, audit=None, diversity=None, compliance=None, fidelity=Non
         blocks_built(content, f),
         blocks_example(content, f, corpus, lineage, manifest, picks,
                        hf_href=hf_href, repo_href=repo_href),
-        blocks_appendix(content, f, audit=audit, diversity=diversity, compliance=compliance,
+        blocks_appendix(content, f, audit=audit, diversity=diversity,
                         curve=curve, principles=principles, repo_href=repo_href),
     ])
