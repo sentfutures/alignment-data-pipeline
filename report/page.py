@@ -44,7 +44,7 @@ REPO_URL = "https://github.com/sentfutures/animal-welfare-data-pipeline"
 PROMPTS_DAD = f"{REPO_URL}/tree/main/prompts/dad"
 PROMPTS_SDF = f"{REPO_URL}/tree/main/prompts/sdf"
 HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
-          "animal-welfare-training-dataset")
+          "animal-welfare-training-claude")
 HF_DAD = f"{HF_URL}/viewer/dad"
 HF_SDF = f"{HF_URL}/viewer/sdf"
 
