@@ -102,12 +102,16 @@ def run(
             continue
 
         record_id = str(uuid.uuid4())
+        example_gid = registry.gid(
+            "example", example_fingerprint(resp["user_message"], rewritten))
+        # Persist the allocation BEFORE the record that carries it — the
+        # registry's ordering invariant.
+        registry.save()
 
         # Full audit record (includes the annotation + retrieval trail for inspection)
         audit_record = {
             "record_id": record_id,
-            "example_gid": registry.gid(
-                "example", example_fingerprint(resp["user_message"], rewritten)),
+            "example_gid": example_gid,
             "response_id": rid,
             "response_gid": resp.get("response_gid"),
             "prompt_gid": prompt_key(resp),
@@ -121,7 +125,6 @@ def run(
         }
         results.append(audit_record)
         utils.append_jsonl(audit_record, audit_path)
-        registry.save()
         checkpoint.mark_done(rid)
         done_response_ids.add(rid)
 

@@ -89,9 +89,13 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
                    else "empty")
             print(f"    Skipping {pid}: baseline {why} — not written, will retry on resume.")
             continue
+        plain_gid = registry.gid("plain", response_fingerprint(response))
+        # Persist the allocation BEFORE the record that carries it — the
+        # registry's ordering invariant.
+        registry.save()
         record = {
             "prompt_gid": pid,
-            "plain_gid": registry.gid("plain", response_fingerprint(response)),
+            "plain_gid": plain_gid,
             "user_message": d["user_message"],
             "baseline_response": response,
             "model": model or config.get("model"),
@@ -99,7 +103,6 @@ def run(config: dict, output_dir: Path, dilemmas: list[dict]) -> list[dict]:
         results.append(record)
         utils.append_jsonl(record, output_path)
         checkpoint.mark_done(pid)
-        registry.save()
 
     print(f"  Total baseline responses: {len(results)}.")
     return results

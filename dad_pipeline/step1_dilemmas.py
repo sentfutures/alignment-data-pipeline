@@ -574,9 +574,12 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                 "batch": None,
             }
             examples.append(record)
+            # Persist the allocation BEFORE the record that carries it — the
+            # registry's ordering invariant (a crash may leave a gap, never a
+            # gid on a record the registry doesn't know about).
+            registry.save()
             utils.append_jsonl(record, output_path)
             imported += 1
-        registry.save()
         print(f"  Imported {imported} seed examples from {seed_path}")
 
     # --- Step 1a: scenario deal + plan. The deal is offline and persists once
@@ -606,8 +609,11 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
             deals = compose_scenarios.deal_scenarios(target - len(examples), rng, variables_path)
             for p in deals:
                 p["scenario_gid"] = registry.gid("scenario", scenario_fingerprint(p))
-                utils.append_jsonl(p, deals_path)
+            # Stamp the whole deal, persist, then write — the registry's
+            # ordering invariant (no record may carry an unallocated gid).
             registry.save()
+            for p in deals:
+                utils.append_jsonl(p, deals_path)
             print(f"  [1a deal] Dealt {len(deals)} stratified scenarios into {deals_path}")
 
         rejects = utils.load_jsonl(rejects_path)
@@ -960,6 +966,11 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
                 print(f"    {pid}: drafted message duplicates {gid} — "
                       "not shipped; --resume will redraft it.")
                 continue
+            # Persist the allocation BEFORE the record that carries it — the
+            # registry's ordering invariant. Per record, not once per pass: a
+            # pass-level save leaves every gid written so far unpersisted if the
+            # run dies mid-pass.
+            registry.save()
             record = {
                 "prompt_gid": gid,
                 "user_message": user_message,
@@ -997,7 +1008,6 @@ def run(config: dict, prompts_dir: Path, output_dir: Path) -> list[dict]:
             examples.append(record)
             accepted.add(pid)
             utils.append_jsonl(record, output_path)
-        registry.save()
 
     if draft_rejected:
         print(f"  {len(draft_rejected)} scenario(s) rejected at 1b (undraftable after "

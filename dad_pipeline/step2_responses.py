@@ -220,8 +220,9 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
     output_path = output_dir / "responses.jsonl"
     checkpoint = utils.Checkpoint(output_dir / "_checkpoint.json")
     # Stable content-keyed response ids (R-####), shared across runs. Assigned
-    # on the main thread only (the registry is not thread-safe) and saved with
-    # every write batch, so a crash never orphans an id already on a record.
+    # on the main thread only (the registry is not thread-safe) and saved
+    # *before* the batch of records carrying those ids is written, so a crash
+    # never leaves a written record holding an unallocated id.
     registry = IdRegistry(registry_path(output_dir))
 
     # Drop unusable scopes on load so a resumed run re-derives them instead of
@@ -471,12 +472,15 @@ def run(config: dict, prompts_dir: Path, output_dir: Path, dilemmas: list[dict],
         for record in out["responses"]:
             record["response_gid"] = registry.gid(
                 "response", response_fingerprint(record["assistant_response"]))
+        # Persist the allocations BEFORE the records that carry them — the
+        # registry's ordering invariant.
+        if out["responses"]:
+            registry.save()
+        for record in out["responses"]:
             results.append(record)
             done_keys.add((prompt_key(record), record["sample_index"]))
             utils.append_jsonl(record, output_path)
             checkpoint.mark_done(f"{prompt_key(record)}_s{record['sample_index']}")
-        if out["responses"]:
-            registry.save()
 
     if scope_rejected:
         print(f"  {len(scope_rejected)} prompt(s) rejected at 2a (scope unusable) — "
