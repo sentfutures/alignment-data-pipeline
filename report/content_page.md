@@ -40,31 +40,34 @@ define one.
 
 <!-- id: title -->
 
-Teaching models to reason about animal welfare
+Teaching models to reason about harm to animals
 
 <!-- id: intro -->
 
-Anthropic's [Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/) found that a model learns more from the reasons behind a behaviour than from the behaviour itself.
+Research on alignment midtraining ([1](https://alignment.anthropic.com/2026/teaching-claude-why/), [2](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits)) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
 
-Pre-training style documents were the better way to teach a model something new, and conversations showed it reasoning through someone else's hard decision. Training on both worked better than training on either alone.
+Two complementary techniques proved especially effective:
 
-We have built two training dataset generation pipelines on their methods, for a subject very little training data covers: the welfare consideration of nonhuman sentient beings.
+1. **Synthetic document finetuning** using pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model in training while increasing the number of aligned propensities associated with it.
+2. **Difficult advice Q&A** depicting an AI assistant coaching users through ethical dilemmas analogous to those the target model might eventually encounter in deployment. This teaches ethical reasoning skills while teaching the model to identify with the responsible persona.
+
+Following this research, we built pipelines for synthesizing training data on a subject currently absent from the training corpus: welfare considerations of nonhuman sentient beings. We developed scenarios and reasoning principles in consultation with leading animal ethicists to create a robust training set that mirrors situations where real AI systems will take actions beneficial or detrimental to animal welfare.
 
 <!-- id: dad_desc -->
 
-An AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
+AI coaching users through ethical dilemmas involving disenfranchised third parties (e.g. animals).
 
 <!-- id: sdf_desc -->
 
-Prose from a world where animals and other sentient beings are reasoned about carefully.
+Diverse artifacts from a world where your model already reasons responsibly about animal welfare.
 
 <!-- id: dad_use -->
 
-Midtraining, as supervised fine-tuning on chat transcripts.
+Supervised fine-tuning QA
 
 <!-- id: sdf_use -->
 
-Midtraining, as continued pretraining on documents.
+Midtraining
 
 <!-- id: dad_unit -->
 
@@ -72,13 +75,5 @@ One user dilemma in, one assistant answer out.
 
 <!-- id: sdf_unit -->
 
-One standalone document, no chat framing.
-
-<!-- id: dad_pipeline -->
-
-matrix deal → dilemma → reasoning → constitution rewrite
-
-<!-- id: sdf_pipeline -->
-
-matrix deal → plan → draft → rewrite → score
+Blogs, interviews, encyclopedia entries, forum threads.
 

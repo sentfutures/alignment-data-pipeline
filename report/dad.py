@@ -47,8 +47,7 @@ CONTENT_IDS = (
     "dad_what",
     "method_intro", "stage1", "stage2", "stage3", "control",
     "example_pick", "example_extra",
-    "caveats",
-    "appendix_intro", "judged_caveat", "checks_intro",
+    "appendix_intro", "checks_intro",
 )
 
 SECTION_ID = "dad"
@@ -74,7 +73,6 @@ SECTION_TITLE = "Difficult advice"
 BEATS = (
     ("dad-built", "The pipeline"),
     ("dad-example", "One example, end to end"),
-    ("dad-weak", "Caveats"),
     ("dad-appendix", "Appendix"),
 )
 
@@ -905,7 +903,12 @@ def judged_drawer(audit, content, f, cons, labels):
     # its presence is not evidence that a judge ran. Say so explicitly rather than letting
     # a drawer titled "what the paid judges measured" fill up with offline measures.
     paid = bool(means or (cons and cons.get("plain") is not None) or mpr.get("survival"))
-    body = [C.prose(content, "judged_caveat", f) if paid else R.note(
+    body = [R.note(
+        "Both arms answer the same dilemmas and a paid judge scores the answers. It sits "
+        "in a drawer because it is the least sound measurement here: the judgements are "
+        f"{f.get('judge_arms_clause', 'not evenly matched')}, so the two means are not "
+        "taken over the same records, and judge and generator are the same model family."
+    ) if paid else R.note(
         "No paid judge pass ran on this run, so nothing here compares the two arms on "
         "substance or manner. Populate it with `python evals/audit_dad.py --input <run> "
         "--reasons`. The rows below are offline measurements against the control.")]
@@ -954,9 +957,7 @@ def judged_drawer(audit, content, f, cons, labels):
     body = [b for b in body if b]
     if len(body) <= 1:
         return ""
-    title = ("What the paid judges measure, and why the report does not lead with it"
-             if paid else "How the two arms compare, offline")
-    return R.details(title, "".join(body),
+    return R.details("Improving on the control", "".join(body),
                      meta=f.get("judge_arms_clause", "") if paid else "")
 
 
@@ -1352,7 +1353,6 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               C.run_note(run_id, n=f.get("n"),
                          lead="Every figure and verdict below is measured on one run:"),
-              audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels)]
 
     charts = _appendix_charts(audit, f, cons)
@@ -1383,7 +1383,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
                      if worst else "informational", counts or "—"))
     if rows:
         blocks.append(R.details(
-            "Every check that runs",
+            "Diversity checks",
             C.prose(content, "checks_intro", f)
             + checks_table(audit, diversity)
             + _diversity_block(diversity)
@@ -1423,7 +1423,6 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
         blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
                        hf_href=hf_href, repo_href=repo_href, run_id=run_id),
-        blocks_weak(content, f),
         blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks,
                         run_id=run_id),
     ])

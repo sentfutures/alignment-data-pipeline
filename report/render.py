@@ -60,6 +60,8 @@ _MD_CODE = re.compile(r"`([^`]+)`")
 _MD_BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _MD_ITAL = re.compile(r"(?<![*\w])\*([^*\n]+)\*(?!\*)")
 _MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+# "1. ", "2) " — the marker of a numbered list line, stripped before the item renders.
+_MD_ORDERED = re.compile(r"^\d+[.)]\s+")
 
 
 def inline_md(text):
@@ -107,8 +109,14 @@ def paragraphs(text):
     """Blank-line-separated prose to <p>/<ul>/<h3>/dek blocks, with inline markdown.
 
     Conventions, all of which the prose files use: a block whose lines all start with
-    ``- `` is a list; a block opening ``### `` is a subhead; a block opening ``> `` is
-    a dek — the one-line finding that sits under a heading.
+    ``- `` is a list, and one whose lines all start ``1. ``/``2. `` is a NUMBERED list;
+    a block opening ``### `` is a subhead; a block opening ``> `` is a dek — the one-line
+    finding that sits under a heading.
+
+    The numbered form exists because the intro names two techniques and then counts them
+    off; rendering that as bullets loses the count the sentence above it just promised.
+    The digits are not read — an ``<ol>`` numbers itself — so a mis-numbered source list
+    still renders 1, 2, 3.
 
     The dek is built here rather than by a ``dek()`` of its own: the prose convention is
     the only way one is ever made, and a second public route to the same markup is how a
@@ -122,6 +130,9 @@ def paragraphs(text):
         if all(ln.startswith("- ") for ln in lines):
             items = "".join(f"<li>{inline_md(ln[2:])}</li>" for ln in lines)
             blocks.append(f"<ul>{items}</ul>")
+        elif all(_MD_ORDERED.match(ln) for ln in lines):
+            items = "".join(f"<li>{inline_md(_MD_ORDERED.sub('', ln))}</li>" for ln in lines)
+            blocks.append(f"<ol>{items}</ol>")
         elif lines[0].startswith("> "):
             line = inline_md(" ".join(ln.lstrip("> ") for ln in lines))
             blocks.append(f"<p class='dek'>{line}</p>")
@@ -945,6 +956,14 @@ object-fit:cover;object-position:50% 48.5%}
 .hero-intro{max-width:60ch;margin:2.4rem auto 0}
 .hero-intro p{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
 .hero-intro p+p{margin-top:1.05rem}
+/* The hero centres, but a numbered list cannot: centred items leave the markers
+   stranded down the left while the text ragged-edges around them, and the eye loses
+   which line belongs to which number. So the list alone goes flush left, indented
+   enough to hang its markers, and stays centred as a BLOCK within the measure. */
+.hero-intro ol{max-width:52ch;margin:1.05rem auto 0;padding-left:1.6rem;text-align:left}
+.hero-intro ol li{margin:0;color:var(--text-secondary);font-size:1.1rem;line-height:1.6}
+.hero-intro ol li+li{margin-top:.7rem}
+.hero-intro ol+p{margin-top:1.05rem}
 /* Type: the serif argues, the sans measures. */
 h1{font:700 2.6rem/1.07 var(--serif);letter-spacing:-.02em;margin:0 0 .5rem;
 text-wrap:balance;font-variant-numeric:proportional-nums}
