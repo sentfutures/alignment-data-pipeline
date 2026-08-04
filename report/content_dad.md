@@ -79,4 +79,4 @@ Corpus-wide evals from a {{n}}-example sample run using {{gen_models}}.
 
 <!-- id: checks_intro -->
 
-Besides the stage 1 gate on user messages, we provide a set of corpus-level evals to test for diversity: register collapse, repeated openings, and other stylistic tics.
+How varied the responses are across several dimensions: the **rhetorical moves** they make (classified by an LLM), the **wording and phrases** they repeat (detected automatically), and the **meanings or topics** they cover (measured using embedding similarity).

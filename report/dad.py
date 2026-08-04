@@ -1037,42 +1037,52 @@ def judged_drawer(audit, content, f, cons, labels, repo_href=""):
     return R.details("Comparison to the control", "".join(body))
 
 
-def checks_table(audit, diversity):
-    """Every measurement that could have run, and whether it did.
+def _tics_figure(audit):
+    """Tracked phrases as a share of each arm — the wording-and-phrases dimension."""
+    tics = audit.get("tracked_tics") or audit.get("stock_phrases") or {}
+    watch = tics.get("watch") or {}
+    n_pipe, n_plain = tics.get("n_pipeline") or 0, tics.get("n_plain") or 0
+    if not (watch and n_pipe):
+        return ""
+    rows = sorted(({"label": phrase,
+                    "plain": (d.get("plain") or 0) / n_plain if n_plain else 0,
+                    "pipeline": (d.get("pipeline") or 0) / n_pipe}
+                   for phrase, d in watch.items()
+                   if (d.get("pipeline") or d.get("plain"))),
+                  key=lambda r: -r["pipeline"])[:10]
+    if not rows:
+        return ""
+    return R.figure(
+        title="Tracked phrases",
+        note_="Phrases the eval watches by name because earlier runs turned them into "
+              "habits. Share of each arm's answers containing one at least once.",
+        chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+                             percent=True, label_w=210),
+        caption="**The pipeline's most common tracked phrase stays well under half of "
+                "its answers**, which is where a word choice becomes a tic.")
 
-    A check that did not run says so rather than vanishing, because a reader deciding
-    whether to trust the dataset needs to know which questions were never asked.
-    """
-    mpr = (audit or {}).get("moral_patient_reasons") or {}
-    checks = [
-        ("Valuable welfare considerations", bool(mpr.get("pipeline") or
-                                                 (audit or {}).get("welfare_impact")),
-         "Welfare substance per answer, both arms"),
-        ("Retention", bool(mpr.get("survival")),
-         "Item by item, which of the control's considerations the pipeline kept, weakened or "
-         "dropped, and what it added"),
-        ("Delivery quality", bool((audit or {}).get("delivery")),
-         f"How helpful, proportionate and non-preachy each answer is, "
-         f"judged 0–{_score_max(audit)}"),
-        ("Showcase examples", bool((audit or {}).get("showcase")),
-         "Concrete pipeline-beats-control cases with verbatim improved spans"),
-        # Response stance appears only when it ran: every other unrun check names a
-        # missing measurement, but this row's gloss ("…or moralizes") reads as a claim
-        # about moralizing on a run that never measured it.
-        *([("Response stance", True,
-            "Whether an answer defers, stays calibrated, or moralizes")]
-          if ((audit or {}).get("moves") or {}).get("stance") else []),
-        ("Tracked phrases and rhetorical moves",
-         bool((audit or {}).get("tracked_tics") or (audit or {}).get("rhetorical_moves")),
-         "Recurring phrasing and argumentative habits, as a share of each arm"),
-        ("Length, structure, jargon", bool((audit or {}).get("response_lengths")),
-         "Offline dataset measurements against the control"),
-        ("Semantic diversity", bool(diversity),
-         "Embedding near-duplicate rate, topic spread, effective record count"),
-    ]
-    rows = [(name, what if ok else R.Raw(f"<i>not run on this run</i> — {R.esc(what)}"))
-            for name, ok, what in checks]
-    return R.table(["check", "what it establishes"], rows)
+
+def _moves_figure(audit):
+    """Rhetorical moves as a share of each arm — the argumentative-habits dimension."""
+    moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
+    if not moves:
+        return ""
+    rows = sorted(({"label": name, "plain": d.get("plain_share"),
+                    "pipeline": d.get("pipeline_share")} for name, d in moves.items()),
+                  key=lambda r: -(r["pipeline"] or 0))
+    gloss = {name: (d.get("description") or "") for name, d in moves.items()}
+    invented = [r["label"] for r in rows
+                if (r["pipeline"] or 0) > 0.25 and not (r["plain"] or 0)]
+    dropped = [r["label"] for r in rows
+               if (r["plain"] or 0) > 0.25 and not (r["pipeline"] or 0)]
+    return R.figure(
+        title="Rhetorical habits",
+        note_="Argumentative moves, as a share of each arm's answers. Hover a bar for "
+              "what the move is; the definitions are below.",
+        chart=R.grouped_hbar(rows[:6], series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
+                             percent=True, label_w=210, glossary=gloss),
+        caption=(_habits_caption(invented, dropped) if (invented or dropped) else
+                 "**Both arms reach for the same moves at similar rates.**"))
 
 
 # ------------------------------------------------------------------ method
@@ -1135,43 +1145,6 @@ def _footprint_figures(audit, f):
             caption=f"**The pipeline moralizes more than the control** "
                     f"({f.get('moralizes_pipeline', '?')} against "
                     f"{f.get('moralizes_plain', '?')}), which stage 3 exists to prevent."))
-    tics = audit.get("tracked_tics") or audit.get("stock_phrases") or {}
-    watch = tics.get("watch") or {}
-    n_pipe, n_plain = tics.get("n_pipeline") or 0, tics.get("n_plain") or 0
-    if watch and n_pipe:
-        rows = sorted(({"label": phrase,
-                        "plain": (d.get("plain") or 0) / n_plain if n_plain else 0,
-                        "pipeline": (d.get("pipeline") or 0) / n_pipe}
-                       for phrase, d in watch.items()
-                       if (d.get("pipeline") or d.get("plain"))),
-                      key=lambda r: -r["pipeline"])[:10]
-        if rows:
-            blocks.append(R.figure(
-                title="Tracked phrases",
-                note_="Phrases the eval watches by name because earlier runs turned them into "
-                      "habits. Share of each arm's answers containing one at least once.",
-                chart=R.grouped_hbar(rows, series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
-                                     percent=True, label_w=210),
-                caption="**The pipeline's most common tracked phrase stays well under half of "
-                        "its answers**, which is where a word choice becomes a tic."))
-    moves = (audit.get("rhetorical_moves") or {}).get("moves") or {}
-    if moves:
-        rows = sorted(({"label": name, "plain": d.get("plain_share"),
-                        "pipeline": d.get("pipeline_share")} for name, d in moves.items()),
-                      key=lambda r: -(r["pipeline"] or 0))
-        gloss = {name: (d.get("description") or "") for name, d in moves.items()}
-        invented = [r["label"] for r in rows
-                    if (r["pipeline"] or 0) > 0.25 and not (r["plain"] or 0)]
-        dropped = [r["label"] for r in rows
-                   if (r["plain"] or 0) > 0.25 and not (r["pipeline"] or 0)]
-        blocks.append(R.figure(
-            title="Rhetorical habits",
-            note_="Argumentative moves, as a share of each arm's answers. Hover a bar for "
-                  "what the move is; the definitions are below.",
-            chart=R.grouped_hbar(rows[:6], series=[("plain", R.PLAIN), ("pipeline", R.PIPELINE)],
-                                 percent=True, label_w=210, glossary=gloss),
-            caption=(_habits_caption(invented, dropped) if (invented or dropped) else
-                     "**Both arms reach for the same moves at similar rates.**")))
     structure = audit.get("structure") or {}
     if (structure.get("pipeline") or {}).get("effective_shapes") is not None:
         p, b = structure["pipeline"], structure.get("plain") or {}
@@ -1358,37 +1331,95 @@ def _appendix_charts(audit, f, cons):
     return out + _footprint_figures(audit, f)
 
 
-def _diversity_block(diversity):
-    """The numbers behind the checks table's "Semantic diversity" row.
+def _semantic_figures(diversity):
+    """Meanings and topics: the corpus audit viewer's two-chart pair, mirrored.
 
-    Inside that drawer rather than beside it: on its own it was a third top-level row of
-    the appendix carrying three tiles, and a reader had no way to tell it apart from the
-    two reference tables it sat under.
+    Redundancy (each record's nearest-neighbour cosine, where past 0.90 is a
+    near-duplicate) and topic spread (meaning-cluster sizes, largest first), with the
+    viewer's own captions, then the Vendi effective-count as a sentence. Renders from
+    the per-record ``scopes.combined`` data, so a run whose diversity report predates
+    that field gets nothing rather than an approximation.
     """
-    if not diversity:
+    scope = ((diversity or {}).get("scopes") or {}).get("combined") or {}
+    sims, clusters = scope.get("nn_sims") or [], scope.get("clusters") or {}
+    if not sims:
         return ""
-    vendi = diversity.get("vendi") or {}
-    nn = diversity.get("nn") or {}
-    clusters = ((diversity.get("scopes") or {}).get("combined") or {}).get("clusters") or {}
-    return (
-        "<h4>What the diversity pass measures</h4>"
-        "<p class='muted'>Embedding-space measurements over the final dataset, from "
-        f"<code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"
-        + R.tiles([
-            R.stat(f"{vendi.get('score', 0):.1f}", "effectively distinct records",
-                   f"of {diversity.get('n_records', '?')} actual records; near-duplicates "
-                   f"count as fractions of a record"),
-            R.stat(f"{nn.get('over_0.90', 0):.0%}", "near-duplicate records",
-                   f"cosine similarity above 0.90 to their nearest neighbour; "
-                   f"{nn.get('over_0.80', 0):.0%} above 0.80"),
-            R.stat(f"{clusters.get('evenness', 0):.2f}", "topic-spread evenness",
-                   f"1.00 is perfectly even; the largest cluster holds "
-                   f"{clusters.get('largest_share', 0):.0%} of records"),
-        ]))
+    over = scope.get("over") or {}
+    out = [
+        "<h4>Meanings and topics</h4>",
+        "<p class='muted'>Similarity is measured with embeddings, so two records count "
+        "as alike when they cover the same subject even in completely different words. "
+        f"Embedding model: <code>{R.esc(diversity.get('embed_model', '?'))}</code>.</p>"]
+    # Fixed 0.05 buckets ending at 1.00, so the 0.90 near-duplicate threshold is a
+    # bucket edge and an empty right-hand tail stays visible rather than cropped.
+    lo = min(0.5, min(sims))
+    edges = [round(lo + i * 0.05, 2) for i in range(int(round((1.0 - lo) / 0.05)))]
+    buckets = [(f"{a:.2f}", sum(1 for s in sims if a <= s < round(a + 0.05, 2)))
+               for a in edges]
+    out.append(R.figure(
+        title="Redundancy — how close each record sits to its nearest neighbour",
+        chart=R.histogram(buckets, xlabel="nearest-neighbour cosine similarity"),
+        caption=f"**{over.get('0.90', 0):.0%} near-duplicate** (similarity above 0.90), "
+                f"{over.get('0.80', 0):.0%} similar (above 0.80). Lower is more varied."))
+    sizes = clusters.get("sizes") or []
+    if sizes:
+        k = clusters.get("k") or len(sizes)
+        out.append(R.figure(
+            title="Topic spread — the records grouped into meaning clusters",
+            chart=R.histogram([(str(i + 1), s) for i, s in enumerate(sizes)],
+                              xlabel="clusters, largest first"),
+            caption=f"**Evenness {clusters.get('evenness', 0):.3f} across {k} clusters**, "
+                    f"the largest holding {clusters.get('largest_share', 0):.0%} of "
+                    "records. Many even bars mean many distinct topics; one tall bar "
+                    "means they clump onto a single one."))
+    n, vr = scope.get("n") or 0, scope.get("vendi_ratio") or 0
+    if n and vr:
+        out.append("<p>" + R.inline_md(
+            f"**{vr * n:.1f} of {n} records effectively distinct** in meaning "
+            f"(Vendi ratio {vr:.2f}). Higher is more varied.") + "</p>")
+    detail = clusters.get("detail") or []
+    if detail:
+        out.append(R.details(
+            "What each cluster is",
+            "<p class='muted'>Clusters are unlabelled groups of records with similar "
+            "meaning, numbered to match the topic-spread bars (largest first). Each is "
+            "shown by its most central record — a typical member, not a name for the "
+            "group.</p>"
+            + R.table(["cluster", "records", "most central record"],
+                      [(f"{i + 1}", f"{d.get('size', '?')}",
+                        f"{d.get('rep_id', '?')} — “{d.get('rep', '')}”")
+                       for i, d in enumerate(detail)], align="rrl"),
+            meta=f"{len(detail)} clusters"))
+    return "".join(out)
+
+
+def diversity_drawer(audit, content, f, diversity):
+    """The corpus audit viewer's Composition and Diversity Analysis, as one drawer.
+
+    Mirrors that viewer section by design — the same three dimensions in the same
+    order (the rhetorical moves the answers make, the wording and phrases they repeat,
+    the meanings and topics they cover), the same two semantic charts, the same
+    captions — so a reader moving between this page and the viewer meets one story.
+    The health-check triage material (which checks ran, per-section verdict rows) is
+    deliberately absent: it is review-tool work, and what this run's audit flagged
+    already renders in the audit-flags drawer.
+    """
+    moves_fig = _moves_figure(audit)
+    tics_fig = _tics_figure(audit)
+    semantic = _semantic_figures(diversity)
+    if not (moves_fig or tics_fig or semantic):
+        return ""
+    parts = [C.prose(content, "checks_intro", f), moves_fig, tics_fig,
+             _moves_drawer(audit) if moves_fig else "", semantic]
+    have = [name for name, part in (("rhetorical moves", moves_fig),
+                                    ("tracked phrases", tics_fig),
+                                    ("meanings and topics", semantic)) if part]
+    return R.details("Composition and diversity", "".join(p for p in parts if p),
+                     meta=" · ".join(have))
 
 
 def _moves_drawer(audit):
-    """The gloss for the checks table's rhetorical-moves row, nested under it.
+    """The definitions behind the rhetorical-habits figure, nested under it.
 
     A glossary is not a finding, and as a top-level appendix row it read as one.
     """
@@ -1406,8 +1437,8 @@ def _moves_drawer(audit):
         meta=f"{len(moves)} moves")
 
 
-def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest=None,
-                    picks=(), run_id="", repo_href=""):
+def blocks_appendix(audit, content, f, cons, labels, diversity, manifest=None,
+                    run_id="", repo_href=""):
     """Everything that is evidence, collapsed so it costs a reader nothing.
 
     Every chart lands here — the page above carries none — and so does everything specific
@@ -1421,18 +1452,20 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
     rather than saying "that run", because a reader arriving from the rail may not have
     read the beat that introduced it.
 
-    FIVE drawers, each answering a different question: what the audit flagged, how the
-    dataset compares to a plain model, every chart, every check, and the worked example's
-    full diff. It was eight, and the grouping contradicted itself — a drawer called "every
-    chart from this run" with two siblings that also held a figure and three stat tiles, so
-    a reader who opened it had no way to know it was not every chart. What used to be its
-    own row is now inside the drawer whose question it answers: the per-record retention
-    chart is a chart, and the diversity tiles and the rhetorical-move glossary are the
-    numbers and the gloss behind two rows of the checks table.
+    FOUR drawers, each answering a different question: what the audit flagged, how the
+    dataset compares to a plain model, every chart, and how varied the output is. The
+    variety drawer mirrors the corpus audit viewer's Composition and Diversity Analysis
+    section; the health-check triage tables and the worked example's full rewrite diff
+    used to render here and were cut — a hand-off reader takes the three inline hunks'
+    word, and verdict-row dumps belong to the review tool.
     """
     blocks = [R.sub("dad-appendix", "Appendix"), C.prose(content, "appendix_intro", f),
               C.run_note(run_id, n=f.get("n"),
                          lead="Every figure and verdict below is measured on one run:"),
+              # The derived candour floor. Every docstring that says "the arm asymmetry
+              # renders in the audit-flags drawer" is pointing here, so this call is
+              # load-bearing: without it the drawer silently never renders.
+              audit_flags_drawer(audit, f, manifest),
               judged_drawer(audit, content, f, cons, labels, repo_href=repo_href)]
 
     charts = _appendix_charts(audit, f, cons)
@@ -1449,37 +1482,7 @@ def blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manife
             "Every chart", "".join(charts),
             meta=f"{len(charts)} figures · {f.get('footprint_regressions', '')}"))
 
-    rows, verdicted = [], 0
-    for sec in audit.get("sections") or []:
-        verdicts = [r.get("verdict") for r in (sec.get("rows") or []) if r.get("verdict")]
-        worst = ("BAD" if "BAD" in verdicts else "OK" if "OK" in verdicts
-                 else "GOOD" if "GOOD" in verdicts else "")
-        if worst:
-            verdicted += 1
-        counts = " ".join(f"{verdicts.count(v)} {v}" for v in ("GOOD", "OK", "BAD")
-                          if verdicts.count(v))
-        rows.append((sec.get("title", "?"), sec.get("group", "—"),
-                     R.Raw(R.chip(worst, {"BAD": "bad", "OK": "warn", "GOOD": "good"}[worst]))
-                     if worst else "informational", counts or "—"))
-    if rows:
-        blocks.append(R.details(
-            "Diversity checks",
-            C.prose(content, "checks_intro", f)
-            + checks_table(audit, diversity)
-            + _diversity_block(diversity)
-            + "<h4>As the audit records them</h4>"
-            + R.table(["check", "group", "worst verdict", "counts"], rows, align="llll")
-            + _moves_drawer(audit),
-            meta=f"{len(rows)} checks · {verdicted} carry a verdict"))
-
-    pid, _ = _picks(content, picks, {r.get("prompt_id"): r for r in rewrites or []})
-    rw = next((r for r in rewrites or [] if r.get("prompt_id") == pid), None)
-    if rw and rw.get("draft_response") and rw.get("rewritten_response"):
-        blocks.append(R.details(
-            "The full stage-3 rewrite diff for the worked example",
-            "<p class='muted'>Struck through: stage 2's draft. Highlighted: the shipped "
-            "answer.</p>" + C.word_diff(rw["draft_response"], rw["rewritten_response"]),
-            meta=f"{len(rw['rewritten_response'].split()):,} words"))
+    blocks.append(diversity_drawer(audit, content, f, diversity))
     return "".join(blocks)
 
 
@@ -1503,6 +1506,6 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
         blocks_built(content, f),
         blocks_example(content, f, rewrites, baseline, lineage, labels, picks,
                        hf_href=hf_href, repo_href=repo_href, run_id=run_id),
-        blocks_appendix(audit, content, f, cons, rewrites, labels, diversity, manifest, picks,
+        blocks_appendix(audit, content, f, cons, labels, diversity, manifest,
                         run_id=run_id, repo_href=repo_href),
     ])

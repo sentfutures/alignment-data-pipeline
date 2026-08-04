@@ -116,7 +116,14 @@ AUDIT_FULL = {
 DIVERSITY = {"n_records": 2, "embed_model": "gemini-embedding-001",
              "vendi": {"score": 5.15, "ratio": 0.132},
              "nn": {"over_0.90": 0.0, "over_0.80": 0.33},
-             "scopes": {"combined": {"clusters": {"evenness": 0.875, "largest_share": 0.33}}}}
+             "scopes": {"combined": {
+                 "n": 2, "nn_sims": [0.75, 0.85], "vendi_ratio": 0.50,
+                 "over": {"0.90": 0.0, "0.80": 0.33},
+                 "clusters": {"k": 2, "evenness": 0.875, "largest_share": 0.33,
+                              "sizes": [1, 1],
+                              "detail": [{"size": 1, "rep_id": "R-0201",
+                                          "rep": "Should I do the thing?",
+                                          "ids": ["AW-0001"]}]}}}}
 
 MANIFEST = {"run_id": "2026-07-20_20-51_bedrock-40", "created_at": "2026-07-20T20:51:58",
             "git_commit": "abc12345", "git_dirty": True,
@@ -938,13 +945,15 @@ class TestLineage:
         assert panes, ex[:400]
         assert "hidden" not in re.search(r"<div class='pane-x' id='ex-0'([^>]*)>", ex).group(1)
 
-    def test_rewrite_diff_shows_hunks_inline_and_the_whole_thing_in_the_appendix(self):
+    def test_rewrite_diff_shows_hunks_inline_and_only_inline(self):
+        """The worked example carries the three largest hunks; the full-diff drawer that
+        duplicated the whole answer into the appendix was cut."""
         html = build(content=content(example_pick="AW-0001"), baseline=BASELINE,
                      rewrites=REWRITES, lineage=LINEAGE)
         assert "<ins>" in html
         assert "3 largest changes" in html
         appendix = html[html.find("id='dad-appendix'"):]
-        assert "full stage-3 rewrite diff" in appendix.lower()
+        assert "full stage-3 rewrite diff" not in appendix.lower()
 
     def test_diff_summary_reports_how_much_changed(self):
         assert "%" in C.diff_summary("a b c d", "a b c e")
@@ -1115,20 +1124,37 @@ class TestCandour:
         warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
         assert any(sev == "BAD" and "showcase" in w for sev, w in warnings)
 
-    def test_every_check_is_listed_in_the_appendix(self):
-        """The 24-row table moved out of the main flow, but it did not leave the page:
-        'nothing was left out' has to stay a claim a reader can check."""
-        html = build()
+    def test_the_health_check_triage_tables_do_not_render(self):
+        """The variety drawer mirrors the corpus audit viewer's diversity section; the
+        audit's per-section verdict dump and the which-checks-ran table are review-tool
+        triage and stay out of the hand-off page."""
+        html = build(diversity=DIVERSITY)
         appendix = html[html.find("id='dad-appendix'"):]
-        assert "Locale / taxa plausibility" in appendix
-        assert "Response stance (LLM)" in appendix
+        assert "Composition and diversity" in appendix
+        assert "Locale / taxa plausibility" not in appendix
+        assert "As the audit records them" not in appendix
+        assert "not run on this run" not in appendix
 
-    def test_a_check_that_did_not_run_says_so(self):
-        """A reader deciding whether to trust the dataset needs to know which questions
-        were never asked, not just how the asked ones scored."""
-        audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
-        text = strip_tags(build(audit=audit, diversity=None))
-        assert "not run on this run" in text
+    def test_the_variety_drawer_mirrors_the_viewer_charts_and_captions(self):
+        """The viewer's two semantic charts and their captions, with the Vendi count as
+        a sentence — computed from the same scopes.combined data the viewer reads."""
+        html = build(diversity=DIVERSITY)
+        text = strip_tags(html)
+        assert "Redundancy — how close each record sits to its nearest neighbour" in text
+        assert "Topic spread — the records grouped into meaning clusters" in text
+        assert "0% near-duplicate (similarity above 0.90), 33% similar (above 0.80)" in text
+        assert "Evenness 0.875 across 2 clusters" in text
+        assert "1.0 of 2 records effectively distinct in meaning (Vendi ratio 0.50)" in text
+        assert "What each cluster is" in text
+
+    def test_no_per_record_diversity_data_drops_the_semantic_block_only(self):
+        """A diversity report without scopes.combined.nn_sims (pre-field runs) keeps the
+        moves and phrases figures but renders no meanings-and-topics charts."""
+        html = build(diversity={"n_records": 2, "vendi": {"score": 5.0, "ratio": 0.1}})
+        appendix = html[html.find("id='dad-appendix'"):]
+        assert "Composition and diversity" in appendix
+        assert "Meanings and topics" not in appendix
+        assert "Rhetorical habits" in appendix
 
     def test_charts_emit_parseable_svg(self):
         import xml.etree.ElementTree as ET
