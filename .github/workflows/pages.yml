@@ -1,6 +1,6 @@
 name: pages
 
-# Publishes report/index.html to GitHub Pages (reasoning.sentientfutures.ai)
+# Publishes website/index.html to GitHub Pages (reasoning.sentientfutures.ai)
 # whenever main changes it. The custom domain lives in the repo's Pages
 # settings, not here.
 
@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
     paths:
-      - report/index.html
+      - website/index.html
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -29,10 +29,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Stage the report as the site root
+      - name: Stage the site root
         run: |
           mkdir -p _site
-          cp report/index.html _site/index.html
+          cp website/index.html _site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
