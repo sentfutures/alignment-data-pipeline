@@ -484,6 +484,32 @@ class TestShape:
         start = html.index(".ilink{")
         assert "font" not in html[start:html.index("}", start)]
 
+    def test_paper_has_no_indigo_on_it(self):
+        """Print turns every accent object to ink — including the UNDERLINE and the buttons.
+
+        Overriding `color` alone is not enough and the page did exactly that: the base `a` rule
+        sets `text-decoration-color` to the accent, so a printed link was black text under an
+        indigo rule, `.lbtn` declares its own accent colour so it printed indigo outright, and
+        `.cite-n sup` is not an anchor, so a bare `a` override never reached it. Invisible on
+        screen, which is why it is asserted here.
+        """
+        html = build(sdf_inputs=SDF_INPUTS)
+        printed = html[html.index("@media print"):]
+        rule = re.search(r"a,[^{]*\{[^}]*color:var\(--text-primary\)[^}]*\}", printed).group(0)
+        for sel in (".lbtn", ".cite-n sup"):
+            assert sel in rule, f"{sel} still prints in the accent: {rule}"
+        assert "text-decoration-color:currentColor" in rule
+
+    def test_the_palette_is_closed_even_in_the_print_block(self):
+        """Every colour is a token. The printed URL's own colour was a raw `#555` — the one
+        hex on the page outside the token block, and `--text-muted` is what it meant."""
+        html = build()
+        css = re.search(r"<style>(.*?)</style>", html, re.S).group(1)
+        # Token declarations are where hexes live; anything else is a colour typed by hand.
+        css = re.sub(r":root\{[^}]*\}", "", css)
+        assert not re.findall(r"[:\s]#[0-9a-fA-F]{3,8}\b", css), re.findall(
+            r".{30}#[0-9a-fA-F]{3,8}", css)
+
     def test_the_outbound_arrow_is_drawn_not_typed(self):
         """As a glyph U+2197 is a hairline in most faces and a different shape in every
         one, on a page that gets printed and screenshotted."""

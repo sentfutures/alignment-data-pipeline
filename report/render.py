@@ -1446,7 +1446,7 @@ text-decoration-color:var(--accent)}
    anything — and the negative margin gives back the space it would otherwise add. WCAG 2.5.8
    exempts a target inside a sentence from the 24px minimum, so this is comfort, not
    conformance. */
-.cite-n{text-decoration:none;padding:.5em .25em;margin:0 -.25em}
+.cite-n{text-decoration:none;padding:.22em .25em;margin:0 -.25em}
 /* The raise happens ONCE, here, and not on the anchor: <sup> already carries the UA's own
    vertical-align:super and font-size:smaller, so raising and shrinking the anchor too shifted
    the digits twice — measured at 4x, they sat above the cap line at ~10px while the separating
@@ -1482,9 +1482,14 @@ footer.foot p{margin:0;color:inherit}
 /* Which runs this page was built from. Its own line under the two above, at the size the
    rest of the footer takes: a reader looking for it is looking deliberately. */
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
-   the page stays one file. */
+   the page stays one file.
+
+   The mark has to sit CLOSER to the name it belongs to than to the sentence it follows, or it
+   reads as punctuation after "A project by". Measured: a bare word space put it ~3.6px from
+   "by" and 4px from "Sentient Futures" — the same on both sides, so proximity said nothing.
+   The left margin is the word boundary, the right one groups the mark with the name. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
-margin-right:.5rem;flex:0 0 auto}
+margin-left:.4rem;margin-right:.25rem;flex:0 0 auto}
 /* An icon link declares NO face and no size, on purpose: it is not a control — there is
    nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
    the footer's own size, like the maker link beside it, and the bare `a` rule gives both the
@@ -1597,9 +1602,13 @@ thead{display:table-header-group}
 details{display:block}details>div{display:block!important}summary{list-style:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr)}
 main a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em;
-color:#555;word-break:break-all}
+color:var(--text-muted);word-break:break-all}
 .chip,rect,circle,path,line{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-a{color:var(--text-primary)}}
+/* On paper nothing is pressable and nothing is indigo: the label, its underline and the
+   outline button all go to ink. text-decoration-color has to be said out loud — the base rule
+   sets it to the accent, so overriding `color` alone left black text under an indigo rule, and
+   `.cite-n sup` is not an anchor, so the bare `a` override never reached it at all. */
+a,.lbtn,.cite-n sup{color:var(--text-primary);text-decoration-color:currentColor}}
 """
 
 JS = """
