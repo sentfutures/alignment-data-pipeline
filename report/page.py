@@ -32,8 +32,8 @@ from report import dad
 from report import render as R
 from report import sdf
 
-CONTENT_IDS = ("title", "intro", "sdf_desc", "sdf_use", "sdf_unit", "sdf_pipeline",
-               "dad_desc", "dad_use", "dad_unit", "dad_pipeline")
+CONTENT_IDS = ("title", "intro", "sdf_desc", "sdf_use", "sdf_unit",
+               "dad_desc", "dad_use", "dad_unit")
 
 
 REPO_URL = "https://github.com/sentfutures/alignment-data-pipeline"
@@ -85,12 +85,12 @@ def _date(manifest):
 def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """The two datasets, side by side. Their names are this section's heading.
 
-    Six rows, and every one of them says which side of the line it is on: three describe
-    the RESULT — what the dataset is, what one record is, what it is for — and one
-    describes the PIPELINE that produces it, before the two rows that link out to the
-    templates and to a made example. A reader arriving cold cannot tell a claim about the
-    data from a claim about the process unless the table tells them, and this table is
-    where a page that is mostly two long pipeline walkthroughs draws that line first.
+    Five rows: three describe the RESULT — what the dataset is, what one record is, what
+    it is for — before the two that link out to the templates and to a made example.
+
+    A ``pipeline`` row naming each chain of stages used to sit between them. It was cut:
+    the two walkthroughs below ARE the pipeline, at length and with a diagram each, and a
+    one-line chain above them was a summary the reader met before it could mean anything.
 
     ``result`` was the masthead's subtitle. It reads as a row because it is one: the
     sentence saying what each dataset is was the only unlabelled claim in the comparison.
@@ -104,8 +104,6 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
         ("result", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
         ("result format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
         ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
-        ("pipeline", _cell(content, "sdf_pipeline", f),
-         _cell(content, "dad_pipeline", f)),
         ("prompt templates", _prompts_cell(sdf_kwargs, PROMPTS_SDF),
          _prompts_cell(dad_kwargs, PROMPTS_DAD)),
         ("example dataset",

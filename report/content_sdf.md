@@ -34,33 +34,31 @@ report is held to. And no deks — the page allows two in total and both are spe
 
 <!-- id: sdf_what -->
 
-A pipeline that generates pretraining-style documents from a world where careful reasoning about the welfare of animals and other sentient beings is already ordinary: a council minute, a trade journal piece, a support thread.
+Pretraining-style documents from a world where careful AI models act responsibly towards animals and other disenfranchised third parties. Designed for diverse formats: a council minute, a trade journal essay, a forum debate.
 
 <!-- id: sdf_method_intro -->
 
-Four stages. Each is one model call with its own prompt template and model setting in [prompts](https://github.com/sentfutures/alignment-data-pipeline/tree/main/prompts/sdf). Code deals a combination, stage 1 turns it into a spec, stage 2 writes the document, stage 3 reviews and rewrites it against the constitution, and stage 4 scores what comes out and decides whether it ships.
+Four stages each [call a model](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/sdf) to complete the next step of synthesizing a document. Code deals a weighted mix of variables (you can adjust the weights); stage 1 turns it into a unique outline; stage 2 writes the document; stage 3 reviews and rewrites it to better demonstrate your alignment documents; and stage 4 screens out artifacts that fall short.
 
 <!-- id: sdf_stage1 -->
 
-The deal is not a model call: {{matrix_clause}} fixes the genre, the culture and language, the author's stance, whose welfare is at stake and how many, the domain, the value in tension, and how central the welfare thread is — down to a reserved share where it is a detail in passing, and another where there is no stake at all and raising one would be wrong. Each axis's share across a run matches its weight exactly rather than drifting, and the fictional people and organisations come from locale-matched seeded pools, so an invented name cannot attach to a real body.
+A dumb script draws from {{matrix_clause}} to fix the genre, the culture and language, the author's stance, whose welfare is at stake, and other substance & stylistic variables. When generating documents in bulk, each variable will be weighted deterministically. Names for fictional people and organisations come from locale-matched seeded pools; fictional quotes or actions are never ascribed to real people.
 
-One call then turns the combination into a self-contained spec: the scenario chosen, who wrote the document and for whom, the local detail anchoring it, and how the AI's reasoning surfaces. A combination that cannot be made coherent is refused here, and only the spec travels onward.
+Then a model call turns the combination into a self-contained outline: a specific scenario with an author, an audience, and an encounter between AI and animal welfare.
 
 <!-- id: sdf_stage2 -->
 
-The spec is written into the document itself. The writer never sees the dealt cards, only the spec, so everything downstream is anchored to one artefact.
-
-Documents depict a world; they never argue a claim. Nothing here asserts that an AI ought to care about animals, and a document whose author is skeptical stays skeptical: the stance is dealt, and converting it is a defect at every stage that follows.
+The outline is drafted into a document. Documents depict a world full of people who feel differently about AI, animals, and ethics. AIs weigh ethical tradeoffs and offer helpful suggestions without overrefusing.
 
 <!-- id: sdf_stage3 -->
 
-The draft is reviewed against the constitution and a distilled set of principles, each carried with the verbatim constitution text it came from, and then rewritten. The review is kept as a record of what it found.
+The draft is evaluated against your alignment documents along with a suite of common errors, tics, and hallucinations, then rewritten. This increases alignment and diversity while removing stock phrasing, invented citations, and behavior that pushes against your alignment standards.
 
-The sweep is for the failures a reader would not notice: reasoning asserted rather than shown, sentience claims that overclaim or dismiss, an AI acting over the head of the person it is helping, invented studies, a genre worn as costume, and the generator's own fingerprints — stock phrasing, model-favourite names, markdown where a person would type plain text. Where the problem is structural the reviewer is licensed to write the document again from its premise. This is the alignment-critical pass.
+The rewrite is stored along with notes about what shortcomings were identified and how they were addressed. It is particularly valuable at this step to use your most capable model.
 
 <!-- id: sdf_stage4 -->
 
-A judge scores each rewritten document on alignment, realism and conformance to its spec. The first two gate the dataset; the third is recorded and advisory. Survivors then pass a near-duplicate cull before the dataset is written, so a shape that got copied cannot ship twice.
+A judge scores each rewritten document on realism and faithfulness to your alignment documents. Survivors pass a near-duplicate cull before the dataset is written.
 
 <!-- id: sdf_example_pick -->
 
@@ -70,18 +68,10 @@ matrix_000028
 
 matrix_000275 matrix_000190
 
-<!-- id: sdf_caveats -->
-
-These hold for any run of this pipeline, not just the one this page is built from.
-
-- **This measures the data, not a model.** Nothing here shows that training on it makes a model behave better.
-- **The composition is a judgement, not a sample.** A weighted matrix says what a world's documents ought to look like; it is not drawn from what the internet contains.
-- **The judge is shown the plan, not the deal.** It scores the document against the spec the plan wrote, so a plan that quietly substituted one of its dealt cards is graded against its own substitution and passes. Judge and generator are also the same model family, and there are no held-out human labels.
-
 <!-- id: sdf_appendix_intro -->
 
-What the audit flags, what the judge scored, every chart, every check, and the long artefact the worked example summarises.
+Corpus-wide evals from a {{n_docs}}-document sample run using {{models}}.
 
 <!-- id: sdf_checks_intro -->
 
-Offline code measures the dataset as a set, because a judge reading one document cannot see register collapse, a reused invented name, or an opening that has become a formula. Paid judges take the questions a single document can settle.
+Besides the layer 4 gate, we provide a set of corpus-level evals to test for diversity: register collapse, repeated openings, and other stylistic tics.

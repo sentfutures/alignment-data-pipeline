@@ -250,10 +250,6 @@ class TestNotLeadingWithTheJudge:
         assert "<figure" in sec, "the charts have to still be on the page somewhere"
         assert "<figure" not in sec[:sec.index("id='sdf-appendix'")]
 
-    def test_the_judged_drawer_says_why_it_is_a_drawer(self):
-        drawer = re.search(r"<summary>What the judge scores[^<]*", section(build())).group(0)
-        assert "why the report does not lead with it" in drawer
-
     def test_the_gate_and_the_judge_are_counted_separately(self):
         """A scoring call whose JSON failed to parse is checkpointed at 5/5/5 and then
         fails the gate, so "the gate dropped four" and "the judge rejected three" are
@@ -279,29 +275,6 @@ class TestNotLeadingWithTheJudge:
 # --- candour ------------------------------------------------------------------
 
 class TestCandour:
-    def test_the_caveats_carry_no_run_figures(self):
-        """``blocks_weak`` is handed no audit at all, so a number from one run cannot
-        reach a list that claims to hold for every run."""
-        weak = beat(build(), "sdf-weak")
-        assert not re.search(r"\d", strip_tags(weak)), strip_tags(weak)
-
-    def test_the_derived_floor_survives_the_caveats_being_emptied(self):
-        """Generalising the caveats must not quietly become softening them: every verdict
-        the run's own audit earned is computed, and it is still there with the prose gone."""
-        html = build(content=content(sdf_caveats=""))
-        ap = section(html)
-        ap = ap[ap.index("id='sdf-appendix'"):]
-        text = strip_tags(ap)
-        assert "claude_code" in text                    # provenance
-        assert "blind judge" in text                    # the ablation rule
-        assert "carried every dealt card" in text       # card fidelity
-        assert "starved" in text                        # principle coverage
-
-    def test_the_flag_drawer_counts_what_it_collapses(self):
-        """Collapsing rows is visibly a view and not a filter."""
-        s = summary(section(build()), "What the audit flags")
-        assert re.search(r"\d+ findings · \d+ BAD", strip_tags(s)), s
-
     def test_a_dirty_or_unfaithful_backend_is_surfaced(self):
         rows = S.derived_warnings(AUDIT, MANIFEST, S.facts(AUDIT, DIVERSITY, MANIFEST))
         assert any("claude_code" in w for _, w in rows)
@@ -477,7 +450,11 @@ class TestDegradation:
     @pytest.mark.parametrize("key,wanted", [
         ("compliance", "audit/compliance_report.json"),
         ("fidelity", "audit/card_fidelity_report.json"),
-        ("ablation", "audit/realism_ablation.json"),
+        # ("ablation", "audit/realism_ablation.json") — the blind-realism rerun's
+        # degrade-and-name-the-file note lived in the judged drawer, which was cut from
+        # the appendix. The ablation is still a "not run on this run" row in the checks
+        # table (test_a_missing_optional_artefact_is_a_not_run_row_in_the_checks_table),
+        # so a reader is still told; the page just no longer names the file.
     ])
     def test_an_optional_artefact_names_itself_when_absent(self, key, wanted):
         """These three are not written by evals/audit_sdf.py, so most runs will not have
@@ -495,7 +472,7 @@ class TestDegradation:
         assert "not run on this run" in S.checks_table(rows)
 
     def test_the_checks_drawer_counts_what_ran(self):
-        s = summary(section(build(compliance=None)), "Every check that runs")
+        s = summary(section(build(compliance=None)), "Diversity checks")
         n, ran = (int(x) for x in re.findall(r"(\d+)", strip_tags(s)))
         assert ran < n
 

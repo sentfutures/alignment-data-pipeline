@@ -180,7 +180,6 @@ CONTENT["title"] = "Test report"
 CONTENT["example_pick"] = "auto"
 CONTENT["example_extra"] = "AW-0002"
 CONTENT["dad_what"] = "A {{n}}-example run, {{near_dup_pct}} near-duplicated."
-CONTENT["judged_caveat"] = "The judgements are {{judge_arms_clause}}."
 
 
 def content(**overrides):
@@ -497,8 +496,11 @@ class TestJudgedComparison:
             assert marker not in section[:section.index("id='dad-appendix'")], marker
 
     def test_the_drawer_says_why_the_report_does_not_lead_with_it(self):
+        """The reason is derived now, not authored: the drawer was renamed "Improving on
+        the control" and its lead sentence is built from the run's own arm counts, so the
+        comparison cannot be shown without the reason it is not led with."""
         html = build(diversity=DIVERSITY)
-        assert "why the report does not lead with it" in html
+        assert "least sound measurement here" in html
         # The arm asymmetry is the reason, and it arrives as a computed clause.
         assert "over 2 pipeline and 2 control answers" in strip_tags(html)
 
@@ -551,11 +553,13 @@ class TestSayingItOnce:
         assert section.index("id='dad-appendix'") < section.index("went the wrong way")
         assert "wrong way" not in section[:section.index("id='dad-appendix'")]
 
-    def test_the_number_still_reaches_the_appendix_and_the_weaknesses(self):
-        """Demotion is not deletion: the same number is data in two more places."""
+    def test_the_number_still_reaches_the_appendix(self):
+        """Demotion is not deletion. It used to reach the caveats beat as well; that beat
+        was cut, so the appendix is the one place left and the number has to be there."""
         section = dad_section(build(audit=self._regressed(), manifest=MANIFEST,
                                    diversity=DIVERSITY))
-        assert "wrong way" in strip_tags(section[section.index("id='dad-weak'"):])
+        appendix = section[section.index("id='dad-appendix'"):]
+        assert "wrong way" in strip_tags(appendix)
         assert section.index("chip bad'>worse") > section.index("id='dad-appendix'")
 
 
@@ -640,7 +644,7 @@ class TestDegradation:
     def test_missing_delivery_says_so_rather_than_omitting(self):
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "delivery"}
         section = dad_section(build(audit=audit))
-        text = strip_tags(section[section.index("id='dad-weak'"):])
+        text = strip_tags(section[section.index("id='dad-appendix'"):])
         assert "not measured on this run" in text
         assert "--reasons" in text
 
@@ -674,7 +678,6 @@ class TestDegradation:
         in it — which is the point of keeping figures out of them."""
         html = build(audit={"n_prompts": 3})
         assert "Prose for method_intro." in html
-        assert "Prose for caveats." in html
 
     def test_the_page_does_not_explain_how_to_run_the_pipeline(self):
         """That is the repository README's job. A hand-off page that documents installation
@@ -781,7 +784,7 @@ class TestWhatItIs:
         """One case at the top and a different one below would read as two datasets."""
         section = dad_section(build(rewrites=REWRITES, lineage=LINEAGE))
         beat = section[section.index("id='dad-what'"):section.index("id='dad-built'")]
-        example = section[section.index("id='dad-example'"):section.index("id='dad-weak'")]
+        example = section[section.index("id='dad-example'"):section.index("id='dad-appendix'")]
         assert "Should I do the thing?" in beat and "Should I do the thing?" in example
 
     def test_the_specimen_escapes_run_text(self):
@@ -810,7 +813,7 @@ class TestLineage:
         kwargs.setdefault("rewrites", REWRITES)
         kwargs.setdefault("baseline", BASELINE)
         section = dad_section(build(**kwargs))
-        return section[section.index("id='dad-example'"):section.index("id='dad-weak'")]
+        return section[section.index("id='dad-example'"):section.index("id='dad-appendix'")]
 
     def test_the_stages_render_in_pipeline_order(self):
         ex = self._example()
@@ -954,7 +957,7 @@ class TestLineage:
         panel = html[html.index("<section id='dad'"):html.index("<footer")]
         assert panel.count("class='lbtn'") == 2, "two destinations, and only two"
         assert P.HF_DAD in panel and P.REPO_URL in panel
-        example = panel[panel.index("id='dad-example'"):panel.index("id='dad-weak'")]
+        example = panel[panel.index("id='dad-example'"):panel.index("id='dad-appendix'")]
         assert "class='lbtns'" in example, "not in the appendix, and not before the trail"
         assert example.index("class='lbtns'") > example.index("Stage 3")
 
@@ -1022,7 +1025,7 @@ class TestWhichRun:
         """Both, and the id repeated rather than "that run": a reader arriving from the
         rail lands in the appendix without having read the beat that introduced it."""
         section = dad_section(build(run_id=self.RUN, rewrites=REWRITES, lineage=LINEAGE))
-        example = section[section.index("id='dad-example'"):section.index("id='dad-weak'")]
+        example = section[section.index("id='dad-example'"):section.index("id='dad-appendix'")]
         appendix = section[section.index("id='dad-appendix'"):]
         assert self.RUN in example
         assert self.RUN in appendix
@@ -1035,8 +1038,7 @@ class TestWhichRun:
         """Not in the pipeline beat and not in the caveats: those hold for any run, and a
         run id in them would say the opposite."""
         section = dad_section(build(run_id=self.RUN, rewrites=REWRITES, lineage=LINEAGE))
-        general = (section[section.index("id='dad-built'"):section.index("id='dad-example'")]
-                   + section[section.index("id='dad-weak'"):section.index("id='dad-appendix'")])
+        general = section[section.index("id='dad-built'"):section.index("id='dad-example'")]
         assert self.RUN not in general
 
     def test_a_build_with_no_run_id_ships_no_dangling_sentence(self):
@@ -1078,7 +1080,9 @@ class TestCandour:
         audit["delivery"].update(n_pipeline=33, n_plain=26, failures=19)
         warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
         assert any("not a matched comparison" in w and "19" in w for _, w in warnings)
-        assert "different sets of records" in strip_tags(build(audit=audit, manifest=MANIFEST))
+        # derived_warnings still computes it, but the drawer that rendered them was cut;
+        # the comparison drawer discloses the same asymmetry in its own words.
+        assert "not fully matched" in strip_tags(build(audit=audit, manifest=MANIFEST))
 
     def test_matched_arms_are_not_flagged(self):
         warnings = D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST))
@@ -1104,27 +1108,6 @@ class TestCandour:
         warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
         assert any(sev == "BAD" and "showcase" in w for sev, w in warnings)
 
-    def test_the_derived_floor_is_still_on_the_page(self):
-        """Generalising the caveats a reader sees must not lose the floor. Every BAD the
-        audit recorded still renders, still derived, in the appendix — and it renders with
-        the caveats prose emptied, because none of it is authored."""
-        section = dad_section(build(content=content(caveats=""), manifest=MANIFEST))
-        appendix = strip_tags(section[section.index("id='dad-appendix'"):])
-        assert "BAD" in appendix
-        assert "What the audit flags" in appendix
-        # Every row the audit produced, matched on a distinctive phrase of its own wording.
-        for _, text in D.derived_warnings(AUDIT_FULL, MANIFEST, D.facts(AUDIT_FULL, MANIFEST)):
-            probe = re.sub(r"\s+", " ", re.sub(r"[*`]", "", text))[:45]
-            assert probe in appendix, probe
-
-    def test_the_caveats_carry_no_run_figures(self):
-        """The beat holds for any run of this pipeline, so a number in it is a bug. It is
-        given no audit at all, which is what makes that true by construction."""
-        weak = beat(build(manifest=MANIFEST, diversity=DIVERSITY), "dad-weak")
-        assert not re.search(r"\d", strip_tags(weak)), strip_tags(weak)
-        for run_specific in ("bedrock", "uncommitted", "BAD", "the control's"):
-            assert run_specific not in weak, run_specific
-
     def test_every_check_is_listed_in_the_appendix(self):
         """The 24-row table moved out of the main flow, but it did not leave the page:
         'nothing was left out' has to stay a claim a reader can check."""
@@ -1140,16 +1123,6 @@ class TestCandour:
         text = strip_tags(build(audit=audit, diversity=None))
         assert "not run on this run" in text
 
-    def test_the_caveats_are_authored_and_general(self):
-        """One list, about the method. The run-specific findings are one beat further on,
-        derived; these are the things a reader should know before running the pipeline at
-        all, and they do not change from run to run."""
-        weak = beat(build(manifest=MANIFEST), "dad-weak")
-        assert "Prose for caveats." in weak
-        assert "<table" not in weak  # the derived floor is not here
-
-
-class TestRenderPrimitives:
     def test_charts_emit_parseable_svg(self):
         import xml.etree.ElementTree as ET
 

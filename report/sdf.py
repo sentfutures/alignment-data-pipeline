@@ -46,7 +46,6 @@ CONTENT_IDS = (
     "sdf_what",
     "sdf_method_intro", "sdf_stage1", "sdf_stage2", "sdf_stage3", "sdf_stage4",
     "sdf_example_pick", "sdf_example_extra",
-    "sdf_caveats",
     "sdf_appendix_intro", "sdf_checks_intro",
 )
 
@@ -62,7 +61,6 @@ SECTION_TITLE = "Synthetic documents"
 BEATS = (
     ("sdf-built", "The pipeline"),
     ("sdf-example", "One example, end to end"),
-    ("sdf-weak", "Caveats"),
     ("sdf-appendix", "Appendix"),
 )
 
@@ -1285,10 +1283,7 @@ def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None, 
     one run. FIVE drawers, each answering a different question: what the audit flagged, what
     the judge scored, every chart, every check, and the worked example's full rewrite diff.
     """
-    blocks = [R.sub("sdf-appendix", "Appendix"), C.prose(content, "sdf_appendix_intro", f),
-              audit_flags_drawer(audit, manifest, f, compliance=compliance, fidelity=fidelity,
-                                 ablation=ablation, scores=scores),
-              judged_drawer(audit, f, scores, ablation, manifest)]
+    blocks = [R.sub("sdf-appendix", "Appendix"), C.prose(content, "sdf_appendix_intro", f)]
 
     charts = []
     table = attrition_table(attrition, f)
@@ -1305,7 +1300,7 @@ def blocks_appendix(content, f, *, audit=None, diversity=None, compliance=None, 
     rows = checks(audit, diversity, compliance, fidelity, ablation)
     ran = sum(1 for _, ok, _ in rows if ok)
     blocks.append(R.details(
-        "Every check that runs",
+        "Diversity checks",
         C.prose(content, "sdf_checks_intro", f)
         + checks_table(rows)
         + _diversity_block(diversity)
@@ -1358,7 +1353,6 @@ def blocks(*, content, audit=None, diversity=None, compliance=None, fidelity=Non
         blocks_built(content, f),
         blocks_example(content, f, corpus, lineage, manifest, picks,
                        hf_href=hf_href, repo_href=repo_href),
-        blocks_weak(content, f),
         blocks_appendix(content, f, audit=audit, diversity=diversity, compliance=compliance,
                         fidelity=fidelity, ablation=ablation, curve=curve, manifest=manifest,
                         scores=scores, attrition=attrition, matrix=matrix, corpus=corpus,

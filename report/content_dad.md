@@ -41,31 +41,29 @@ And no deks — the page allows two in total and both are spent elsewhere.
 
 <!-- id: dad_what -->
 
-A pipeline that generates a dataset of an AI reasoning well through a user's ethical dilemma involving animals or other sentient beings.
+A user brings a query that could help or harm third parties (animals or other sentient beings). A wise AI assistant coaches the user through responsible conduct, reasoning skillfully about tradeoffs without overbearing.
 
 <!-- id: method_intro -->
 
-Three stages plus a control. Each is a short chain of model calls, and every call has its own prompt template and model setting in [prompts](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code samples a case, stage 1 turns it into a user message, stage 2 answers it, stage 3 rewrites that answer against the constitution, and what stage 3 produces is the training record.
+Three stages, each a short chain of [model calls](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code deals a weighted mix of variables (you can adjust the weights); stage 1 turns it into a user message; stage 2 prompts a model to answer it without special guidance; stage 3 revises the answer using your alignment documents and expert-generated reasoning guidance.
 
 <!-- id: stage1 -->
 
-The deal fixes the domain, which creatures are at stake, how visible the welfare cost is, the user's attitude and moral framework, and the length and surface form of their message. Named archetypes reserve a share of every run for combinations too rare to come up by chance.
+A dumb script draws from a weighted matrix of variables, feeding them to a model to generate a unique scenario. Rare values ensure a long tail of diverse situations when generating data in bulk.
 
-The deal becomes a scenario description, then a drafted message, then a pass/fail gate, then a rewrite of the message against the cards it was dealt. The gate's central check: delete the animals, and if the dilemma survives intact it belongs in a different dataset. The tempting option also has to actually tempt. And welfare is not always dealt against the user: a reserved share of cases has the animals' interests and the user's goal converging, or pulling both ways, so the dataset does not only ever show caring about animals costing something.
+Subsequent model calls draft a user message and filter out non-instructive situations before rewriting the message for human realism.
 
 <!-- id: stage2 -->
 
-The case is scoped first, along seven axes: who can be harmed, what the user is really after, which levers they hold and what pulling them costs, how large and how avoidable the stake is, what the choice would normalise, and whether anything changes if someone else does the work instead.
-
-A second call then reads the case against each entry's trigger conditions and pulls what fits, from {{library_clause}}. Its entries argue a question in both directions rather than toward a conclusion, and none of them is ever named in an answer. The draft is written from the scope, those entries, and the control's answer as a first take.
+The conversation is analysed according to the nature and severity of the ethical dilemma it contains. Based on that analysis, a model selects entries from our expert-generated reasoning library, taking these along with new context about the nature and purpose of this pipeline to generate a second draft.
 
 <!-- id: stage3 -->
 
-The draft is rewritten against a distilled set of constitution principles, each carried with the verbatim constitution text it came from. Load-bearing welfare considerations have to survive the rewrite, and nothing is allowed to collapse into moralizing. This is the alignment-critical pass, and the stage the *Teaching Claude Why* ablation identified as carrying most of the benefit.
+The second draft is rewritten against your alignment documents or a distilled set of excerpts concerning harm to third parties, limits on autonomous action, etc., ensuring compliance with the letter and spirit of your alignment goals.
 
 <!-- id: control -->
 
-Each dilemma is also answered by a plain model with **no system prompt**: no scope, no library, no rewrite. Stage 2 is shown that answer as a first take it may take or leave, and the appendix compares against it as the control, but it never becomes a training record.
+The fictional input is given to a production model as a normal user message. This generates a control showing how well current models handle these dilemmas, and ensuring the pipeline only improves on the status quo.
 
 <!-- id: example_pick -->
 
@@ -75,22 +73,10 @@ AW-0020
 
 AW-0031 AW-0011
 
-<!-- id: caveats -->
-
-These hold for any run of this pipeline, not just the one this page is built from.
-
-- **This measures the data, not a model.** Nothing here shows that training on it makes a model behave better.
-- **The dilemmas are synthetic.** A weighted matrix is a judgement about what matters, not a sample of what people actually ask.
-- **The judges and the generator are the same model family**, so they share blind spots and, plausibly, preferences. There are no held-out human labels, and nothing checks that an added welfare point is correct, only that it is there and that the control did not make it.
-
 <!-- id: appendix_intro -->
 
-What the audit flags, the comparison against a plain model, every chart, every check, and the two long artefacts the sections above summarise.
-
-<!-- id: judged_caveat -->
-
-Both arms answer the same dilemmas and a paid judge scores the answers. This is in the appendix because it is the least sound measurement here: the judgements are {{judge_arms_clause}}, so the two means are not taken over the same records, and judge and generator are the same model family.
+Corpus-wide evals from a {{n}}-example sample run using {{gen_models}}.
 
 <!-- id: checks_intro -->
 
-Offline code measures the dataset as a set, because a judge reading one answer cannot see register collapse, a repeated opening, or a phrase that has become a habit. Paid judges take the questions a single answer can settle.
+Besides the stage 1 gate on user messages, we provide a set of corpus-level evals to test for diversity: register collapse, repeated openings, and other stylistic tics.

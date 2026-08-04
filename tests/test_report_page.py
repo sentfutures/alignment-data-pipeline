@@ -210,14 +210,21 @@ class TestShape:
         assert rails == ["sdf", "dad"]
 
     def test_both_reports_take_the_same_skeleton(self):
-        """A reader learns the shape once. Both reports now carry the whole skeleton, and
-        beat for beat it is the same one under the same names."""
+        """A reader learns the shape once. Both reports carry the same beats, in the same
+        order, under the same names.
+
+        The Caveats beat was cut from BOTH sides in the external-readiness copy pass — the
+        bullets restated what the pipeline openly does rather than conceding anything, so
+        they read as filler where self-criticism belonged. Its absence is asserted on both
+        sides rather than merely unmentioned, so restoring it to one report alone fails
+        here instead of quietly splitting the skeleton.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
         beats = dict(re.findall(r"<h3 id='([^']+)'>([^<]*)</h3>", html))
-        assert beats["dad-weak"] == beats["sdf-weak"] == "Caveats"
+        assert "sdf-weak" not in beats and "dad-weak" not in beats
         for anchor, _ in D.BEATS + S.BEATS:
             assert anchor in beats, anchor
-        # Same names in the same order, so the two rails read alike.
+        # Same names in the same order.
         assert [t for _, t in S.BEATS] == [t for _, t in D.BEATS]
 
     def test_neither_report_puts_a_heading_over_its_opening_line(self):
@@ -262,12 +269,18 @@ class TestShape:
         assert "object-fit:cover" in rule and "object-position:50% 48.5%" in rule
 
     def test_the_intro_stops_after_three_paragraphs(self):
-        """The two datasets are named once, in the comparison's mastheads. Listing them
-        here as well was the same two names twice within a screen. Three paragraphs: the
-        finding, how it was taught, and what we built on it."""
+        """The two DATASETS are named once, in the comparison's mastheads — listing them
+        here as well was the same two names twice within a screen, and `<ul>` staying out
+        is what stops that coming back. Three paragraphs: the finding, how it was taught,
+        and what we built on it.
+
+        The middle paragraph now counts off the two TECHNIQUES as an ordered list, which is
+        a different thing from the two datasets and is why `<ol>` is allowed where `<ul>`
+        is not."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
-        assert "<li>" not in hero and "<ul>" not in hero
+        assert "<ul>" not in hero
+        assert hero.count("<ol>") == 1 and hero.count("<li>") == 2
         assert hero.count("<p>") == 3
 
     def test_the_footer_names_the_runs_the_page_was_built_from(self):
@@ -755,11 +768,24 @@ class TestContentsRail:
     def test_the_appendix_drawers_are_not_in_the_rail(self):
         """An <h4> becomes a rail item by having an id, and the appendix's headings live
         inside closed drawers — a link that scrolls to a collapsed heading goes nowhere,
-        so they carry none."""
+        so they carry none.
+
+        Stated as the invariant rather than against one named heading: which drawers an
+        appendix renders depends on which eval artefacts the run carried, so a test that
+        pins a title passes or fails on the fixture rather than on the rule.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
-        panel = html[html.index("<section id='dad'"):]
-        assert "<h4>Measure by measure</h4>" in panel
-        assert "Measure by measure" not in strip_tags(self.rail(html, "dad"))
+        # Synthetic documents comes first, so its panel has to be cut at the next
+        # section — an unbounded slice runs on into difficult advice's own headings.
+        for pid, ends_at in (("sdf", "<section id='dad'"), ("dad", None)):
+            panel = html[html.index(f"<section id='{pid}'"):]
+            if ends_at:
+                panel = panel[:panel.index(ends_at)]
+            appendix = panel[panel.index(f"id='{pid}-appendix'"):]
+            assert "<h4 id=" not in appendix          # an id is what puts it in the rail
+            rail = strip_tags(self.rail(html, pid))
+            for title in re.findall(r"<summary>([^<]+)", appendix):
+                assert title.strip() not in rail, title
 
     def test_every_rail_link_lands_on_a_heading_that_rendered(self):
         """The rail is read back off the built panel rather than taken from a BEATS list,
@@ -939,14 +965,17 @@ class TestTypeScale:
 
 class TestComparisonTable:
     def test_the_rows_are_what_a_lab_needs_to_run_it(self):
-        """Six rows, in one pass, and each says which side of the line it is on: three
-        describe the result, one the pipeline, two link out. Dates, model ids and the
-        composition spread went to the report that goes into them: a reader here is
-        deciding whether to run the pipeline, not shopping for a dataset."""
+        """Five rows, in one pass, and each says which side of the line it is on: three
+        describe the result, two link out. Dates, model ids and the composition spread went
+        to the report that goes into them: a reader here is deciding whether to run the
+        pipeline, not shopping for a dataset.
+
+        The `pipeline` row was cut: the two walkthroughs below ARE the pipeline, and a
+        one-line chain above them was a summary met before it could mean anything."""
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
-        assert labels == ["result", "result format", "what it is for", "pipeline",
+        assert labels == ["result", "result format", "what it is for",
                           "prompt templates", "example dataset"]  # templates before data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
@@ -990,35 +1019,6 @@ class TestComparisonTable:
         row = self._rows(table)["example dataset"]
         assert row.count("<span class='cmp-fig'><span></span><a class='lbtn'") == 2
         assert not hasattr(P, "_records")
-
-    def test_the_pipeline_row_names_the_stages_the_report_goes_on_to_walk(self):
-        """The comparison's one line about process has to be the same pipeline the report
-        below it draws, or the table is a fifth vocabulary for it. The DAD flow diagram is
-        the authority — it is what a reader sees next — so the row is checked against the
-        stage names in the SVG rather than against a copy typed here.
-
-        The two columns are also checked against each other: the row is only worth a pass
-        of the eye if `sdf` and `dad` are written in the same shape, and one column drifting
-        into a sentence while the other stays a chain is how that stops being true.
-
-        BOTH halves are checked now. The document one was unchecked while its report was a
-        stub with no diagram to check it against.
-        """
-        html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
-        table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
-        cells = re.findall(r"<td>(.*?)</td>", self._rows(table)["pipeline"], re.S)
-        assert len(cells) == 2
-        for i, pid, stages in ((0, "sdf", ("plan", "draft", "rewrite", "score")),
-                               (1, "dad", ("dilemma", "reasoning", "constitution rewrite"))):
-            panel = html[html.index(f"<section id='{pid}'"):]
-            flow = re.search(r"<svg [^>]*class='flow'.*?</svg>", panel, re.S).group(0)
-            for stage in stages:
-                assert stage in cells[i], (pid, stage)
-                assert stage in flow, (pid, stage)
-        assert "matrix deal" in cells[0] and "matrix deal" in cells[1]
-        # Same shape both sides: a chain of stages, no sentence, no full stop.
-        for cell in cells:
-            assert cell.count("→") >= 3 and "." not in cell
 
     @staticmethod
     def _rows(table):
@@ -1135,21 +1135,13 @@ class TestSdfReport:
         re-applies the eval's own thresholds. 12% truncated is BAD on them."""
         html = build(sdf_inputs=SDF_INPUTS)
         section = html[html.index("<section id='sdf'"):]
-        assert "12% of documents are truncated" in strip_tags(section)
-        assert "claude_code" in section  # the backend provenance rule
-        assert "chip bad'>BAD" in section
-
-    def test_the_derived_floor_is_in_the_appendix_not_the_caveats(self):
-        """The caveats beat is authored and general; every verdict specific to one run is
-        derived and sits in the appendix drawer. The two used to be the same block.
-
-        Sliced by ``beat()`` rather than on ``index("id='sdf-weak'")``: the naive slice
-        keeps the next beat's ``<h3`` and its stray ``3`` passes an assertion about digits.
-        """
-        section = self.section(build(sdf_inputs=SDF_INPUTS))
-        weak = beat(section, "sdf-weak")
-        assert not re.search(r"\d", strip_tags(weak)), strip_tags(weak)
-        assert "What the audit flags" in section[section.index("id='sdf-appendix'"):]
+        rows = S.derived_warnings(SDF_INPUTS["audit"], SDF_INPUTS["manifest"],
+                                  S.facts(SDF_INPUTS["audit"], SDF_INPUTS.get("diversity"),
+                                          SDF_INPUTS["manifest"]))
+        text = " ".join(w for _, w in rows)
+        assert "12% of documents are truncated" in strip_tags(text)
+        assert "claude_code" in text  # the backend provenance rule
+        assert "id='sdf-appendix'" in section
 
     def test_a_clean_run_earns_no_flagged_rows(self):
         """A run that clears every threshold gets no drawer, rather than an empty one."""
@@ -1263,14 +1255,6 @@ class TestBrevity:
         """A section renamed in a module and not in its prose file, or a prose block
         left behind after a rename, is a build error rather than a silent hole."""
         assert set(shipped_content()) == set(P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS)
-
-    def test_the_shipped_caveats_hold_for_any_run(self):
-        """The caveats beat is about the method, so it carries no figure and no
-        placeholder — a run number in it would be false the next time the pipeline runs.
-        Checked against the shipped prose, because the fixtures cannot prove it."""
-        caveats = shipped_content()["caveats"]
-        assert not re.search(r"\d", caveats), caveats
-        assert "{{" not in caveats
 
     def test_the_shipped_prose_does_not_explain_how_to_run_anything(self):
         """Installation and invocation are the repository README's job. This page is the
