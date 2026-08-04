@@ -57,7 +57,7 @@ Teaching models to reason about harm to animals
 
 <!-- id: intro -->
 
-Research on alignment midtraining[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
+Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
 
 Two complementary techniques proved especially effective:
 
