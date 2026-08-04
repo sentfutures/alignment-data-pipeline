@@ -181,7 +181,7 @@ class TestShape:
         ids = re.findall(r"<section id='([^']+)'", html)
         assert ids == ["datasets", "explore", "sdf", "dad"]
         assert re.findall(r"<h2>([^<]*)</h2>", html) == [
-            "Walk through either pipeline", S.SECTION_TITLE, D.SECTION_TITLE]
+            "Walk through either pipeline", R.esc(S.SECTION_TITLE), R.esc(D.SECTION_TITLE)]
         # The comparison is titled by its own two mastheads on screen — and by a heading
         # a screen reader can find, because heading navigation skipped it entirely.
         assert re.match(r"<section id='datasets'><h2 class='vh'>[^<]+</h2><div class='cmp-wrap'>",
@@ -590,7 +590,7 @@ class TestChooser:
         html = build(sdf_inputs=SDF_INPUTS)
         choices = re.search(r"<div class='choices'[^>]*>.*?</div>", html, re.S).group(0)
         assert "role='tablist'" not in choices and "role='tab'" not in choices
-        for pid, label in (("dad", D.SECTION_TITLE), ("sdf", S.SECTION_TITLE)):
+        for pid, label in (("dad", R.esc(D.SECTION_TITLE)), ("sdf", S.SECTION_TITLE)):
             assert f"aria-controls='{pid}'" in choices
             assert f"id='choose-{pid}'" in choices
             assert label in choices
@@ -617,7 +617,7 @@ class TestChooser:
         choices = re.search(r"<div class='choices'[^>]*>.*?</div>",
                             build(sdf_inputs=SDF_INPUTS), re.S).group(0)
         assert strip_tags(choices).split() == [*S.SECTION_TITLE.split(), "&darr;",
-                                               *D.SECTION_TITLE.split(), "&darr;"]
+                                               *R.esc(D.SECTION_TITLE).split(), "&darr;"]
 
     def test_the_choice_lines_up_with_what_is_being_chosen(self):
         """At rest, 40rem centred is exactly the two dataset columns above (2 x 20rem), so
@@ -1227,7 +1227,7 @@ class TestComparisonTable:
         """One order for the whole page: the comparison, the chooser and the panels."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         assert re.findall(r"<span class='cmp-name'>([^<]*)</span>", html) == [
-            S.SECTION_TITLE, D.SECTION_TITLE]
+            S.SECTION_TITLE, R.esc(D.SECTION_TITLE)]
         assert re.findall(r"data-panel='(\w+)' id='choose", html) == ["sdf", "dad"]
         assert html.index("<section id='sdf'") < html.index("<section id='dad'")
 
@@ -1239,7 +1239,7 @@ class TestComparisonTable:
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         head = re.search(r"<thead>.*?</thead>", table, re.S).group(0)
-        assert f"<span class='cmp-name'>{D.SECTION_TITLE}</span>" in head
+        assert f"<span class='cmp-name'>{R.esc(D.SECTION_TITLE)}</span>" in head
         assert f"<span class='cmp-name'>{S.SECTION_TITLE}</span>" in head
         assert "cmp-d" not in html  # the subtitle slot, and its rule, are gone
         # Derived from the prose file, not typed here: this line is edited, and a hardcoded

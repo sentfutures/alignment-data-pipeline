@@ -417,8 +417,8 @@ class TestBuildSection:
         """"The dilemma corpus" told a reader nothing they could act on, and "corpora"
         was the wrong register for the whole page."""
         html = build()
-        assert f"<h2>{D.SECTION_TITLE}</h2>" in html
-        assert D.SECTION_TITLE == "Difficult advice"
+        assert f"<h2>{R.esc(D.SECTION_TITLE)}</h2>" in html
+        assert D.SECTION_TITLE == "Difficult advice Q&A"
         headings = re.findall(r"<h2>([^<]*)</h2>", html)
         assert headings and not any(h[0].isdigit() for h in headings)
         assert "corpus" not in strip_tags(html).lower().replace("dad_corpus.jsonl", "")

@@ -51,7 +51,7 @@ CONTENT_IDS = (
 )
 
 SECTION_ID = "dad"
-SECTION_TITLE = "Difficult advice"
+SECTION_TITLE = "Difficult advice Q&A"
 
 # The skeleton, in order. The document corpus's section takes the same one, so a reader
 # learns it once; the ids are prefixed because both sections live in one document.
