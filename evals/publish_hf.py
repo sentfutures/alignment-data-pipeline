@@ -931,6 +931,13 @@ def main() -> None:
                         help="Stage + build the card locally; make no Hub API calls")
     parser.add_argument("--staging-dir", default=None,
                         help="Where to stage files (default: a temp dir)")
+    parser.add_argument("--regenerate-card", action="store_true",
+                        help="Rebuild README.md from the run's audit files and "
+                             "upload it, replacing whatever card is on the Hub. "
+                             "OFF by default: the card is hand-written and "
+                             "edited on the Hub (tracked copy in "
+                             "evals/hf_card.md), so a routine publish uploads "
+                             "data and audit files and leaves it untouched.")
     parser.add_argument("--allow-unmerged", action="store_true",
                         help="Publish even though this run's code is not in "
                              "origin/main, without the interactive "
@@ -1033,7 +1040,12 @@ def main() -> None:
             print(f"NOTE: a '{sibling_tag}' dataset already on the Hub is not fetched in "
                   f"--dry-run, so it is missing from this preview; a real publish "
                   f"regenerates its section from the Hub.")
-            print("\n--- README.md ---\n")
+            if args.regenerate_card:
+                print("\n--- README.md (WOULD REPLACE the card on the Hub) ---\n")
+            else:
+                print("\n--- README.md (preview only; NOT uploaded without "
+                      "--regenerate-card, so the Hub's hand-written card "
+                      "stands) ---\n")
             print(card)
             return
 
@@ -1057,9 +1069,13 @@ def main() -> None:
                             else datasets + [entry])
 
             # Card built inside the context: the sibling's downloaded metadata
-            # must still exist on disk when build_card reads it.
-            card = build_card(datasets, args.license_id, pretty_name)
-            (staging_dir / "README.md").write_text(card, encoding="utf-8")
+            # must still exist on disk when build_card reads it. Staged only
+            # with --regenerate-card — upload_folder overwrites every path it
+            # finds, so leaving README.md out of the staging dir is what
+            # protects a card edited on the Hub.
+            if args.regenerate_card:
+                card = build_card(datasets, args.license_id, pretty_name)
+                (staging_dir / "README.md").write_text(card, encoding="utf-8")
 
         # run_names (plural) is main's combined-publish naming; the unmerged
         # marker rides on the end of it rather than replacing it.
@@ -1067,6 +1083,10 @@ def main() -> None:
         if unmerged:
             # Visible in the repo's commit history, not just this terminal.
             commit_message += f" ({_unmerged_summary(unmerged)})"
+
+        if not args.regenerate_card:
+            print("  Card: leaving the Hub's README.md as it is "
+                  "(--regenerate-card rebuilds it from the audit files).")
 
         commit = _upload_folder(
             folder_path=str(staging_dir),
