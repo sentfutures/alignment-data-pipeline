@@ -117,7 +117,13 @@ EACH ISSUE:
   [CQ <dimension>] <finding title> if it maps to no numbered report item.
 - Body, in order:
   1. The HTML marker line, exactly:
-     <!-- claude-kickoff finding=<report-number-or-dimension-slug> batch=<k> -->
+     <!-- claude-kickoff finding=<report-number-or-dimension-slug> batch=<k> after=<n|none> -->
+     where after=<n> is the ISSUE NUMBER of the batch predecessor whenever
+     this finding shares files with an earlier issue in the same cluster —
+     create issues in batch order so that number already exists — and
+     after=none for cluster-independent findings. The fixer workflow reads
+     this marker and automatically defers an issue until its predecessor
+     closes, so batch order is enforced even if every issue is armed at once.
   2. "## Motivation" — the finding's failure_scenario, lightly edited.
   3. "## Affected files" — the finding's file + instances, as a list.
   4. "## Acceptance criteria" — from the finding's recommendation, as concrete,

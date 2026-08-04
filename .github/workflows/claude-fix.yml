@@ -65,7 +65,7 @@ permissions:
   issues: write # labels + comments
   pull-requests: write # open the PR
   id-token: write # claude-code-action auth
-  actions: read # busy gate counts in-progress runs
+  actions: write # busy gate reads runs; auto-continue + backfill dispatch workflows
 
 jobs:
   fix:
@@ -115,6 +115,24 @@ jobs:
           for l in claude-busy-wait claude-quota-wait; do
             gh api -X DELETE "repos/$REPO/issues/$ISSUE/labels/$l" >/dev/null 2>&1 || true
           done
+
+          # Batch-dependency guard: kickoff stamps `after=<issue>` in its
+          # marker when this issue shares files with an earlier batch-mate.
+          # While that predecessor is open, defer — the requeue tick fired
+          # after every run (and the half-hour cron) re-checks, so this clears
+          # itself the moment the predecessor's PR merges and closes it.
+          dep=$(jq -r .body <<<"$json" | grep -o '<!-- claude-kickoff [^>]*-->' | head -1 | sed -n 's/.* after=#\{0,1\}\([0-9]\{1,\}\).*/\1/p')
+          if [ -n "$dep" ]; then
+            dstate=$(gh issue view "$dep" -R "$REPO" --json state --jq .state 2>/dev/null || echo "")
+            if [ "$dstate" = "OPEN" ]; then
+              gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=claude-busy-wait" >/dev/null
+              if ! gh api "repos/$REPO/issues/$ISSUE/comments" --paginate 2>/dev/null \
+                   | jq -es '(add // []) | map(select(.body | contains("<!-- claude-waiting-on "))) | length > 0' >/dev/null; then
+                gh issue comment "$ISSUE" -R "$REPO" --body "<!-- claude-waiting-on dep=$dep --> Waiting for #$dep to close first (same-file batch order from kickoff). The queue re-checks automatically after every run and every cron tick — nothing to do."
+              fi
+              stop "Deferred: waiting on predecessor #$dep."
+            fi
+          fi
 
           tier=""
           for t in tier-max tier-heavy tier-standard tier-light; do
@@ -286,9 +304,12 @@ jobs:
               echo "Plan comment tier ($ptier) != current tier ($TIER) — re-planning (escalation path)."
             fi
           fi
-          branch_exists=false
-          if git ls-remote --exit-code --heads origin "claude/issue-$ISSUE" >/dev/null 2>&1; then branch_exists=true; fi
-          { echo "have_plan=$have_plan"; echo "plan_risk=$plan_risk"; echo "branch_exists=$branch_exists"; } >> "$GITHUB_OUTPUT"
+          branch_exists=false; branch_tip=""
+          if git ls-remote --exit-code --heads origin "claude/issue-$ISSUE" >/dev/null 2>&1; then
+            branch_exists=true
+            branch_tip=$(git ls-remote --heads origin "claude/issue-$ISSUE" | cut -f1)
+          fi
+          { echo "have_plan=$have_plan"; echo "plan_risk=$plan_risk"; echo "branch_exists=$branch_exists"; echo "branch_tip=$branch_tip"; } >> "$GITHUB_OUTPUT"
 
       - name: Plan (read-only)
         id: plan
@@ -467,7 +488,7 @@ jobs:
           claude_args: |
             --model ${{ steps.params.outputs.impl_model }}
             --effort ${{ steps.params.outputs.impl_effort }}
-            --max-turns 50
+            --max-turns 100
             --add-dir ${{ runner.temp }}
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git rev-parse:*),Bash(git ls-remote:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(pytest:*),Bash(python:*)"
             --disallowedTools "Task"
@@ -536,10 +557,53 @@ jobs:
           claude_args: |
             --model sonnet
             --effort medium
-            --max-turns 50
+            --max-turns 75
             --add-dir ${{ runner.temp }}
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git switch:*),Bash(git rev-parse:*),Bash(git ls-remote:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh issue edit:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(pytest:*),Bash(python:*)"
             --disallowedTools "Task"
+
+      # When an implement-phase Claude step fails, a cheap second model reads
+      # the transcript tail and the branch diff and posts what a human (or the
+      # classifier) actually needs: what got done, where it stopped, and
+      # whether a plain re-run can finish it. Advisory only — its verdict
+      # gates nothing except whether the auto-continue in the classifier is
+      # skipped ("stuck"). continue-on-error: a quota-dead run will quota-kill
+      # this step too, and the classifier must still run cleanly without it.
+      - name: Digest the failure (model triage)
+        id: digest
+        if: failure() && (steps.implement.outcome == 'failure' || steps.light.outcome == 'failure')
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: true
+          allowed_bots: "*"
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE NUMBER: ${{ env.ISSUE }}
+            BRANCH: claude/issue-${{ env.ISSUE }}
+            TRANSCRIPT FILE: ${{ steps.implement.outputs.execution_file || steps.light.outputs.execution_file }}
+
+            An automated implement run for this issue just failed. Diagnose it
+            from evidence only — do not fix anything:
+            1. Read the tail of the TRANSCRIPT FILE (it is large; the last ~300
+               lines usually suffice).
+            2. `git fetch origin` then inspect `git log` and
+               `git diff origin/main...origin/BRANCH` if the branch exists.
+            3. Decide: was the run making real progress against the issue's
+               plan (resumable), or stuck/looping/confused (stuck)? Use
+               "unclear" only when the evidence is genuinely ambiguous.
+            Structured output: verdict (resumable|stuck|unclear); summary (3-6
+            sentences: what was accomplished, what remains, what the run was
+            doing when it ended); recommendation (one sentence).
+          claude_args: |
+            --model sonnet
+            --effort low
+            --max-turns 10
+            --add-dir ${{ runner.temp }}
+            --allowedTools "Read,Glob,Grep,Bash(git log:*),Bash(git diff:*),Bash(git fetch:*),Bash(git ls-remote:*)"
+            --disallowedTools "Task"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["resumable","stuck","unclear"]},"summary":{"type":"string"},"recommendation":{"type":"string"}},"required":["verdict","summary"]}'
 
       # PR author must NOT be claude[bot] (the auto-reviewer can't approve or
       # request changes on its own PRs), so a plain step creates it with
@@ -699,6 +763,8 @@ jobs:
           E_PLAN: ${{ steps.plan.outputs.execution_file }}
           E_LIGHT: ${{ steps.light.outputs.execution_file }}
           E_IMPL: ${{ steps.implement.outputs.execution_file }}
+          TIP_BEFORE: ${{ steps.state.outputs.branch_tip }}
+          DIGEST: ${{ steps.digest.outputs.structured_output }}
         run: |
           set -euo pipefail
           phase=""; exec_file=""; outcome=failure
@@ -752,6 +818,39 @@ jobs:
             gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
             echo "Classified as QUOTA (phase=$phase, count=$count, manual_only=$manual)."
           else
+            subtype=""
+            if [ -n "$exec_file" ] && [ -s "$exec_file" ]; then
+              subtype=$(jq -r '(map(select(.type=="result")) | last | .subtype) // ""' "$exec_file" 2>/dev/null || true)
+            fi
+            dverdict=""; dsummary=""; drec=""
+            if [ -n "${DIGEST:-}" ]; then
+              dverdict=$(jq -r '.verdict // empty' <<<"$DIGEST" 2>/dev/null || true)
+              dsummary=$(jq -r '.summary // empty' <<<"$DIGEST" 2>/dev/null || true)
+              drec=$(jq -r '.recommendation // empty' <<<"$DIGEST" 2>/dev/null || true)
+            fi
+            # Auto-continue: a turn-cap death that pushed new commits during
+            # the run is a budget problem, not a mystery — re-dispatch (bounded
+            # at 2 continues) instead of paging a human, unless the digest
+            # model judged the run stuck. Progress evidence + a hard counter
+            # keeps this inside the "never auto-retry a mystery" principle.
+            if [ "$subtype" = "error_max_turns" ] && [ "$phase" = "implement" ] && [ "$dverdict" != "stuck" ]; then
+              tip_now=$(gh api "repos/$REPO/git/ref/heads/claude/issue-$ISSUE" --jq '.object.sha' 2>/dev/null || echo "")
+              ccount=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate 2>/dev/null \
+                | jq -s 'add // [] | [ .[] | select(.user.login == "github-actions[bot]") | select(.body | contains("<!-- claude-continue issue=")) ] | length')
+              if [ -n "$tip_now" ] && [ "$tip_now" != "${TIP_BEFORE:-}" ] && [ "${ccount:-0}" -lt 2 ]; then
+                n=$((ccount + 1))
+                body="$RUNNER_TEMP/continue_comment.md"
+                {
+                  echo "<!-- claude-continue issue=$ISSUE count=$n -->"
+                  echo "**Turn budget exhausted mid-progress — auto-continuing ($n of 2).** New commits were pushed during the run, so this reads as a budget limit, not a failure; the next run resumes from the plan comment and branch state."
+                  if [ -n "$dsummary" ]; then echo ""; echo "_Model digest (${dverdict:-no verdict}):_ $dsummary"; fi
+                } > "$body"
+                gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
+                gh workflow run claude-fix.yml -R "$REPO" -f issue_number="$ISSUE" || true
+                echo "Auto-continue $n of 2 dispatched."
+                exit 0
+              fi
+            fi
             gh api -X POST "repos/$REPO/issues/$ISSUE/labels" -f "labels[]=needs-human" >/dev/null
             note=""
             if [ "$outcome" = "other" ]; then note=" — the failure came from a plumbing step, a timeout, or a cancellation, not a Claude step"; fi
@@ -783,8 +882,23 @@ jobs:
               fi
               echo '```'
               echo ""
+              if [ -n "$dsummary" ]; then
+                echo "**Model digest** (verdict: ${dverdict:-n/a}): $dsummary"
+                if [ -n "$drec" ]; then echo ""; echo "_Recommendation:_ $drec"; fi
+                echo ""
+              fi
               echo "Run: $GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID"
             } > "$body"
             gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
             echo "Classified as TASK FAILURE (phase=$phase) — needs-human applied."
           fi
+
+      # Backfill: whenever a run ends — success, failure, or deliberate stop —
+      # immediately trigger a requeue tick so freed capacity never idles until
+      # the next half-hour cron. The tick re-checks capacity and every queue
+      # rule itself; with an empty queue it is a no-op, so this cannot loop.
+      - name: Trigger a requeue tick
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run claude-quota-retry.yml -R "$REPO" || true
