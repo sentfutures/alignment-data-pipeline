@@ -237,14 +237,10 @@ class TestShape:
             assert "class='lede'" in head
             assert "<h3" not in head, f"#{pid} opens on a heading"
 
-    def test_the_difficult_advice_report_opens_on_what_it_is(self):
-        """The beat, then its lede. The lede is still the first line a reader reads and
-        still the comparison's own masthead sentence — someone who arrived on #dad from a
-        deep link never saw that table — but it now sits under a heading, above the flow
-        and one record."""
-        panel = build(sdf_inputs=SDF_INPUTS).split("<section id='dad'")[1]
-        head = panel[:panel.index("<h3 id='dad-built'")]
-        assert head.index("<h3 id='dad-what'>") < head.index("class='lede'")
+    # A `test_the_difficult_advice_report_opens_on_what_it_is` sat here, requiring
+    # `<h3 id='dad-what'>` above the lede. It was the exact opposite of
+    # test_neither_report_puts_a_heading_over_its_opening_line above, which is the current
+    # rule and covers the same ground — both cannot hold, and the beat is gone.
 
     def test_the_hero_is_the_image_the_title_and_the_lines_that_follow(self):
         """Image, title, intro, centred, and nothing else. A lede, a meta line or a set
@@ -347,28 +343,31 @@ class TestShape:
     def hero(html):
         return re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
 
-    def test_the_footer_names_the_runs_the_page_was_built_from(self):
-        """Provenance was taken off the page entirely, and then appeared nowhere: no run
-        id, no commit, no backend, anywhere. A page whose every figure is derived from two
-        run directories has to name them or nothing on it can be located or cited. It
-        belongs at the foot, under the maker line — not inside a report."""
+    def test_the_footer_carries_no_provenance(self):
+        """Who made it and where to go, and nothing else.
+
+        One line per run — id, commit, dirty flag, backend — was here twice, and was
+        removed twice. It was restored on the argument that provenance otherwise "appeared
+        nowhere", which is not so: `common.run_note()` names the run inside the report,
+        where the reader who wants it is. What the footer added on top of that was a commit
+        sha, a dirty flag and a backend name, none of which a reader can act on, and
+        "+ uncommitted changes" on the last line of a handoff page reads as a draft.
+        """
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
         assert f"A project by <a href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
-        assert foot.index("A project by") < foot.index("class='foot-run'")
-        text = strip_tags(foot)
-        for run in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"]):
-            assert run in text
-        assert text.count("run ") == 2 and "git " in text
-
-    def test_a_dataset_with_no_run_gets_no_half_provenance_line(self):
-        """Built without a run, the page says nothing about it rather than printing a
-        line of question marks."""
-        html = P.build(content=content())          # no dad run, no sdf run
-        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
         assert "class='foot-run'" not in foot
-        assert P.MAKER in foot                     # the rest of the footer is unchanged
+        text = strip_tags(foot)
+        for gone in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"], "git ", "backend"):
+            assert gone not in text, gone
+
+    def test_the_run_is_still_named_where_the_reader_needs_it(self):
+        """The footer carrying nothing is only correct because the report carries it. If
+        both stopped, the page's figures would come off a batch nobody could identify."""
+        html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
+        panel = html[html.index("<section id='dad'"):]
+        assert DAD_INPUTS["run_id"] in panel
 
     def test_the_footer_links_are_links_not_buttons(self):
         """Two destinations, each with its mark and the outbound arrow, floated right."""
@@ -414,7 +413,7 @@ class TestShape:
                    for u in re.findall(r"href='(https?://[^']+)'", html)}
         assert origins <= {"https://github.com", "https://huggingface.co",
                            "https://alignment.anthropic.com", P.MAKER_URL}
-        assert P.HF_DAD in html and P.HF_SDF in html and P.REPO_URL in html
+        assert R.esc(P.HF_DAD) in html and P.HF_SDF in html and P.REPO_URL in html
 
     def test_every_link_that_leaves_the_page_says_so(self):
         """The arrow is the only signal a reader gets that a click ends the page."""
@@ -430,25 +429,86 @@ class TestShape:
         assert re.search(r"::selection\{background:var\(--accent\);color:var\(--surface-0\)\}",
                          html)
 
-    def test_a_link_is_a_typographic_object_not_a_coloured_word(self):
-        """Mono against the serif, bold, and underlined in the accent at full strength."""
+    def test_a_link_is_marked_never_re_faced(self):
+        """A link takes the typography of the text around it; the mark is the accent and the
+        2px accent underline, and the rule sets no face, size or weight at all.
+
+        It was mono 600 at .92em, on the reasoning that mono carries identity and a link is a
+        thing you go and fetch. That conflated two kinds of content: a run id or a path IS a
+        literal string and mono is right for it, while a work's title is language, and setting
+        it in mono changed x-height and letterfit mid-sentence in every paragraph of both
+        reports. Mono means a literal string now, and nothing else.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
         rule = re.search(r"\na\{[^}]*\}", html).group(0)
-        for want in ("font-family:var(--mono)", "font-weight:600",
-                     "color:var(--accent)", "text-decoration-thickness:2px"):
+        for want in ("color:var(--accent)", "text-decoration-thickness:2px",
+                     "font-weight:600"):
             assert want in rule, rule
+        # WEIGHT IS PART OF THE MARK — 600 against whatever the surrounding text is. FACE and
+        # SIZE are what a link must never set: those come from the context it sits in.
+        for gone in ("font-family", "font-size", "letter-spacing"):
+            assert gone not in rule, f"{gone} re-faces the link: {rule}"
+        # No per-section link style either: one link object, everywhere.
+        assert ".hero-intro a{" not in html
 
     def test_the_buttons_are_not_dragged_along_with_the_links(self):
-        """.lbtn, .choice and .tab are actions, and each sets its own font shorthand so
-        a bare `a` rule cannot reach them. The outbound buttons are deliberately mono,
-        matching the links; they just say so themselves."""
+        """.lbtn, .choice and .tab are actions, and each sets its own font shorthand so a bare
+        `a` rule cannot reach them. This matters MORE now that the `a` rule sets no face: a
+        control that forgot to declare one would silently inherit whatever it sat in."""
         html = build(sdf_inputs=SDF_INPUTS)
         for cls in ("\n.lbtn{", ".choice{", ".tab{"):
             start = html.index(cls)
             rule = html[start:html.index("}", start)]
             assert "font:" in rule, rule          # its own shorthand beats the `a` rule
-        start = html.index("\n.lbtn{")
-        assert "var(--mono)" in html[start:html.index("}", start)]
+
+    def test_a_control_declares_the_serif_and_only_an_id_stays_mono(self):
+        """One face for the things you press. The chooser was serif and everything else was
+        mono, which is the drift this removes — the chooser becomes the model.
+
+        `.tab` is the single exception and it is about CONTENT, not about being a control: a
+        carousel tab's label is a record id, so it is set in the face this page uses for every
+        other literal string.
+        """
+        html = build(sdf_inputs=SDF_INPUTS)
+
+        def face(cls):
+            start = html.index(cls)
+            return re.search(r"font:[^;}]*", html[start:html.index("}", start)]).group(0)
+
+        for cls in ("\n.lbtn{", ".choice{"):
+            assert "var(--serif)" in face(cls), (cls, face(cls))
+        assert "var(--mono)" in face(".tab{")            # a record id, not a title
+        # .ilink is NOT a control — nothing to press in the footer, only somewhere to go — so
+        # it declares no face at all and takes the footer's own sans, like the maker link
+        # beside it. Declaring serif here left a serif 600 link next to a sans 400 one.
+        start = html.index(".ilink{")
+        assert "font" not in html[start:html.index("}", start)]
+
+    def test_paper_has_no_indigo_on_it(self):
+        """Print turns every accent object to ink — including the UNDERLINE and the buttons.
+
+        Overriding `color` alone is not enough and the page did exactly that: the base `a` rule
+        sets `text-decoration-color` to the accent, so a printed link was black text under an
+        indigo rule, `.lbtn` declares its own accent colour so it printed indigo outright, and
+        `.cite-n sup` is not an anchor, so a bare `a` override never reached it. Invisible on
+        screen, which is why it is asserted here.
+        """
+        html = build(sdf_inputs=SDF_INPUTS)
+        printed = html[html.index("@media print"):]
+        rule = re.search(r"a,[^{]*\{[^}]*color:var\(--text-primary\)[^}]*\}", printed).group(0)
+        for sel in (".lbtn", ".cite-n sup"):
+            assert sel in rule, f"{sel} still prints in the accent: {rule}"
+        assert "text-decoration-color:currentColor" in rule
+
+    def test_the_palette_is_closed_even_in_the_print_block(self):
+        """Every colour is a token. The printed URL's own colour was a raw `#555` — the one
+        hex on the page outside the token block, and `--text-muted` is what it meant."""
+        html = build()
+        css = re.search(r"<style>(.*?)</style>", html, re.S).group(1)
+        # Token declarations are where hexes live; anything else is a colour typed by hand.
+        css = re.sub(r":root\{[^}]*\}", "", css)
+        assert not re.findall(r"[:\s]#[0-9a-fA-F]{3,8}\b", css), re.findall(
+            r".{30}#[0-9a-fA-F]{3,8}", css)
 
     def test_the_outbound_arrow_is_drawn_not_typed(self):
         """As a glyph U+2197 is a hairline in most faces and a different shape in every
@@ -564,6 +624,20 @@ class TestChooser:
         # A descendant selector here would centre and stretch both report titles too:
         # every panel opens with its own <h2>, and the panels are inside #explore.
         assert "#explore h2{" not in html
+
+    def test_the_instruction_does_not_set_level_with_the_reports_it_points_at(self):
+        """"Walk through either pipeline" is the one h2 on the page that is not a name. At
+        the h2's own 2rem it was the same size as "Synthetic documents" and "Difficult
+        advice" — both h2s INSIDE this section — so the label was as loud as the thing, and
+        with #datasets' heading visually hidden it was the only visible h2 before a report
+        opened. It stays an <h2>, so the outline and the H key are unchanged."""
+        html = build(sdf_inputs=SDF_INPUTS)
+        rule = re.search(r"#explore>h2\{[^}]*\}", html).group(0)
+        head = float(re.search(r"font-size:([\d.]+)rem", rule).group(1))
+        h2 = float(re.search(r"(?m)^h2\{font:600 ([\d.]+)rem", html).group(1))
+        h3 = float(re.search(r"(?m)^h3\{font:600 ([\d.]+)rem", html).group(1))
+        assert head < h2 and head <= h3
+        assert "<h2>Walk through either pipeline</h2>" in html
 
     def test_a_report_ends_where_its_content_ends(self):
         """There was a filled button here offering the other dataset, from when the
@@ -689,9 +763,14 @@ class TestStickyBar:
             assert found, f"{name} does not interpolate off --t: {block}"
             for f in found:
                 assert 0 < float(f) < 1, f"{name} factor {f} does not shrink the bar"
-        # Tight has to be markedly lighter than loose, or the change is not worth animating:
-        # measured 83px -> 52px in Chromium.
-        assert _bar_rem(html, 1) < 0.7 * _bar_rem(html, 0)
+        # Tight has to be lighter than loose, or the change is not worth animating — but the
+        # RANGE is deliberately narrow: ~72px -> ~52px. It was 83px -> 52px, and the pinned
+        # size is the one measured to sit beside prose, so a resting bar 61% taller than it
+        # was oversized on arrival by the design's own evidence, and the collapse read as a
+        # layout event rather than the bar settling. The floor is what matters and it has not
+        # moved: the coefficients were re-derived to hold the pinned size where it was.
+        assert _bar_rem(html, 1) < 0.8 * _bar_rem(html, 0)
+        assert 3.1 < _bar_rem(html, 1) < 3.4, "the pinned size is the measured one"
         # The pair narrows too, and its floor is measured rather than chosen: below 27.5rem
         # "Synthetic documents" wraps and the tight bar ends up TALLER than the loose one
         # (measured at 202px per button in Chromium).
@@ -800,9 +879,11 @@ class TestContentsRail:
         markup = html[:html.index("<script>")]
         assert re.findall(r"data-rail='([^']+)'", markup) == ["sdf", "dad"]
         rail = self.rail(html, "dad")
+        # Three beats, the report's own. "What it is" and "Caveats" were both cut — the
+        # report opens on a bare lede with no heading, so it earns no rail item, and
+        # test_both_reports_take_the_same_skeleton holds the caveats beat gone on both sides.
         assert [t for _, t in re.findall(r"class='r-b' href='#([^']+)'>([^<]+)<", rail)] == [
-            "What it is", "How it is built", "One example, end to end", "Caveats",
-            "Appendix"]
+            "The pipeline", "One example, end to end", "Appendix"]
 
     def test_the_stages_are_sub_items_under_the_beat_they_belong_to(self):
         """The point of the sub-items: a report's stages are where a reader is going, and
@@ -823,11 +904,11 @@ class TestContentsRail:
                 by_beat[current].append(target)
         assert by_beat["dad-built"] == ["dad-built-stage1", "dad-built-stage2",
                                        "dad-built-stage3", "dad-built-control"]
-        assert by_beat["dad-weak"] == [] and by_beat["dad-appendix"] == []
-        # The opening beat names its two halves — "The pipeline" and "The result" — and
-        # they take no id, so they stay out of the rail. "The pipeline" listed here,
-        # directly above "How it is built", is exactly the ambiguity the labels remove.
-        assert by_beat["dad-what"] == []
+        assert by_beat["dad-appendix"] == []
+        # The two cut beats are not in the rail because they are not in the report: a rail
+        # item naming a beat that did not render is the failure render.outline() exists to
+        # prevent, so their absence is asserted here rather than assumed.
+        assert "dad-weak" not in by_beat and "dad-what" not in by_beat
 
     def test_the_appendix_drawers_are_not_in_the_rail(self):
         """An <h4> becomes a rail item by having an id, and the appendix's headings live
@@ -959,6 +1040,28 @@ class TestContentsRail:
         assert "getComputedStyle(el).scrollMarginTop" in script
         assert "setAttribute('aria-current','true')" in script
 
+    def test_the_last_beat_is_current_at_the_bottom_of_the_page(self):
+        """The appendix cannot reach the line the other beats reach, so the bottom decides.
+
+        The current beat is the last heading whose top has crossed its own scroll-margin-top —
+        112px. The appendix is the last beat and its drawers are closed, so there is less page
+        under it than there is screen: measured at 1440x900, the difficult-advice appendix would
+        need the page scrolled to 7,047px and 6,917px is as far as it goes — 130px short, and
+        220px short on the documents side. The rail therefore marked a stage inside the worked
+        example while the reader was looking at the appendix.
+
+        Corrected at the bottom rather than by shortening the line, because the line is the
+        CSS's own headroom for a linked heading and is right everywhere else. Measured after:
+        "Appendix" at the bottom in both reports, at 900px and 1400px of viewport and on a
+        phone, with the drawers closed and again with every drawer opened.
+        """
+        script = build(sdf_inputs=SDF_INPUTS)
+        script = script[script.index("<script>"):]
+        assert "document.documentElement.scrollHeight" in script
+        assert "heads[heads.length-1].el.id" in script
+        # It reads the live viewport and scroll, so a tall window and a phone both get it.
+        assert "innerHeight+scrollY" in script
+
     def test_the_rail_links_are_a_control_not_the_page_s_link_treatment(self):
         """Every other link on the page is mono, bold and underlined in the accent. The
         rail measures the document rather than arguing in it, so it takes the sans — with
@@ -1079,7 +1182,7 @@ class TestComparisonTable:
         assert P.PROMPTS_SDF in rows["prompt templates"]
         assert P.PROMPTS_DAD in rows["prompt templates"]
         assert P.HF_SDF in rows["example dataset"]
-        assert P.HF_DAD in rows["example dataset"]
+        assert R.esc(P.HF_DAD) in rows["example dataset"]
         assert "<tfoot>" not in table
 
     def test_the_comparison_carries_no_record_count(self):
@@ -1321,6 +1424,65 @@ class TestBrevity:
         assert html.count("alignment.anthropic.com") == 1
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
         assert "alignment.anthropic.com" in hero
+
+    def test_no_link_on_the_page_has_a_number_for_its_accessible_name(self):
+        """A link's ACCESSIBLE name is the name of the thing it points at.
+
+        The visible mark may be a number — the intro's two sources are raised citation
+        markers, which is what keeps the claim they hang off readable. What may not be a
+        number is the name the link announces: `[1](url)` gives a screen reader "link, 1" and
+        a links list a row that says nothing (WCAG 2.4.4). So a marker carries its work's name
+        in `aria-label`, and that is what this checks — across the whole page, because the
+        same shortcut is available anywhere prose cites something.
+        """
+        html = self.page()
+        links = re.findall(r"<a\b([^>]*)>(.*?)</a>", html, re.S)
+        assert links, "no links found — the selector is wrong, not the page"
+        for attrs, inner in links:
+            aria = re.search(r"aria-label='([^']*)'", attrs)
+            name = aria.group(1) if aria else strip_tags(inner).strip()
+            assert not re.fullmatch(r"[\d\W]*", name), f"link named {name!r}"
+
+    def test_a_citation_marker_is_raised_numbered_and_named(self):
+        """The author writes the work's name, the renderer draws the number.
+
+        Three things have to hold together or the form is worse than the words it replaced:
+        the visible mark is a numeral (so the sentence reads uninterrupted), the accessible
+        name is the work (so it is not "link, 1"), and consecutive markers are separated (or
+        1 and 2 side by side read as "12").
+        """
+        html = self.page()
+        markers = re.findall(r"<a class='cite-n'[^>]*>(.*?)</a>", html, re.S)
+        assert len(markers) == 2
+        assert [strip_tags(m).strip() for m in markers] == ["1", "2"]   # counted, not authored
+        assert "aria-label='Teaching Claude Why'" in html
+        assert all("<sup>" in m for m in markers)
+        # Underlined like every other link, but thinner: the brand's 2px under a ~9px numeral
+        # is proportionally what 4px would be under body text.
+        # ...and drawn on the <sup>, not the anchor: a decoration is positioned from its own
+        # element's baseline, and the anchor's is the PARAGRAPH's, which put the underline below
+        # and left of the raised numeral (measured at 6x).
+        assert "text-decoration:none" in re.search(r"\.cite-n\{[^}]*\}", html).group(0)
+        marker_rule = re.search(r"\.cite-n sup\{[^}]*\}", html).group(0)
+        assert "text-decoration:underline" in marker_rule
+        thick = float(re.search(r"text-decoration-thickness:([\d.]+)px", marker_rule).group(1))
+        base = float(re.search(r"\na\{[^}]*text-decoration-thickness:([\d.]+)px",
+                               html, re.S).group(1))
+        assert 0 < thick < base, (thick, base)
+        # The raise is stated ONCE, on the <sup>, not also on the anchor: <sup> carries the
+        # UA's own super + smaller, so doing it twice shifted the digits clear of the comma.
+        sup = re.search(r"\.cite-n sup\{[^}]*\}", html).group(0)
+        assert "vertical-align:super" in sup and "line-height:0" in sup
+        assert "vertical-align" not in re.search(r"\.cite-n\{[^}]*\}", html).group(0)
+        # Each marker says it leaves the page, with a smaller-drawn version of the same
+        # arrow every other outbound link carries — which is also what stops a raised numeral
+        # promising a footnote that is not there.
+        assert all("class='ext-c'" in m for m in markers)
+        assert "stroke-width='2.4'" in html                        # heavier, to hold at 7px
+        # Consecutive markers are separated, or 1 and 2 side by side read as "12". A raised
+        # comma did that until the arrows arrived; they separate them now.
+        assert re.search(r"\.cite-n\+\.cite-n\{margin-left:", html)
+        assert "content:','" not in html
 
     def test_the_page_does_not_argue_a_third_route(self):
         """The belief-implantation comparison is a decision record, not something a

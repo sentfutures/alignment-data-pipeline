@@ -15,7 +15,7 @@ Structure:
     #explore    Walk through either pipeline — two buttons
       #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
       #dad      Difficult advice     (report/dad.py, hidden until chosen)
-    footer      repo, viewers, run ids, commits, build provenance
+    footer      repo and both viewers, and nothing else
 
 Nothing is open on load; ``#dad`` or ``#sdf`` in the URL opens that report, so the
 dataset card's deep links land where they say they will, and printing expands both. The
@@ -45,8 +45,13 @@ PROMPTS_DAD = f"{REPO_URL}/tree/main/prompts/dad"
 PROMPTS_SDF = f"{REPO_URL}/tree/main/prompts/sdf"
 HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
           "animal-welfare-training-claude")
-HF_DAD = f"{HF_URL}/viewer/dad"
-HF_SDF = f"{HF_URL}/viewer/sdf"
+# The config names as they exist on the Hub, percent-encoded: the dataset's two configs are
+# named for the datasets rather than for the pipeline directories, so these are not `sdf` and
+# `dad`. The `&` in the difficult-advice one is escaped to `&amp;` by `esc()` when the href is
+# written, which is what makes it a valid attribute — so a test comparing against these
+# constants has to escape them too.
+HF_DAD = f"{HF_URL}/viewer/difficult%20advice%20Q&A"
+HF_SDF = f"{HF_URL}/viewer/synthetic%20documents"
 
 HERO_ALT = "A line drawing of a butterfly at the end of a looping dashed flight path."
 # Inferred from the team's own domain; one constant to change if it is wrong.
@@ -183,10 +188,12 @@ def section_explore(panels, outlines):
 def footer(maker_icon=""):
     """Who made it and where to go.
 
-    No run ids, no commits, no backend. The page reads as the pipeline running now rather
-    than as a report on one batch that finished, and a footer naming two run directories
-    dates it to that batch. What a reader needs to locate the data is the two links, and
-    what they need to reproduce it is the repository.
+    No run ids, no commits, no dirty flag, no backend. This was restored once on the
+    grounds that provenance had otherwise "appeared nowhere" — untrue: ``common.run_note()``
+    names the run inside the report, twice, where the reader who wants it is. What the
+    footer added on top was a commit sha, a dirty flag and a backend name, none of which a
+    reader can act on, and "+ uncommitted changes" on the last line of a handoff page reads
+    as an unfinished draft.
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
     return (f"<p>A project by <a href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
@@ -222,11 +229,11 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         section_datasets(content, f, dad_kwargs, sdf_kwargs),
         section_explore(panels, outlines),
     ]
-    # The intro is four blocks, not one: the finding and the sentence that introduces the
-    # pair, the two techniques as two columns, then what we built on them. The pair is a
-    # figure between two runs of prose rather than a list inside one, because the two
-    # techniques ARE the two datasets below — same things, same order — and ~90 words of
-    # definitional prose with two digits in front of it did not say so.
+    # The intro is four blocks, not one: the finding and its two sources, the sentence that
+    # introduces the pair, the two techniques as two columns, then what we built on them.
+    # The pair is a figure between two runs of prose rather than a list inside one, because
+    # the two techniques ARE the two datasets below — same things, same order — and ~90 words
+    # of definitional prose with two digits in front of it did not say so.
     intro = (C.prose(content, "intro", f)
              + R.named_pair([_technique(content, "sdf_technique", f),
                              _technique(content, "dad_technique", f)])

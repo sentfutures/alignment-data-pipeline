@@ -214,7 +214,15 @@ of them measures. Both reports sit within a few words of 800, so anything added 
 to be paid for out of it.
 
 **Skeleton.** Both reports read: **an opening lede → the pipeline → one example end to end
-→ caveats → appendix**, and both now carry all of it. **The lede takes no heading on either
+→ appendix**, and both carry all of it. A **caveats** beat sat between the example and the
+appendix and was cut from BOTH sides in the external-readiness copy pass: its bullets restated
+what the pipeline openly does rather than conceding anything, so they read as filler where
+self-criticism belonged. `test_both_reports_take_the_same_skeleton` asserts its absence on both
+sides, so restoring it to one report alone fails rather than quietly splitting the skeleton —
+and the derived floor is untouched, because every BAD/OK verdict still renders in the
+appendix's audit drawer. `dad.blocks_weak()` and `sdf.blocks_weak()` are still defined and now
+dead: nothing calls them, and the prose ids they read (`caveats`, `sdf_caveats`) are gone from
+the prose files and from both `CONTENT_IDS`. **The lede takes no heading on either
 side** — the `<h2>` is the heading, and one over a single sentence only names what a reader
 can already see while costing a rail item and a hairline (`h3[id]` is what draws that rule).
 `report/sdf.py` carried a `sdf-what` heading while that report was a stub whose whole content
@@ -226,27 +234,20 @@ measured" beat: this is not a results report. Each pipeline's stages are `<h4 id
 pipeline, used twice; `test_both_reports_take_the_same_skeleton` pins the two beat lists
 against each other.
 
-`what it is` earned its heading. It was a bare lede on the reasoning that a heading over one
-sentence only names what a reader can already see — true of one sentence, and not true of
-what the beat now carries: a **vertical flow schematic** (`render.flow()`) of the matrix, the
-three stages and the record, and a **trimmed specimen** of one real record's question and
-answer side by side. Both were previously invisible until the worked example, ~3,000px down.
-The lede stays, first, under the heading, and it names the pipeline and what the pipeline
-produces. **Each half is labelled** — `The pipeline` over the schematic, `The result` over the
-specimen — because a diagram and a quotation left unlabelled make the reader work out for
-themselves which is the process and which is its output, and that is the one distinction the
-rest of the page rests on: everything after this beat is process. The labels take **no id**,
-so they stay out of the rail (an id is what makes an `<h4>` a rail item — `render.substep()`),
-and they are document subheads rather than `h4.pane-h`, because the specimen's own two panes
-are already pane headings. Three rules hold the beat in place: each half is *labelled*, then
-preceded by a sentence that *says* what it shows — a diagram's labels are not read aloud and
-30 words of a record is not a description — and it links nowhere and names no record id,
-because it is the overview and the trail is two beats below. (**Note:** this paragraph
-describes a beat the code does not currently build — `dad.blocks_what()` returns a bare lede
-and `dad.BEATS` has no `dad-what`, a divergence that predates the document report and is
-tracked by the failing `TestWhatItIs` tests. The claim it used to end on, that `sdf.py`
-opened on an `sdf-what` heading, is no longer true either: that heading went when the
-document report was written, so both sides open on a bare lede.)
+**There is no `what it is` beat, and the flow lives in the pipeline beat.** A `dad-what`
+heading briefly carried a **vertical flow schematic** (`render.flow()`) and a **trimmed
+specimen** of one record, each under its own label, on the reasoning that both were otherwise
+invisible until the worked example ~3,000px down. Both moved: the diagram went down to **the
+pipeline**, the beat whose prose reads it aloud, and the specimen was cut because the worked
+example two beats below is the same record in full. So both reports now open on a bare lede
+with no heading of its own, held there by
+`test_neither_report_puts_a_heading_over_its_opening_line`, and nothing above the pipeline beat
+carries a figure, a tile, a chip or a score. What survived the move is in
+`tests/test_dad_report.py::TestTheFlow`: the schematic owes an accessible name, because SVG
+text is not read as prose, and it takes no series or status colour, because it measures
+nothing. **Known drift:** the flow's stage names still say `the constitution rewrite` while the
+copy pass rewrote `content_dad.md` to say "your alignment documents" — one pipeline, two
+vocabularies, and a copy decision nobody has made yet.
 
 The beat is cheap on purpose, and that is measured, not hoped: `<svg>`, `<table>`,
 `<blockquote>` and `<div class='resp'>` are all uncounted by `editorial_words()`, so the
@@ -355,8 +356,16 @@ typed (as a glyph it is a hairline that differs per font, and this page gets pri
 Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
 allows a `data:` src and nothing else off-page.
 
-**Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links (mono,
-600, 2px accent underline) and outline buttons (`.lbtn`, `.choice`, `.tab`, 4px radius).
+**Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links and outline
+buttons (`.lbtn`, `.choice`, `.tab`, 4px radius). **A link is marked, never re-faced**: it
+inherits its context's face and size — serif in prose, sans in the footer and the rail — and
+the mark is weight 600, the accent, and a 2px accent underline at a .2em offset — mono came off links page-wide, because mono means a literal
+string (an id, a path, code) and a work's title is language. Controls are serif at their own
+size; `.tab` is the one mono control, and for its content (a record id), not for being a
+control. The intro's two sources are **raised citation markers** (`.cite-n`): the prose file
+authors the work's name, the renderer draws the number and carries the name in `aria-label`,
+because a link whose accessible name is "1" tells a screen reader nothing. They borrow the
+footnote convention without a footnote and link straight out.
 An accent fill means *selected* — the open tab, the open pane — and nothing else; there is
 no primary button. Cream fills with a border are not a control style. Status
 colours (`--good/--warn/--bad`) and the chart series hues stay reserved; the palette
@@ -399,11 +408,17 @@ are gone.
 difficult-advice report carried no link at all through ten thousand words, so the reader
 most likely to want the data had to scroll back past everything they had read; the pair
 (`Browse the records` / `The pipeline`) now sits at the foot of the worked example, which
-is the only place it appears. Provenance — run id, commit, dirty flag, backend, one line
-per run via `common.meta_line()` — is in the footer. It was removed on the grounds that a
-run id is for a reader deep in a report rather than the last line of the page, which was
-right about where it belongs and wrong about the consequence: it then appeared nowhere,
-and nothing on the page could be located, reproduced or cited.
+is the only place it appears. **The footer carries no provenance** — no run id, no commit,
+no dirty flag, no backend. It has been added and removed twice, most recently restored on
+the grounds that provenance had otherwise "appeared nowhere", and that is not true:
+`common.run_note()` names the run twice inside the difficult-advice report, under
+`#dad-example` and under the appendix intro, which is where a reader who wants it is. What
+the footer added on top of that was a commit sha, a dirty flag and a backend name — none of
+which a reader can act on, and one of which (`bedrock`) is not in the code to go and look
+at — plus "+ uncommitted changes" on the last line of a handoff page, which reads as an
+unfinished draft. `test_the_footer_carries_no_provenance` holds it out, and
+`test_the_run_is_still_named_where_the_reader_needs_it` is the other half: the footer may
+only stay empty for as long as the report names the run.
 
 **The control edge answers to 3:1, not 4.5:1.** `--accent-edge` is a control boundary
 (WCAG 1.4.11), and at `#c9c3ea` it reached 1.53:1 on the paper — the page's only decision
@@ -447,8 +462,11 @@ edge, never a fill, and the line for "arrived at" is the heading's **own
 `scroll-margin-top`**, read off the element — measured: with the bar's bottom as the line the
 marker sat one heading behind every jump. Below 900px there is no beside, so it becomes a
 static block at the head of the report, held to the reading measure. The page itself still
-has no rail. **The bar has two sizes** — 83px
-tall and 40rem wide loose, 52px and 30rem tight, arrow faded out — and **crosses between
+has no rail. **The bar has two sizes** — ~72px
+tall and 40rem wide loose, ~52px and 30rem tight, arrow faded out (the height range was
+83px→52px and was narrowed: the pinned size is the one measured to sit beside prose, so a
+resting bar 61% taller than it was oversized on arrival; the 40rem is the comparison's two
+20rem columns and did not move) — and **crosses between
 them at a trigger point, not with the scroll**: a size that tracked scrolling read as
 distraction beside prose. It tightens 96px past its own top and loosens at 24px (two
 thresholds, or a reader on the boundary flips a layout change back and forth), animated by a

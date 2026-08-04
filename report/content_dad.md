@@ -41,7 +41,7 @@ And no deks — the page allows two in total and both are spent elsewhere.
 
 <!-- id: dad_what -->
 
-A user brings a query that could help or harm third parties (animals or other sentient beings). A wise AI assistant coaches the user through responsible conduct, reasoning skillfully about tradeoffs without overbearing.
+A fictional user brings a query that could help or harm animals — resembling dilemmas AIs themselves might encounter in the future, according to AI x Animal Welfare experts. A wise AI assistant coaches the user through responsible conduct, reasoning skillfully about tradeoffs without being overbearing.
 
 <!-- id: method_intro -->
 

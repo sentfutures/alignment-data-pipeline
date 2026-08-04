@@ -60,12 +60,15 @@ _MD_CODE = re.compile(r"`([^`]+)`")
 _MD_BOLD = re.compile(r"\*\*([^*]+)\*\*")
 _MD_ITAL = re.compile(r"(?<![*\w])\*([^*\n]+)\*(?!\*)")
 _MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+# `[^Name of the work](url)` — a citation marker. The name is the accessible
+# name; the visible mark is a number the renderer counts out.
+_MD_CITE = re.compile(r"\[\^([^\]]+)\]\(([^)\s]+)\)")
 # "1. ", "2) " — the marker of a numbered list line, stripped before the item renders.
 _MD_ORDERED = re.compile(r"^\d+[.)]\s+")
 
 
 def inline_md(text):
-    """Escape, then apply a bold/italic/code/link subset of markdown.
+    """Escape, then apply a bold/italic/code/link/citation subset of markdown.
 
     Used on prose only — editorial copy and LLM-written judge notes, which contain
     ``**bold**``. NEVER used on corpus text, which must render verbatim.
@@ -74,8 +77,37 @@ def inline_md(text):
     out = _MD_CODE.sub(r"<code>\1</code>", out)
     out = _MD_BOLD.sub(r"<b>\1</b>", out)
     out = _MD_ITAL.sub(r"<i>\1</i>", out)
+    out = _cite_markers(out)          # before _MD_LINK, or it eats the [^Name](url) form
     out = _MD_LINK.sub(_link, out)
     return out
+
+
+def _cite_markers(text):
+    """``[^Name of the work](url)`` -> a raised, numbered citation marker.
+
+    THE AUTHOR WRITES THE NAME AND THE RENDERER DRAWS THE NUMBER, which is the whole point of
+    the form: the visible mark is a superscript numeral, so the claim it hangs off reads
+    uninterrupted, while the work's name becomes the marker's accessible name. Written as
+    ``[1](url)`` instead, the link announces as "link, 1" and a links list gets a row that
+    says nothing — the number is a position, not a name.
+
+    Numbered per call, which is per prose block: two markers in one paragraph are 1 and 2. A
+    page-wide sequence would need state threaded through every renderer, and nothing here
+    cites across blocks.
+
+    The marker promises a note at the foot of the page and there is none — it links straight
+    out. That is a borrowed convention, and the title attribute is the disclosure: hovering
+    names the work.
+    """
+    n = [0]
+
+    def one(m):
+        name, href = m.group(1), m.group(2)
+        n[0] += 1
+        return (f"<a class='cite-n' href='{href}'{NEW_TAB} aria-label='{name}' "
+                f"title='{name}'><sup>{n[0]}{CITE_ARROW}</sup></a>")
+
+    return _MD_CITE.sub(one, text)
 
 
 # Leaving the page means leaving it in a NEW TAB: this is a long read whose chooser
@@ -86,6 +118,14 @@ NEW_TAB = " target='_blank' rel='noopener noreferrer'"
 # The outbound mark, drawn rather than typed. As a glyph (U+2197) it is a hairline in
 # most faces and a different shape in every one; this page is printed and screenshotted,
 # so the mark has to be the same weight as the type it sits beside, everywhere.
+# The marker's own arrow: same path, drawn smaller and a touch heavier in stroke, because at
+# the marker's .72em a 9px glyph is wider than the numeral it follows and 2px of stroke on a
+# 6px box reads as a blob.
+CITE_ARROW = ("<svg class='ext-c' viewBox='0 0 12 12' width='7' height='7' aria-hidden='true' "
+              "fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' "
+              "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
+              "<path d='M4.6 3.1h4.3v4.3'/></svg>")
+
 EXT_ARROW = ("<svg class='ext' viewBox='0 0 12 12' width='9' height='9' aria-hidden='true' "
              "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' "
              "stroke-linejoin='round'><path d='M3.1 8.9 8.9 3.1'/>"
@@ -948,6 +988,14 @@ section>figure,section>.tiles,section>.scroll,section>.pair,section>details,
 section>.explore-body,section>.lbtns,section>.cmp-wrap,
 section>.carousel{grid-column:text-start/full-end}
 section+section{margin-top:5rem}
+/* One centred rule, above the comparison and nowhere else. 30rem is three quarters of the two
+   dataset columns (2 x --cmp-col = 40rem), and it is centred on the page, which is where the
+   pair is centred too. Its own margin is the ENTIRE gap between the intro and the table — the
+   hero's bottom padding is zero — so "equally spaced" is one value here rather than arithmetic
+   across two rules that each restate at a breakpoint. Drawn as a grid child, because a border
+   on the section itself runs the full shell column. */
+#datasets::before{content:'';grid-column:1/-1;width:30rem;margin:3rem auto;
+border-top:1px solid var(--hairline)}
 /* The panel is a section, so its own display:grid would beat the browser's default
    [hidden] rule. It has to be said out loud. */
 .panel[hidden]{display:none}
@@ -956,7 +1004,7 @@ section+section{margin-top:5rem}
    enough air to separate them from the page and no more. The two datasets are two
    things, so they are two things here as well as in the table below. */
 .hero{display:flex;flex-direction:column;align-items:center;
-padding:2.6rem 28px 5rem;text-align:center}
+padding:2.6rem 28px 0;text-align:center}
 /* 3rem above the art and 3rem above the title, not the 6rem each carried. The art is a
    186px band inside a 36rem box, so 12rem of stacked margin spent ~190px of the first
    screen on paper with nothing on it and pushed the comparison — the section that does
@@ -1001,7 +1049,9 @@ font-size:1.1rem;line-height:1.68}
 .npair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2.75rem;
 list-style:none;margin:2.6rem 0 0;padding:0;text-align:left}
 .npair>li{margin:0;padding-top:1.1rem;border-top:1px solid var(--hairline)}
-.npair-h{display:block;font:650 1.12rem/1.3 var(--serif);color:var(--text-primary);
+/* Muted and a step smaller, so the two technique names recede rather than reading as a first
+   run at the comparison's mastheads below them. */
+.npair-h{display:block;font:650 1.05rem/1.3 var(--serif);color:var(--text-muted);
 margin:0 0 .7rem}
 .npair-b{font-size:1rem;line-height:1.68;color:var(--text-secondary)}
 /* Type: the serif argues, the sans measures. */
@@ -1059,7 +1109,15 @@ padding-top:1rem;border-top:1px solid var(--border);max-width:46rem}
    The child combinator is load-bearing: both reports live INSIDE #explore now (that is
    what gives the sticky bar its travel), and each opens with its own <h2>, so a
    descendant selector here centres and stretches both report titles too. */
-#explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem}
+/* The one h2 on the page that is not a name. It is an instruction, and at the h2's own 2rem
+   it set level with "Synthetic documents" and "Difficult advice" — the two documents it
+   points at, both of which are h2s INSIDE this section — so the label was as loud as the
+   thing. Since #datasets' heading is visually hidden, it was also the only visible h2 before
+   a report opens: on arrival the page's second voice after the title was a caption for two
+   buttons. Dropped to the beat size, which puts it under the names and above the prose.
+   Still an <h2>, so the outline and the H key are unchanged. */
+#explore>h2{grid-column:text-start/full-end;text-align:center;margin-bottom:1.2rem;
+font-size:1.4rem}
 /* The travel, for both the bar and the rail. min-width:0 for the reason main has it: it is
    a grid item, and a grid track takes its automatic minimum from the item's min-content
    size.
@@ -1101,7 +1159,10 @@ column-gap:3rem}
    the <h2> it belongs to. 3rem here plus the rail's own .2rem is that margin — the two
    numbers have to add up to it, which is what the test recomputes. Only at rest: once the
    rail pins, its own `top` places it. */
-.railcol{grid-column:rail-col;padding-top:9rem}
+/* The contents start level with the report's <h2>, not with the top of the row: the panel
+   carries a 3.2rem top margin the rail does not, so without this the first beat sat ~48px
+   above the heading it is the contents of. This plus the rail's own .2rem is that margin. */
+.railcol{grid-column:rail-col;padding-top:3rem}
 .panels{grid-column:read-col;min-width:0}
 /* One report's contents, held on screen for as long as that report is being read.
    Its travel is .railcol, which stretches to the row's height — the height of the open
@@ -1135,18 +1196,26 @@ border-left:2px solid transparent;padding:.28rem 0 .28rem .7rem}
    It TIGHTENS ONCE, at a trigger point, because at rest it is right and pinned over a
    report it is heavy: --t is a flag, 0 loose and 1 tight, the script sets it when the
    reader is past the trigger, and every dimension below is one interpolation off it, so
-   the two states are one set of numbers. Measured in Chromium: 83px tall and 40rem wide
-   loose, 52px and 30rem tight. A size that tracked the scroll continuously read as
-   distracting — the bar moved whenever the page did — so this crosses once and settles.
-   The six sizes are tokens, so each breakpoint restates only the tokens.
+   the two states are one set of numbers. ~72px tall and 40rem wide loose, ~52px and 30rem
+   tight. A size that tracked the scroll continuously read as distracting — the bar moved
+   whenever the page did — so this crosses once and settles. The six sizes are tokens, so
+   each breakpoint restates only the tokens.
+
+   THE HEIGHT RANGE IS NARROW ON PURPOSE, and it used to be 83px. The pinned size is the
+   one measured to sit comfortably beside prose, so a resting size 61% taller than it was
+   oversized on arrival by its own evidence — and the collapse read as a layout event
+   rather than the bar settling. Only the height came down: the WIDTH stays 40rem because
+   that is exactly the comparison's two 20rem columns, so each button sits under the column
+   it opens. The interpolation coefficients were re-derived to hold the pinned size where it
+   was, not left to shrink with the base.
 
    The transition lives on the concrete properties rather than on --t (a custom property
    is discrete unless it is registered), which is also what lets the reduced-motion rule
    at the foot of this stylesheet turn the animation off with the same transition:none it
    applies to everything else. */
-.choicebar{--pad:.8rem;--gap:1.2rem;--btn-y:1rem;--btn-x:1.25rem;--label:1.14rem;
+.choicebar{--pad:.7rem;--gap:1.2rem;--btn-y:.8rem;--btn-x:1.25rem;--label:1.05rem;
 --w:40rem;grid-column:1/-1;position:sticky;top:0;z-index:5;background:var(--surface-0);
-padding:calc(var(--pad)*(1 - .5*var(--t))) 0;transition:padding .2s ease;
+padding:calc(var(--pad)*(1 - .4*var(--t))) 0;transition:padding .2s ease;
 /* The wrapper's pull is for the contents, not the chooser. The bar spans both columns, so
    left to itself it widens leftwards with the block and takes its centred pair of buttons
    1.125rem off the page's centre line, out of step with the hero and the comparison. */
@@ -1162,10 +1231,10 @@ transition:width .2s ease,gap .2s ease}
    a button, a card, a chip and a code block at once, and had stopped meaning anything;
    an outline in the accent that fills when you choose says "this is a control". */
 .choice{display:flex;align-items:center;justify-content:space-between;gap:1rem;
-padding:calc(var(--btn-y)*(1 - .5*var(--t))) calc(var(--btn-x)*(1 - .2*var(--t)));
+padding:calc(var(--btn-y)*(1 - .35*var(--t))) calc(var(--btn-x)*(1 - .2*var(--t)));
 background:none;border:1px solid var(--accent-edge);
 border-radius:4px;cursor:pointer;font:650 var(--label)/1.3 var(--serif);
-font-size:calc(var(--label)*(1 - .12*var(--t)));color:var(--accent);text-align:left;
+font-size:calc(var(--label)*(1 - .08*var(--t)));color:var(--accent);text-align:left;
 transition:padding .2s ease,font-size .2s ease}
 .choice:hover{background:var(--accent-wash)}
 .choice[aria-expanded=true]{background:var(--accent);border-color:var(--accent);
@@ -1173,7 +1242,7 @@ color:var(--surface-0)}
 /* The arrow goes as the bar tightens: it means "the report is below", which is stale once
    the reader is inside the report, and losing it is half of why the shrunk bar reads as
    lighter. */
-.choice-a{font:400 1.1rem/1 var(--sans);font-size:calc(1.1rem*(1 - .2*var(--t)));
+.choice-a{font:400 1rem/1 var(--sans);font-size:calc(1rem*(1 - .2*var(--t)));
 opacity:calc(.8 - .8*var(--t));transition:font-size .2s ease,opacity .2s ease}
 .panel{margin-top:3.2rem;scroll-margin-top:7rem}
 /* A report's title needs room under it: the h2's default half-rem is set for a heading
@@ -1231,12 +1300,15 @@ vertical-align:middle}
 .lbtns{display:flex;flex-wrap:wrap;gap:.7rem;margin:1.1rem 0}
 .lbtn{display:inline-flex;align-items:center;gap:.45rem;padding:.45rem .8rem;
 border:1px solid var(--accent-edge);border-radius:4px;background:none;text-decoration:none;
-font:600 .8rem/1.3 var(--mono);letter-spacing:-.01em;color:var(--accent)}
+font:600 .92rem/1.3 var(--serif);color:var(--accent)}
 .lbtn:hover{background:var(--accent-wash)}
 .lbtn .ico{flex:0 0 auto}
 .lbtn-m{font-weight:400;color:var(--text-muted)}
 .lbtn:hover .lbtn-m{color:var(--text-secondary)}
-svg.ext{margin-left:.22em;vertical-align:-.05em;flex:0 0 auto}
+/* inline-block so the link's underline stops at the last letter: the arrow is inside
+   the <a>, and a text-decoration cannot be removed by a descendant — only escaped by
+   one that is not inline. Measured at 4x, the underline ran on beneath it. */
+svg.ext{display:inline-block;margin-left:.22em;vertical-align:-.05em;flex:0 0 auto}
 
 /* Numbers. Direction is a labelled chip, never a colored numeral. */
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 2rem;
@@ -1331,7 +1403,11 @@ summary .sum-m{color:var(--text-muted);font-weight:400}
 .carousel{margin:1.1rem 0}
 .tabs{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1.1rem}
 .tab{padding:.4rem .75rem;background:none;border:1px solid var(--accent-edge);
-border-radius:4px;cursor:pointer;font:600 .88rem/1.3 var(--mono);color:var(--accent)}
+border-radius:4px;cursor:pointer;font:600 .88rem/1.3 var(--mono);
+color:var(--accent)}
+/* The only mono control on the page, and mono for its CONTENT rather than
+   because it is a control: a carousel tab's label is a record id, so it
+   matches the ids in the run notes rather than the buttons beside it. */
 .tab:hover{background:var(--accent-wash)}
 .tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);
 color:var(--surface-0)}
@@ -1348,9 +1424,59 @@ mark{background:var(--mark);color:inherit;padding:0 .1em}
    enough to hold the accent, and underlined in the accent rather than in a tint of it.
    Buttons are unaffected — .lbtn, .choice, .tab and .skip each set their own font
    shorthand, which beats a bare element selector. */
-a{font-family:var(--mono);font-weight:600;font-size:.92em;letter-spacing:-.01em;
-color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
-text-underline-offset:3px;text-decoration-color:var(--accent)}
+/* A LINK IS MARKED, NEVER RE-FACED. It takes the typography of the text around it — serif
+   in prose, sans in the rail — and the mark is the accent plus the 2px accent underline.
+   Nothing here sets a face, a size or a weight, which is the whole rule.
+
+   It used to be mono 600 at .92em, on the reasoning that mono carries IDENTITY and a link is
+   a thing you go and fetch. That conflated two different kinds of content: a run id or a path
+   IS a literal string, and mono is right for it; "Teaching Claude Why" is language, and
+   setting it in mono changed x-height and letterfit mid-sentence in every paragraph of both
+   reports. Mono now means a literal string and nothing else, which makes it mean more.
+
+   WEIGHT IS PART OF THE MARK, not part of the face: 600 against the surrounding text, which
+   is what a link inherits its face and size from. At the inherited weight the mark was colour
+   and an underline only, and a link in a long report read faint.
+
+   Colour is not carrying this alone: a 2px underline survives greyscale, print (where the
+   print rule turns links black and keeps the underline) and colour-blindness. */
+a{font-weight:600;color:var(--accent);text-decoration:underline;
+text-decoration-thickness:2px;text-underline-offset:.2em;
+text-decoration-color:var(--accent)}
+/* A citation marker: the source, raised, so the sentence it hangs off reads uninterrupted.
+   It carries the accent underline like every other link — it was the one link on the page
+   without one — but THINNER (the brand's 2px under a ~9px numeral is proportionally what 4px
+   would be under body text) and drawn on the <sup> RATHER THAN THE ANCHOR. That is not tidying:
+   a text-decoration is positioned from the element's own baseline, and the anchor's baseline is
+   the paragraph's, so underlining .cite-n put two dashes below and left of the raised numerals,
+   measured at 6x. On the <sup> it tracks the digit. The arrow escapes it, as on every other
+   link, because inline-block breaks the propagation. line-height:0
+   keeps it out of the line box, so a marker cannot open up the leading of the paragraph it
+   sits in. The padding is hit area — inline padding enlarges the target without moving
+   anything — and the negative margin gives back the space it would otherwise add. WCAG 2.5.8
+   exempts a target inside a sentence from the 24px minimum, so this is comfort, not
+   conformance. */
+.cite-n{text-decoration:none;padding:.22em .25em;margin:0 -.25em}
+/* The raise happens ONCE, here, and not on the anchor: <sup> already carries the UA's own
+   vertical-align:super and font-size:smaller, so raising and shrinking the anchor too shifted
+   the digits twice — measured at 4x, they sat above the cap line at ~10px while the separating
+   comma, which had only the anchor's single shift, sat below them. Stating the size and the
+   shift explicitly on the <sup> also replaces `smaller`, which is a relative keyword no two
+   engines have to agree on. */
+.cite-n sup{font-size:.72em;vertical-align:super;line-height:0;
+text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:.18em;
+text-decoration-color:var(--accent)}
+/* The marker's arrow. `vertical-align:.12em` lifts it off the <sup>'s own baseline to sit
+   against the numeral's body — measured at 6x, on the baseline it read as dropped below the
+   digit it belongs to. inline-block for the same reason as svg.ext: a text-decoration cannot
+   be removed by a descendant, only escaped by one that is not inline. */
+svg.ext-c{display:inline-block;margin-left:.08em;vertical-align:.12em}
+.cite-n:hover{background:var(--accent-wash)}
+/* Consecutive markers need separating, or two adjacent numerals read as one number — 1 and 2
+   side by side is "12". A raised comma did that job before each marker carried an arrow; the
+   arrow now separates them, so this is a hair of space instead of another glyph. It has to
+   beat the marker's own -.25em, which is there to give back what its hit-area padding adds. */
+.cite-n+.cite-n{margin-left:-.08em}
 a:hover{background:var(--accent-wash)}
 /* button is in this list because the page HAS buttons — the chooser and the carousel —
    and without it the only controls on the page fall back to the UA's own ring, which is
@@ -1366,12 +1492,20 @@ footer.foot p{margin:0;color:inherit}
 /* Which runs this page was built from. Its own line under the two above, at the size the
    rest of the footer takes: a reader looking for it is looking deliberately. */
 /* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
-   the page stays one file. */
+   the page stays one file.
+
+   The mark has to sit CLOSER to the name it belongs to than to the sentence it follows, or it
+   reads as punctuation after "A project by". Measured: a bare word space put it ~3.6px from
+   "by" and 4px from "Sentient Futures" — the same on both sides, so proximity said nothing.
+   The left margin is the word boundary, the right one groups the mark with the name. */
 .ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
-margin-right:.5rem;flex:0 0 auto}
-.ilink{display:inline-flex;align-items:center;gap:.45rem;font:600 .82rem/1.3 var(--mono);
-color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;
-text-underline-offset:3px;text-decoration-color:var(--accent)}
+margin-left:.4rem;margin-right:.25rem;flex:0 0 auto}
+/* An icon link declares NO face and no size, on purpose: it is not a control — there is
+   nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
+   the footer's own size, like the maker link beside it, and the bare `a` rule gives both the
+   accent, the underline and the 600. Declaring serif here put a serif 600 link next to a sans
+   400 one in the same row; measured, that was the whole of the mismatch. */
+.ilink{display:inline-flex;align-items:center;gap:.45rem}
 .ilink:hover{background:var(--accent-wash)}
 /* The hero's illustration. Dashed while empty, so an unfilled slot reads as deliberate
    rather than as a broken asset; once filled it is line art on the paper, with no frame
@@ -1444,7 +1578,7 @@ section{grid-template-columns:[text-start] minmax(0,1fr) [text-end full-end]}
 .choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06rem}
 .lede{font-size:1.1rem}
-.hero{padding:1.8rem 16px 3.4rem}.hero h1{margin-top:1.6rem;font-size:2.2rem}
+.hero{padding:1.8rem 16px 0}.hero h1{margin-top:1.6rem;font-size:2.2rem}
 .hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
 /* One column: two of them inside a 390px viewport are ~16 characters each. Each item keeps
    its own hairline, so the pair reads as the hanging list it would have been anyway. */
@@ -1478,9 +1612,13 @@ thead{display:table-header-group}
 details{display:block}details>div{display:block!important}summary{list-style:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr)}
 main a[href^="http"]::after{content:" (" attr(href) ")";font-size:.85em;
-color:#555;word-break:break-all}
+color:var(--text-muted);word-break:break-all}
 .chip,rect,circle,path,line{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-a{color:var(--text-primary)}}
+/* On paper nothing is pressable and nothing is indigo: the label, its underline and the
+   outline button all go to ink. text-decoration-color has to be said out loud — the base rule
+   sets it to the accent, so overriding `color` alone left black text under an indigo rule, and
+   `.cite-n sup` is not an anchor, so the bare `a` override never reached it at all. */
+a,.lbtn,.cite-n sup{color:var(--text-primary);text-decoration-color:currentColor}}
 """
 
 JS = """
@@ -1548,6 +1686,16 @@ flow.classList.toggle('tight',past>(flow.classList.contains('tight')?LOOSE:TIGHT
    they are not in a beat yet. */
 var cur='';
 heads.forEach(function(h){if(h.el.getBoundingClientRect().top<=h.line)cur=h.el.id;});
+/* AT THE BOTTOM, THE LAST BEAT IS THE CURRENT ONE, whether or not its heading ever reached
+   the line. It cannot: the appendix is the last beat and its drawers are closed, so there is
+   less content below it than there is screen — measured at 1440x900, 659px of page under a
+   heading that would need to climb 1,349px. So the rail marked a stage inside the worked
+   example while the reader was looking at the appendix. Correcting at the bottom rather than
+   shortening the line, because the line is the CSS's own headroom and is right everywhere
+   else; and it self-corrects when a reader opens a drawer, since the heading can then reach
+   the line the ordinary way. */
+if(heads.length&&innerHeight+scrollY>=document.documentElement.scrollHeight-2)
+cur=heads[heads.length-1].el.id;
 links.forEach(function(a){
 if(cur&&a.getAttribute('href')==='#'+cur){a.setAttribute('aria-current','true');}
 else{a.removeAttribute('aria-current');}});}
