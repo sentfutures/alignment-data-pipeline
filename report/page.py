@@ -44,7 +44,7 @@ REPO_URL = "https://github.com/sentfutures/animal-welfare-data-pipeline"
 PROMPTS_DAD = f"{REPO_URL}/tree/main/prompts/dad"
 PROMPTS_SDF = f"{REPO_URL}/tree/main/prompts/sdf"
 HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
-          "animal-welfare-training-dataset")
+          "animal-welfare-training-claude")
 # The config names as they exist on the Hub, percent-encoded: the dataset's two configs are
 # named for the datasets rather than for the pipeline directories, so these are not `sdf` and
 # `dad`. The `&` in the difficult-advice one is escaped to `&amp;` by `esc()` when the href is
