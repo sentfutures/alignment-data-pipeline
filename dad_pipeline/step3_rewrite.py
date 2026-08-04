@@ -84,12 +84,14 @@ def run(
         rid = resp["response_id"]
         scenario_cards = resp.get("scenario_cards") or resp.get("annotation") or {}
 
-        # A truncated (max_tokens), empty, or transcript-echoed rewrite must
-        # never become a training record. Skip it without checkpointing so a
-        # later --resume retries it, and log it so repeated failures are
-        # visible rather than silent.
-        if not rewritten or stop_reason == "max_tokens" or utils.looks_like_transcript_echo(rewritten):
+        # A truncated (max_tokens), refusal-cut, empty, or transcript-echoed
+        # rewrite must never become a training record. Skip it without
+        # checkpointing so a later --resume retries it, and log it so
+        # repeated failures are visible rather than silent.
+        if (not rewritten or stop_reason in ("max_tokens", "refusal")
+                or utils.looks_like_transcript_echo(rewritten)):
             why = ("truncated at max_tokens (even at 8000)" if stop_reason == "max_tokens"
+                   else "cut by the refusal classifier (stop_reason=refusal)" if stop_reason == "refusal"
                    else "transcript echo (reply wrapped in USER:/ASSISTANT: replay)"
                    if rewritten else "empty")
             print(f"    Skipping {prompt_key(resp)}: rewrite {why} — not written, will retry on resume.")

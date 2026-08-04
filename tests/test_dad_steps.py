@@ -1055,13 +1055,40 @@ class TestStep2Run:
         reject = utils.load_jsonl(tmp_path / "scope_rejects.jsonl")[0]
         assert reject["last_stop_reason"] == "refusal" and reject["all_empty"] is True
 
-    def test_persistent_scope_refusal_falls_back_to_configured_model(
+    def test_refusal_stopped_scope_is_not_parsed(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        # A well-formed, parseable scope reply cut by the refusal classifier
+        # must never be accepted — it is missing content the same way a
+        # max_tokens truncation is, even though the brace-salvage path would
+        # otherwise parse it cleanly.
+        def refused(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            assert "build the full map of the case" in blob  # 2b must never be reached
+            return (GOOD_SCOPE, "refusal")
+
+        stub_claude(refused)
+        results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+
+        assert results == []
+        failures = utils.load_jsonl(tmp_path / "scope_failures.jsonl")
+        assert len(failures) == step2_responses.MAX_SCOPE_ATTEMPTS
+        assert all(f["stop_reason"] == "refusal" and f["raw"] for f in failures)
+        reject = utils.load_jsonl(tmp_path / "scope_rejects.jsonl")[0]
+        assert reject["last_stop_reason"] == "refusal" and reject["all_empty"] is False
+        assert utils.load_jsonl(tmp_path / "scopes.jsonl") == []
+
+    @pytest.mark.parametrize("refused_body", ["", GOOD_SCOPE], ids=["empty", "parseable"])
+    def test_persistent_scope_refusal_falls_back_to_configured_model(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, refused_body
     ):
         # 2a mirror of 1a's refusal fallback: when the stage model refuses
         # through all its attempts, ONE extra last-ditch attempt runs on
         # scope_refusal_fallback_model instead of rejecting the prompt (the
-        # shed case seen live). The recovered scope is stamped.
+        # shed case seen live). The recovered scope is stamped. A refusal that
+        # happens to carry parseable text (refused_body=GOOD_SCOPE) must still
+        # be rejected and still reach the fallback — parseability never
+        # overrides stop_reason.
         config = dict(tiny_config)
         dad = dict(tiny_config["dad"])
         dad["response_scope_model"] = "claude-opus-5"
@@ -1074,7 +1101,7 @@ class TestStep2Run:
             if "build the full map of the case" in blob:
                 scope_models.append(kw.get("model"))
                 if kw.get("model") == "claude-opus-5":
-                    return ("", "refusal")
+                    return (refused_body, "refusal")
                 return GOOD_SCOPE  # fallback model is willing
             if "retrieving reasoning modules" in blob:
                 return "C1"
@@ -1170,6 +1197,31 @@ class TestStep2Run:
         stub_claude(echo_once)
         results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
         assert results == []
+
+        calls = stub_claude(_dad_step2_dispatch)
+        results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+        assert len(calls) == 1  # only the 2b retry — scope + selection are reused
+        assert len(results) == 1
+        assert results[0]["assistant_response"] == "Draft response."
+
+    def test_refusal_stopped_draft_skips_without_checkpoint(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        # A 2b reply the refusal classifier cuts mid-stream must not feed
+        # step 3, even though the text itself is well-formed; resume retries
+        # it (same policy as truncation and transcript echo).
+        def refused_once(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            if "build the full map of the case" in blob:
+                return GOOD_SCOPE
+            if "retrieving reasoning modules" in blob:
+                return "C1"
+            return ("Several coherent paragraphs, then the classifier cut it.", "refusal")
+
+        stub_claude(refused_once)
+        results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+        assert results == []
+        assert utils.load_jsonl(tmp_path / "responses.jsonl") == []
 
         calls = stub_claude(_dad_step2_dispatch)
         results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
@@ -1378,7 +1430,8 @@ class TestStep3Run:
         [("", "end_turn")],                                            # empty (no retry)
         # observed live: the rewrite wrapped in a transcript replay
         [("USER: User dilemma text.\nASSISTANT: Rewritten careful answer.", "end_turn")],
-    ], ids=["truncated", "empty", "transcript-echo"])
+        [("A fluent half-rewrite.", "refusal")],  # well-formed but classifier-cut
+    ], ids=["truncated", "empty", "transcript-echo", "refusal"])
     def test_unusable_rewrite_skips_without_checkpoint_and_is_logged(
         self, tiny_config, prompts_dad, tmp_path, stub_claude, bad_replies
     ):
@@ -1494,7 +1547,8 @@ class TestBaselineRun:
         # capped even at the doubled budget (both attempts truncate)
         [("cut off mid-sen", "max_tokens"), ("still cut off", "max_tokens")],
         [("", "end_turn")],                 # empty (no retry — not a truncation)
-    ], ids=["truncated", "empty"])
+        [("A fluent half-answer.", "refusal")],  # well-formed but classifier-cut
+    ], ids=["truncated", "empty", "refusal"])
     def test_unusable_reply_skips_without_checkpoint(
         self, tiny_config, tmp_path, stub_claude, bad_replies
     ):
