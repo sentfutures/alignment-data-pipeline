@@ -1211,8 +1211,13 @@ class TestSiblingPreservation:
                         for p in staging_dir.rglob("*") if p.is_file()}
         assert not any(p.startswith("sdf/") for p in staged_paths)
         assert not any(".cache" in p for p in staged_paths)
+        # STAGING_MARKER is local bookkeeping (proves this script owns the
+        # staging dir on reuse) — excluded from the upload itself by
+        # _upload_folder's ignore_patterns, see
+        # test_upload_folder_never_uploads_the_staging_marker.
         assert staged_paths == {"README.md", "dad/dad_corpus.jsonl",
-                                "dad/run_manifest.json", "dad/audit/audit_report.json"}
+                                "dad/run_manifest.json", "dad/audit/audit_report.json",
+                                publish_hf.STAGING_MARKER}
 
     def test_no_sibling_yet_gives_a_single_config_card(self, tmp_path, monkeypatch, stub_hf):
         """First publish into a fresh repo: nothing to preserve, and the card

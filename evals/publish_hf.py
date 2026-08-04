@@ -85,6 +85,16 @@ CORPUS_FILENAMES = ("sdf_corpus.jsonl", "dad_corpus.jsonl")
 # publicly in the card go in here — nothing otherwise invisible.
 CARD_META_FILENAME = "card_meta.json"
 
+# Ownership marker for a staging directory this script created. stage_run
+# WIPES its staging root, and a mistyped --staging-dir (a sibling run under
+# outputs/*/runs/, say) is an uncommitted, unrecoverable, $50-500 loss — so a
+# non-empty directory is only deletable when this marker proves we made it.
+STAGING_MARKER = ".publish_hf_staging"
+# What a staging root created by a PRE-marker version of this script can
+# legitimately hold: the card plus the two per-pipeline dirs. Accepting that
+# shape keeps existing local staging dirs reusable without a manual delete.
+STAGING_LEGACY_ENTRIES = {"README.md", "sdf", "dad"}
+
 # ISO 639-1 codes for every language name sdf_pipeline/compose_prompts.py's
 # derive_language() can produce (the `culture` axis in prompts/sdf/
 # variables.txt) — no existing name->code mapping exists anywhere in the
@@ -200,10 +210,33 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
     # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
     # --input) must reflect only THIS run — otherwise leftover files from an
     # earlier invocation ride along into upload_folder silently mixed with
-    # this run's data.
+    # this run's data. But only if we own it: a non-empty directory this
+    # script didn't create (no STAGING_MARKER, and not a pre-marker legacy
+    # staging shape) is refused rather than wiped — this also makes --dry-run
+    # non-destructive, since stage_run runs before the --dry-run early return.
     if staging_dir.exists():
+        if not staging_dir.is_dir():
+            raise SystemExit(f"--staging-dir {staging_dir} exists and is not a directory.")
+        entries = sorted(p.name for p in staging_dir.iterdir())
+        ours = (
+            not entries                                   # empty: the common `mkdir` case
+            or STAGING_MARKER in entries                   # staged by this script
+            or (set(entries) <= STAGING_LEGACY_ENTRIES     # staged before the marker existed
+                and any((staging_dir / p).is_dir() for p in ("sdf", "dad")))
+        )
+        if not ours:
+            raise SystemExit(
+                f"--staging-dir {staging_dir} already exists, is not empty, and "
+                f"carries no {STAGING_MARKER} marker, so this script did not create "
+                f"it — refusing to delete its {len(entries)} entry/entries "
+                f"({', '.join(entries[:5])}...). Staging WIPES this directory. Pass "
+                f"a new path, an empty directory, or one this script staged into."
+            )
         shutil.rmtree(staging_dir)
     utils.ensure_dir(staging_dir)
+    (staging_dir / STAGING_MARKER).write_text(
+        "Created by evals/publish_hf.py. This directory is wiped and re-staged on "
+        "every publish; nothing here is authoritative.\n", encoding="utf-8")
     # Everything for this run lives under <staging>/<pipeline_tag>/ so the
     # sibling pipeline can occupy its own sibling directory in the same repo.
     dataset_dir = utils.ensure_dir(staging_dir / pipeline_tag)
@@ -644,6 +677,10 @@ def _upload_folder(folder_path: str, repo_id: str, commit_message: str,
         # scopes this to the pipeline being published — a bare "audit/*" would
         # delete the SIBLING pipeline's audit files on every publish.
         delete_patterns=delete_patterns,
+        # huggingface_hub only ignores .git* and .cache/huggingface by
+        # default — a dotfile marker is NOT covered, so without this the
+        # staging bookkeeping marker would ship as dataset content.
+        ignore_patterns=[STAGING_MARKER],
     )
 
 
@@ -930,7 +967,9 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true",
                         help="Stage + build the card locally; make no Hub API calls")
     parser.add_argument("--staging-dir", default=None,
-                        help="Where to stage files (default: a temp dir)")
+                        help="Where to stage files (default: a temp dir). Staging wipes "
+                             "this directory, so it must be new, empty, or one a "
+                             "previous publish staged into.")
     parser.add_argument("--regenerate-card", action="store_true",
                         help="Rebuild README.md from the run's audit files and "
                              "upload it, replacing whatever card is on the Hub. "
