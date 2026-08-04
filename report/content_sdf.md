@@ -34,7 +34,7 @@ report is held to. And no deks — the page allows two in total and both are spe
 
 <!-- id: sdf_what -->
 
-Pretraining-style documents from a world where careful AI models act responsibly towards animals and other disenfranchised third parties. Designed for diverse formats: a council minute, a trade journal essay, a forum debate.
+Pretraining-style documents from a world where careful AI models act responsibly towards animals and other disenfranchised third parties. The pipeline is designed to generate diverse formats and depict varied characters. Users on a French-language internet forum debate the inclusion of animal welfare in an AI constitution; a Chinese trade journal essay discusses a model's tendency to suggest cost-effective welfare improvements to animal handling protocols; a news story about an AI helping a rural community adapt a festive tradition to protect wildlife.
 
 <!-- id: sdf_method_intro -->
 
