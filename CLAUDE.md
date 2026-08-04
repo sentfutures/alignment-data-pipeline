@@ -84,7 +84,7 @@ python evals/diversity.py --input outputs/sdf/latest
 python evals/diversity.py --input outputs/dad/latest
 ```
 
-> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-training-dataset` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
+> **`evals/publish_hf.py` publishes a run's final corpus + audit reports to the public Hugging Face dataset repo `sentientfutures/animal-welfare-training-claude` — this is a deliberate, human-initiated action, not a routine post-run step.** Most runs are dev/exploratory and were never meant to become, or overwrite, the canonical published snapshot. **Only run this when a human developer explicitly asks for a specific run to be published** — never on your own initiative as part of a normal run, resume, or eval pass, and never for a run whose provenance (backend, label) you haven't confirmed with them first.
 
 That one repo holds **both** corpora as separate HF *configs* (each gets its own selector in the dataset viewer), staged under per-pipeline subdirectories — `sdf/` and `dad/`, each with its corpus jsonl, `run_manifest.json`, and `audit/`. Consequences worth knowing before running it:
 
@@ -92,6 +92,7 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 - `delete_patterns` is scoped to `<pipeline>/audit/*`. A bare `audit/*` would delete the *sibling* dataset's audit files on every publish.
 - **Tags are repo-wide**, so prefix them per dataset (`sdf-v1-…`, `dad-v1-…`). The pre-multi-config `v1-fullscale-500-opus5` tag predates this convention.
 - `--dry-run` makes zero network calls, so it cannot see a sibling already on the Hub and says so — the preview shows only the pipeline being published. (It therefore also skips the `git fetch` the merge check would otherwise do, and says `origin/main` may be stale.)
+- `--staging-dir` is wiped before staging, so the script refuses any existing non-empty directory it did not create (marker `.publish_hf_staging`), in `--dry-run` too.
 - **An unmerged publish warns and asks, and is recorded on the card.** Before staging, the script checks whether the current `HEAD` and the run's own `git_commit` are reachable from `origin/main` (`utils.merge_state`). If either isn't — or can't be verified — it prints what's unmerged and requires a typed `yes`; with no TTY it exits telling you to pass `--allow-unmerged`. Proceeding stamps "published from an unmerged branch" into the dataset card's provenance block and into the Hub commit message. The stamp persists in `<pipeline>/card_meta.json`, so it survives the sibling's next publish regenerating the card, and clears itself once that pipeline publishes something merged. A **dirty tree at run time is context, never a trigger** — every run so far has been dirty, and a warning that fires on all of them is one people learn to ignore. This is a guardrail against accidents, not an access control: the write token is on contributors' laptops, so anyone can bypass the script entirely — which is exactly why the card, not the terminal, carries the record.
 
 ```bash
@@ -105,7 +106,7 @@ That one repo holds **both** corpora as separate HF *configs* (each gets its own
 # HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
 # An unmerged run prompts for confirmation first (--allow-unmerged skips the
 # prompt; the card records it either way).
-REPO=sentientfutures/animal-welfare-training-dataset
+REPO=sentientfutures/animal-welfare-training-claude
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
     --pretty-name "Animal-welfare training dataset" --tag sdf-v1-<run-label>
@@ -149,6 +150,7 @@ Running cost is tracked per run in `outputs/{sdf,dad}/runs/<run_id>/cost_log.jso
 
 - **Run `pytest` after every functional change** — after editing any code under `shared/`, `sdf_pipeline/`, `dad_pipeline/`, or `evals/`, and again before each commit or push. The suite is offline and takes ~2 seconds; don't wait for CI to find out.
 - **Every PR description must include a "How to test" section** with the manual steps a reviewer can run to verify the change and the expected results (see `.github/pull_request_template.md`). Note that `gh pr create --body` bypasses the template — when opening a PR from a Claude session, write the section into the body explicitly. These instructions serve reviewers before merge and become the historical record when a feature later needs to be understood or reverted.
+- **Review responses are posted by a human, never by an agent.** Replies to review threads, review comments, approvals, and thread resolutions are the PR author's to post — an agent commenting under a contributor's account makes a PR look like a human weighed the review when none did, and keeping the poster human keeps the record truthful about who actually decided. An agent addressing review feedback should apply the comments it agrees with, report the rest to the author with a recommendation, and draft reply text for them to post rather than posting it. The `pr-review-watch` skill carries the full workflow (verify every claim against the code first; escalate disagreements and design trade-offs instead of guessing).
 
 ### Writing tests for new code (required for contributions)
 
@@ -161,6 +163,27 @@ Every PR that adds or changes pipeline behavior must add or update tests in the 
 - **Cover the money paths**: every new stage needs at least a parse-happy-path test, a malformed-response fallback test, and a checkpoint/resume test asserting zero API calls for completed work — resume correctness is what protects paid work when a run dies.
 - **Derive, don't hardcode, constitution-shaped expectations**: counts and principle ids come from `load_segments()`/`META_PRINCIPLE_IDS`/`_PRINCIPLE_KEYWORDS` (the section count is pinned once, in `test_constitution_loader.py`) — the reading is actively edited and hardcoded ids renumber. FIFO queue stubs are for serial stages only; stages that fan out via `parallel_map` need a callable dispatcher (the stub fails loudly if violated).
 - If you change a prompt template's placeholders or add a template, update `tests/test_prompts_render.py` (and the e2e dispatcher markers in `tests/test_e2e_smoke.py` if the opening prose changed).
+
+## Fixing audit findings (the claude-fix pipeline)
+
+Committed audits live in `code_quality/`; the claude-fix pipeline turns their findings into reviewed PRs on the maintainer's Claude subscription. The operator loop:
+
+1. **File the issues**: `scripts/kickoff.sh --dry-run` prints the would-create table without creating anything; drop the flag to file for real. Defaults to the pinned ledger's high-severity findings; `--min-severity medium` widens the net, `--report <path>` targets a future audit's JSON, `--limit N` caps the batch. Re-running is idempotent — existing `[CQ …]` titles are reported as `exists`, never duplicated. Issues arrive labeled `claude-fix-ready` plus exactly one `tier-*` (never `tier-max`, which is a human-only escalation tier).
+2. **Arm one**: add the `claude-fix` label (`gh issue edit <n> --add-label claude-fix`). That label is the only trigger, and deliberately the only throttle. Arm issues that touch the **same files serially** — wait for the previous PR to merge; kickoff's `batch` column encodes the intended order — because nothing in the pipeline serializes overlapping branches, and concurrent PRs on shared files end in merge conflicts a human has to untangle. **Disjoint issues can be armed together**: the repo-wide 2-concurrent-Claude-jobs busy gate and the retry cron pace them automatically. For kickoff-created issues carrying an `after=<issue>` marker, same-cluster ordering is enforced by the pipeline itself — a successor defers (`claude-busy-wait`) until its predecessor closes — so arming a whole kickoff batch at once is safe; the serial-arming rule above matters only for issues without that marker.
+3. **What happens**: two-phase tiers plan read-only (writes tool-blocked), post the plan as an issue comment, and stop with `needs-human` on a HIGH risk class (auth, data models/migrations, public API contracts, payments, PII — fail-closed); otherwise they implement on `claude/issue-<n>` with incremental pushes and open a PR (authored by `github-actions[bot]`) only when `compileall + pytest` is green. The auto-review approves or requests changes; `claude-review-fix.yml` addresses change requests (3-cycle cap). A human always merges.
+4. **When it stops**: `needs-human` means exactly that — the newest issue/PR comment says why and how to re-trigger (clear the label, then remove **and re-add** `claude-fix`; re-adding an already-present label fires no event; `gh workflow run claude-fix.yml -f issue_number=<n>` always works). A run that exhausts its turn budget while visibly progressing (new commits pushed) **auto-continues** — at most twice, with a model-written digest comment of what got done and what remains — before paging a human; runs the digest judges stuck page a human immediately. `claude-quota-wait` / `claude-busy-wait` need no action — the 30-minute cron requeues them (8-retry cap; tier-max **plan-phase** quota failures are frozen for manual relaunch, protecting the Fable allowance). To escalate a stuck tier-heavy issue: relabel it `tier-max` and re-trigger — the planner upgrades to Fable while the existing branch and (re-generated) plan carry forward.
+
+The full operator runbook — canary walkthroughs, the `simulate_quota` test hook, edge cases — is in PR #118's description; the rules the CI sessions themselves follow are in "When running in CI" below.
+
+## When running in CI
+
+Rules for Claude sessions launched by the repo's automation (`.github/workflows/claude-fix.yml`, `claude-review-fix.yml` — the pipeline that turns `claude-fix`-labeled issues into PRs on `claude/issue-<n>` branches; `scripts/kickoff.sh` files the issues):
+
+- **Test gate** (dependencies are already installed by the workflow): `python -m compileall -q shared sdf_pipeline dad_pipeline pref_pipeline evals viewer && pytest` from the repo root — the exact required `smoke` check. Run it before every push; a PR only opens when it is green.
+- **Definition of done**: the gate is green, the issue's acceptance criteria are met, and there are **no unrelated changes** — touch only files the plan names; never touch `outputs/`, `.github/workflows/`, or `code_quality/`.
+- **Incremental commits**: commit AND push after every coherent step, so a run killed by a usage limit leaves resumable state on the branch. Small commits with imperative subjects. Never force-push; never commit scratch files (plan.md, pr_body.md, review-body.md).
+- **PR body format** (the workflow opens the PR from files you write; `gh pr create --body` bypasses the PR template, so every section is written explicitly): `Closes #<n>`, `## Plan` (the plan as approved by the risk gate), `## Risk class`, `## How to test` (concrete reviewer steps + expected results — required, see PR expectations above), and a final Claude-generated callout line.
+- **Boundaries**: never merge, approve, or close PRs; never remove the `needs-human` label; when giving up, always post a comment explaining the state you left behind before ending the turn.
 
 ## Constitution
 

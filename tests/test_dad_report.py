@@ -116,7 +116,14 @@ AUDIT_FULL = {
 DIVERSITY = {"n_records": 2, "embed_model": "gemini-embedding-001",
              "vendi": {"score": 5.15, "ratio": 0.132},
              "nn": {"over_0.90": 0.0, "over_0.80": 0.33},
-             "scopes": {"combined": {"clusters": {"evenness": 0.875, "largest_share": 0.33}}}}
+             "scopes": {"combined": {
+                 "n": 2, "nn_sims": [0.75, 0.85], "vendi_ratio": 0.50,
+                 "over": {"0.90": 0.0, "0.80": 0.33},
+                 "clusters": {"k": 2, "evenness": 0.875, "largest_share": 0.33,
+                              "sizes": [1, 1],
+                              "detail": [{"size": 1, "rep_id": "R-0201",
+                                          "rep": "Should I do the thing?",
+                                          "ids": ["AW-0001"]}]}}}}
 
 MANIFEST = {"run_id": "2026-07-20_20-51_bedrock-40", "created_at": "2026-07-20T20:51:58",
             "git_commit": "abc12345", "git_dirty": True,
@@ -475,10 +482,12 @@ class TestJudgedComparison:
         assert "structural variety" in text
         assert "answer length" in text
 
-    def test_an_unmeasured_row_says_so_rather_than_vanishing(self):
+    def test_unmeasured_stance_adds_no_moralizing_row(self):
+        """A dashed "answers that moralize" row reads as a finding about moralizing on
+        a run that never measured stance, so the row appears only when stance ran."""
         audit = {k: v for k, v in AUDIT_FULL.items() if k != "moves"}
         html = D.scoreboard(audit, D.facts(audit), D._considerations(audit))
-        assert "not measured" in strip_tags(html)
+        assert "moralize" not in strip_tags(html)
 
     def test_a_worse_number_gets_the_bad_chip(self):
         audit = json.loads(json.dumps(AUDIT_FULL))
@@ -495,14 +504,58 @@ class TestJudgedComparison:
             assert marker in appendix, marker
             assert marker not in section[:section.index("id='dad-appendix'")], marker
 
-    def test_the_drawer_says_why_the_report_does_not_lead_with_it(self):
-        """The reason is derived now, not authored: the drawer was renamed "Improving on
-        the control" and its lead sentence is built from the run's own arm counts, so the
-        comparison cannot be shown without the reason it is not led with."""
+    def test_the_drawer_leads_with_what_is_compared_not_a_caveat(self):
+        """The drawer is "Comparison to the control" and opens on what the judges score;
+        the arm asymmetry renders once, with the run's own numbers, in the audit-flags
+        drawer rather than as a caveat repeated here."""
         html = build(diversity=DIVERSITY)
-        assert "least sound measurement here" in html
-        # The arm asymmetry is the reason, and it arrives as a computed clause.
-        assert "over 2 pipeline and 2 control answers" in strip_tags(html)
+        assert "Comparison to the control" in html
+        assert "Improving on the control" not in html
+        assert "least sound measurement" not in html
+        assert "Both arms answer the same dilemmas" in strip_tags(html)
+
+    def test_the_two_judge_intro_defines_both_axes_and_links_the_rubrics(self):
+        """A run with the welfare-impact judge names both judges in the corpus audit's
+        words and points at the judge prompts, which are the rubrics."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["welfare_impact"] = {"pipeline_mean": 92.0, "plain_mean": 83.0,
+                                   "score_max": 100, "per_case": {}}
+        html = build(audit=audit)
+        text = strip_tags(html)
+        assert "Welfare impact" in text and "delivery quality" in text
+        assert "evals/audit_dad.py" in text
+
+    def test_the_pareto_plots_both_judges_and_computes_its_caption(self):
+        """With both judges' per-case scores the figure renders on their own scale, and
+        the caption's percentages come from the plotted answers — a delivery loss must
+        not inherit the "not bought with manner" verdict."""
+        delivery = {"score_max": 100, "per_case": {
+            "AW-0001": {"pipeline": {"score": 91, "blended_score": 91.0},
+                        "plain": {"score": 93, "blended_score": 93.0}}}}
+        welfare = {"score_max": 100, "per_case": {
+            "AW-0001": {"pipeline": {"blended_score": 85.0},
+                        "plain": {"blended_score": 60.0}}}}
+        fig = D._pareto_figure({"delivery": delivery, "welfare_impact": welfare}, {}, {})
+        assert "Substance against manner" in fig
+        assert "+42% welfare impact" in fig and "-2% delivery quality" in fig
+        assert "not bought with manner" not in fig
+        gained = json.loads(json.dumps(welfare))
+        gained["per_case"]["AW-0001"]["plain"]["blended_score"] = 85.0
+        gained["per_case"]["AW-0001"]["pipeline"]["blended_score"] = 92.0
+        flipped = D._pareto_figure(
+            {"delivery": {"score_max": 100, "per_case": {
+                "AW-0001": {"pipeline": {"blended_score": 93.0},
+                            "plain": {"blended_score": 91.0}}}},
+             "welfare_impact": gained}, {}, {})
+        assert "not bought with manner" in flipped
+
+    def test_the_example_count_is_the_shipped_corpus_not_the_step1_deck(self):
+        """The audit's n_prompts counts step-1 dilemmas; the page's "examples" is the
+        records that shipped."""
+        audit = json.loads(json.dumps(AUDIT_FULL))
+        audit["n_prompts"] = 7
+        html = build(audit=audit, rewrites=REWRITES)
+        assert "A 2-example run" in strip_tags(html)
 
     def test_no_paid_pass_says_so_instead_of_showing_a_hole(self):
         audit = {k: v for k, v in AUDIT_FULL.items()
@@ -892,13 +945,15 @@ class TestLineage:
         assert panes, ex[:400]
         assert "hidden" not in re.search(r"<div class='pane-x' id='ex-0'([^>]*)>", ex).group(1)
 
-    def test_rewrite_diff_shows_hunks_inline_and_the_whole_thing_in_the_appendix(self):
+    def test_rewrite_diff_shows_hunks_inline_and_only_inline(self):
+        """The worked example carries the three largest hunks; the full-diff drawer that
+        duplicated the whole answer into the appendix was cut."""
         html = build(content=content(example_pick="AW-0001"), baseline=BASELINE,
                      rewrites=REWRITES, lineage=LINEAGE)
         assert "<ins>" in html
         assert "3 largest changes" in html
         appendix = html[html.find("id='dad-appendix'"):]
-        assert "full stage-3 rewrite diff" in appendix.lower()
+        assert "full stage-3 rewrite diff" not in appendix.lower()
 
     def test_diff_summary_reports_how_much_changed(self):
         assert "%" in C.diff_summary("a b c d", "a b c e")
@@ -1069,20 +1124,37 @@ class TestCandour:
         warnings = D.derived_warnings(audit, MANIFEST, D.facts(audit, MANIFEST))
         assert any(sev == "BAD" and "showcase" in w for sev, w in warnings)
 
-    def test_every_check_is_listed_in_the_appendix(self):
-        """The 24-row table moved out of the main flow, but it did not leave the page:
-        'nothing was left out' has to stay a claim a reader can check."""
-        html = build()
+    def test_the_health_check_triage_tables_do_not_render(self):
+        """The variety drawer mirrors the corpus audit viewer's diversity section; the
+        audit's per-section verdict dump and the which-checks-ran table are review-tool
+        triage and stay out of the hand-off page."""
+        html = build(diversity=DIVERSITY)
         appendix = html[html.find("id='dad-appendix'"):]
-        assert "Locale / taxa plausibility" in appendix
-        assert "Response stance (LLM)" in appendix
+        assert "Composition and diversity" in appendix
+        assert "Locale / taxa plausibility" not in appendix
+        assert "As the audit records them" not in appendix
+        assert "not run on this run" not in appendix
 
-    def test_a_check_that_did_not_run_says_so(self):
-        """A reader deciding whether to trust the dataset needs to know which questions
-        were never asked, not just how the asked ones scored."""
-        audit = {k: v for k, v in AUDIT_FULL.items() if k != "showcase"}
-        text = strip_tags(build(audit=audit, diversity=None))
-        assert "not run on this run" in text
+    def test_the_variety_drawer_mirrors_the_viewer_charts_and_captions(self):
+        """The viewer's two semantic charts and their captions, with the Vendi count as
+        a sentence — computed from the same scopes.combined data the viewer reads."""
+        html = build(diversity=DIVERSITY)
+        text = strip_tags(html)
+        assert "Redundancy — how close each record sits to its nearest neighbour" in text
+        assert "Topic spread — the records grouped into meaning clusters" in text
+        assert "0% near-duplicate (similarity above 0.90), 33% similar (above 0.80)" in text
+        assert "Evenness 0.875 across 2 clusters" in text
+        assert "1.0 of 2 records effectively distinct in meaning (Vendi ratio 0.50)" in text
+        assert "What each cluster is" in text
+
+    def test_no_per_record_diversity_data_drops_the_semantic_block_only(self):
+        """A diversity report without scopes.combined.nn_sims (pre-field runs) keeps the
+        moves and phrases figures but renders no meanings-and-topics charts."""
+        html = build(diversity={"n_records": 2, "vendi": {"score": 5.0, "ratio": 0.1}})
+        appendix = html[html.find("id='dad-appendix'"):]
+        assert "Composition and diversity" in appendix
+        assert "Meanings and topics" not in appendix
+        assert "Rhetorical habits" in appendix
 
     def test_charts_emit_parseable_svg(self):
         import xml.etree.ElementTree as ET

@@ -46,7 +46,7 @@ Tags are repo-wide, so with more than one dataset in the repo they should be
 prefixed per pipeline (`sdf-v1-…`, `dad-v1-…`) to stay unambiguous.
 
 Usage:
-  REPO=sentientfutures/animal-welfare-training-dataset
+  REPO=sentientfutures/animal-welfare-training-claude
   python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
   python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
       --tag sdf-v1-fullscale-500-opus5
@@ -84,6 +84,16 @@ CORPUS_FILENAMES = ("sdf_corpus.jsonl", "dad_corpus.jsonl")
 # time the other pipeline is published. Only the two strings already rendered
 # publicly in the card go in here — nothing otherwise invisible.
 CARD_META_FILENAME = "card_meta.json"
+
+# Ownership marker for a staging directory this script created. stage_run
+# WIPES its staging root, and a mistyped --staging-dir (a sibling run under
+# outputs/*/runs/, say) is an uncommitted, unrecoverable, $50-500 loss — so a
+# non-empty directory is only deletable when this marker proves we made it.
+STAGING_MARKER = ".publish_hf_staging"
+# What a staging root created by a PRE-marker version of this script can
+# legitimately hold: the card plus the two per-pipeline dirs. Accepting that
+# shape keeps existing local staging dirs reusable without a manual delete.
+STAGING_LEGACY_ENTRIES = {"README.md", "sdf", "dad"}
 
 # ISO 639-1 codes for every language name sdf_pipeline/compose_prompts.py's
 # derive_language() can produce (the `culture` axis in prompts/sdf/
@@ -200,10 +210,33 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
     # Wipe first: a reused --staging-dir (e.g. re-running after fixing a typo'd
     # --input) must reflect only THIS run — otherwise leftover files from an
     # earlier invocation ride along into upload_folder silently mixed with
-    # this run's data.
+    # this run's data. But only if we own it: a non-empty directory this
+    # script didn't create (no STAGING_MARKER, and not a pre-marker legacy
+    # staging shape) is refused rather than wiped — this also makes --dry-run
+    # non-destructive, since stage_run runs before the --dry-run early return.
     if staging_dir.exists():
+        if not staging_dir.is_dir():
+            raise SystemExit(f"--staging-dir {staging_dir} exists and is not a directory.")
+        entries = sorted(p.name for p in staging_dir.iterdir())
+        ours = (
+            not entries                                   # empty: the common `mkdir` case
+            or STAGING_MARKER in entries                   # staged by this script
+            or (set(entries) <= STAGING_LEGACY_ENTRIES     # staged before the marker existed
+                and any((staging_dir / p).is_dir() for p in ("sdf", "dad")))
+        )
+        if not ours:
+            raise SystemExit(
+                f"--staging-dir {staging_dir} already exists, is not empty, and "
+                f"carries no {STAGING_MARKER} marker, so this script did not create "
+                f"it — refusing to delete its {len(entries)} entry/entries "
+                f"({', '.join(entries[:5])}...). Staging WIPES this directory. Pass "
+                f"a new path, an empty directory, or one this script staged into."
+            )
         shutil.rmtree(staging_dir)
     utils.ensure_dir(staging_dir)
+    (staging_dir / STAGING_MARKER).write_text(
+        "Created by evals/publish_hf.py. This directory is wiped and re-staged on "
+        "every publish; nothing here is authoritative.\n", encoding="utf-8")
     # Everything for this run lives under <staging>/<pipeline_tag>/ so the
     # sibling pipeline can occupy its own sibling directory in the same repo.
     dataset_dir = utils.ensure_dir(staging_dir / pipeline_tag)
@@ -644,6 +677,10 @@ def _upload_folder(folder_path: str, repo_id: str, commit_message: str,
         # scopes this to the pipeline being published — a bare "audit/*" would
         # delete the SIBLING pipeline's audit files on every publish.
         delete_patterns=delete_patterns,
+        # huggingface_hub only ignores .git* and .cache/huggingface by
+        # default — a dotfile marker is NOT covered, so without this the
+        # staging bookkeeping marker would ship as dataset content.
+        ignore_patterns=[STAGING_MARKER],
     )
 
 
@@ -918,7 +955,7 @@ def main() -> None:
                              "named in the card's provenance table; SDF takes "
                              "exactly one.")
     parser.add_argument("--repo-id", required=True,
-                        help="e.g. sentientfutures/animal-welfare-training-dataset")
+                        help="e.g. sentientfutures/animal-welfare-training-claude")
     parser.add_argument("--license", default="cc-by-4.0", dest="license_id")
     parser.add_argument("--tag", default=None,
                         help="Tag to create on the upload commit. Tags are repo-wide, so "
@@ -930,7 +967,16 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true",
                         help="Stage + build the card locally; make no Hub API calls")
     parser.add_argument("--staging-dir", default=None,
-                        help="Where to stage files (default: a temp dir)")
+                        help="Where to stage files (default: a temp dir). Staging wipes "
+                             "this directory, so it must be new, empty, or one a "
+                             "previous publish staged into.")
+    parser.add_argument("--regenerate-card", action="store_true",
+                        help="Rebuild README.md from the run's audit files and "
+                             "upload it, replacing whatever card is on the Hub. "
+                             "OFF by default: the card is hand-written and "
+                             "edited on the Hub (tracked copy in "
+                             "evals/hf_card.md), so a routine publish uploads "
+                             "data and audit files and leaves it untouched.")
     parser.add_argument("--allow-unmerged", action="store_true",
                         help="Publish even though this run's code is not in "
                              "origin/main, without the interactive "
@@ -1033,7 +1079,12 @@ def main() -> None:
             print(f"NOTE: a '{sibling_tag}' dataset already on the Hub is not fetched in "
                   f"--dry-run, so it is missing from this preview; a real publish "
                   f"regenerates its section from the Hub.")
-            print("\n--- README.md ---\n")
+            if args.regenerate_card:
+                print("\n--- README.md (WOULD REPLACE the card on the Hub) ---\n")
+            else:
+                print("\n--- README.md (preview only; NOT uploaded without "
+                      "--regenerate-card, so the Hub's hand-written card "
+                      "stands) ---\n")
             print(card)
             return
 
@@ -1057,9 +1108,13 @@ def main() -> None:
                             else datasets + [entry])
 
             # Card built inside the context: the sibling's downloaded metadata
-            # must still exist on disk when build_card reads it.
-            card = build_card(datasets, args.license_id, pretty_name)
-            (staging_dir / "README.md").write_text(card, encoding="utf-8")
+            # must still exist on disk when build_card reads it. Staged only
+            # with --regenerate-card — upload_folder overwrites every path it
+            # finds, so leaving README.md out of the staging dir is what
+            # protects a card edited on the Hub.
+            if args.regenerate_card:
+                card = build_card(datasets, args.license_id, pretty_name)
+                (staging_dir / "README.md").write_text(card, encoding="utf-8")
 
         # run_names (plural) is main's combined-publish naming; the unmerged
         # marker rides on the end of it rather than replacing it.
@@ -1067,6 +1122,10 @@ def main() -> None:
         if unmerged:
             # Visible in the repo's commit history, not just this terminal.
             commit_message += f" ({_unmerged_summary(unmerged)})"
+
+        if not args.regenerate_card:
+            print("  Card: leaving the Hub's README.md as it is "
+                  "(--regenerate-card rebuilds it from the audit files).")
 
         commit = _upload_folder(
             folder_path=str(staging_dir),
