@@ -1,6 +1,6 @@
 <!--
 Prose for the difficult-advice section of the handoff page (the #dad beats). Sections
-are delimited by HTML comments of the form "id: <section>"; every id in report/dad.py's
+are delimited by HTML comments of the form "id: <section>"; every id in website/dad.py's
 CONTENT_IDS must appear exactly once here, and no others. Supported markup: paragraphs,
 `- ` lists, **bold**, *italic*, `code`, [links](url), `### ` subheads, and `> ` deks.
 

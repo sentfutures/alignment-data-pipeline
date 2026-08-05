@@ -1,4 +1,4 @@
-# `report/` — the handoff page
+# `website/` — the handoff page
 
 One self-contained HTML file covering both datasets, written for one reader: someone who
 runs midtraining at another lab, has no context on this project, and has about forty
@@ -14,10 +14,10 @@ organised by what the eval measured; this is organised by what a reader needs, i
 ## Build
 
 ```bash
-python report/build_report.py \
+python website/build_website.py \
   --dad-run outputs/dad/runs/2026-07-29_12-26_archetype200 \
   --sdf-run outputs/sdf/runs/2026-07-25_15-57_fullscale-500-opus5
-# -> report/index.html
+# -> website/index.html
 ```
 
 Those two runs are the pinned ones behind the current build. `--run` still works as an
@@ -55,9 +55,16 @@ reads `CHAD_AWS_BEDROCK_KEY`).
 
 ## Hosting
 
-The page is one file with nothing beside it, so serving it is an upload: nothing in it
-refers to its own URL, every asset is inlined and every outbound link is absolute. It stays
-that way — a hosted copy is never a second, un-self-contained build.
+The page is one file with **one** file beside it, so serving it is an upload: nothing in it
+refers to its own URL apart from the preview tags, every other asset is inlined and every
+outbound link is absolute. It stays that way — a hosted copy is never a second,
+un-self-contained build.
+
+`.github/workflows/pages.yml` is the deploy. It publishes to `reasoning.sentientfutures.ai`
+on a push to `main` that touches the built page or the card image, and it does **not** run
+the builder: it copies `website/index.html` and `website/assets/preview.png` into the site
+root and hands them to Pages. So the committed `index.html` is what is live, and rebuilding
+it is a commit like any other.
 
 **It is unlisted, and that is a meta tag rather than a `robots.txt`.** Every build carries
 `<meta name="robots" content="noindex,nofollow">`, unconditionally. The two files do
@@ -76,25 +83,44 @@ Because a pasted link is then the *only* way anyone arrives, a hosted build carr
 tags. They need to know where the page lives, so naming the site is what turns them on:
 
 ```bash
-python report/build_report.py --dad-run <run> --sdf-run <run> --site-url https://<host>/
-# -> report/index.html + report/preview.png   (upload both)
+python website/build_website.py --dad-run <run> --sdf-run <run> \
+    --site-url    https://reasoning.sentientfutures.ai/ \
+    --preview-url https://reasoning.sentientfutures.ai/preview.png
+# -> website/index.html   (the workflow serves the card image from assets/)
 ```
 
-`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card`, points
-`og:image` at `preview.png` beside the page, and copies that file into the output directory
-— **the one file that travels with the HTML**, because a card renderer fetches the image out
-of band and a data URI is no use to it. `--preview-url` overrides the URL to point at an
-image hosted elsewhere, and then nothing is copied out; with no image at all the card
-declares `summary` rather than promising a large image it has not got. With neither flag the
-build says nothing about where it lives and ships nothing beside itself, which is right for
-the copy that opens from disk or arrives attached to an email; the build line prints
-`preview=no`.
+`--site-url` adds `og:title` / `og:url` / `og:description` / `twitter:card` and points
+`og:image` at `preview.png` beside the page, because a card renderer fetches the image out
+of band and a data URI is no use to it. On its own it also **copies** that file into the
+output directory. The command above passes `--preview-url` naming the same URL, which
+suppresses the copy: the deploy already stages the image from `website/assets/`, so a second
+one committed next to the page would be a drifting duplicate. (`.gitignore` covers it if
+someone rebuilds without the flag.) `--preview-url` is otherwise for an image hosted
+somewhere else entirely; with no image at all the card declares `summary` rather than
+promising a large image it has not got. With neither flag the build says nothing about where
+it lives, which is right for the copy that opens from disk or arrives attached to an email;
+the build line prints `preview=no`.
 
-**The card image is the hero.** `report/assets/preview.png` is the butterfly trimmed to its
-own bounds and centred on the page's paper at 1200×630 — no crop through the drawing, no
-filter, no text baked over it. `python report/make_preview.py` redraws it from
-`assets/hero.png`; it needs Pillow, which is why it is a separate script and not part of
-`build_report.py`, and its output is committed.
+**The card image and the tab icons are the hero.** `python website/make_preview.py` redraws
+all three from `assets/hero.png` and their output is committed; it needs Pillow, which is
+why it is a separate script and not part of the stdlib-only `build_website.py`.
+
+- `assets/preview.png` — the butterfly trimmed to its own bounds and centred on the page's
+  paper at 1200×630. No crop through the drawing, no filter, no text baked over it.
+- `assets/favicon-16.png`, `assets/favicon-32.png` — the butterfly *alone*, without the
+  dashed trail, squared up on the same paper. These are inlined as data URIs, so they are
+  not among the files a deploy carries, and they are the one `<link>` on the page: a
+  favicon has no other spelling, and `test_is_self_contained` allows that shape and no
+  other.
+
+Two sizes rather than one, and the ink is thickened before each is shrunk. Both fall out of
+the same fact — the hero is hairline pencil work. A straight resize to 16px leaves 14 of 256
+pixels carrying any ink, the darkest at 3.9:1 on the paper, which is a blank cream square in
+a tab; a darkest-pixel-wins pass first is the ordinary way to decimate line art and holds the
+strokes at full strength. That is a resampling choice and changes nothing about `hero.png`.
+It is also why `sizes=` is declared: hand a browser one 32 and it scales to 16 itself,
+averaging the ink straight back out. The two filter radii in `ICONS` were tuned by eye
+against a contact sheet — lower reads washed out, higher smears the wing veins into a blob.
 
 The `description` those tags use is prose, authored in `content_page.md` under the
 `description` id like every other word on the page. It is the one id that never renders in
@@ -113,8 +139,8 @@ hosted copy is never edited in place.
 | hero        | The illustration, the title, and the lines that follow from it — centred, and carrying the `#intro` id. Four blocks: the finding (_Teaching Claude Why_ and the SDF post, the page's one credit to both), the sentence that introduces the pair, **the two techniques as two columns** (`render.named_pair()`, synthetic documents first), then what we built on them, in two paragraphs. Four paragraphs of prose and it stops. The pair is a figure between the second paragraph and the third, not a list inside one: those two techniques _are_ the two datasets below, in the same order, and ~90 words of definitional prose with two digits in front of it did not say so. It carries **no index over either name** — an eyebrow ("Technique 1") names what the heading under it already says — and no tie line naming the dataset each produced, which was tried and read as awkward against names that barely differ. Nothing else: no lede, no provenance, no tiles, and no "Intro" heading over a paragraph that needs no introducing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `#datasets` | The comparison. No heading over it: the two column mastheads (the name in serif, and nothing else) are the heading. Five rows, and **each one says whether it describes the data or the process that makes it** — `result`, `result format`, `what it is for`, then `prompt templates` and `example dataset`. (A `pipeline` row of stage chains was cut: the two walkthroughs below _are_ the pipeline, and a one-line chain above them was a summary met before it could mean anything.) This is where the page draws that line first, because everything after it is two long pipeline walkthroughs and the reader came for the datasets. What each dataset _is_ used to be the masthead's subtitle; it is the `result` row now, because it was the one unlabelled claim in a table whose every other line said what it was answering. **The record count is deliberately not here**: how many records exist is a property of one run, and this section describes the pipelines. Dates, model ids, the composition spread and the counts all live in the report that goes into them. The last two rows carry the way to what they name: the figure (if any) at the column's left edge, an outline button at its right — the templates on GitHub, the published sample on Hugging Face. The `example dataset` row is button-only, so its cells keep an empty first flex item and its buttons line up under the row above. Labels are right-aligned, one line each, vertically centred. |
 | `#explore`  | "Walk through either pipeline" — a walkthrough, not results, because roughly half of each report is the worked example and the pipeline that produced it. Two buttons carrying each dataset's name and nothing else, 40rem centred at rest so each sits under its own column, in a bar that pins to the top of the screen while a report is read and tightens as it goes. Both reports are _inside_ this section, in `.explore-body` — see "The chooser".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `#sdf`      | Synthetic documents, in full (`report/sdf.py`). Same skeleton as `#dad` and four pipeline stages instead of three. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `#dad`      | Difficult advice, in full (`report/dad.py`). Opens on the `what it is` overview — the vertical flow schematic and a trimmed specimen. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `#sdf`      | Synthetic documents, in full (`website/sdf.py`). Same skeleton as `#dad` and four pipeline stages instead of three. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `#dad`      | Difficult advice, in full (`website/dad.py`). Opens on the `what it is` overview — the vertical flow schematic and a trimmed specimen. Hidden until chosen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | footer      | Repo and both viewers as buttons, one provenance line per run, and the build claim.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Both reports take the same skeleton, so a reader learns it once: **the opening lede / the
@@ -237,7 +263,7 @@ screen. `TestStickyBar` pins the six things that make that work:
   report's `<h3 id>`s with its `<h4 id>`s nested under them, hidden with the panel it
   belongs to and toggled by the same handler (`[data-rail]` in the inline JS), so what a
   reader sees is always the contents of what they are reading. It is **read back off the
-  built panel** — `render.outline()` over the markup `report/page.py` just assembled, not a
+  built panel** — `render.outline()` over the markup `website/page.py` just assembled, not a
   module's `BEATS` list — because the beats are conditional: the document report only earns
   `sdf-weak` when its run's audit flagged something, and
   `test_every_rail_link_lands_on_a_heading_that_rendered` builds a clean run to prove a link
@@ -344,7 +370,7 @@ buttons are ~10rem of permanent chrome, a quarter of a phone screen.
 | `sdf.py`          | The `#sdf` beats: `facts()`, the block builders, `read_lineage()`, `read_matrix()`, `read_attrition()`, `judged_drawer()`, `derived_warnings()`.                                                                                                                                                                                |
 | `common.py`       | Loading, prose parsing, `fill()`, the word diff (`diff_summary`/`diff_hunks`/`word_diff`, used by both reports), cost aggregation, the provenance warnings, the warnings table, `editorial_words()`, the CLI parser.                                                                                                                                                                                         |
 | `render.py`       | CSS + inline-SVG chart primitives + the `document()` shell. No pipeline knowledge.                                                                                                                                                                                                                                            |
-| `build_report.py` | The CLI.                                                                                                                                                                                                                                                                                                                      |
+| `build_website.py` | The CLI.                                                                                                                                                                                                                                                                                                                      |
 
 Each report module exposes `blocks()`, returning its body as one flat string; `page.py`
 wraps that in `render.panel()`, which is the `<section>`, and both panels go inside
@@ -505,7 +531,7 @@ which is what the beat is for; the drawer's summary counts what is behind it, an
 
 ## The hero illustration
 
-`report/assets/hero.png` is inlined as a `data:` URI at build time (`build_report.
+`website/assets/hero.png` is inlined as a `data:` URI at build time (`build_website.
 data_uri()`), because the page must open offline and survive an artifact host's CSP: a
 file reference, even a relative one, breaks the "one file" guarantee and
 `test_is_self_contained` with it. `render.illustration()` raises on anything that is not
@@ -519,7 +545,7 @@ carried a third top margin nothing in its own block accounted for. With that and
 ~490px and the whole intro is above the fold on a 900px viewport; the comparison, which is
 what does this page's work, starts at ~845px rather than 1,160px.
 
-`report/assets/hero.png` is the artwork as supplied, unedited — an RGBA PNG, so the line
+`website/assets/hero.png` is the artwork as supplied, unedited — an RGBA PNG, so the line
 art sits straight on the cream with no background of its own. It is 2.1 MB, which
 makes the built page ~3 MB — fine for a page you open or publish, worth knowing
 before you email it.
@@ -617,7 +643,7 @@ apt-get install -y chromium && npm install puppeteer   # chromium must match you
 node -e "const p=require('puppeteer');(async()=>{
   const b=await p.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
   const pg=await b.newPage(); await pg.setViewport({width:1440,height:1000});
-  await pg.goto('file://\$PWD/report/index.html',{waitUntil:'load'});
+  await pg.goto('file://\$PWD/website/index.html',{waitUntil:'load'});
   console.log(await pg.evaluate(()=>{
     const th=[...document.querySelectorAll('.cmp thead th')].map(e=>e.getBoundingClientRect());
     return {centre:innerWidth/2, pairMid:(th[0].left+th[1].right)/2};}));
@@ -694,15 +720,15 @@ one thing no assertion can check is whether the lineage scans as a walk or as a 
 ## Tests
 
 ```bash
-pytest tests/test_report_common.py tests/test_dad_report.py tests/test_sdf_report.py \
-       tests/test_report_page.py
+pytest tests/test_website_common.py tests/test_website_dad.py tests/test_website_sdf.py \
+       tests/test_website_page.py
 ```
 
-Offline. `test_report_common.py` covers the shared plumbing (prose ids, the placeholder
+Offline. `test_website_common.py` covers the shared plumbing (prose ids, the placeholder
 contract, the provenance floor, the warnings table, the word diff, the prose count);
-`test_dad_report.py` and `test_sdf_report.py` cover the two reports along the same risk
+`test_website_dad.py` and `test_website_sdf.py` cover the two reports along the same risk
 axes — degradation, candour, not leading with the judge, the lineage naming what it could
-not find, colour integrity; `test_report_page.py` covers the page itself, whose distinctive
+not find, colour integrity; `test_website_page.py` covers the page itself, whose distinctive
 risks are a report that cannot be reached, a column that shows nothing when a run is
 missing, a chooser bar with nowhere to stick or a beat hidden under it, and prose growing
 back.
@@ -720,7 +746,7 @@ next beat's `<h3` and its stray `3` breaks any assertion about digits.
 records its verdicts into `sections[].rows[]`; `evals/audit_sdf.py` only prints them, so
 `common.audit_verdict_warnings()` returns `[]` for an SDF audit and `sdf.derived_warnings()`
 re-applies the eval's own thresholds instead. Every rule is pinned in
-`test_sdf_report.py::TestDerivedThresholds` against the number the eval uses, so the two
+`test_website_sdf.py::TestDerivedThresholds` against the number the eval uses, so the two
 cannot drift apart silently. Teaching `audit_sdf.py` to record rows the way `audit_dad.py`
 does would give future runs the shared floor for free, and is the fix worth making.
 

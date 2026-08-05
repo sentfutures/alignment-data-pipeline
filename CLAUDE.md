@@ -207,10 +207,10 @@ SDF layers 3-5 embed the constitution (and, for layers 3-4, the formatted princi
 - **Committed run outputs are deliberate.** Smoke/validation runs under `outputs/*/runs/` are kept in git as reviewable examples of pipeline behavior at each design stage; `local_*`-labeled runs and `latest` pointers stay untracked (gitignore covers all pipelines incl. pref). Prune only with team agreement. When a PR both changes pipeline code and commits a fresh run demonstrating it, prefer landing them as separate PRs (code first, then the run) — bundling them produces diffs dominated by generated data (PR #73: two committed runs made up 71% of the diff's additions), which is hard for both human and automated review to work through. `.gitattributes` marks these paths `linguist-generated` so GitHub's UI collapses them either way.
 - **Final DAD records contain only user + assistant messages** — system prompts, reasoning library and scope scaffolding, and the constitution are stripped before training records are written
 
-## The handoff page (`report/`)
+## The handoff page (`website/`)
 
-`python report/build_report.py --dad-run <run> --sdf-run <run>` builds **one** file,
-`report/index.html`, covering both datasets. Full detail is in `report/README.md`; what
+`python website/build_website.py --dad-run <run> --sdf-run <run>` builds **one** file,
+`website/index.html`, covering both datasets. Full detail is in `website/README.md`; what
 follows is what must not be undone by accident.
 
 **Audience and shape.** Written for an ML researcher at another lab with no context and
@@ -248,7 +248,7 @@ dead: nothing calls them, and the prose ids they read (`caveats`, `sdf_caveats`)
 the prose files and from both `CONTENT_IDS`. **The lede takes no heading on either
 side** — the `<h2>` is the heading, and one over a single sentence only names what a reader
 can already see while costing a rail item and a hairline (`h3[id]` is what draws that rule).
-`report/sdf.py` carried a `sdf-what` heading while that report was a stub whose whole content
+`website/sdf.py` carried a `sdf-what` heading while that report was a stub whose whole content
 was that one line and three stat tiles; it lost it when the beats below it landed, and
 `test_neither_report_puts_a_heading_over_its_opening_line` keeps both sides that way. The stages come before the example that
 walks through them, because the chooser promises a walkthrough. There is still no "what we
@@ -266,7 +266,7 @@ example two beats below is the same record in full. So both reports now open on 
 with no heading of its own, held there by
 `test_neither_report_puts_a_heading_over_its_opening_line`, and nothing above the pipeline beat
 carries a figure, a tile, a chip or a score. What survived the move is in
-`tests/test_dad_report.py::TestTheFlow`: the schematic owes an accessible name, because SVG
+`tests/test_website_dad.py::TestTheFlow`: the schematic owes an accessible name, because SVG
 text is not read as prose, and it takes no series or status colour, because it measures
 nothing. **Known drift:** the flow's stage names still say `the constitution rewrite` while the
 copy pass rewrote `content_dad.md` to say "your alignment documents" — one pipeline, two
@@ -329,13 +329,13 @@ purpose: it is the one caveat a reader gets without opening anything.
 `{{placeholders}}` resolved from the pinned runs at build time, the page's own prose has no
 facts available at all, and `content_sdf.md` gets exactly one, `{{matrix_clause}}`, which
 carries its own degraded string. And every verdict the audit recorded is *derived*, never
-written; `evals/audit_sdf.py` only prints its verdicts, so `report/sdf.py` re-applies the
+written; `evals/audit_sdf.py` only prints its verdicts, so `website/sdf.py` re-applies the
 eval's own thresholds, each one pinned against the eval's number in
-`test_sdf_report.py::TestDerivedThresholds`.
+`test_website_sdf.py::TestDerivedThresholds`.
 
 **The document report spends two chart hues and no more.** `R.PLAIN` and `R.PIPELINE` mean
 "control" and "pipeline" in the difficult-advice report, and that pipeline has no control arm
-— so `report/sdf.py` never borrows them. Its one pair is the matrix's dealt weight against
+— so `website/sdf.py` never borrows them. Its one pair is the matrix's dealt weight against
 what shipped; every other chart is a single series in the palette's default, where a colour
 carries no meaning to confuse. The greens are avoided outright: `--series-6` is `#008300`
 against `--good`'s `#0ca30c`, so a magnitude drawn in it reads as a verdict.
@@ -372,12 +372,43 @@ are English, and a first worked example a reader cannot read, or one from a rese
 teaches the wrong default. The two extras are the interesting slices — a skeptical author,
 and the arc where there is no welfare stake and the AI correctly raises nothing.
 
-**Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero
-and the Sentient Futures mark are inlined as data URIs from `report/assets/`, the
-GitHub and Hugging Face marks are inline SVG, and the outbound `↗` is drawn rather than
-typed (as a glyph it is a hairline that differs per font, and this page gets printed).
-Every outbound link opens in a new tab. Enforced by `test_is_self_contained`, which
-allows a `data:` src and nothing else off-page.
+**Self-contained means self-contained.** No external CSS, JS, fonts or images: the hero,
+the Sentient Futures mark and the two tab icons are inlined as data URIs from
+`website/assets/`, the GitHub and Hugging Face marks are inline SVG, and the outbound `↗`
+is drawn rather than typed (as a glyph it is a hairline that differs per font, and this
+page gets printed). Every outbound link opens in a new tab. Enforced by
+`test_is_self_contained`, which allows a `data:` src and nothing else off-page. **The tab
+icon is the one `<link>` on the page**, and the one hole in that rule: a favicon has no
+other spelling — a browser will not read one out of a `<meta>`, and the implicit
+`/favicon.ico` lookup only exists for a hosted copy, so it would leave the emailed file
+without an icon. The test no longer bans `<link>` outright; it requires every one to be
+`rel='icon'` with a `data:` href, so a stylesheet or a font cannot follow it in.
+`render.icon_links()` emits them and, like `illustration()`, raises on a non-`data:` value.
+It is deliberately **not** part of `head_meta()`, which is what a crawler and a link
+preview see — an icon is neither.
+
+**The icons are decimated per size, and that is why there are two.** `make_preview.py`
+draws `favicon-16.png` and `favicon-32.png` alongside the card, cropping the butterfly
+*without* its dashed trail (derived from column alpha density, not a hardcoded box) and
+squaring it on the page's paper — paper rather than transparency, because dark line work
+on dark browser chrome is an invisible icon. The hero is hairline pencil, so a straight
+LANCZOS to 16px leaves 14 of 256 pixels inked with the darkest at 3.9:1 on the paper: a
+blank cream square in the tab. A `MinFilter` (darkest-pixel-wins) pass before the resize
+is the ordinary decimation for line art and takes it to 149 inked pixels at full strength.
+That is a resampling choice and changes nothing about `hero.png`. `sizes=` is declared for
+the same reason: hand a browser one 32×32 and it averages the ink back out scaling to 16.
+The two radii in `ICONS` are eye-tuned constants, not a formula — a fit to two points would
+only dress the eye up as arithmetic.
+
+**The page is deployed by `.github/workflows/pages.yml`, which does not run the builder.**
+It copies the committed `website/index.html` and `website/assets/preview.png` into the site
+root on a push to `main` touching either, so **the committed HTML is what is live** and a
+rebuild is an ordinary commit. `preview.png` is staged by the workflow rather than by
+`--site-url`'s copy-out, so the hosted build passes `--preview-url` naming the same URL to
+suppress that copy; `/website/preview.png` is gitignored in case someone forgets. The live
+build is made with `--site-url https://reasoning.sentientfutures.ai/`, so unlike every
+earlier committed copy it carries the `og:`/`twitter:` tags — which it must, since the page
+is `noindex` and a pasted link is the only way anyone arrives.
 
 **The page is unlisted, and that is a meta tag, not a `robots.txt`.** Every build carries
 `<meta name="robots" content="noindex,nofollow">` unconditionally (`render.head_meta()`): the
@@ -387,15 +418,15 @@ copy must not be `Disallow`ed**: a crawler refused the file never reads the tag 
 to index, while a linked URL can still be indexed by reference, which is the worse of the two
 outcomes. Because a pasted link is then the only way in, a **hosted** build takes preview
 tags, opt-in behind `--site-url`; that also points `og:image` at `preview.png` and copies
-`report/assets/preview.png` (the hero on the page's paper at 1200×630, drawn by
-`report/make_preview.py`, which needs Pillow and so is not part of the stdlib-only builder)
+`website/assets/preview.png` (the hero on the page's paper at 1200×630, drawn by
+`website/make_preview.py`, which needs Pillow and so is not part of the stdlib-only builder)
 out beside the HTML — **the one file that travels with the page**, since a card renderer
 fetches the image over the network and cannot use a data URI. `--preview-url` overrides it and
 copies nothing; with no image the card declares `summary`, not `summary_large_image`. With
 neither flag the file says nothing about where it lives and ships nothing beside itself, and
 that is the copy committed to the repo. The `description` those tags carry is authored prose
 like everything else — `content_page.md`'s `description` id, the one id that never renders in
-the document, flattened by `render.plain_md()`. Hosting notes are in `report/README.md`.
+the document, flattened by `render.plain_md()`. Hosting notes are in `website/README.md`.
 
 **Brand.** One accent, `--accent:#3b2fa0`, spent on the text selection, links and outline
 buttons (`.lbtn`, `.choice`, `.tab`, 4px radius). **A link is marked, never re-faced**: it
@@ -478,7 +509,7 @@ the open report rather than as tall as one grid row.
 The script measures `.explore-body`, never the bar (a stuck sticky element reports where
 it is painted), and the headroom a linked beat or stage needs to clear the bar is
 `scroll-margin-top:7rem` in CSS, not arithmetic in JS (`_bar_rem()` in
-`tests/test_report_page.py` recomputes the bar's height from its tokens, so retuning it
+`tests/test_website_page.py` recomputes the bar's height from its tokens, so retuning it
 without revisiting the headroom — or the rail's `top` — fails there).
 
 **Each report's contents ride beside it, in a sticky rail.** `.rail` is a column of jump
@@ -525,7 +556,7 @@ page by a wide child (the comparison landed 116px off centre), a deep link scrol
 before the multi-megabyte hero had laid out, scroll anchoring fighting the bar's shrink,
 and every section's named grid lines going undefined below 760px, which collapsed the
 prose to one word per line. If you touch layout, measure it — see "Checking
-it renders" in `report/README.md` for the chromium + puppeteer snippet.
+it renders" in `website/README.md` for the chromium + puppeteer snippet.
 
 **The narrow layout keeps the named lines.** Below 760px `section` is a single track
 declared `[text-start] minmax(0,1fr) [text-end full-end]`, not a bare `minmax(0,1fr)` with
@@ -553,7 +584,7 @@ holds on this run: the delivery judge lost 24 of its judgements, and its two arm
 **different sets of records** — 171 each side, but 16 records judged only on the pipeline
 side and 16 only on the control side — while the welfare-impact judge is 179 against 187.
 
-**Two things the repin broke are now fixed, both in `report/dad.py`.** The pinned run is in
+**Two things the repin broke are now fixed, both in `website/dad.py`.** The pinned run is in
 the two-holistic-judge schema (`delivery` / `welfare_impact` / `composite`), which dropped
 the `moral_patient_reasons` metric `_pareto()` plots on its vertical axis — so "Substance
 against manner" rendered its title, its axis note, a "not measured" placeholder and a typed
@@ -612,5 +643,5 @@ prompts/dad/        dilemma prompt spec + reasoning library + DAD step templates
 outputs/sdf/        intermediate + final SDF outputs
 outputs/dad/        intermediate + final DAD outputs
 evals/              scoring scripts and rubric
-report/             hand-over page: one self-contained index.html covering both datasets; see report/README.md
+website/            the project front page: one self-contained index.html covering both datasets; see website/README.md
 ```

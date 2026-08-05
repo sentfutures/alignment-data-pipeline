@@ -1,6 +1,6 @@
 <!--
 Prose for the synthetic-documents section of the handoff page (the #sdf beats). Sections
-are delimited by HTML comments of the form "id: <section>"; every id in report/sdf.py's
+are delimited by HTML comments of the form "id: <section>"; every id in website/sdf.py's
 CONTENT_IDS must appear exactly once here, and no others. Supported markup: paragraphs,
 `- ` lists, **bold**, *italic*, `code`, [links](url), `### ` subheads, and `> ` deks.
 
@@ -23,7 +23,7 @@ WHAT GOES WHERE. The beats a reader sees are the opening (`sdf_what`), the proce
     arriving on #sdf from a deep link never saw the comparison.
   * `sdf_caveats` carries NO figures and NO placeholders. It is about the method, and it
     holds for any run of this pipeline. A number in it is a bug, not a tightening.
-  * The gate, the judge's spread and the blind rerun are written by report/sdf.py, derived,
+  * The gate, the judge's spread and the blind rerun are written by website/sdf.py, derived,
     inside the appendix drawer they belong to. This file must not restate them.
   * Nothing here explains how to install or run the pipeline. That is the repository
     README's job, and it was cut from this page deliberately.

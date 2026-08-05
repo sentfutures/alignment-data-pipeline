@@ -1,7 +1,7 @@
-"""Tests for report/dad.py — the dilemma corpus's section of the handoff page.
+"""Tests for website/dad.py — the dilemma corpus's section of the handoff page.
 
 The section never renders alone any more, so every test here builds the whole page
-around it (report/page.py owns the shell) and asserts on the ``#dad`` beats.
+around it (website/page.py owns the shell) and asserts on the ``#dad`` beats.
 
 Six things carry real risk here and get most of the coverage:
 
@@ -33,11 +33,11 @@ import re
 
 import pytest
 
-from report import common as C
-from report import dad as D
-from report import page as P
-from report import render as R
-from report import sdf as S
+from website import common as C
+from website import dad as D
+from website import page as P
+from website import render as R
+from website import sdf as S
 
 # --- fixtures, shaped like the real audit JSON --------------------------------
 
@@ -366,7 +366,11 @@ class TestBuildSection:
         tested is the page's markup, not the dataset's prose."""
         html = build(diversity=DIVERSITY, manifest=MANIFEST, lineage=LINEAGE,
                      rewrites=REWRITES, baseline=BASELINE)
-        assert not re.search(r"<(link|iframe)\b", html)
+        assert not re.search(r"<iframe\b", html)
+        for tag in re.findall(r"<link\b[^>]*>", html):        # only the tab icon; see
+            assert re.fullmatch(                              # test_website_page.py
+                r"<link rel='icon' sizes='\d+x\d+' href='data:image/png;base64,[^']+'>",
+                tag), tag
         assert not re.search(r"<script[^>]*\ssrc=", html)
         markup = without_corpus_text(html)
         assert "@import" not in markup and "url(" not in markup
@@ -661,7 +665,7 @@ class TestChartsAreEvidence:
         both moved (the diagram to the pipeline beat whose prose reads it aloud, the record
         to the worked example that shows it in full), and a heading over a single sentence
         only names what a reader can already see. `test_neither_report_puts_a_heading_over
-        _its_opening_line` in test_report_page.py holds both reports to that.
+        _its_opening_line` in test_website_page.py holds both reports to that.
 
         What did NOT change is the half of the rule that was about measurement: nothing
         above the pipeline beat carries a figure, a tile, a chip or a score. A chart there
@@ -796,8 +800,9 @@ class TestTheFlow:
         Read against the SHIPPED prose, because the fixture's placeholder cannot prove it.
         """
         from pathlib import Path
-        prose = (Path(__file__).resolve().parent.parent
-                 / "report" / "content_dad.md").read_text(encoding="utf-8")
+        # Off the module's own __file__ rather than a spelled-out directory name.
+        prose = (Path(D.__file__).resolve().parent
+                 / "content_dad.md").read_text(encoding="utf-8")
         said = prose[prose.index("id: method_intro"):prose.index("id: example_pick")]
         for shown in ("weighted matrix", "stage 1", "stage 2", "stage 3"):
             assert shown in said, shown
@@ -1261,13 +1266,13 @@ class TestCandour:
 
 class TestCLI:
     def _argv(self, run_dir, content_file, out_dir, sdf_run=None):
-        argv = ["build_report.py", "--dad-run", str(run_dir),
+        argv = ["build_website.py", "--dad-run", str(run_dir),
                 "--content", str(content_file), "--out-dir", str(out_dir)]
         return argv + (["--sdf-run", str(sdf_run)] if sdf_run else [])
 
     def test_writes_one_file(self, tmp_path, monkeypatch):
         """One page, named index.html so it publishes to Pages as it stands."""
-        from report import build_report as B
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, tmp_path))
         B.main()
@@ -1277,7 +1282,7 @@ class TestCLI:
         assert "<section id='sdf' class='panel'" in out.read_text(encoding="utf-8")
 
     def test_rebuild_overwrites_cleanly(self, tmp_path, monkeypatch):
-        from report import build_report as B
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, tmp_path))
         B.main()
@@ -1286,7 +1291,7 @@ class TestCLI:
         assert (tmp_path / "index.html").read_text(encoding="utf-8") == first
 
     def test_a_dad_run_alone_is_enough(self, tmp_path, monkeypatch):
-        from report import build_report as B
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, tmp_path))
         B.main()
@@ -1299,7 +1304,7 @@ class TestCLI:
         a data URI like everything else here — which makes it the one thing a deploy can
         leave behind. Naming the site is enough to get both files.
         """
-        from report import build_report as B
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         out = tmp_path / "site"
         out.mkdir()
@@ -1312,7 +1317,7 @@ class TestCLI:
 
     def test_an_image_hosted_elsewhere_is_not_copied_out(self, tmp_path, monkeypatch):
         """--preview-url points at someone else's file, so shipping ours would be litter."""
-        from report import build_report as B
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         out = tmp_path / "site"
         out.mkdir()
@@ -1324,18 +1329,25 @@ class TestCLI:
         assert '"https://cdn.test/card.png"' in (out / "index.html").read_text(encoding="utf-8")
 
     def test_a_local_build_ships_nothing_beside_the_page(self, tmp_path, monkeypatch):
-        """No site URL, no deploy: the file that opens from disk stands alone."""
-        from report import build_report as B
+        """No site URL, no deploy: the file that opens from disk stands alone.
+
+        Including its tab icon — the icons are inlined, not copied out, so adding them did
+        not add a second file to carry. That is the half of this test that would break if
+        someone ever "fixed" the favicon by writing one next to the page.
+        """
+        from website import build_website as B
         run_dir, content_file = make_run_dir(tmp_path)
         out = tmp_path / "local"
         out.mkdir()
         monkeypatch.setattr("sys.argv", self._argv(run_dir, content_file, out))
         B.main()
         assert [p.name for p in out.iterdir()] == ["index.html"]
+        html = (out / "index.html").read_text(encoding="utf-8")
+        assert html.count("<link rel='icon'") == len(B.FAVICONS)
 
     def test_no_dad_run_exits_with_guidance(self, tmp_path, monkeypatch):
-        from report import build_report as B
-        monkeypatch.setattr("sys.argv", ["build_report.py", "--out-dir", str(tmp_path)])
+        from website import build_website as B
+        monkeypatch.setattr("sys.argv", ["build_website.py", "--out-dir", str(tmp_path)])
         with pytest.raises(SystemExit, match="--dad-run"):
             B.main()
 

@@ -13,8 +13,8 @@ Structure:
                 it names (as two columns), and what we built on them
     #datasets   the two datasets, compared row by row
     #explore    Walk through either pipeline — two buttons
-      #sdf      Synthetic documents  (report/sdf.py, hidden until chosen)
-      #dad      Difficult advice     (report/dad.py, hidden until chosen)
+      #sdf      Synthetic documents  (website/sdf.py, hidden until chosen)
+      #dad      Difficult advice     (website/dad.py, hidden until chosen)
     footer      repo and both viewers, and nothing else
 
 Nothing is open on load; ``#dad`` or ``#sdf`` in the URL opens that report, so the
@@ -28,10 +28,10 @@ stdlib only, and no imports from viewer/ or shared/.
 import datetime
 import re
 
-from report import common as C
-from report import dad
-from report import render as R
-from report import sdf
+from website import common as C
+from website import dad
+from website import render as R
+from website import sdf
 
 CONTENT_IDS = ("title", "description", "intro", "sdf_technique", "dad_technique",
                "intro_close",
@@ -255,7 +255,7 @@ def footer(maker_icon=""):
 # ------------------------------------------------------------------ assembly
 
 def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
-         illustration="", maker_icon="", site_url="", preview_url=""):
+         illustration="", maker_icon="", icons=(), site_url="", preview_url=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
     f = dict(PAGE_FACTS)
@@ -297,6 +297,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         "description": R.plain_md(C.fill(content["description"], f)),
         "site_url": site_url,
         "preview_url": preview_url,
+        "icons": icons,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
         "footer": footer(maker_icon),
     }

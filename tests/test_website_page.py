@@ -1,4 +1,4 @@
-"""Tests for report/page.py — the handoff page that carries both corpora.
+"""Tests for website/page.py — the handoff page that carries both corpora.
 
 This replaces test_report_hub.py: there is no landing page and no second file any more,
 so the risks that page had (a link to a report nobody built, a card whose numbers
@@ -21,11 +21,11 @@ import re
 
 import pytest
 
-from report import common as C
-from report import dad as D
-from report import page as P
-from report import render as R
-from report import sdf as S
+from website import common as C
+from website import dad as D
+from website import page as P
+from website import render as R
+from website import sdf as S
 
 CONTENT = {k: f"Prose for {k}." for k in P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS}
 CONTENT["title"] = "Two corpora"
@@ -114,9 +114,12 @@ def shipped_content():
     a section renamed in a module and not in its prose file fails here.
     """
     from pathlib import Path
-    report_dir = Path(__file__).resolve().parent.parent / "report"
-    return C.load_content([report_dir / "content_page.md", report_dir / "content_dad.md",
-                           report_dir / "content_sdf.md"],
+    # Off the package's own __file__, not a path spelled out here: the directory was
+    # called report/ until it was renamed, and this was one of two places outside it
+    # that had to be found and changed.
+    website_dir = Path(P.__file__).resolve().parent
+    return C.load_content([website_dir / "content_page.md", website_dir / "content_dad.md",
+                           website_dir / "content_sdf.md"],
                           P.CONTENT_IDS + D.CONTENT_IDS + S.CONTENT_IDS)
 
 
@@ -131,7 +134,7 @@ def beat(section, anchor):
 
     Slicing on ``index("id='sdf-weak'")`` looks right and is not: it keeps the tail of its
     own opening tag and the head of the next beat's ``<h3``, and that stray ``3`` passes
-    any assertion about digits in a beat. Same helper as test_dad_report.py's.
+    any assertion about digits in a beat. Same helper as test_website_dad.py's.
     """
     start = section.index(f"<h3 id='{anchor}'")
     body = section[section.index(">", start) + 1:]
@@ -176,6 +179,28 @@ def _rail_top_rem(html, t):
 
 
 class TestShape:
+    def test_every_comment_in_the_stylesheet_closes_the_one_it_opened(self):
+        """The stylesheet is two thirds prose, and an unbalanced delimiter is silent.
+
+        This shipped for one build: a rationale added above `#datasets::before` left a stray
+        `*/` in front of the rule, so the parser read the whole thing as one invalid selector
+        and DROPPED the declaration — the divider and the 3rem of air above the comparison
+        both vanished, and nothing in the built HTML looked wrong. Nothing else here can
+        catch that, because every other test reads the CSS as text.
+        """
+        css = re.search(r"<style>(.*?)</style>", build(), re.S).group(1)
+        depth, i = 0, 0
+        while i < len(css):
+            if css.startswith("/*", i):
+                assert depth == 0, f"nested /* at {css[i:i + 60]!r}"
+                depth, i = 1, i + 2
+            elif css.startswith("*/", i):
+                assert depth == 1, f"unopened */ before {css[i + 2:i + 62]!r}"
+                depth, i = 0, i + 2
+            else:
+                i += 1
+        assert depth == 0, "a comment is left open"
+
     def test_the_page_is_three_sections_and_two_reports(self):
         html = build(sdf_inputs=SDF_INPUTS)
         ids = re.findall(r"<section id='([^']+)'", html)
@@ -337,6 +362,35 @@ class TestShape:
         narrow = html[html.index("@media (max-width:620px)"):]
         assert re.search(r"\.npair\{grid-template-columns:minmax\(0,1fr\)", narrow)
 
+    def test_stacked_it_centres_and_the_rule_over_each_item_does_too(self):
+        """Flush left is a property of the two-column form, not of the pair.
+
+        Centring is wrong across two columns — it leaves four ragged edges — and that is the
+        reason the pair goes flush left. Stacked there is one column with two edges, inside a
+        hero whose title, both paragraphs and closing lines are all centred, so flush left
+        made the stack read as a different kind of block rather than the same one narrower.
+        It also comes off the screen edges, which is the air the centred prose above it has at
+        the ends of its lines. The hairline follows: at the item's own width it read as a rule
+        across the page, so it is 3/4 and centred under the block it heads — drawn as a
+        pseudo-element, because a rule with a width is not a box's border.
+        """
+        html = build()
+        wide = html[:html.index("@media (max-width:620px)")]
+        narrow = html[html.index("@media (max-width:620px)"):]
+        assert "text-align:left" in re.search(r"\.npair\{[^}]*\}", wide).group(0)
+        stacked = re.search(r"\.npair\{[^}]*\}", narrow).group(0)
+        assert "text-align:center" in stacked
+        assert re.search(r"padding:0 [\d.]+rem", stacked), stacked      # off the edges
+        rule = re.search(r"\.npair>li::before\{[^}]*\}", narrow).group(0)
+        assert "width:75%" in rule and "margin:0 auto" in rule, rule
+        # and the border it replaces is off, or the item carries two hairlines.
+        assert "border-top:0" in re.search(r"\.npair>li\{[^}]*\}", narrow).group(0)
+        # The two-column form keeps the border on the item: the rule is as wide as the column
+        # it heads there, which is what a two-up wants.
+        assert not re.search(r"\.npair[^{]*::before", wide)
+        assert "border-top:1px solid var(--hairline)" in re.search(r"\.npair>li\{[^}]*\}",
+                                                                  wide).group(0)
+
     def test_the_intro_carries_two_measures(self):
         """The paragraphs keep the measure a centred line can be read at; the container is
         wider because the pair is two columns inside it, and two columns inside 60ch are
@@ -434,9 +488,20 @@ class TestShape:
     def test_is_self_contained(self):
         """One file. Every reference in it either stays on the page (an anchor), is
         carried inside it (a data URI), or is prose pointing at the web — never a
-        relative path to something that has to travel alongside."""
+        relative path to something that has to travel alongside.
+
+        `<link>` used to be banned outright. The tab icon is the one exception, because a
+        favicon has no other spelling — a browser will not read one out of a `<meta>` —
+        so the rule is now shape-checked instead of absent: every link on the page must be
+        an icon with a `data:` href, which lets nothing else (a stylesheet, a preload, a
+        font) in behind it.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
-        assert not re.search(r"<(link|iframe)\b", html)
+        assert not re.search(r"<iframe\b", html)
+        for tag in re.findall(r"<link\b[^>]*>", html):
+            assert re.fullmatch(
+                r"<link rel='icon' sizes='\d+x\d+' href='data:image/png;base64,[^']+'>",
+                tag), tag
         assert not re.search(r"<script[^>]*\ssrc=", html)
         assert "@import" not in html and "url(" not in html
         refs = re.findall(r"(?:src|href)='([^']+)'", html)
@@ -453,6 +518,31 @@ class TestShape:
         emailed or published on its own, which is the whole failure this format avoids."""
         with pytest.raises(ValueError, match="data: URI"):
             build(illustration="assets/hero.png")
+
+    def test_the_tab_icon_is_carried_inside_the_page(self):
+        """Inlined for the same reason the hero is: the copy that opens from disk or
+        arrives by email keeps its icon, and no new file has to travel beside the page.
+
+        Each size is declared, because each PNG is decimated for the size it names — the
+        art is hairline pencil work, and letting the browser scale one image down averages
+        the ink away. `sizes=` is what stops it.
+        """
+        html = build(icons=[(16, "data:image/png;base64,AAAA"),
+                            (32, "data:image/png;base64,BBBB")])
+        assert "<link rel='icon' sizes='16x16' href='data:image/png;base64,AAAA'>" in html
+        assert "<link rel='icon' sizes='32x32' href='data:image/png;base64,BBBB'>" in html
+
+    def test_a_page_with_no_icon_asks_for_nothing(self):
+        """A missing asset degrades to no tag, never to a tag pointing at nothing — the
+        same shape as the hero's empty slot. A `<link rel='icon'>` with an empty href is a
+        request for the page's own URL, which is not a picture."""
+        assert "rel='icon'" not in build()
+        assert "rel='icon'" not in build(icons=[(16, "")])
+
+    def test_a_tab_icon_that_would_have_to_travel_is_refused(self):
+        """Same guard as the hero, for the same failure."""
+        with pytest.raises(ValueError, match="data: URI"):
+            build(icons=[(16, "assets/favicon-16.png")])
 
     def test_is_light_mode_only(self):
         html = build()
@@ -905,6 +995,25 @@ class TestNarrowLayout:
         for line in ("[text-start]", "text-end", "full-end"):
             assert line in rule, rule
 
+    def test_no_bare_width_is_wider_than_a_phone(self):
+        """A fixed width wide enough to overflow the narrowest track is the bug that shipped:
+        the hairline above the comparison was `width:30rem`, 480px in a ~358px track on a
+        390px viewport, so the whole document scrolled 122px to the right with blank paper
+        beside every section — and a border-top is invisible past the edge, so nothing on
+        screen said what was doing it.
+
+        Written as the invariant rather than against that one rule, and deliberately blind to
+        which block a declaration sits in: a media query is no defence, since the widest
+        viewport a phone rule applies to is still a phone. Anything this wide has to be
+        wrapped — `min()`, `clamp()`, a percentage — which is what every other width on the
+        page already is. 320px is the narrowest viewport the page is expected to survive.
+        """
+        css = re.search(r"<style>(.*?)</style>", build(sdf_inputs=SDF_INPUTS), re.S).group(1)
+        css = re.sub(r"/\*.*?\*/", " ", css, flags=re.S)
+        for value, unit in re.findall(r"[^-]width:\s*([\d.]+)(rem|px)\b", css):
+            px = float(value) * (16 if unit == "rem" else 1)
+            assert px < 320, f"width:{value}{unit} cannot fit a phone — cap it with min()"
+
     def test_the_narrow_block_does_not_re_place_children_with_a_weaker_selector(self):
         """`section>*{grid-column:1}` is (0,0,1). It loses to `section>figure` (0,0,2) and
         to `section>.explore-body` (0,1,1) — the chooser, both rails and both reports —
@@ -945,7 +1054,7 @@ class TestContentsRail:
         This fixture ships no rewrite records, so the worked example has no stages to
         list — which is the other half of the contract, and why the beats with no anchored
         stage under them get no sub-items rather than borrowing the ones above.
-        (tests/test_dad_report.py checks the example's three against a run that has them.)
+        (tests/test_website_dad.py checks the example's three against a run that has them.)
         """
         rail = self.rail(build(sdf_inputs=SDF_INPUTS), "dad")
         by_beat, current = {}, None
@@ -1139,8 +1248,25 @@ class TestContentsRail:
         assert ".explore-body{grid-template-columns:minmax(0,1fr)}" in small
         assert re.search(r"\.rail\{[^}]*position:static", small)
         assert re.search(r"\.rail\{[^}]*flex-wrap:wrap", small)
-        assert ".railcol{border-bottom:1px solid var(--hairline)" in small
+        assert re.search(r"\.rail\{[^}]*border-bottom:1px solid var\(--hairline\)", small)
         assert "border-right" not in re.search(r"\.railcol\{[^}]*\}", html).group(0)
+
+    def test_the_separator_belongs_to_the_contents_and_not_to_their_column(self):
+        """Nothing is drawn for contents that are not there.
+
+        The rule and the 3.6rem above it were on ``.railcol``, which is in the markup whether
+        or not a rail is inside it — and on load neither report is open, so both rails are
+        hidden. Measured at 390px: a hairline right across the page under the two buttons,
+        above the footer, separating nothing, on narrow screens only. ``.rail[hidden]`` is
+        ``display:none``, so on the rail itself they arrive with the contents they belong to.
+        """
+        html = build(sdf_inputs=SDF_INPUTS)
+        small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
+        col = re.search(r"\.railcol\{[^}]*\}", small).group(0)
+        for drawn in ("border", "margin", "padding-bottom"):
+            assert drawn not in col, col
+        assert re.search(r"\.rail\{[^}]*margin-top:", small)
+        assert "[hidden]{display:none}" in re.search(r"\.rail\[hidden\]\{[^}]*\}", html).group(0)
 
     def test_neither_control_prints(self):
         """Paper has nothing to press and no links to follow."""
@@ -1357,7 +1483,7 @@ class TestComparisonTable:
 
 class TestSdfReport:
     """The document report, from the page's side. Its own risks are in
-    test_sdf_report.py; what is here is the part the page is responsible for."""
+    test_website_sdf.py; what is here is the part the page is responsible for."""
 
     def section(self, html):
         return html[html.index("<section id='sdf'"):html.index("<section id='dad'")]
@@ -1541,6 +1667,20 @@ class TestBrevity:
         # comma did that until the arrows arrived; they separate them now.
         assert re.search(r"\.cite-n\+\.cite-n\{margin-left:", html)
         assert "content:','" not in html
+
+    def test_two_markers_cannot_be_split_across_two_lines(self):
+        """Separated is not the same as breakable, and both markers are one word's worth.
+
+        The arrow inside each marker is `display:inline-block` — an atomic inline, which
+        UAX#14 lets a line break either side of. Measured at 390px: the intro's first
+        paragraph ended on marker 1 and opened the next line with marker 2. Two halves fix
+        it, one per break opportunity: a word joiner before each marker (so it cannot start
+        a line, which glues it both to its word and to the marker before it) and nowrap
+        inside the anchor (so the numeral cannot part from its own arrow).
+        """
+        html = self.page()
+        assert html.count(f"{R.WORD_JOINER}<a class='cite-n'") == 2
+        assert "white-space:nowrap" in re.search(r"\.cite-n\{[^}]*\}", html).group(0)
 
     def test_the_page_does_not_argue_a_third_route(self):
         """The belief-implantation comparison is a decision record, not something a

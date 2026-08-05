@@ -1,4 +1,4 @@
-"""Tests for report/common.py — the plumbing both report pages share.
+"""Tests for website/common.py — the plumbing both report pages share.
 
 The two rules the reports rest on are enforced here rather than in either page, so
 they are tested here: an unknown or duplicated prose id is a build error, and an
@@ -12,8 +12,8 @@ import re
 
 import pytest
 
-from report import common as C
-from report import render as R
+from website import common as C
+from website import render as R
 
 IDS = ("title", "lede", "body")
 

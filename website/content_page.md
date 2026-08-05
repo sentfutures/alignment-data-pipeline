@@ -1,7 +1,7 @@
 <!--
-Prose for the handoff page's own sections (report/index.html). Sections are delimited by
-HTML comments of the form "id: <section>"; every id in report/page.py's CONTENT_IDS and
-report/sdf.py's CONTENT_IDS must appear exactly once across the prose files, and no
+Prose for the handoff page's own sections (website/index.html). Sections are delimited by
+HTML comments of the form "id: <section>"; every id in website/page.py's CONTENT_IDS and
+website/sdf.py's CONTENT_IDS must appear exactly once across the prose files, and no
 others. Supported markup: paragraphs, `- ` lists, **bold**, *italic*, `code`,
 [links](url), `### ` subheads, and `> ` deks.
 
@@ -63,7 +63,7 @@ Teaching models to reason about harm to animals
 
 <!-- id: description -->
 
-Two open midtraining datasets that teach a model to reason carefully about the welfare of animals and other sentient beings, with the pipeline that produced them.
+Two open pipelines for alignment finetuning data teaching AI models to reason responsibly about the welfare of animals and other sentient beings, with sample datasets.
 
 <!-- id: intro -->
 

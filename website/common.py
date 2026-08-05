@@ -4,7 +4,7 @@ Same contract as render.py: stdlib only, no repo imports, no pipeline knowledge 
 report generators have to build in an environment where the pipeline's own
 dependencies are not installed, which is also what makes them portable.
 
-Everything here is used by report/page.py and report/dad.py today. Anything that only
+Everything here is used by website/page.py and website/dad.py today. Anything that only
 one pipeline needs stays in that pipeline's module: in particular the weaknesses floor
 splits in two, because ``evals/audit_dad.py`` records its verdicts into
 ``sections[].rows[]`` and ``evals/audit_sdf.py`` only prints them. So
@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-from report import render as R
+from website import render as R
 
 
 # ------------------------------------------------------------------ loading
@@ -457,7 +457,7 @@ def cli_parser(doc):
     p.add_argument("--sdf-run", dest="sdf_run", default=None,
                    help="SDF run directory. Optional: without it the document corpus's "
                         "column and section say so instead of showing figures")
-    p.add_argument("--out-dir", default=None, help="output directory (default report/)")
+    p.add_argument("--out-dir", default=None, help="output directory (default website/)")
     p.add_argument("--content", action="append", default=None,
                    help="prose file, repeatable; overrides the page's default prose file(s)")
     p.add_argument("--example", default=None, help="prompt_id to feature as the worked example")
@@ -470,7 +470,7 @@ def cli_parser(doc):
                    help="public URL of the hosted page; adds og:/twitter: preview tags")
     p.add_argument("--preview-url", dest="preview_url", default=None,
                    help="absolute URL of the preview image (og:image). Defaults to "
-                        "preview.png beside the page, which build_report.py copies out; "
+                        "preview.png beside the page, which build_website.py copies out; "
                         "pass one to point at an image hosted elsewhere instead")
     return p
 

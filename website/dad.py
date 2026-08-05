@@ -12,7 +12,7 @@ the pipeline — no commands, no costs, no per-stage model table. That belongs i
 repository README, and it was cut from here deliberately.
 
 This module builds BLOCKS, not a page: ``blocks()`` returns the section's body, and
-report/page.py wraps it in the one ``<section id='dad'>`` on the artefact. Blocks stay
+website/page.py wraps it in the one ``<section id='dad'>`` on the artefact. Blocks stay
 flat — a figure has to be a direct child of the section for the CSS grid to bleed it
 past the text measure, so nothing here wraps a beat in a container.
 
@@ -36,12 +36,12 @@ left to an author's discipline:
      not soften this: the floor is computed, and the view may collapse rows but only with
      a visible count.
 
-Built by report/build_report.py. stdlib only, and deliberately no imports from viewer/
+Built by website/build_website.py. stdlib only, and deliberately no imports from viewer/
 or shared/.
 """
 
-from report import common as C
-from report import render as R
+from website import common as C
+from website import render as R
 
 CONTENT_IDS = (
     "dad_what",
@@ -67,7 +67,7 @@ SECTION_TITLE = "Difficult advice Q&A"
 #
 # "What it is" is not a beat: the <h2> plus one line under it does that job, and a heading
 # over a single sentence only names what a reader can already see — while costing a rail
-# item and a hairline. report/sdf.py carried an `sdf-what` heading while that report was a
+# item and a hairline. website/sdf.py carried an `sdf-what` heading while that report was a
 # stub whose whole content was that one line and three stat tiles; it lost it when the beats
 # below it landed, so both reports now open the same way.
 BEATS = (
@@ -92,7 +92,7 @@ def load_inputs(run_dir):
     """All filesystem access, in one place. Returns this section's kwargs.
 
     Prose is not loaded here: the page owns one content namespace across both sections,
-    so report/page.py loads it once.
+    so website/page.py loads it once.
     """
     from pathlib import Path
     run_dir = Path(run_dir)
@@ -653,7 +653,7 @@ def _survival_rows(surv):
                                ("dropped", "dropped"), ("added", "added by the pipeline"))]
 
 
-# The word diff moved to report/common.py when the document report grew a rewrite stage of
+# The word diff moved to website/common.py when the document report grew a rewrite stage of
 # its own: `C.diff_summary`, `C.diff_hunks`, `C.word_diff`.
 
 
@@ -1373,7 +1373,7 @@ def blocks(*, audit, content, diversity=None, manifest=None, baseline=None, rewr
            hf_href="", repo_href=""):
     """The whole ``#dad`` section body, in skeleton order. Pure: no filesystem, no argv.
 
-    Returns one flat string of blocks. report/page.py wraps it in ``<section id='dad'>``
+    Returns one flat string of blocks. website/page.py wraps it in ``<section id='dad'>``
     with the h2; every block here is therefore a grid child of that section, which is
     what lets figures bleed past the text measure.
     """
