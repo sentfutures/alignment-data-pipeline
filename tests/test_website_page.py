@@ -17,6 +17,7 @@ disagree with the report it points at) are gone. What replaces them:
 Fully offline.
 """
 
+import inspect
 import re
 
 import pytest
@@ -415,24 +416,28 @@ class TestShape:
         """
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
-        assert f"A project by <a class='maker' href='{P.MAKER_URL}'" in foot
+        assert f"A project by <a href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
         assert "class='foot-run'" not in foot
         text = strip_tags(foot)
         for gone in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"], "git ", "backend"):
             assert gone not in text, gone
 
-    def test_the_gap_before_the_maker_mark_sits_outside_the_link(self):
-        """The word boundary is a margin on the anchor, never on the mark inside it.
+    def test_the_only_marks_in_the_footer_name_a_destination(self):
+        """The maker's own mark is gone, and so is every rule and argument that fed it.
 
-        A margin on the mark is inside the anchor's background box, so the hover wash and
-        the underline both started .4rem left of the mark, over space that belongs to the
-        sentence before it. Same gap, drawn from outside.
+        A 15px squircle in front of "Sentient Futures" is a picture of the name printed
+        beside it — a third link idiom in a footer that had two, and the only saturated
+        colour on the page's least important line. The two that stay identify a place the
+        reader has not been yet.
         """
-        html = build()
-        mark = re.search(r"\.ico-img\{[^}]*\}", html).group(0)
-        assert "margin-left" not in mark, mark
-        assert re.search(r"\.maker\{[^}]*margin-left:\.4rem", html)
+        html = build(sdf_inputs=SDF_INPUTS)
+        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
+        assert "<img" not in foot and "ico-img" not in foot, foot
+        assert foot.count("class='ilink'") == 2
+        for dead in (".ico-img{", ".maker{"):
+            assert dead not in html, dead
+        assert "maker_icon" not in inspect.signature(P.body).parameters
 
     def test_the_run_is_still_named_where_the_reader_needs_it(self):
         """The footer carrying nothing is only correct because the report carries it. If
@@ -441,15 +446,25 @@ class TestShape:
         panel = html[html.index("<section id='dad'"):]
         assert DAD_INPUTS["run_id"] in panel
 
-    def test_the_footer_links_are_links_not_buttons(self):
-        """Two destinations, each with its mark and the outbound arrow, floated right."""
+    def test_the_footer_is_the_credit_then_a_split_row(self):
+        """Two rows: the byline, then who made it left and where to go right.
+
+        The split lives on `.foot-row`, which has exactly two children, and NOT on the
+        footer: on the footer it had four, so the byline took a full-width line, the
+        colophon and the maker split the next and the two destinations wrapped alone onto a
+        third — three rows with three different alignments. The destinations are links and
+        not buttons, there being nothing to press down here, only somewhere to go.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
-        assert foot.count("class='ilink'") == 2
         assert "class='lbtn'" not in foot          # the buttons live in the comparison
         assert ">Datasets</span>" in foot and ">Pipelines</span>" in foot
-        assert foot.index("A project by") < foot.index("foot-links")
-        assert re.search(r"footer\.foot\{[^}]*justify-content:space-between", html)
+        order = [foot.index(s) for s in ("foot-by", "foot-row", "foot-colophon", "foot-links")]
+        assert order == sorted(order), foot
+        rule = re.search(r"footer\.foot\{[^}]*\}", html).group(0)
+        assert "justify-content" not in rule and "text-align" not in rule, rule
+        row = re.search(r"\.foot-row\{[^}]*\}", html).group(0)
+        assert "justify-content:space-between" in row, row
 
     def test_the_page_asks_not_to_be_indexed(self):
         """It is handed to a reader, not found.
@@ -1158,17 +1173,28 @@ class TestContentsRail:
         # back from the margin, so it counts on the reading side.
         assert shell - 3.5 - rail - gap - prose + pull >= 11.5, "the figure track shrank"
 
-    def test_the_contents_start_level_with_the_report_s_title(self):
-        """The panel carries a top margin the rail does not, so the first beat sat 48px above
-        the <h2> it is the contents of. The column's padding plus the rail's own has to come
-        to that margin — derived here, because a hardcoded 3rem goes stale the moment the
-        panel's margin is retuned. Measured at 1440px: both tops at y=1499."""
+    def test_the_contents_start_level_with_the_report_s_first_line(self):
+        """Not with its <h2>: levelled with the title, a .8rem sans link shares a band with
+        2rem serif and reads as a second heading. The datum is the lede, and every term of it
+        is derived — the panel's margin, the h2's line box and its margin place the lede's
+        box; the two half-leadings are the optical correction, so it is cap to cap rather
+        than box to box. Hardcoding the sum goes stale the moment any of them is retuned."""
         html = build(sdf_inputs=SDF_INPUTS)
         panel = float(re.search(r"\.panel\{margin-top:([\d.]+)rem", html).group(1))
+        h2 = re.search(r"(?m)^h2\{font:\d+ ([\d.]+)rem/([\d.]+)", html)
+        size, lh = (float(g) for g in h2.groups())
+        # The panel's own h2 margin, not the global .5rem it overrides — deriving from the
+        # wrong one of the two put the rail 22px above the line it is meant to meet.
+        below = float(re.search(r"\.panel>h2\{margin-bottom:([\d.]+)rem", html).group(1))
+        lede = re.search(r"\.lede\{font:([\d.]+)rem/([\d.]+)", html)
+        link = re.search(r"\.rail a\{[^}]*padding:([\d.]+)rem", html)
+        beat = re.search(r"\.rail \.r-b\{font:\d+ ([\d.]+)rem/([\d.]+)", html)
+        half = lambda m: (float(m.group(2)) - 1) * float(m.group(1)) / 2
+        want = panel + size * lh + below + half(lede) - (float(link.group(1)) + half(beat))
         col = float(re.search(r"\.railcol\{[^}]*padding-top:([\d.]+)rem", html).group(1))
         rail = float(re.search(r"\.rail\{[^}]*padding:([\d.]+)rem", html).group(1))
-        assert col + rail == panel, f"{col} + {rail} != the panel's {panel}rem"
-        # Below 900px the contents sit above the report, so there is no title to line up with.
+        assert abs(col + rail - want) <= 0.15, f"{col} + {rail} is not the lede's {want}rem"
+        # Below 900px the contents sit above the report, so there is no line to line up with.
         small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
         assert re.search(r"\.railcol\{[^}]*padding-top:0", small)
 

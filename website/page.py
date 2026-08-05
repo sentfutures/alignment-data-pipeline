@@ -232,8 +232,15 @@ def byline(authors=AUTHORS, contributors=CONTRIBUTORS):
             f"{contrib}<p class='foot-affil'>{key}</p></div>")
 
 
-def footer(maker_icon=""):
-    """Who made it and where to go.
+def footer():
+    """Two rows: the credit, then who made it on the left and where to go on the right.
+
+    TWO ROWS, NOT FOUR THINGS IN ONE. The footer used to be a single ``space-between`` row
+    that four children had outgrown — the byline claimed a full-width line, the feedback
+    sentence and the maker's name split the next, and the two destinations wrapped alone
+    onto a third — so it read as three rows with three different alignments. The split is
+    kept and given exactly two items a side, inside its own ``.foot-row``; the byline, which
+    belongs to neither half, has the line above to itself.
 
     No run ids, no commits, no dirty flag, no backend. This was restored once on the
     grounds that provenance had otherwise "appeared nowhere" — untrue: ``common.run_note()``
@@ -242,20 +249,23 @@ def footer(maker_icon=""):
     reader can act on, and "+ uncommitted changes" on the last line of a handoff page reads
     as an unfinished draft.
     """
-    mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
     return (byline()
-            + f"<p>If you have suggestions or feedback, please provide them "
-            f"<a href='{REPO_URL}/issues'{R.NEW_TAB}>on GitHub{R.EXT_ARROW}</a>.</p>"
-            f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
-            f"{R.EXT_ARROW}</a></p>"
+            + "<div class='foot-row'>"
+            # Two spans and no glyph between them: the separating is column-gap's job here
+            # exactly as it is in the affiliation key, so nothing a screen reader has to
+            # read out sits between two links.
+            + f"<p class='foot-colophon'><span>A project by "
+            f"<a href='{MAKER_URL}'{R.NEW_TAB}>{R.esc(MAKER)}{R.EXT_ARROW}</a></span>"
+            f"<span><a href='{REPO_URL}/issues'{R.NEW_TAB}>Give feedback{R.EXT_ARROW}</a>"
+            f"</span></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p></div>")
 
 
 # ------------------------------------------------------------------ assembly
 
 def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
-         illustration="", maker_icon="", icons=(), site_url="", preview_url=""):
+         illustration="", icons=(), site_url="", preview_url=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
     f = dict(PAGE_FACTS)
@@ -299,7 +309,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         "preview_url": preview_url,
         "icons": icons,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
-        "footer": footer(maker_icon),
+        "footer": footer(),
     }
     return "".join(sections), head
 

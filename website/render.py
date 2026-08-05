@@ -1076,7 +1076,11 @@ object-fit:cover;object-position:50% 48.5%}
 .hero-intro>p{max-width:60ch;margin-left:auto;margin-right:auto}
 .hero-intro p{margin-top:0;margin-bottom:0;color:var(--text-secondary);
 font-size:1.1rem;line-height:1.68}
-.hero-intro p+p{margin-top:1.4rem}
+/* 1.8rem, not the 1.4 this ran at: at 1.4 against a 1.68 line-height the gap between two
+   paragraphs was barely more than the gap between two lines inside one, so the intro read
+   as a single centred block. Enough to separate them and no more — the structural gaps
+   around the pair below stay bigger than this one. */
+.hero-intro p+p{margin-top:1.8rem}
 /* Every paragraph in here wraps the same way, on the global text-wrap:pretty. `balance` was
    tried on the two above the pair and is wrong: it evens the lines by SHRINKING the block's
    used width, so those two set visibly narrower than the two below them and the centred
@@ -1201,15 +1205,23 @@ min-width:0;overflow-anchor:none;margin-left:calc(-1*var(--pull));
 display:grid;grid-template-columns:[rail-col] var(--rail) [read-col] minmax(0,1fr);
 column-gap:3rem}
 .explore-body.tight{--t:1}
-/* The contents start level with the report's title, not with the top of the row: the panel
-   carries .panel's 3.2rem top margin and the rail did not, so its first beat sat 48px above
-   the <h2> it belongs to. 3rem here plus the rail's own .2rem is that margin — the two
-   numbers have to add up to it, which is what the test recomputes. Only at rest: once the
-   rail pins, its own `top` places it. */
-/* The contents start level with the report's <h2>, not with the top of the row: the panel
-   carries a 3.2rem top margin the rail does not, so without this the first beat sat ~48px
-   above the heading it is the contents of. This plus the rail's own .2rem is that margin. */
-.railcol{grid-column:rail-col;padding-top:3rem}
+/* THE DATUM IS THE REPORT'S FIRST LINE OF PROSE, NOT ITS TITLE. With no padding at all the
+   first beat sat ~48px ABOVE the <h2> it is the contents of; levelled with the <h2> instead
+   it overshot the other way — a .8rem sans link sharing a band with a 2rem serif title reads
+   as a competing second heading, and at that ratio of sizes box-to-box alignment puts the
+   rail's text visibly above the title's cap. Landing on the lede gives the heading its own
+   band and makes the rail an annotation beside the prose.
+
+   Derived, never typed: .panel's 3.2rem margin + the <h2>'s 2.3rem line box (2rem/1.15) +
+   the 1.9rem margin `.panel>h2` gives it — NOT the global h2's .5rem, which is overridden
+   here and was what a first attempt at this landed 22px high on — puts the lede's box at
+   7.4rem, and the two half-leadings are the optical term: the lede's .305rem down against
+   this link's .42rem (.28rem padding plus its own .14rem). So the rail's box wants
+   7.285rem, of which .2rem is the rail's own padding. 7.1rem here keeps the column on the
+   page's quarter-rem grain; the remainder is a quarter of a pixel. The test recomputes all
+   of it from those same rules. Measured at 1440px: both text tops at y=204.
+   Only at rest: once the rail pins, its own `top` places it. */
+.railcol{grid-column:rail-col;padding-top:7.1rem}
 .panels{grid-column:read-col;min-width:0}
 /* One report's contents, held on screen for as long as that report is being read.
    Its travel is .railcol, which stretches to the row's height — the height of the open
@@ -1535,45 +1547,52 @@ a:hover{background:var(--accent-wash)}
    the one focus treatment nobody here designed. */
 a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
 summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* One line: who made it on the left, where to go on the right. */
+/* TWO ROWS: the credit, then who made it on the left and where to go on the right.
+
+   The split is the footer's oldest rule and it is kept — but it belongs to a row of its
+   own, with two items a side. It was on the footer itself, where four children had
+   outgrown it: the byline took a full-width line, the feedback sentence and the maker's
+   name split the next, and the two destinations wrapped alone onto a third, so the closing
+   band read as three rows with three different alignments. `.foot-row` is the split; the
+   byline, which belongs to neither half of "who made it / where to go", has the line above
+   it to itself. */
 footer.foot{margin-top:5rem;padding-top:1.1rem;border-top:1px solid var(--border);
-font:.85rem/1.6 var(--sans);color:var(--text-muted);
-display:flex;justify-content:space-between;align-items:baseline;gap:1.5rem;flex-wrap:wrap}
+font:.85rem/1.6 var(--sans);color:var(--text-muted)}
 footer.foot p{margin:0;color:inherit}
-.foot-links{display:flex;gap:1.6rem}
-/* The byline takes its own full-width line above that row rather than sitting in it: the
-   footer is "who made it left, where to go right", and a byline with an affiliation key
-   is not a thing that belongs in either half. Credit, then the org, then the way out.
-   `flex:0 0 100%` earns the line without needing the footer to stop being a flex row. */
-.foot-by{flex:0 0 100%;margin-bottom:.85rem}
+.foot-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;
+gap:.5rem 2rem}
+/* No size step: in a row with the colophon these two are its peers, and a 1rem pair beside
+   a .85rem one is a mismatch, not a ranking. */
+.foot-links{display:flex;flex-wrap:wrap;gap:.4rem 1.6rem}
+.foot-by{margin-bottom:1.4rem}
 .foot-authors{color:var(--text-secondary)}
 footer.foot .foot-by p+p{margin-top:.3rem}
 /* Row-gap 0: the key wraps to as many lines as it needs, and column-gap does the
-   separating so no comma or bullet has to be typed between institutions. */
-.foot-affil{display:flex;flex-wrap:wrap;gap:0 1.15rem}
+   separating so no comma or bullet has to be typed between institutions — a glyph put
+   there in CSS is still read out, and the key's whole job is to be skipped.
+   2rem, not the 1.15rem it had: at 1.15 the space between two institutions was barely
+   wider than the word space inside "University of Santiago de Compostela", so five items
+   read as one run-on sentence with digits in it. nowrap for the other half of that —
+   an institution that breaks across two lines is the same failure from the other side. */
+.foot-affil{display:flex;flex-wrap:wrap;gap:0 2rem}
+.foot-affil>span{white-space:nowrap}
+/* The quietest line on the page, and the same separator idiom as the key above it: two
+   spans held apart by column-gap, with nothing typed between them. */
+.foot-colophon{display:flex;flex-wrap:wrap;gap:.3rem 1.6rem}
 /* line-height 0 keeps a superscript from stretching the line it sits on. */
 .foot-by sup{font-size:.74em;line-height:0;padding-right:.06em}
-/* Which runs this page was built from. Its own line under the two above, at the size the
-   rest of the footer takes: a reader looking for it is looking deliberately. */
-/* A supplied mark rather than a drawn one — inlined as a data URI like the hero, so
-   the page stays one file.
+/* THE ONLY MARKS IN THE FOOTER NAME A DESTINATION. `assets/sf.png` used to sit inside
+   "A project by Sentient Futures" as a 15px rounded square, and it is a picture of a name
+   printed 4px to its right — a third link idiom in a footer that had two already, and the
+   only saturated colour down here landed on the least important line. Dropped with its
+   `.ico-img`/`.maker` rules and the maker_icon argument that fed it, rather than left as a
+   class nothing emits.
 
-   The mark has to sit CLOSER to the name it belongs to than to the sentence it follows, or it
-   reads as punctuation after "A project by". Measured: a bare word space put it ~3.6px from
-   "by" and 4px from "Sentient Futures" — the same on both sides, so proximity said nothing.
-   The word boundary is a margin on the LINK, not on the mark: a margin inside the anchor is
-   inside its background box, so the hover wash and the underline both began .4rem left of the
-   mark, on space that belongs to the sentence. On the anchor the same gap sits outside the
-   hit area, and the wash starts where the link starts. The right margin stays on the mark —
-   it is inside the link on both sides, and it is what groups the mark with the name. */
-.ico-img{width:15px;height:15px;border-radius:3px;vertical-align:-.17em;
-margin-right:.25rem;flex:0 0 auto}
-.maker{margin-left:.4rem}
-/* An icon link declares NO face and no size, on purpose: it is not a control — there is
-   nothing to press in the footer, only somewhere to go — so it takes the footer's own sans at
-   the footer's own size, like the maker link beside it, and the bare `a` rule gives both the
-   accent, the underline and the 600. Declaring serif here put a serif 600 link next to a sans
-   400 one in the same row; measured, that was the whole of the mismatch. */
+   An icon link declares NO face and no size, on purpose: it is not a control — there is
+   nothing to press in the footer, only somewhere to go — so it takes its tier's size and
+   the footer's own sans, and the bare `a` rule gives it the accent, the underline and the
+   600. Declaring serif here put a serif 600 link next to a sans 400 one in the same row;
+   measured, that was the whole of the mismatch. */
 .ilink{display:inline-flex;align-items:center;gap:.45rem}
 .ilink:hover{background:var(--accent-wash)}
 /* The hero's illustration. Dashed while empty, so an unfilled slot reads as deliberate
@@ -1652,8 +1671,15 @@ section{grid-template-columns:[text-start] minmax(0,1fr) [text-end full-end]}
 .choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06rem}
 .lede{font-size:1.1rem}
-.hero{padding:1.8rem 16px 0}.hero h1{margin-top:1.6rem;font-size:2.2rem}
-.hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
+/* THESE TWO GAPS STAY CLEAR OF `.hero-intro p+p`, which is 1.4rem and is not restated
+   here. Tightened to 1.6rem and 1.2rem they were not: the title-to-intro break — the
+   largest one in the hero — got LESS air than the space between two paragraphs of the
+   intro, and the whole hero read as one block. The ladder mobile wants is the one the
+   wide layout has, strictly descending as the break gets smaller: 2.6rem above the title
+   (2.2 here plus the art's own .4rem bottom, set by `.illo.art`), 2.2 above the intro,
+   1.8 above the two techniques, 1.4 between paragraphs. */
+.hero{padding:1.8rem 16px 0}.hero h1{margin-top:2.2rem;font-size:2.2rem}
+.hero-intro{margin-top:2.2rem}.hero-intro p{font-size:1.05rem}
 /* One column: two of them inside a 390px viewport are ~16 characters each.
    AND IT CENTRES, which the two-column form must not. The reason the pair goes flush left up
    there is that centring two columns leaves four ragged edges; one column has two, and the
@@ -1670,7 +1696,25 @@ padding:0 1rem;max-width:32rem;text-align:center}
 .npair>li::before{content:'';display:block;width:75%;margin:0 auto 1.1rem;
 border-top:1px solid var(--hairline)}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
-.illo{aspect-ratio:16/9}}
+.illo{aspect-ratio:16/9}
+/* THE LABEL GOES ABOVE ITS TWO CELLS, and this is a bug fix, not a preference. `.cmp-k`
+   carries a fixed 8rem — a fifth of a phone — and with `table-layout:auto` the two data
+   columns cannot get below their min-content width, so the table measured 422px inside a
+   358px wrapper at 390 (382 at 414): the SECOND dataset's column was cut off, reachable
+   only by swiping a table that gives no sign it scrolls. It clears on its own at ~450px.
+   The rows become two-column grids with the label spanning both, so the comparison stays a
+   comparison — side by side is the whole point of it — and the row's rule moves to the
+   <tr>, or each cell draws its own and the line across the row becomes two short ones. */
+.cmp,.cmp thead,.cmp tbody{display:block;width:100%;margin-left:0}
+.cmp tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1.1rem;
+border-bottom:1px solid var(--hairline)}
+.cmp thead tr{border-bottom:0}
+.cmp-corner{display:none}
+.cmp th.cmp-k{grid-column:1/-1;text-align:left;width:auto;white-space:normal;
+padding:.9rem 0 .6rem}
+.cmp td,.cmp thead th{padding:0 0 .95rem;width:auto}
+.cmp thead th{padding-top:.9rem}
+.cmp td{border-bottom:0}}
 @media print{
 @page{margin:16mm 14mm}
 :root{--surface-1:#fff;--surface-2:#fff;--hairline:#d8d6cd}
