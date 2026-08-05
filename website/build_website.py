@@ -40,7 +40,9 @@ WEBSITE_DIR = Path(__file__).resolve().parent
 CONTENT = [WEBSITE_DIR / "content_page.md", WEBSITE_DIR / "content_dad.md",
            WEBSITE_DIR / "content_sdf.md"]
 HERO = WEBSITE_DIR / "assets" / "hero.png"
-MAKER_ICON = WEBSITE_DIR / "assets" / "sf.png"
+# assets/sf.png is deliberately not read: the maker's mark used to sit inside "A project by
+# Sentient Futures", where it was a picture of a name printed 4px to its right. The footer's
+# only marks now are the two that identify a destination the reader has not seen yet.
 # The link preview's image — the hero on the page's own paper, drawn by make_preview.py.
 # The ONE file that travels beside index.html, and only for a hosted build: a card renderer
 # fetches og:image over the network, so this is the one picture the page cannot carry.
@@ -80,7 +82,7 @@ def main():
     # (urljoin, so both ".../" and ".../index.html" land on ".../preview.png").
     preview_url = args.preview_url or (urljoin(site_url, PREVIEW.name) if site_url else "")
     html = page.build(example=args.example, sdf_example=args.sdf_example, illustration=hero,
-                      maker_icon=data_uri(MAKER_ICON), icons=icons, site_url=site_url,
+                      icons=icons, site_url=site_url,
                       preview_url=preview_url, **kwargs)
     if site_url and not args.preview_url and PREVIEW.exists():
         shutil.copyfile(PREVIEW, out_dir / PREVIEW.name)

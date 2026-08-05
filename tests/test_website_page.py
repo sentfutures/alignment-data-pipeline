@@ -17,6 +17,7 @@ disagree with the report it points at) are gone. What replaces them:
 Fully offline.
 """
 
+import inspect
 import re
 
 import pytest
@@ -415,24 +416,28 @@ class TestShape:
         """
         html = build(sdf_inputs=SDF_INPUTS, dad_inputs=DAD_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
-        assert f"A project by <a class='maker' href='{P.MAKER_URL}'" in foot
+        assert f"A project by <a href='{P.MAKER_URL}'" in foot
         assert P.MAKER in foot
         assert "class='foot-run'" not in foot
         text = strip_tags(foot)
         for gone in (SDF_INPUTS["run_id"], DAD_INPUTS["run_id"], "git ", "backend"):
             assert gone not in text, gone
 
-    def test_the_gap_before_the_maker_mark_sits_outside_the_link(self):
-        """The word boundary is a margin on the anchor, never on the mark inside it.
+    def test_the_only_marks_in_the_footer_name_a_destination(self):
+        """The maker's own mark is gone, and so is every rule and argument that fed it.
 
-        A margin on the mark is inside the anchor's background box, so the hover wash and
-        the underline both started .4rem left of the mark, over space that belongs to the
-        sentence before it. Same gap, drawn from outside.
+        A 15px squircle in front of "Sentient Futures" is a picture of the name printed
+        beside it — a third link idiom in a footer that had two, and the only saturated
+        colour on the page's least important line. The two that stay identify a place the
+        reader has not been yet.
         """
-        html = build()
-        mark = re.search(r"\.ico-img\{[^}]*\}", html).group(0)
-        assert "margin-left" not in mark, mark
-        assert re.search(r"\.maker\{[^}]*margin-left:\.4rem", html)
+        html = build(sdf_inputs=SDF_INPUTS)
+        foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
+        assert "<img" not in foot and "ico-img" not in foot, foot
+        assert foot.count("class='ilink'") == 2
+        for dead in (".ico-img{", ".maker{"):
+            assert dead not in html, dead
+        assert "maker_icon" not in inspect.signature(P.body).parameters
 
     def test_the_run_is_still_named_where_the_reader_needs_it(self):
         """The footer carrying nothing is only correct because the report carries it. If
@@ -441,15 +446,25 @@ class TestShape:
         panel = html[html.index("<section id='dad'"):]
         assert DAD_INPUTS["run_id"] in panel
 
-    def test_the_footer_links_are_links_not_buttons(self):
-        """Two destinations, each with its mark and the outbound arrow, floated right."""
+    def test_the_footer_is_the_credit_then_a_split_row(self):
+        """Two rows: the byline, then who made it left and where to go right.
+
+        The split lives on `.foot-row`, which has exactly two children, and NOT on the
+        footer: on the footer it had four, so the byline took a full-width line, the
+        colophon and the maker split the next and the two destinations wrapped alone onto a
+        third — three rows with three different alignments. The destinations are links and
+        not buttons, there being nothing to press down here, only somewhere to go.
+        """
         html = build(sdf_inputs=SDF_INPUTS)
         foot = re.search(r"<footer class='foot'>.*?</footer>", html, re.S).group(0)
-        assert foot.count("class='ilink'") == 2
         assert "class='lbtn'" not in foot          # the buttons live in the comparison
         assert ">Datasets</span>" in foot and ">Pipelines</span>" in foot
-        assert foot.index("A project by") < foot.index("foot-links")
-        assert re.search(r"footer\.foot\{[^}]*justify-content:space-between", html)
+        order = [foot.index(s) for s in ("foot-by", "foot-row", "foot-colophon", "foot-links")]
+        assert order == sorted(order), foot
+        rule = re.search(r"footer\.foot\{[^}]*\}", html).group(0)
+        assert "justify-content" not in rule and "text-align" not in rule, rule
+        row = re.search(r"\.foot-row\{[^}]*\}", html).group(0)
+        assert "justify-content:space-between" in row, row
 
     def test_the_page_asks_not_to_be_indexed(self):
         """It is handed to a reader, not found.
