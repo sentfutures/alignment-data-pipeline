@@ -1616,11 +1616,11 @@ class TestByline:
     def test_the_key_lists_each_institution_exactly_once(self):
         key = re.search(r"<p class='foot-affil'>(.*?)</p>", self._byline(), re.S).group(1)
         listed = re.findall(r"<sup>(\d+)</sup>([^<]*)", key)
-        institutions = [inst for _, inst in P.AUTHORS]
+        institutions = [inst for _, inst in (*P.AUTHORS, *P.CONTRIBUTORS)]
         expected = list(dict.fromkeys(institutions))       # dedup, order kept
         assert [inst for _, inst in listed] == expected
         assert [n for n, _ in listed] == [str(i + 1) for i in range(len(expected))]
-        # Four people, one institution: the key is shorter than the author list.
+        # Many people, few institutions: the key is shorter than the author list.
         assert len(listed) < len(P.AUTHORS)
 
     def test_a_shared_institution_is_not_repeated_in_the_key(self):

@@ -780,7 +780,7 @@ class TestTheFlow:
         section = dad_section(build(rewrites=REWRITES, lineage=LINEAGE))
         built = section[section.index("id='dad-built'"):section.index("id='dad-example'")]
         flow = re.search(r"<svg[^>]*class='flow'.*?</svg>", section, re.S).group(0)
-        for stage in ("the dilemma", "the reasoning", "the constitution rewrite"):
+        for stage in ("the user dilemma", "the model response", "the constitution rewrite"):
             assert stage in flow and stage in built
 
     def test_the_flow_is_a_schematic_so_it_carries_no_series_or_status_colour(self):
@@ -829,8 +829,8 @@ class TestLineage:
     def test_the_stages_render_in_pipeline_order(self):
         ex = self._example()
         marks = [ex.index(m) for m in (
-            "Stage 1 · the dilemma", "dealt axis", "the planner writes",
-            "Should I do the thing?", "Stage 2 · the reasoning",
+            "Stage 1 · the user dilemma", "dealt axis", "the planner writes",
+            "Should I do the thing?", "Stage 2 · the model response",
             "what stage 2 works out", "Stage 3 · the constitution rewrite")]
         assert marks == sorted(marks), marks
 
@@ -839,7 +839,7 @@ class TestLineage:
         learn a second vocabulary for the same pipeline."""
         section = dad_section(build(lineage=LINEAGE, rewrites=REWRITES))
         built = section[section.index("id='dad-built'"):section.index("id='dad-example'")]
-        for heading in ("Stage 1 · the dilemma", "Stage 2 · the reasoning",
+        for heading in ("Stage 1 · the user dilemma", "Stage 2 · the model response",
                         "Stage 3 · the constitution rewrite"):
             assert heading in built and heading in self._example()
 
@@ -851,10 +851,9 @@ class TestLineage:
         assert "Consider the animals here." in strip_tags(answer.split("<details")[0])
         # The control's answer is inside a <summary>...</summary> drawer label's details
         # block, and the label says what it is for.
-        take = ex[ex.index("The first take stage 2 is shown"):]
-        assert take.startswith("The first take stage 2 is shown")
-        assert "never a training record" in take[:400]
-        assert "Maybe." not in strip_tags(ex[:ex.index("The first take stage 2 is shown")])
+        take = ex[ex.index("first take"):]
+        assert "control model answering the user dilemma" in take[:200]
+        assert "Maybe." not in strip_tags(ex[:ex.index("first take")])
 
     def test_the_dealt_cards_drop_null_axes(self):
         """A deal with no cultural setting has no cultural setting. Rendering the axis
@@ -870,7 +869,7 @@ class TestLineage:
     def test_the_library_entries_are_glossed_from_the_run(self):
         ex = self._example()
         assert "C2" in ex and "Surface it." in ex
-        assert "never named in an answer" in ex
+        assert "reasoning_library.csv" in ex
 
     def test_bare_ids_when_the_gloss_is_missing(self):
         lineage = json.loads(json.dumps(LINEAGE))
@@ -912,7 +911,7 @@ class TestLineage:
         # quoted in stage 1. (The prose file's only extra IS this record, so it is spent as
         # the primary and no carousel is left over — which is why this asserts the trail
         # rather than a tab.)
-        first = ex.index("Stage 1 · the dilemma")
+        first = ex.index("Stage 1 · the user dilemma")
         assert "And this other thing?" in strip_tags(ex[first:ex.index("Stage 2 ·")])
         assert "Should I do the thing?" not in strip_tags(ex)
 

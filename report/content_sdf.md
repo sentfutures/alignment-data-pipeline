@@ -34,7 +34,9 @@ report is held to. And no deks — the page allows two in total and both are spe
 
 <!-- id: sdf_what -->
 
-Pretraining-style documents from a world where careful AI models act responsibly towards animals and other disenfranchised third parties. The pipeline is designed to generate diverse formats and depict varied characters. Users on a French-language internet forum debate the inclusion of animal welfare in an AI constitution; a Chinese trade journal essay discusses a model's tendency to suggest cost-effective welfare improvements to animal handling protocols; a news story about an AI helping a rural community adapt a festive tradition to protect wildlife.
+Pretraining-style documents from a world where careful AI models act responsibly towards animals and other disenfranchised third parties. The pipeline is designed to generate diverse formats and depict varied characters.
+
+The dataset includes users on a French-language internet forum debating the inclusion of animal welfare in an AI constitution; a Chinese trade journal essay discusses a model's tendency to suggest cost-effective welfare improvements to animal handling protocols; a news story about an AI helping a rural community adapt a festive tradition to protect wildlife.
 
 <!-- id: sdf_method_intro -->
 
@@ -48,11 +50,11 @@ Then a model call turns the combination into a self-contained outline: a specifi
 
 <!-- id: sdf_stage2 -->
 
-The outline is drafted into a document. Documents depict a world full of people who feel differently about AI, animals, and ethics. AIs weigh ethical tradeoffs and offer helpful suggestions without overrefusing.
+The outline is drafted into a document. Documents depict a world full of people who feel different ways towards AI, animals, and ethics. The AIs in the scenarios weigh ethical tradeoffs and offer helpful suggestions without overrefusing.
 
 <!-- id: sdf_stage3 -->
 
-The draft is evaluated against your alignment documents along with a suite of common errors, tics, and hallucinations, then rewritten. This increases alignment and diversity while removing stock phrasing, invented citations, and behavior that pushes against your alignment standards.
+The draft is evaluated against your alignment document along with a suite of common errors, tics, and hallucinations to avoid, then rewritten. This increases alignment and diversity while removing stock phrasing, invented citations, and behavior that could degrade other outputs.
 
 The rewrite is stored along with notes about what shortcomings were identified and how they were addressed. It is particularly valuable at this step to use your most capable model.
 
