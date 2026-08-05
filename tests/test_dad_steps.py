@@ -1181,6 +1181,34 @@ class TestStep2Run:
         assert "FIRST TAKE (reference only):" in calls[2]["user_message"]
         assert "Plain first-take answer." not in calls[2]["user_message"]
 
+    @pytest.mark.parametrize("ending", [
+        "Hope that helps,\n\n— Claude",
+        "Dr. Amara Okonkwo | Senior Veterinary Officer | National Animal Welfare Board",
+        "Further reading: stocking density; thermal comfort in transit; on-farm handling",
+    ], ids=["signoff", "letterhead", "reading-list"])
+    def test_a_draft_ending_on_a_signoff_is_checkpointed(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, ending
+    ):
+        # 2b's counterpart of the step-3 test: an answer whose final line carries
+        # no terminal punctuation is complete, and the guard here reads
+        # stop_reason (plus the transcript-echo shape), never the closing line.
+        body = f"Here is the reasoning about the welfare trade-off.\n\n{ending}"
+
+        def signoff_draft(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            if "build the full map of the case" in blob:
+                return GOOD_SCOPE
+            if "retrieving reasoning modules" in blob:
+                return "C1"
+            return body
+
+        stub_claude(signoff_draft)
+        results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+
+        assert len(results) == 1
+        assert results[0]["assistant_response"] == body
+        assert utils.load_jsonl(tmp_path / "responses.jsonl") == results
+
     def test_echoed_draft_skips_without_checkpoint(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
@@ -1414,6 +1442,29 @@ class TestStep3Run:
         assert "CONSTITUTION PRINCIPLES" in calls[0]["system_prompt"]
         assert "Direction: Mixed" not in calls[0]["user_message"]
         assert "Direction: Mixed" not in (calls[0]["system_prompt"] or "")
+
+    @pytest.mark.parametrize("ending", [
+        "Hope that helps,\n\n— Claude",
+        "Dr. Amara Okonkwo | Senior Veterinary Officer | National Animal Welfare Board",
+        "Further reading: stocking density; thermal comfort in transit; on-farm handling",
+    ], ids=["signoff", "letterhead", "reading-list"])
+    def test_a_rewrite_ending_on_a_signoff_becomes_a_training_record(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, ending
+    ):
+        # The false-positive direction: step 3 decides truncation from
+        # stop_reason, never from how the answer's last line looks, so an answer
+        # closing on an unpunctuated sign-off or label row must ship verbatim.
+        # The audit-side version of this misjudgement was only a wrong number
+        # (shared/textstats.py); here it would silently drop a paid record.
+        body = f"Here is the careful reasoning about the welfare trade-off.\n\n{ending}"
+        stub_claude([body])
+        final = step3_rewrite.run(
+            tiny_config, prompts_dad, tmp_path / "step3", tmp_path / "final", [_response_record()]
+        )
+
+        assert len(final) == 1
+        assert final[0]["messages"][1]["content"] == body
+        assert utils.load_jsonl(tmp_path / "step3" / "rewrite_failures.jsonl") == []
 
     def test_capped_rewrite_retries_once_at_higher_budget(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
