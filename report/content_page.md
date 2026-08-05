@@ -77,7 +77,7 @@ Two complementary techniques proved especially effective:
 
 <!-- id: dad_technique -->
 
-**Difficult advice Q&A** Depicts an AI assistant coaching users through realistic ethical dilemmas. This teaches ethical reasoning application across a range of possible scenarios.
+**Difficult advice Q&A** Depictions of an AI assistant coaching users through realistic dilemmas. This teaches the application of reasoning across a range of possible scenarios.
 
 <!-- id: intro_close -->
 
