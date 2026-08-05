@@ -83,7 +83,7 @@ Two complementary techniques proved especially effective:
 
 Following this research, we built pipelines for synthesizing training data on a subject that is currently underrepresented in training data: welfare considerations of nonhuman sentient beings.
 
-We developed scenarios and reasoning principles in consultation with leading animal ethicists to develop a pipeline for creating training data that mirrors situations where models act beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
+The outputs show models acting beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
 
 <!-- id: dad_desc -->
 

@@ -246,6 +246,8 @@ def footer(maker_icon=""):
     return (byline()
             + f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
+            f"<p>If you have suggestions or feedback, please provide them "
+            f"<a href='{REPO_URL}/issues'{R.NEW_TAB}>on GitHub{R.EXT_ARROW}</a>.</p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
             f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
 
