@@ -195,8 +195,15 @@ AUTHORS = (
     ("Arda Enfiyeci", "Sentient Futures"),
 )
 
+# Technical contributors, credited under the authors with the same numbered-affiliation
+# treatment. Separate tuple, separate line: a contribution is not an authorship claim.
+CONTRIBUTORS = (
+    ("Jasmine Brazilek", "Compassion Aligned Machine Learning"),
+    ("Miles Tidmarsh", "Compassion Aligned Machine Learning"),
+)
 
-def byline(authors=AUTHORS):
+
+def byline(authors=AUTHORS, contributors=CONTRIBUTORS):
     """The author list and its numbered affiliation key, paper-style.
 
     One number per institution, assigned by first appearance — the convention a reader
@@ -209,15 +216,20 @@ def byline(authors=AUTHORS):
     names its institution in a ``title`` for a hover.
     """
     seen = []
-    for _, inst in authors:
+    for _, inst in (*authors, *contributors):
         if inst not in seen:
             seen.append(inst)
     num = {inst: i + 1 for i, inst in enumerate(seen)}
     names = ", ".join(f"{R.esc(name)}<sup title='{R.esc(inst)}'>{num[inst]}</sup>"
                       for name, inst in authors)
     key = "".join(f"<span><sup>{num[inst]}</sup>{R.esc(inst)}</span>" for inst in seen)
+    contrib = ""
+    if contributors:
+        c_names = ", ".join(f"{R.esc(name)}<sup title='{R.esc(inst)}'>{num[inst]}</sup>"
+                            for name, inst in contributors)
+        contrib = f"<p class='foot-authors'>with technical contributions from {c_names}</p>"
     return (f"<div class='foot-by'><p class='foot-authors'>{names}</p>"
-            f"<p class='foot-affil'>{key}</p></div>")
+            f"{contrib}<p class='foot-affil'>{key}</p></div>")
 
 
 def footer(maker_icon=""):
@@ -232,7 +244,9 @@ def footer(maker_icon=""):
     """
     mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
     return (byline()
-            + f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
+            + f"<p>If you have suggestions or feedback, please provide them "
+            f"<a href='{REPO_URL}/issues'{R.NEW_TAB}>on GitHub{R.EXT_ARROW}</a>.</p>"
+            f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
             f"{R.EXT_ARROW}</a></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
             f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")

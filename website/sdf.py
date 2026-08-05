@@ -527,7 +527,7 @@ def lineage_blocks(did, doc, lin, manifest):
         # No line introducing this one: the drawer's own label and meta say what it holds
         # and that it never ships, and the ceiling above is 800 counted words.
         out.append(R.details("The draft, written from the spec alone", R.highlight(draft, []),
-                             meta=f"{len(draft.split()):,} words · never a training record"))
+                             meta=f"{len(draft.split()):,} words"))
     else:
         out.append(R.note("The draft is in `layer3/drafts.jsonl`, which this run did not keep."))
 
