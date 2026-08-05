@@ -1201,15 +1201,23 @@ min-width:0;overflow-anchor:none;margin-left:calc(-1*var(--pull));
 display:grid;grid-template-columns:[rail-col] var(--rail) [read-col] minmax(0,1fr);
 column-gap:3rem}
 .explore-body.tight{--t:1}
-/* The contents start level with the report's title, not with the top of the row: the panel
-   carries .panel's 3.2rem top margin and the rail did not, so its first beat sat 48px above
-   the <h2> it belongs to. 3rem here plus the rail's own .2rem is that margin — the two
-   numbers have to add up to it, which is what the test recomputes. Only at rest: once the
-   rail pins, its own `top` places it. */
-/* The contents start level with the report's <h2>, not with the top of the row: the panel
-   carries a 3.2rem top margin the rail does not, so without this the first beat sat ~48px
-   above the heading it is the contents of. This plus the rail's own .2rem is that margin. */
-.railcol{grid-column:rail-col;padding-top:3rem}
+/* THE DATUM IS THE REPORT'S FIRST LINE OF PROSE, NOT ITS TITLE. With no padding at all the
+   first beat sat ~48px ABOVE the <h2> it is the contents of; levelled with the <h2> instead
+   it overshot the other way — a .8rem sans link sharing a band with a 2rem serif title reads
+   as a competing second heading, and at that ratio of sizes box-to-box alignment puts the
+   rail's text visibly above the title's cap. Landing on the lede gives the heading its own
+   band and makes the rail an annotation beside the prose.
+
+   Derived, never typed: .panel's 3.2rem margin + the <h2>'s 2.3rem line box (2rem/1.15) +
+   the 1.9rem margin `.panel>h2` gives it — NOT the global h2's .5rem, which is overridden
+   here and was what a first attempt at this landed 22px high on — puts the lede's box at
+   7.4rem, and the two half-leadings are the optical term: the lede's .305rem down against
+   this link's .42rem (.28rem padding plus its own .14rem). So the rail's box wants
+   7.285rem, of which .2rem is the rail's own padding. 7.1rem here keeps the column on the
+   page's quarter-rem grain; the remainder is a quarter of a pixel. The test recomputes all
+   of it from those same rules. Measured at 1440px: both text tops at y=204.
+   Only at rest: once the rail pins, its own `top` places it. */
+.railcol{grid-column:rail-col;padding-top:7.1rem}
 .panels{grid-column:read-col;min-width:0}
 /* One report's contents, held on screen for as long as that report is being read.
    Its travel is .railcol, which stretches to the row's height — the height of the open
@@ -1652,8 +1660,15 @@ section{grid-template-columns:[text-start] minmax(0,1fr) [text-end full-end]}
 .choice-a{display:none}
 h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06rem}
 .lede{font-size:1.1rem}
-.hero{padding:1.8rem 16px 0}.hero h1{margin-top:1.6rem;font-size:2.2rem}
-.hero-intro{margin-top:1.2rem}.hero-intro p{font-size:1.05rem}
+/* THESE TWO GAPS STAY CLEAR OF `.hero-intro p+p`, which is 1.4rem and is not restated
+   here. Tightened to 1.6rem and 1.2rem they were not: the title-to-intro break — the
+   largest one in the hero — got LESS air than the space between two paragraphs of the
+   intro, and the whole hero read as one block. The ladder mobile wants is the one the
+   wide layout has, strictly descending as the break gets smaller: 2.6rem above the title
+   (2.2 here plus the art's own .4rem bottom, set by `.illo.art`), 2.2 above the intro,
+   1.8 above the two techniques, 1.4 between paragraphs. */
+.hero{padding:1.8rem 16px 0}.hero h1{margin-top:2.2rem;font-size:2.2rem}
+.hero-intro{margin-top:2.2rem}.hero-intro p{font-size:1.05rem}
 /* One column: two of them inside a 390px viewport are ~16 characters each.
    AND IT CENTRES, which the two-column form must not. The reason the pair goes flush left up
    there is that centring two columns leaves four ragged edges; one column has two, and the

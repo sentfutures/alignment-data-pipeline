@@ -1158,17 +1158,28 @@ class TestContentsRail:
         # back from the margin, so it counts on the reading side.
         assert shell - 3.5 - rail - gap - prose + pull >= 11.5, "the figure track shrank"
 
-    def test_the_contents_start_level_with_the_report_s_title(self):
-        """The panel carries a top margin the rail does not, so the first beat sat 48px above
-        the <h2> it is the contents of. The column's padding plus the rail's own has to come
-        to that margin — derived here, because a hardcoded 3rem goes stale the moment the
-        panel's margin is retuned. Measured at 1440px: both tops at y=1499."""
+    def test_the_contents_start_level_with_the_report_s_first_line(self):
+        """Not with its <h2>: levelled with the title, a .8rem sans link shares a band with
+        2rem serif and reads as a second heading. The datum is the lede, and every term of it
+        is derived — the panel's margin, the h2's line box and its margin place the lede's
+        box; the two half-leadings are the optical correction, so it is cap to cap rather
+        than box to box. Hardcoding the sum goes stale the moment any of them is retuned."""
         html = build(sdf_inputs=SDF_INPUTS)
         panel = float(re.search(r"\.panel\{margin-top:([\d.]+)rem", html).group(1))
+        h2 = re.search(r"(?m)^h2\{font:\d+ ([\d.]+)rem/([\d.]+)", html)
+        size, lh = (float(g) for g in h2.groups())
+        # The panel's own h2 margin, not the global .5rem it overrides — deriving from the
+        # wrong one of the two put the rail 22px above the line it is meant to meet.
+        below = float(re.search(r"\.panel>h2\{margin-bottom:([\d.]+)rem", html).group(1))
+        lede = re.search(r"\.lede\{font:([\d.]+)rem/([\d.]+)", html)
+        link = re.search(r"\.rail a\{[^}]*padding:([\d.]+)rem", html)
+        beat = re.search(r"\.rail \.r-b\{font:\d+ ([\d.]+)rem/([\d.]+)", html)
+        half = lambda m: (float(m.group(2)) - 1) * float(m.group(1)) / 2
+        want = panel + size * lh + below + half(lede) - (float(link.group(1)) + half(beat))
         col = float(re.search(r"\.railcol\{[^}]*padding-top:([\d.]+)rem", html).group(1))
         rail = float(re.search(r"\.rail\{[^}]*padding:([\d.]+)rem", html).group(1))
-        assert col + rail == panel, f"{col} + {rail} != the panel's {panel}rem"
-        # Below 900px the contents sit above the report, so there is no title to line up with.
+        assert abs(col + rail - want) <= 0.15, f"{col} + {rail} is not the lede's {want}rem"
+        # Below 900px the contents sit above the report, so there is no line to line up with.
         small = html[html.index("@media (max-width:900px)"):html.index("@media (max-width:760px)")]
         assert re.search(r"\.railcol\{[^}]*padding-top:0", small)
 
