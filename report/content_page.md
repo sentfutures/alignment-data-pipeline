@@ -73,17 +73,17 @@ Two complementary techniques proved especially effective:
 
 <!-- id: sdf_technique -->
 
-**Synthetic document finetuning** Uses pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model in training while increasing the number of aligned propensities associated with it.
+**Synthetic document finetuning** Uses pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model.
 
 <!-- id: dad_technique -->
 
-**Difficult advice Q&A** Depicts an AI assistant coaching users through ethical dilemmas analogous to those the target model might eventually encounter in deployment. This teaches ethical reasoning skills while teaching the model to identify with the responsible persona.
+**Difficult advice Q&A** Depicts an AI assistant coaching users through realistic ethical dilemmas. This teaches ethical reasoning application across a range of possible scenarios.
 
 <!-- id: intro_close -->
 
-Following this research, we built pipelines for synthesizing training data on a subject currently absent from the training corpus: welfare considerations of nonhuman sentient beings.
+Following this research, we built pipelines for synthesizing training data on a subject that is currently underrepresented in training data: welfare considerations of nonhuman sentient beings.
 
-We developed scenarios and reasoning principles in consultation with leading animal ethicists to create a robust training set that mirrors situations where real AI systems will take actions beneficial or detrimental to animal welfare.
+We developed scenarios and reasoning principles in consultation with leading animal ethicists to develop a pipeline for creating training data that mirrors situations where models act beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
 
 <!-- id: dad_desc -->
 
