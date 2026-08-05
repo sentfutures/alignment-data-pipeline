@@ -77,7 +77,7 @@ Two complementary techniques proved especially effective:
 
 <!-- id: dad_technique -->
 
-**Difficult advice Q&A** Depictions of an AI assistant coaching users through realistic dilemmas. This teaches the application of reasoning across a range of possible scenarios.
+**Difficult advice Q&A** Depictions of an AI assistant advising users on realistic and complex dilemmas. This teaches the application of reasoning across a range of possible scenarios.
 
 <!-- id: intro_close -->
 
@@ -91,7 +91,7 @@ AI coaching users through ethical dilemmas involving disenfranchised third parti
 
 <!-- id: sdf_desc -->
 
-Diverse artifacts from a world where your model already reasons responsibly about animal welfare.
+Diverse artifacts from a world where a model already reasons responsibly about animal welfare.
 
 <!-- id: dad_use -->
 
