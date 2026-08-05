@@ -73,7 +73,7 @@ Two complementary techniques proved especially effective:
 
 <!-- id: sdf_technique -->
 
-**Synthetic document finetuning** Uses pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model.
+**Synthetic document finetuning** Pretraining-style documents from a world where the target model is *already* aligned to certain behaviors. This reinforces the existence of an aligned persona.
 
 <!-- id: dad_technique -->
 
