@@ -67,32 +67,15 @@ _WORD_RE = re.compile(r"[\w']+")
 DIM = 1 << 14  # 16384 hashed shingle buckets
 
 
-def trim_unfinished(text: str) -> str:
-    """Cut a token-capped output back to its last complete sentence.
-
-    Outputs that hit a max-token cap end mid-sentence, and a mid-sentence
-    cutoff is exactly the artifact we don't want a model trained on this
-    corpus to learn. Only trims when a sentence boundary exists in the second
-    half of the text, so a legitimately unpunctuated text is left alone.
-
-    Gated on ends_mid_sentence, so a text whose only unpunctuated line is a
-    sign-off, byline or letterhead is returned whole. Without that gate the
-    nearest boundary to cut back to is the newline above the sign-off, which
-    silently deletes it — the same false positive ends_mid_sentence exists to
-    avoid, but destructive rather than merely mis-reported.
-    """
-    if not text:
-        return text
-    t = text.rstrip()
-    if not t or t[-1] in _TERMINAL_CHARS:
-        return t
-    if not ends_mid_sentence(t):
-        return t
-    cut = max(t.rfind("."), t.rfind("!"), t.rfind("?"), t.rfind("\n"))
-    if cut > len(t) * 0.5:
-        return t[: cut + 1].rstrip()
-    return t
-
+# trim_unfinished() was removed on 2026-08-05. It cut a token-capped output back
+# to its last complete sentence, and layer 3 once used it on the untagged-output
+# fallback path (see code_quality/findings_v1_2026-07-10.json, which flags that
+# it produced a superficially complete document flowing into layers 4-5). That
+# caller is long gone and nothing replaced it: every stage now rejects on
+# stop_reason and refuses to checkpoint, so a truncated output is retried rather
+# than salvaged. What remained was dead code that silently deleted a document's
+# closing sign-off — it trimmed back to the newline above it — so it was deleted
+# rather than guarded. Recover it from history if a salvage path is ever wanted.
 
 _SEPARATOR_LINE_RE = re.compile(r"^[\s\-=*_~#]+$")
 

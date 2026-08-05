@@ -5,36 +5,13 @@ import pytest
 from shared import entity_pools, textstats
 
 
-class TestTrimUnfinished:
-    def test_trims_midsentence_tail_back_to_last_boundary(self):
-        body = "The committee reviewed the aquaculture welfare standards in detail."
-        cut = body + " But the follow-up paragraph was cut mid wo"
-        assert textstats.trim_unfinished(cut) == body
-
-    def test_leaves_complete_text_alone(self):
-        assert textstats.trim_unfinished("Ends cleanly.") == "Ends cleanly."
-        assert textstats.trim_unfinished('He said "done."') == 'He said "done."'
-
-    def test_conservative_when_boundary_in_first_half(self):
-        # A short text whose only boundary is early: trimming would discard
-        # more than half, so it is left alone.
-        t = "Short. But this untrimmed tail runs on and on and on"
-        assert textstats.trim_unfinished(t) == t
-
-    def test_empty_and_whitespace(self):
-        assert textstats.trim_unfinished("") == ""
-        assert textstats.trim_unfinished("   ") == ""
-
-    def test_does_not_trim_a_signoff_off_a_finished_document(self):
-        # The destructive half of the sign-off false positive: the nearest
-        # boundary to cut back to is the newline above the sign-off, so an
-        # ungated trim deletes it. Gated on ends_mid_sentence, so the shapes
-        # TestSignoffIsNotTruncation covers are returned whole.
-        for ending in ("— Michelle",
-                       "Dr. Amara Okonkwo | Senior Veterinary Officer | National Welfare Board",
-                       "See also: Machine ethics; Digital minds; Precautionary reasoning"):
-            doc = f"The follow-up visit is booked for Thursday.\n\n{ending}"
-            assert textstats.trim_unfinished(doc) == doc, ending
+class TestEndsMidSentence:
+    def test_trim_unfinished_is_gone(self):
+        # Removed 2026-08-05: dead code that deleted a document's closing
+        # sign-off by trimming back to the newline above it. Nothing salvages
+        # truncated output any more — every stage rejects on stop_reason and
+        # retries. Pinned so it cannot quietly return.
+        assert not hasattr(textstats, "trim_unfinished")
 
     def test_ends_mid_sentence_flag(self):
         # A truncated tail is a full line of running prose with no stop. The
