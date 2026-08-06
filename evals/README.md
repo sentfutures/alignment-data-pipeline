@@ -34,10 +34,13 @@ for one specific run to be published, and confirm which run that is first. Most
 runs are exploratory and were never meant to become, or to overwrite, the
 published snapshot.
 
-Two consequences are easy to miss. Publishing one pipeline regenerates the
+Three consequences are easy to miss. Publishing one pipeline regenerates the
 whole dataset card, so the script reads the other pipeline's metadata back off
-the Hub to rebuild its half. And audit files are staged verbatim, so anything a
+the Hub to rebuild its half. Audit files are staged verbatim, so anything a
 report happens to record about the machine that produced it goes public with it.
+And published rows are ordered English first, because the Hub viewer opens on
+whatever is first in the file — only the staged copy is reordered, never the
+run's own `final/` corpus, so nothing the evals measure moves underneath them.
 `--dry-run` stages everything and prints the card without making a single
 network call.
 
