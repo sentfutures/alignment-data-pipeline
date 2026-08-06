@@ -267,11 +267,26 @@ def order_english_first(corpus_path: Path, language_of) -> dict[str, int] | None
     return counts
 
 
-def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
+def flatten_dad_corpus(src: Path, dst: Path, languages: dict[str, str] | None = None,
+                       append: bool = False) -> int:
     """Write the published form of a DAD corpus: one flat record per example
-    (example_gid, user_prompt, assistant_response) instead of the training
-    format's messages array, so the Hub viewer shows one readable column per
-    field with no role/content nesting.
+    (example_gid, language, user_prompt, assistant_response) instead of the
+    training format's messages array, so the Hub viewer shows one readable
+    column per field with no role/content nesting.
+
+    `language` is the language the scenario was DEALT (see dad_languages), not
+    one detected from the text, and it is emitted only when the map is
+    non-empty — a run we cannot measure would otherwise grow a column that is
+    null on every row and reads as broken. A single row that does not join
+    carries null rather than a guessed "English": a visible gap is honest, an
+    invented value is not.
+
+    That this column is worth its width, while the old source_run column was
+    not, is not a contradiction. A short language cell against two very wide
+    text columns costs almost nothing on the viewer's first screen, and unlike
+    a run id repeated down every row it carries information no other column
+    holds — which is exactly what a reader needs once the corpus is ordered
+    English-first and a balanced sample has to be rebuilt.
 
     Deliberately carries NO per-row run column, even when several runs are
     concatenated into one published corpus (append=True for every run after
@@ -307,11 +322,12 @@ def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
                     f"{src}: record {rid} has no user+assistant message pair "
                     f"— refusing to publish a mangled row"
                 )
-            fout.write(json.dumps({
-                "example_gid": record.get("example_gid"),
-                "user_prompt": by_role["user"],
-                "assistant_response": by_role["assistant"],
-            }, ensure_ascii=False) + "\n")
+            row = {"example_gid": record.get("example_gid")}
+            if languages:
+                row["language"] = languages.get(record.get("example_gid"))
+            row["user_prompt"] = by_role["user"]
+            row["assistant_response"] = by_role["assistant"]
+            fout.write(json.dumps(row, ensure_ascii=False) + "\n")
             n += 1
     return n
 
@@ -391,6 +407,16 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
                     "manifest_file": None, "audit_files": [], "n_docs": 0,
                     "runs": [], "languages": None}
 
+    # Built BEFORE the loop, because the flatten writes the language column as
+    # it goes. Merged across runs since a combined corpus is one published
+    # file; a gid repeated across runs means byte-identical content (the ids
+    # are content-keyed via dad_pipeline/id_registry.py), so whichever run
+    # wins the merge carries the same answer.
+    dad_language_map: dict[str, str] = {}
+    if corpus_name == "dad_corpus.jsonl":
+        for run_dir in run_dirs:
+            dad_language_map.update(dad_languages(run_dir))
+
     corpus_dst = dataset_dir / corpus_name
     for i, run_dir in enumerate(run_dirs):
         manifest = _load_json(run_dir / "run_manifest.json") or {}
@@ -398,7 +424,8 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
         corpus_src = run_dir / "final" / corpus_name
         if corpus_name == "dad_corpus.jsonl":
-            n = flatten_dad_corpus(corpus_src, corpus_dst, append=(i > 0))
+            n = flatten_dad_corpus(corpus_src, corpus_dst, dad_language_map,
+                                   append=(i > 0))
         else:
             shutil.copy2(corpus_src, corpus_dst)
             with open(corpus_dst, encoding="utf-8") as f:
@@ -437,21 +464,13 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
     # non-English part way down. Run order survives inside each language block
     # (the sort is stable), and the card's per-run table reports counts, never
     # row ranges, so it stays true either way.
-    if corpus_name == "dad_corpus.jsonl":
-        # A gid repeated across runs means byte-identical content (the ids are
-        # content-keyed via dad_pipeline/id_registry.py), so whichever run wins
-        # the merge carries the same answer.
-        languages: dict[str, str] = {}
-        for run_dir in run_dirs:
-            languages.update(dad_languages(run_dir))
-
-        def language_of(record: dict) -> str | None:
-            return languages.get(record.get("example_gid"))
-    else:
-        def language_of(record: dict) -> str | None:
-            return record.get("language")
-
-    staged["languages"] = order_english_first(corpus_dst, language_of)
+    # Both pipelines now publish the language on the row itself — SDF writes it
+    # upstream, DAD gets it from the flatten above — so the ordering reads the
+    # very column a visitor sees. That also makes the decline path fall out for
+    # free: a run with no measurable language emits no column, every row reads
+    # None, and order_english_first leaves the file alone.
+    staged["languages"] = order_english_first(
+        corpus_dst, lambda record: record.get("language"))
 
     staged["corpus_file"] = corpus_name
     return staged

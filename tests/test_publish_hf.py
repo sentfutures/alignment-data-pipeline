@@ -438,6 +438,8 @@ class TestFlattenDadCorpus:
         assert set(by_gid) == {"E-0000", "E-0001"}
         for i in range(2):
             rec = by_gid[f"E-{i:04d}"]
+            # No language column here: this run carries no language data, so
+            # the column is omitted rather than nulled down every row.
             assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
@@ -734,6 +736,45 @@ class TestDadLanguageJoin:
         assert staged["languages"] is None
         _, records = _published(dataset_dir, corpus_name)
         assert [r["example_gid"] for r in records] == ["E-0000", "E-0001"]
+
+    def test_published_dad_rows_carry_the_language_they_were_dealt(self, tmp_path):
+        """SDF rows already publish a language column; this closes the gap so
+        a reader can rebuild a balanced subset from a corpus that is now
+        ordered English-first."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            languages=["English", "Mandarin Chinese"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert set(records[0]) == {"example_gid", "language", "user_prompt",
+                                   "assistant_response"}
+        assert {r["example_gid"]: r["language"] for r in records} == {
+            "E-0000": "English", "E-0001": "Mandarin Chinese"}
+
+    def test_a_run_with_no_language_data_publishes_no_language_column(self, tmp_path):
+        """A column that is null on every row reads as broken; omitting it says
+        the same thing honestly."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert all("language" not in r for r in records)
+
+    def test_an_unjoined_row_carries_a_null_language_not_a_guess(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            languages=["Spanish", "English", "English"])
+        rewrites = (run_dir / "step3" / "rewrites.jsonl")
+        kept = [line for line in rewrites.read_text(encoding="utf-8").splitlines()
+                if "E-0002" not in line]
+        rewrites.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert {r["example_gid"]: r["language"] for r in records} == {
+            "E-0000": "Spanish", "E-0001": "English", "E-0002": None}
 
     def test_a_row_whose_example_gid_does_not_join_lands_behind_the_english_block(
             self, tmp_path):
