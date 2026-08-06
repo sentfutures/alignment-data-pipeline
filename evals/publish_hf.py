@@ -539,23 +539,33 @@ def build_metrics_rows(dataset_dir: Path,
     return rows
 
 
-def detected_languages(dataset_dir: Path, pipeline_tag: str) -> list[str]:
+def detected_languages(dataset_dir: Path, pipeline_tag: str,
+                       measured: dict[str, int] | None = None) -> list[str]:
     """ISO 639-1 codes actually present in this ONE dataset, not a hardcoded
     guess. The card's repo-wide `language:` field is the UNION over datasets.
 
-    SDF runs get this from audit_report.json's own composition.language
-    breakdown (evals/audit_sdf.py, keyed by the same full names
-    LANGUAGE_CODES maps) — the culture matrix deliberately samples mostly
-    non-English documents, so hardcoding "en" would misdeclare the card's
-    language metadata for every real SDF run. DAD's audit_report.json has no
-    such breakdown (dilemmas are English-only by the dad.language_distribution
-    default), so DAD runs — and any SDF run missing the file or whose
-    language names don't map — fall back to ["en"] rather than guessing.
+    `measured` is the breakdown the ordering pass counted while staging
+    (stage_run's staged["languages"]), and is preferred when present because
+    it is read off the rows being published rather than off a report about
+    them. DAD needs it: its audit_report.json carries no composition breakdown
+    at all, and DAD is NOT English-only — the ~35% marked slice of the
+    cultural_setting axis deals settings like "China, written in Mandarin
+    Chinese", and roughly a fifth of a real run's rows are not English.
+    Without this the card would declare `language: [en]` over them, which is
+    invisible today only because the repo-wide union takes SDF's 16 codes.
+
+    SDF also has audit_report.json's own composition.language breakdown
+    (evals/audit_sdf.py, keyed by the same full names LANGUAGE_CODES maps),
+    kept as the fallback — it still covers a sibling fetched off the Hub,
+    which arrives with no staging metadata. Anything unmeasurable, or whose
+    language names don't map (the legacy bare "en" code four early SDF runs
+    write is not a LANGUAGE_CODES key), falls back to ["en"] rather than
+    guessing.
     """
-    if pipeline_tag != "sdf":
-        return ["en"]
-    d = _load_json(dataset_dir / "audit" / "audit_report.json")
-    names = _get(d, "composition", "language", default={}) if d else {}
+    names: dict = measured or {}
+    if not names and pipeline_tag == "sdf":
+        d = _load_json(dataset_dir / "audit" / "audit_report.json")
+        names = _get(d, "composition", "language", default={}) if d else {}
     codes = sorted({LANGUAGE_CODES[n] for n in names if n in LANGUAGE_CODES})
     return codes or ["en"]
 
@@ -779,13 +789,15 @@ def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:
     whole on each publish, so every dataset that should survive must be
     present here (see fetch_sibling).
     """
-    # language: is repo-wide, so it must be the union across datasets — SDF
-    # spans 16 languages while DAD is English-only, and declaring either one
-    # alone would misdescribe the repo.
+    # language: is repo-wide, so it must be the union across datasets. Both
+    # pipelines are multilingual — SDF spans 16 languages by construction, and
+    # DAD's cultural_setting axis marks about a third of a run — so declaring
+    # either one alone would misdescribe the repo.
     languages = sorted({
         code
         for ds in datasets
-        for code in detected_languages(ds["dir"], ds["pipeline"])
+        for code in detected_languages(ds["dir"], ds["pipeline"],
+                                       ds["staged"].get("languages"))
     }) or ["en"]
 
     configs = []

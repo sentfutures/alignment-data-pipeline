@@ -1028,14 +1028,44 @@ class TestDetectedLanguages:
         # English, Spanish, Mandarin Chinese, Urdu -> en, es, zh, ur, sorted
         assert publish_hf.detected_languages(dataset_dir, "sdf") == ["en", "es", "ur", "zh"]
 
-    def test_dad_run_always_falls_back_to_en(self, tmp_path):
-        """DAD's audit_report.json has no composition.language breakdown —
-        dilemmas are English-only by the dad.language_distribution default —
-        so DAD runs shouldn't attempt the SDF-specific lookup at all."""
+    def test_a_dad_run_with_no_measured_languages_falls_back_to_en(self, tmp_path):
+        """DAD's audit_report.json has no composition.language breakdown, and
+        the SDF-specific lookup isn't attempted for it, so an unmeasurable DAD
+        run declares en. Note this is a FALLBACK, not a fact about the
+        pipeline: DAD is not English-only — see the test below."""
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad")
         staging_dir = tmp_path / "staged"
         _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
         assert publish_hf.detected_languages(dataset_dir, "dad") == ["en"]
+
+    def test_a_dad_run_declares_the_languages_its_rows_were_dealt(self, tmp_path):
+        """Regression: this hardcoded ["en"] for every non-SDF pipeline, on the
+        claim that DAD dilemmas are English-only. They are not — the ~35%
+        marked slice of the cultural_setting axis deals settings like "China,
+        written in Mandarin Chinese", and about a fifth of a real run's rows
+        are not English. The bug is invisible while SDF shares the repo and
+        supplies all 16 codes to the union; publishing DAD to a repo without
+        SDF would put a false language claim on a public card."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=4, audit_files=[], include_html=False,
+            languages=["English", "Mandarin Chinese", "Japanese", "English"])
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["languages"] == {"English": 2, "Mandarin Chinese": 1,
+                                       "Japanese": 1}
+        assert publish_hf.detected_languages(
+            dataset_dir, "dad", staged["languages"]) == ["en", "ja", "zh"]
+
+    def test_the_measured_breakdown_beats_the_audit_report(self, tmp_path):
+        """The staged rows are what gets published; the audit report is a
+        report about them. When they disagree, believe the rows."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, docs=2, languages=["English", "Japanese"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        # AUDIT_REPORT names English/Spanish/Mandarin/Urdu; the rows say
+        # English/Japanese.
+        assert publish_hf.detected_languages(
+            dataset_dir, "sdf", {"English": 1, "Japanese": 1}) == ["en", "ja"]
 
     def test_missing_audit_report_falls_back_to_en(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False)
