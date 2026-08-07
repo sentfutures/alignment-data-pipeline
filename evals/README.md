@@ -78,16 +78,12 @@ The corpora's licence is declared in that frontmatter and nowhere else. It is
 **CC0-1.0**, and it is not the same thing as this repository's own code licence
 (Apache-2.0, see `LICENSE`).
 
-**Pending, not yet on the Hub.** The English-first ordering landed before the
-card stopped being generated, and the note describing it to consumers was
-written into the tracked copy that this change deletes — it was never applied
-to the live card. Paste it in by hand, under "The two datasets":
-
-> Both are multilingual by design, and both are ordered **English first** so the
-> viewer above opens on something most readers can read. Within that, each row
-> keeps the order its run produced. The `language` column tells you which
-> language a row was written in — **shuffle before training**, or the first pass
-> of an unshuffled stream is all English.
+Checked against the live Hub files on 2026-08-07: the card declares 16 language
+codes and both published corpora contain exactly those 16, with none present
+that is undeclared. The one thing the list cannot express is that 10 DAD rows
+carry `language: null` — the `archetype10` run was hand-seeded and its cards
+carry no `cultural_setting`, so those rows join nothing. They are English, but a
+consumer filtering by language drops them.
 
 `tics.yaml` and `moves.yaml` are the tracked-phrase and tracked-move lists that
 `audit_dad.py` counts against, with their dismissed candidates. They are edited
