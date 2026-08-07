@@ -52,7 +52,7 @@ than left behind a flag. A publish stages `<pipeline>/…` only, and
 `delete_patterns` is scoped to the same prefix, so `README.md` is a path the
 upload can neither overwrite nor delete.
 
-Three things about that card are load-bearing, and nothing in this repository
+Four things about that card are load-bearing, and nothing in this repository
 will catch a mistake in any of them:
 
 - **The `configs:` block in the YAML frontmatter is functional.** It is the
@@ -73,6 +73,11 @@ will catch a mistake in any of them:
   used to be derived; every publish now prints the language breakdown it
   measured while ordering the rows, and reminds you to check the card against
   it.
+- **The shuffle-before-training note has to stay on the card.** Rows are
+  published English first, so an unshuffled training stream starts all-English
+  — a consumer who does not know that gets a silently skewed first pass. It is
+  the one caveat on the card that is about how to *use* the data rather than
+  what the data is, so it is the one most easily edited away as clutter.
 
 The corpora's licence is declared in that frontmatter and nowhere else. It is
 **CC0-1.0**, and it is not the same thing as this repository's own code licence
