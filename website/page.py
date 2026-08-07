@@ -98,14 +98,14 @@ def _date(manifest):
 def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     """The two datasets, side by side. Their names are this section's heading.
 
-    Five rows: three describe the RESULT — what the dataset is, what one record is, what
+    Five rows: three describe the OUTPUT — what the dataset is, what one record is, what
     it is for — before the two that link out to the templates and to a made example.
 
     A ``pipeline`` row naming each chain of stages used to sit between them. It was cut:
     the two walkthroughs below ARE the pipeline, at length and with a diagram each, and a
     one-line chain above them was a summary the reader met before it could mean anything.
 
-    ``result`` was the masthead's subtitle. It reads as a row because it is one: the
+    ``output`` was the masthead's subtitle. It reads as a row because it is one: the
     sentence saying what each dataset is was the only unlabelled claim in the comparison.
 
     How MANY records is not a row — that is a property of a run, and this section
@@ -114,8 +114,8 @@ def section_datasets(content, f, dad_kwargs, sdf_kwargs):
     table meant to be read in one pass.
     """
     rows = [
-        ("result", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
-        ("result format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
+        ("output", _cell(content, "sdf_desc", f), _cell(content, "dad_desc", f)),
+        ("output format", _cell(content, "sdf_unit", f), _cell(content, "dad_unit", f)),
         ("what it is for", _cell(content, "sdf_use", f), _cell(content, "dad_use", f)),
         ("pipeline", _with_button("", REPO_URL, "Pipeline", "github"),
          _with_button("", REPO_URL, "Pipeline", "github")),

@@ -68,7 +68,9 @@ Two open pipelines for alignment finetuning data teaching AI models to reason re
 
 <!-- id: intro -->
 
-Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
+Humans are starting to use AIs to help make a wide range of decisions, some of which **could harm or benefit animals**. AI should take animal welfare into account along with other ethical considerations, but current training data [does not teach them how](https://mantabench.org).
+
+Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) shows how it can be taught: the reasons *behind* aligned behaviors matter just as much as the behaviors themselves.
 
 Two complementary techniques proved especially effective:
 
@@ -82,7 +84,7 @@ Two complementary techniques proved especially effective:
 
 <!-- id: intro_close -->
 
-Following this research, we built pipelines for synthesizing training data on a subject that is currently underrepresented in training data: welfare considerations of nonhuman sentient beings.
+Following this research, **we built two pipelines** that synthesize the missing training data for welfare considerations of animals and other sentient beings.
 
 The outputs show models acting beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
 
@@ -109,4 +111,3 @@ One user dilemma in, one assistant answer out.
 <!-- id: sdf_unit -->
 
 Blogs, interviews, encyclopedia entries, forum threads.
-

@@ -1030,19 +1030,17 @@ section>figure,section>.tiles,section>.scroll,section>.pair,section>details,
 section>.explore-body,section>.lbtns,section>.cmp-wrap,
 section>.carousel{grid-column:text-start/full-end}
 section+section{margin-top:5rem}
-/* One centred rule, above the comparison and nowhere else. 30rem is three quarters of the two
-   dataset columns (2 x --cmp-col = 40rem), and it is centred on the page, which is where the
-   pair is centred too. Its own margin is the ENTIRE gap between the intro and the table — the
-   hero's bottom padding is zero — so "equally spaced" is one value here rather than arithmetic
-   across two rules that each restate at a breakpoint. Drawn as a grid child, because a border
-   on the section itself runs the full shell column.
+/* A centred rule sat above the COMPARISON and is gone: the intro now draws two of its own and
+   a third one a screen below them made the top of the page read as ruled sections. The gap it
+   carried went with it — its margin WAS the entire space between the intro and the table,
+   because the hero's bottom padding was zero — so the hero pays for that gap now, in one value
+   on one rule.
 
-   CAPPED, or it is the widest thing on the page: 30rem is 480px, and below 760px the section
-   is one minmax(0,1fr) track — ~358px on a 390px phone — so a bare width overflowed it by
-   122px and gave the whole document a horizontal scroll with blank paper to the right of
-   every section. min() keeps the 30rem wherever there is room for it. */
-#datasets::before{content:'';grid-column:1/-1;width:min(100%,30rem);margin:3rem auto;
-border-top:1px solid var(--hairline)}
+   The chooser had one too, briefly, and it is gone for the same reason: the two rules the
+   intro draws are the page's whole ration. It keeps the gap that rule was carrying, as
+   6rem of its own rather than the 5rem every other section break takes — the chooser is
+   where the page stops describing and starts asking. */
+#explore{margin-top:6rem}
 /* The panel is a section, so its own display:grid would beat the browser's default
    [hidden] rule. It has to be said out loud. */
 .panel[hidden]{display:none}
@@ -1051,13 +1049,13 @@ border-top:1px solid var(--hairline)}
    enough air to separate them from the page and no more. The two datasets are two
    things, so they are two things here as well as in the table below. */
 .hero{display:flex;flex-direction:column;align-items:center;
-padding:2.6rem 28px 0;text-align:center}
-/* 3rem above the art and 3rem above the title, not the 6rem each carried. The art is a
-   186px band inside a 36rem box, so 12rem of stacked margin spent ~190px of the first
-   screen on paper with nothing on it and pushed the comparison — the section that does
-   this page's work — to 1,160px, past the fold on a laptop. Measured after: the title at
-   ~300px and the whole intro above the fold at 900px of viewport. */
-.hero h1{max-width:22ch;margin:3rem 0 0;font-size:3rem}
+padding:96px 28px 5rem;text-align:center}
+/* 3rem above the art and 64px above the title. This was 6rem each: the art is a 186px band
+   inside a 36rem box, so 12rem of stacked margin spent ~190px of the first screen on paper
+   with nothing on it and pushed the comparison — the section that does this page's work —
+   to 1,160px, past the fold on a laptop. The hero's own top padding (96px) is what the page
+   opens on; these two are the gaps inside it. */
+.hero h1{max-width:22ch;margin:64px 0 0;font-size:3rem}
 /* No margin here: the art's own spacing is set once, by `.illo.art` below. This rule used
    to say `margin:0` and was overridden by it — same specificity, later in the file — so
    the hero silently carried a third top margin nothing here accounted for. */
@@ -1072,7 +1070,7 @@ object-fit:cover;object-position:50% 48.5%}
 /* TWO MEASURES, NOT ONE. The paragraphs keep the 60ch a centred line can be read at; the
    pair below them needs its container wider than that, because two columns inside 60ch are
    ~24ch each and a 48-word item comes out fourteen lines deep. */
-.hero-intro{max-width:min(100%,48rem);margin:2.4rem auto 0}
+.hero-intro{max-width:min(100%,48rem);margin:48px auto 0}
 .hero-intro>p{max-width:60ch;margin-left:auto;margin-right:auto}
 .hero-intro p{margin-top:0;margin-bottom:0;color:var(--text-secondary);
 font-size:1.1rem;line-height:1.68}
@@ -1084,8 +1082,26 @@ font-size:1.1rem;line-height:1.68}
 /* Every paragraph in here wraps the same way, on the global text-wrap:pretty. `balance` was
    tried on the two above the pair and is wrong: it evens the lines by SHRINKING the block's
    used width, so those two set visibly narrower than the two below them and the centred
-   column stopped having one edge. */
-.hero-intro>.npair+p{margin-top:2.6rem}
+   column stopped having one edge.
+
+   The 2.6rem that used to sit on the paragraph after the pair is gone: a rule is drawn
+   between them now and carries the whole gap. Left in, it beat the `margin-top:0` below it
+   on specificity — three classes to one — and the pair's 16px turned into 42. */
+/* Two rules inside the intro, drawn as pseudo-elements on the paragraph BELOW each one:
+   after the opening claim, and under the pair of techniques. A short centred rule, not a
+   full-width one — at the container's own 48rem it would read as a section break inside a
+   block that is one continuous piece of prose. 48px either side of each, so a rule sits in
+   96px of air with the same amount above it as below.
+
+   display:flow-root, and it is load-bearing: the rule is the paragraph's FIRST CHILD, so
+   its top margin collapses straight through the paragraph and out into whatever sits above.
+   Collapsed margins take the larger of the two rather than the sum, which is why the pair's
+   own 16px bottom margin below is invisible without this. The paragraph's own top margin is
+   zeroed for the same reason — two numbers for one gap, neither of them the one anybody
+   set. */
+.hero-intro>p:nth-child(2),.hero-intro>ol+p{margin-top:0;display:flow-root}
+.hero-intro>p:nth-child(2)::before,.hero-intro>ol+p::before{content:'';display:block;
+width:min(100%,240px);margin:48px auto;border-top:1px solid var(--hairline)}
 /* The two techniques, as two columns in the page's own order — synthetic documents left,
    difficult advice right, the same order the comparison, the chooser and both panels use —
    so the pair a reader meets in the hero is the pair the rest of the page keeps.
@@ -1095,11 +1111,19 @@ font-size:1.1rem;line-height:1.68}
    deliberate now that it is visibly a figure rather than a paragraph with digits in front
    of it.
 
-   A hairline over each column and nothing else. No fill, no border box, no radius: a card
-   here would be the first one on the page, and 4px is reserved for things you press. */
-.npair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2.75rem;
-list-style:none;margin:2.6rem 0 0;padding:0;text-align:left}
-.npair>li{margin:0;padding-top:1.1rem;border-top:1px solid var(--hairline)}
+   Each is a bordered box: a hairline all the way round, 4px, 24px of padding. This ran for
+   a while as a hairline over each column and nothing else, on the reasoning that a box here
+   would be the first on a page that has none and that 4px belongs to things you press. The
+   two techniques are the one place the page names a pair of objects rather than making an
+   argument, and they are boxed deliberately. No fill and no shadow, so they stay flat: the
+   border is the whole of it.
+
+   The 16px below sits on top of the 48px belonging to the rule under it: the boxes have a
+   visible bottom edge of their own now, and at 48px flat that edge and the rule read as a
+   pair of lines. */
+.npair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px;
+list-style:none;margin:2.6rem 0 16px;padding:0;text-align:left}
+.npair>li{margin:0;padding:24px;border:1px solid var(--hairline);border-radius:4px}
 /* Muted and a step smaller, so the two technique names recede rather than reading as a first
    run at the comparison's mastheads below them. */
 .npair-h{display:block;font:650 1.05rem/1.3 var(--serif);color:var(--text-muted);
@@ -1678,8 +1702,12 @@ h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06re
    wide layout has, strictly descending as the break gets smaller: 2.6rem above the title
    (2.2 here plus the art's own .4rem bottom, set by `.illo.art`), 2.2 above the intro,
    1.8 above the two techniques, 1.4 between paragraphs. */
-.hero{padding:1.8rem 16px 0}.hero h1{margin-top:2.2rem;font-size:2.2rem}
+.hero{padding:1.8rem 16px 4rem}.hero h1{margin-top:2.2rem;font-size:2.2rem}
 .hero-intro{margin-top:2.2rem}.hero-intro p{font-size:1.05rem}
+/* The two rules inside the intro keep their width and tighten their air: 48px either side is
+   a sixth of a phone screen twice over, and the ladder above is tightened here for the same
+   reason. */
+.hero-intro>p:nth-child(2)::before,.hero-intro>ol+p::before{margin:32px auto}
 /* One column: two of them inside a 390px viewport are ~16 characters each.
    AND IT CENTRES, which the two-column form must not. The reason the pair goes flush left up
    there is that centring two columns leaves four ragged edges; one column has two, and the
@@ -1687,14 +1715,12 @@ h1{font-size:1.9rem}h2{font-size:1.6rem}h3{font-size:1.25rem}h4{font-size:1.06re
    left made the stack read as a different kind of block instead of the same one narrower.
    It also comes off the edges: its own inset plus the shell's is the air the centred prose
    above it has at the ends of its lines, which the stack had none of.
-   The hairline goes with it — 3/4 and centred, as a rule drawn under the item's own width
-   read as a line across the page rather than the head of an item. Drawn as a pseudo-element
-   for the same reason #datasets::before is: it is a rule with a width, not a box's border. */
-.npair{grid-template-columns:minmax(0,1fr);gap:1.8rem;margin:1.8rem auto 0;
+   The box comes with it — a boxed technique stacked is the same object narrower, and the
+   3/4 centred hairline this used to swap in belonged to the borderless form. Its inner
+   padding drops to 20px, because 24px inside a ~326px item is a seventh of the line. */
+.npair{grid-template-columns:minmax(0,1fr);gap:1.8rem;margin:1.8rem auto 16px;
 padding:0 1rem;max-width:32rem;text-align:center}
-.npair>li{padding-top:0;border-top:0}
-.npair>li::before{content:'';display:block;width:75%;margin:0 auto 1.1rem;
-border-top:1px solid var(--hairline)}
+.npair>li{padding:20px}
 .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem}
 .illo{aspect-ratio:16/9}
 /* THE LABEL GOES ABOVE ITS TWO CELLS, and this is a bug fix, not a preference. `.cmp-k`

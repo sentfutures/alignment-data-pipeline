@@ -296,11 +296,11 @@ class TestShape:
         assert "aspect-ratio:1318/425" in rule
         assert "object-fit:cover" in rule and "object-position:50% 48.5%" in rule
 
-    def test_the_intro_stops_after_four_paragraphs(self):
-        """Four paragraphs of intro prose and it stops: the finding, the sentence that
-        introduces the pair, then what we built on it in two. A bulleted list here is the
-        two DATASETS listed a second time within a screen of the comparison's mastheads,
-        and `<ul>` staying out is what stops that coming back.
+    def test_the_intro_stops_after_five_paragraphs(self):
+        """Five paragraphs of intro prose and it stops: the problem, the finding, the
+        sentence that introduces the pair, then what we built on it in two. A bulleted list
+        here is the two DATASETS listed a second time within a screen of the comparison's
+        mastheads, and `<ul>` staying out is what stops that coming back.
 
         The two TECHNIQUES are a different thing from the two datasets, which is why an
         `<ol>` is allowed where a `<ul>` is not — and it is a FIGURE between the second
@@ -310,10 +310,10 @@ class TestShape:
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
         assert "<ul>" not in hero
         assert hero.count("<ol class='npair'>") == 1 and hero.count("<li>") == 2
-        # Two before the pair, one after, and nothing inside it: the body and tie lines are
+        # Three before the pair, two after, and nothing inside it: the body and tie lines are
         # divs, so a paragraph in here is authored prose and can be counted as such.
         before, after = hero.split("<ol class='npair'>")
-        assert before.count("<p>") == 2 and after.count("<p>") == 2
+        assert before.count("<p>") == 3 and after.count("<p>") == 2
         assert "<p>" not in after[:after.index("</ol>")]
 
     def test_the_two_techniques_read_in_the_page_s_own_order(self):
@@ -342,16 +342,23 @@ class TestShape:
         assert "Synthetic document finetuning" not in body
         assert "<b>" not in body                        # the bold run was consumed, not kept
 
-    def test_the_pair_is_a_list_and_not_a_pair_of_cards(self):
-        """Two columns under two hairlines. A fill, a border box or a radius here would be
-        the first card on a page that has none, and 4px is reserved for things you press.
-        It also stays an <ol>, so it is still heard as a list of two ordered items."""
+    def test_the_pair_is_two_bordered_boxes(self):
+        """Two columns, each in a hairline box: border all the way round, 4px, 24px of
+        padding. This ran as a hairline over each column and nothing else, on the reasoning
+        that a box here would be the first on a page that has none and that 4px belongs to
+        things you press — the two techniques are the one place the page names a pair of
+        objects rather than making an argument, and they are boxed deliberately.
+
+        FLAT, still: no fill and no shadow, so the border is the whole of it. And still an
+        <ol>, so it is heard as a list of two ordered items."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         rules = "".join(re.findall(r"\.npair[^{]*\{[^}]*\}", html))
         assert rules
-        for banned in ("box-shadow", "border-radius", "background"):
+        for banned in ("box-shadow", "background"):
             assert banned not in rules, banned
-        assert "border-top:1px solid var(--hairline)" in rules
+        assert "border:1px solid var(--hairline)" in rules
+        assert "border-radius:4px" in rules
+        assert "padding:24px" in rules
         assert "list-style:none" in rules
         # Never a bare 1fr: a wide child would grow the track past the page.
         assert "grid-template-columns:repeat(2,minmax(0,1fr))" in rules
@@ -363,7 +370,7 @@ class TestShape:
         narrow = html[html.index("@media (max-width:620px)"):]
         assert re.search(r"\.npair\{grid-template-columns:minmax\(0,1fr\)", narrow)
 
-    def test_stacked_it_centres_and_the_rule_over_each_item_does_too(self):
+    def test_stacked_it_centres_and_stays_a_pair_of_boxes(self):
         """Flush left is a property of the two-column form, not of the pair.
 
         Centring is wrong across two columns — it leaves four ragged edges — and that is the
@@ -371,9 +378,8 @@ class TestShape:
         hero whose title, both paragraphs and closing lines are all centred, so flush left
         made the stack read as a different kind of block rather than the same one narrower.
         It also comes off the screen edges, which is the air the centred prose above it has at
-        the ends of its lines. The hairline follows: at the item's own width it read as a rule
-        across the page, so it is 3/4 and centred under the block it heads — drawn as a
-        pseudo-element, because a rule with a width is not a box's border.
+        the ends of its lines. The box comes with it: a stacked technique is the same object
+        narrower, so the border stays and only the inner padding gives ground.
         """
         html = build()
         wide = html[:html.index("@media (max-width:620px)")]
@@ -382,15 +388,53 @@ class TestShape:
         stacked = re.search(r"\.npair\{[^}]*\}", narrow).group(0)
         assert "text-align:center" in stacked
         assert re.search(r"padding:0 [\d.]+rem", stacked), stacked      # off the edges
-        rule = re.search(r"\.npair>li::before\{[^}]*\}", narrow).group(0)
-        assert "width:75%" in rule and "margin:0 auto" in rule, rule
-        # and the border it replaces is off, or the item carries two hairlines.
-        assert "border-top:0" in re.search(r"\.npair>li\{[^}]*\}", narrow).group(0)
-        # The two-column form keeps the border on the item: the rule is as wide as the column
-        # it heads there, which is what a two-up wants.
-        assert not re.search(r"\.npair[^{]*::before", wide)
-        assert "border-top:1px solid var(--hairline)" in re.search(r"\.npair>li\{[^}]*\}",
-                                                                  wide).group(0)
+        # The box is not swapped for a rule when it stacks, and nothing turns the border off.
+        assert not re.search(r"\.npair[^{]*::before", html)
+        assert "border" not in re.search(r"\.npair>li\{[^}]*\}", narrow).group(0)
+        assert "border:1px solid var(--hairline)" in re.search(r"\.npair>li\{[^}]*\}",
+                                                               wide).group(0)
+
+    def test_the_two_rules_the_page_draws_are_both_inside_the_intro(self):
+        """Under the opening claim, and under the pair of techniques. Same 240px and the
+        same 48px either side, so a reader meets one rule twice rather than two rules.
+
+        Nowhere else: one above the comparison and one above the chooser were both tried and
+        both cut, because a page that rules every seam between its parts reads as ruled
+        sections rather than as one piece. Each removal has to pay for the gap it carried —
+        the comparison's rule was the ENTIRE space between the intro and the table, since the
+        hero's bottom padding was zero — so the hero carries a bottom padding and the chooser
+        carries a top margin, or each section rides up against the one above it."""
+        html = build()
+        wide = html[:html.index("@media (max-width:620px)")]
+        assert "#datasets::before" not in html and "#explore::before" not in html
+        rules = re.findall(r"\.hero-intro>[^{]*::before\{[^}]*\}", wide)
+        assert len(rules) == 1, rules              # the two rules share one declaration
+        assert "width:min(100%,240px)" in rules[0]
+        assert "margin:48px auto" in rules[0]
+        assert "border-top:1px solid var(--hairline)" in rules[0]
+        assert "#explore{margin-top:6rem}" in wide
+        hero = re.search(r"\n\.hero\{[^}]*\}", html).group(0)
+        assert re.search(r"padding:96px 28px [\d.]+rem", hero), hero
+
+    def test_the_rule_under_the_pair_clears_the_boxes_own_edge(self):
+        """16px below the pair on top of the rule's own 48px: the boxes have a visible
+        bottom edge now, and at 48px flat that edge and the rule read as a pair of lines.
+
+        The paragraph carrying the rule is a flow-root, and that is what makes the 16px
+        exist at all — the rule is its first child, so an unconstrained top margin collapses
+        through it and out, and collapsed margins take the larger of the two, not the sum."""
+        html = build()
+        wide = html[:html.index("@media (max-width:620px)")]
+        assert "display:flow-root" in re.search(r"\.hero-intro>ol\+p\{[^}]*\}", wide).group(0)
+        assert re.search(r"\.npair\{[^}]*margin:[\d.]+rem 0 16px", wide)
+
+    def test_a_bold_run_in_the_intro_takes_the_colour_of_its_paragraph(self):
+        """Two emphasised phrases, marked by WEIGHT alone. A colour on them was tried and
+        cut: a bold run that also changes colour reads as a link that has lost its
+        underline, in a paragraph that carries a real link two lines below it."""
+        html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
+        assert not re.search(r"\.hero-intro[^{]*\bb\{", html)
+        assert self.hero(html).count("<b>") == 2
 
     def test_the_intro_carries_two_measures(self):
         """The paragraphs keep the measure a centred line can be read at; the container is
@@ -1352,7 +1396,7 @@ class TestNamedPair:
 class TestComparisonTable:
     def test_the_rows_are_what_a_lab_needs_to_run_it(self):
         """Five rows, in one pass, and each says which side of the line it is on: three
-        describe the result, two link out. Dates, model ids and the composition spread went
+        describe the output, two link out. Dates, model ids and the composition spread went
         to the report that goes into them: a reader here is deciding whether to run the
         pipeline, not shopping for a dataset.
 
@@ -1361,7 +1405,7 @@ class TestComparisonTable:
         html = build(sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
         labels = re.findall(r"<th class='cmp-k' scope='row'>([^<]*)</th>", table)
-        assert labels == ["result", "result format", "what it is for",
+        assert labels == ["output", "output format", "what it is for",
                           "pipeline", "example dataset"]  # the code before the data
         text = strip_tags(table)
         for gone in ("July 2026", "claude-", "domains", "taxa groups", "languages",
@@ -1432,7 +1476,7 @@ class TestComparisonTable:
     def test_the_mastheads_are_the_names_and_what_each_one_is_is_a_row(self):
         """A masthead is a name, not a filename — and not a subtitle either. What each
         dataset IS used to hang under the name, unlabelled, in a table whose every other
-        line said what it was answering; it is the `result` row now, so a reader can tell
+        line said what it was answering; it is the `output` row now, so a reader can tell
         a claim about the data from a claim about the process by reading down the side."""
         html = build(content=shipped_content(), sdf_inputs=SDF_INPUTS)
         table = re.search(r"<section id='datasets'>.*?</section>", html, re.S).group(0)
@@ -1443,7 +1487,7 @@ class TestComparisonTable:
         # Derived from the prose file, not typed here: this line is edited, and a hardcoded
         # copy of it fails the next time someone rewords it rather than the next time
         # someone breaks the table.
-        row = strip_tags(self._rows(table)["result"])
+        row = strip_tags(self._rows(table)["output"])
         for key in ("dad_desc", "sdf_desc"):
             assert strip_tags(shipped_content()[key]).strip() in row
         assert "<code>dad</code>" not in head and "<code>sdf</code>" not in head
