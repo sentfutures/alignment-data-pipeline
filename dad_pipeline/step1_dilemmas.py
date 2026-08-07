@@ -133,6 +133,8 @@ def dealt_cards(rec: dict) -> dict:
     return rec.get("scenario_cards") or rec.get("annotation") or {}
 
 
+
+
 def format_scenario_cards(annotation: dict) -> str:
     """Human-readable render of a record's scenario_cards (the dealt cards),
     used by the viewer. Also renders the legacy write-up fields (dilemma_anatomy,
