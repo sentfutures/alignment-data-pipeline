@@ -47,10 +47,11 @@ description and the text of a link preview, so it is one flat sentence — markd
 stripped by `render.plain_md()`, and it should read to someone who has not opened the page
 yet. It is not a dek and it is not the intro's first line.
 
-The datasets are CC-BY-4.0 (set by `evals/publish_hf.py` and carried in the Hugging Face
-card's frontmatter, beside the files it governs) and the page deliberately says nothing
-about it — the row that would have carried it was removed. If it ever belongs here it
-belongs in the comparison, as a row in `page.section_datasets()`, not as prose.
+The datasets are CC0-1.0 (declared by hand in the Hugging Face card's frontmatter, beside
+the files it governs — not the same thing as the pipeline code's Apache-2.0) and the page
+deliberately says nothing about it — the row that would have carried it was removed. If it
+ever belongs here it belongs in the comparison, as a row in `page.section_datasets()`, not
+as prose.
 
 Each report's own prose lives in its own file — `content_dad.md` and `content_sdf.md`.
 Moving an id between prose files is a rename, never a copy: the build fails if both files

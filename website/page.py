@@ -51,6 +51,11 @@ HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
 # `dad`. The `&` in the difficult-advice one is escaped to `&amp;` by `esc()` when the href is
 # written, which is what makes it a valid attribute — so a test comparing against these
 # constants has to escape them too.
+#
+# These names are HAND-MAINTAINED, in the `configs:` block of the dataset card's
+# frontmatter, which is edited on the Hub. Nothing in this repository generates
+# them or can check them: rename a config there and these two links 404 in
+# silence. See "The dataset card" in evals/README.md.
 HF_DAD = f"{HF_URL}/viewer/difficult%20advice%20Q&A"
 HF_SDF = f"{HF_URL}/viewer/synthetic%20documents"
 

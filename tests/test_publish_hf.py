@@ -1,6 +1,12 @@
-"""Tests for evals/publish_hf.py — staging, card generation, and the
-Hub-upload chokepoints (stubbed via the stub_hf fixture; never touches
-huggingface_hub or the network)."""
+"""Tests for evals/publish_hf.py — staging and the Hub-upload chokepoints
+(stubbed via the stub_hf fixture; never touches huggingface_hub or the
+network).
+
+There is nothing here about building a dataset card, because this script no
+longer builds one: the card is hand-written and edited on the Hub. What that
+leaves is a contract worth testing in its own right — a publish must never
+stage or delete README.md — and it is pinned in TestMainEndToEnd.
+"""
 
 import json
 import re
@@ -9,7 +15,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 from evals import publish_hf
 
@@ -178,21 +183,11 @@ def _tag_for(corpus_name):
 
 def _stage(run_dir, corpus_name, staging_dir):
     """stage_run for the pipeline implied by corpus_name, plus the per-pipeline
-    dataset dir it staged into (what build_metrics_rows/build_card now read)."""
+    dataset dir it staged into."""
     tag = _tag_for(corpus_name)
     run_dirs = run_dir if isinstance(run_dir, list) else [run_dir]
     staged = publish_hf.stage_run(run_dirs, corpus_name, staging_dir, tag)
     return staged, staging_dir / tag
-
-
-def _one_card(dataset_dir, staged, content=None, license_id="cc-by-4.0",
-              pretty_name="test-datasets"):
-    """build_card for a single dataset — the common case in these tests."""
-    return publish_hf.build_card(
-        [{"pipeline": staged["pipeline"], "dir": dataset_dir,
-          "staged": staged, "content": content}],
-        license_id, pretty_name,
-    )
 
 
 class TestResolveRunDir:
@@ -285,9 +280,10 @@ class TestStageRun:
         files from an earlier call must not ride along into the upload.
 
         Under the per-pipeline layout the staging ROOT is wiped, so an earlier
-        run's whole `<pipeline>/` dir goes with it. That's intended: the
-        sibling dataset is regenerated from the Hub (fetch_sibling), never
-        from whatever happens to be left in a local staging dir."""
+        run's whole `<pipeline>/` dir goes with it. That's intended: the sibling
+        dataset's files stay on the Hub untouched — upload_folder only writes
+        paths present in the staged folder — so nothing depends on whatever
+        happens to be left in a local staging dir."""
         staging_dir = tmp_path / "staged"
 
         run_a, corpus_a = make_run_dir(tmp_path / "a", audit_files=["compliance_report.json"])
@@ -607,9 +603,9 @@ class TestEnglishFirstOrdering:
 
     def test_a_malformed_corpus_line_leaves_the_order_untouched_instead_of_aborting(
             self, tmp_path):
-        """Row order is cosmetic, so it degrades rather than killing a publish
-        — the same way build_metrics_rows drops a row and fetch_sibling drops a
-        section."""
+        """Row order is cosmetic, so it degrades rather than killing a publish:
+        an old run whose language cannot be read is published in the order it
+        was written."""
         run_dir, corpus_name = make_run_dir(
             tmp_path, pipeline="sdf", docs=2, audit_files=[], include_html=False,
             languages=["Spanish", "English"])
@@ -912,29 +908,15 @@ class TestCombinedPublish:
             "E-0000", "E-0000", "E-0001", "E-0001"]
         assert staged["n_docs"] == 4
 
-    def test_per_run_table_reports_each_run_s_code_state(self, tmp_path):
-        """Mixed states must be named per run, not collapsed — a combined
-        corpus is only as reproducible as its least-reproducible run."""
-        run_a, corpus_name = make_run_dir(
-            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
-            run_name="2026-07-28_17-32_pareto200",
-            manifest=_dad_manifest("2026-07-28_17-32_pareto200",
-                                   dirty=True, dirty_files=["config.yaml"]))
-        run_b, _ = make_run_dir(
-            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
-            run_name="2026-07-29_23-58_archetype1000",
-            manifest=_dad_manifest("2026-07-29_23-58_archetype1000", dirty=False))
-        staged, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-
-        assert "| code state |" in card
-        assert "| `abc1234` | dirty (1 uncommitted file) |" in card
-        assert "| `abc1234` | clean |" in card
-
     def test_manifests_and_audits_are_run_scoped(self, tmp_path):
         """Several runs in one dataset dir must not collide on filenames:
         manifests land under manifests/<run_id>.json and audit files under
-        audit/<run_id>/."""
+        audit/<run_id>/.
+
+        These per-run manifests ARE the combined corpus's provenance record —
+        the rows carry no run column, and no card is generated to tabulate
+        them — so each run keeping its own file is what lets a reader tell
+        which runs, on which commits, went into one corpus."""
         run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
         staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
 
@@ -946,22 +928,26 @@ class TestCombinedPublish:
         assert (dataset_dir / "audit" / "2026-07-29_23-58_archetype1000"
                 / "diversity_report.json").exists()
 
-    def test_card_section_renders_per_run_table(self, tmp_path):
-        run_dirs, corpus_name = self._two_runs(tmp_path, second_audit=True)
-        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
+    def test_each_staged_manifest_keeps_its_own_runs_code_state(self, tmp_path):
+        """Mixed states stay named per run, not collapsed — a combined corpus
+        is only as reproducible as its least-reproducible run."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200",
+                                   dirty=True, dirty_files=["config.yaml"]))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000", dirty=False))
+        _, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
 
-        assert "5 chat examples." in card
-        assert "this table is the provenance record" in card
-        assert "`source_run`" not in card
-        assert "| `2026-07-28_17-32_pareto200` | 2 |" in card
-        assert "| `2026-07-29_23-58_archetype1000` | 3 |" in card
-        # per-run metrics line only for the run that has an audit
-        assert "**`2026-07-29_23-58_archetype1000`** — Semantic diversity" in card
-        assert "dad/audit/2026-07-29_23-58_archetype1000/" in card
-        # the frontmatter still declares exactly one dad config
-        fm = yaml.safe_load(card.split("---")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
+        manifests = dataset_dir / "manifests"
+        dirty = json.loads((manifests / "2026-07-28_17-32_pareto200.json").read_text())
+        clean = json.loads((manifests / "2026-07-29_23-58_archetype1000.json").read_text())
+        assert dirty["git_dirty"] is True
+        assert dirty["git_dirty_files"] == ["config.yaml"]
+        assert clean["git_dirty"] is False
 
     def test_single_run_layout_is_unchanged(self, tmp_path):
         """One --input keeps the original shape: top-level run_manifest.json,
@@ -972,437 +958,6 @@ class TestCombinedPublish:
         assert staged["manifest_file"] == "run_manifest.json"
         assert (dataset_dir / "run_manifest.json").exists()
         assert not (dataset_dir / "manifests").exists()
-
-
-class TestBuildMetricsRows:
-    def test_files_with_a_generator_produce_a_row_each(self, tmp_path):
-        """Only audit_report.json/compliance_report.json/diversity_report.json
-        get a bespoke row — the only three with an actual committed generator
-        (evals/audit_sdf.py, evals/compliance_sdf.py, evals/diversity.py).
-        card_fidelity_report.json/realism_ablation.json/vendi_curve.json are
-        one-off artifacts of a specific historical run with no generator
-        anywhere in this repo — see build_metrics_rows' docstring."""
-        run_dir, corpus_name = make_run_dir(tmp_path)
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        rows = publish_hf.build_metrics_rows(dataset_dir)
-        assert len(rows) == 3
-        joined = " ".join(f"{l}:{v}" for l, v, _source in rows)
-        assert "98 of 100 judged clean (98.0%)" in joined
-        assert "Vendi 34.5 effective records of 477 (ratio 0.072)" in joined
-        assert any(label == "Documents (offline audit)" and value == "477"
-                   for label, value, _source in rows)
-        assert {source for _, _, source in rows} == {
-            "audit_report.json", "compliance_report.json", "diversity_report.json",
-        }
-
-    def test_missing_files_omit_their_rows_without_error(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=["compliance_report.json"], include_html=False,
-        )
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        rows = publish_hf.build_metrics_rows(dataset_dir)
-        assert len(rows) == 1
-        assert rows[0][0] == "Constitutional compliance"
-
-    def test_compliance_missing_clean_documents_omits_row(self, tmp_path):
-        """Regression: only judged was guarded, not clean_documents — a
-        compliance report with judged but no clean_documents would render a
-        literal 'None of 100 judged clean' on the public card instead of
-        omitting the row, contradicting the module's own stated contract."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"compliance_report.json": {"judged": 100}},
-        )
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.build_metrics_rows(dataset_dir) == []
-
-    def test_no_audit_dir_gives_no_rows(self, tmp_path):
-        dataset_dir = tmp_path / "staged" / "sdf"
-        dataset_dir.mkdir(parents=True)
-        assert publish_hf.build_metrics_rows(dataset_dir) == []
-
-    def test_partial_diversity_report_omits_row_instead_of_crashing(self, tmp_path):
-        """Regression: vendi_ratio/n_records were interpolated with :.3f/{} in
-        the same f-string but only vendi_score was guarded — a diversity
-        report with score but no ratio (not reachable via the current
-        evals/diversity.py generator, but the module's own contract is
-        'missing a field just omits the row') would raise instead."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"diversity_report.json": {
-                "n_records": 477, "vendi": {"score": 34.45},  # ratio missing
-            }},
-        )
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.build_metrics_rows(dataset_dir) == []
-
-    def test_files_without_a_generator_never_produce_a_row(self, tmp_path):
-        """card_fidelity_report.json/realism_ablation.json/vendi_curve.json are
-        never parsed at all, regardless of their content — so a malformed one
-        can't crash the publish (nothing to test beyond: no row, ever)."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={
-                "card_fidelity_report.json": {"unexpected": "shape"},
-                "realism_ablation.json": {"n": 78},
-                "vendi_curve.json": {"proj": "not even a dict"},
-            },
-        )
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.build_metrics_rows(dataset_dir) == []
-
-
-class TestDetectedLanguages:
-    def test_sdf_run_derives_codes_from_audit_report_composition(self, tmp_path):
-        """Regression: the card used to hardcode language: [en], but the
-        culture matrix deliberately samples mostly non-English documents —
-        audit_report.json's own composition.language breakdown (already read
-        by build_metrics_rows) is the measured source of truth for this."""
-        run_dir, corpus_name = make_run_dir(tmp_path)
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        # English, Spanish, Mandarin Chinese, Urdu -> en, es, zh, ur, sorted
-        assert publish_hf.detected_languages(dataset_dir, "sdf") == ["en", "es", "ur", "zh"]
-
-    def test_a_dad_run_with_no_measured_languages_falls_back_to_en(self, tmp_path):
-        """DAD's audit_report.json has no composition.language breakdown, and
-        the SDF-specific lookup isn't attempted for it, so an unmeasurable DAD
-        run declares en. Note this is a FALLBACK, not a fact about the
-        pipeline: DAD is not English-only — see the test below."""
-        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad")
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.detected_languages(dataset_dir, "dad") == ["en"]
-
-    def test_a_dad_run_declares_the_languages_its_rows_were_dealt(self, tmp_path):
-        """Regression: this hardcoded ["en"] for every non-SDF pipeline, on the
-        claim that DAD dilemmas are English-only. They are not — the ~35%
-        marked slice of the cultural_setting axis deals settings like "China,
-        written in Mandarin Chinese", and about a fifth of a real run's rows
-        are not English. The bug is invisible while SDF shares the repo and
-        supplies all 16 codes to the union; publishing DAD to a repo without
-        SDF would put a false language claim on a public card."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, pipeline="dad", docs=4, audit_files=[], include_html=False,
-            languages=["English", "Mandarin Chinese", "Japanese", "English"])
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-
-        assert staged["languages"] == {"English": 2, "Mandarin Chinese": 1,
-                                       "Japanese": 1}
-        assert publish_hf.detected_languages(
-            dataset_dir, "dad", staged["languages"]) == ["en", "ja", "zh"]
-
-    def test_the_measured_breakdown_beats_the_audit_report(self, tmp_path):
-        """The staged rows are what gets published; the audit report is a
-        report about them. When they disagree, believe the rows."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, docs=2, languages=["English", "Japanese"])
-        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        # AUDIT_REPORT names English/Spanish/Mandarin/Urdu; the rows say
-        # English/Japanese.
-        assert publish_hf.detected_languages(
-            dataset_dir, "sdf", {"English": 1, "Japanese": 1}) == ["en", "ja"]
-
-    def test_missing_audit_report_falls_back_to_en(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.detected_languages(dataset_dir, "sdf") == ["en"]
-
-    def test_unmapped_language_name_is_skipped_not_crashed(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {
-                "n_docs": 10,
-                "composition": {"language": {"English": 8, "Klingon": 2}},
-            }},
-        )
-        staging_dir = tmp_path / "staged"
-        _, dataset_dir = _stage(run_dir, corpus_name, staging_dir)
-        assert publish_hf.detected_languages(dataset_dir, "sdf") == ["en"]
-
-
-class TestBuildCard:
-    def test_uses_report_content_title_and_subtitle_as_section_heading(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(tmp_path)
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged, content=REPORT_CONTENT)
-        assert card.startswith("---\n")
-        # report_content's title is now the DATASET SECTION heading; the repo's
-        # own pretty_name is the repo-level name, not one dataset's title
-        assert "pretty_name: test-datasets" in card
-        assert "# test-datasets" in card
-        assert "## SDF corpus audit — 477 documents (`synthetic documents` config)" in card
-        assert "A test subtitle." in card
-        assert "license: cc-by-4.0" in card
-        # config paths are subdir-qualified now
-        assert f"path: sdf/{corpus_name}" in card
-        # multi-language corpus (see AUDIT_REPORT fixture) — not hardcoded "en"
-        frontmatter = yaml.safe_load(card.split("---\n")[1])
-        assert frontmatter["language"] == ["en", "es", "ur", "zh"]
-
-    def test_pretty_name_with_yaml_breaking_characters_stays_valid(self, tmp_path):
-        """Regression: pretty_name and section headings can come from
-        report_content.json (editorial content this script doesn't control) —
-        a raw quote or embedded newline used to corrupt the hand-built
-        'pretty_name: "{title}"' line into invalid YAML. Must round-trip
-        through a real YAML parser instead."""
-        run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        for tricky in ['A "quoted" name', "A name\nwith a newline", "Name: with a colon"]:
-            card = _one_card(dataset_dir, staged, pretty_name=tricky)
-            parsed = yaml.safe_load(card.split("---\n")[1])
-            assert parsed["pretty_name"] == tricky
-
-    def test_falls_back_to_generic_section_heading_without_content(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(tmp_path, audit_files=[], include_html=False,
-                                            manifest=None)
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged, content=None)
-        assert "## Synthetic documents (`synthetic documents` config)" in card
-
-    def test_includes_provenance_from_manifest(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(tmp_path)
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        assert "`2026-07-25_15-57_fullscale-500-opus5`" in card
-        assert "`4abd78b`" in card
-        assert "`claude_code`" in card
-
-    def test_card_surfaces_per_stage_model_overrides(self, tmp_path):
-        """The manifest's top-level `model` alone misdescribes both published
-        corpora: it reads claude-sonnet-5 while the stages that matter ran on
-        Opus. A card showing only that would tell readers it's a Sonnet
-        dataset."""
-        run_dir, corpus_name = make_run_dir(tmp_path)
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        assert "- **default model**: `claude-sonnet-5`" in card
-        assert "- **per-stage models**: `claude-opus-5`" in card
-
-    def test_card_reports_dirty_tree_alongside_the_commit(self, tmp_path):
-        """A bare SHA implies the run is reproducible from that commit. It
-        isn't when the tree was dirty, so the card says so next to it."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, pipeline="dad", audit_files=[], include_html=False,
-            manifest=_dad_manifest(
-                "2026-07-29_23-58_archetype1000", dirty=True,
-                dirty_files=["dad_pipeline/run.py", "prompts/dad/step1d_refine.txt"]))
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        assert "- **git commit**: `abc1234`" in card
-        assert "- **code state**: dirty (2 uncommitted files)" in card
-
-    def test_card_reports_unknown_code_state_for_older_manifests(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(tmp_path)  # MANIFEST has no git_dirty
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        assert "- **code state**: unknown" in _one_card(dataset_dir, staged)
-
-
-class TestCodeState:
-    """The commit alone overstates reproducibility: every DAD run published so
-    far ran with uncommitted changes, several touching pipeline code and prompt
-    templates."""
-
-    def test_dirty_reports_the_file_count(self):
-        assert publish_hf.code_state(
-            {"git_dirty": True,
-             "git_dirty_files": ["dad_pipeline/run.py", "config.yaml"]}
-        ) == "dirty (2 uncommitted files)"
-
-    def test_one_dirty_file_is_singular(self):
-        assert publish_hf.code_state(
-            {"git_dirty": True, "git_dirty_files": ["config.yaml"]}
-        ) == "dirty (1 uncommitted file)"
-
-    def test_dirty_without_a_file_list_still_reports_dirty(self):
-        assert publish_hf.code_state({"git_dirty": True}) == "dirty"
-
-    def test_clean_tree(self):
-        assert publish_hf.code_state(
-            {"git_dirty": False, "git_dirty_files": []}) == "clean"
-
-    def test_missing_fields_are_unknown_not_clean(self):
-        """A manifest predating the fields must not be advertised as clean."""
-        assert publish_hf.code_state({"git_commit": "abc1234"}) == "unknown"
-
-
-class TestModelsUsed:
-    def test_collects_distinct_overrides_excluding_the_default(self):
-        manifest = {"model": "claude-sonnet-5", "config": {"sdf": {
-            "rewrite_model": "claude-opus-5", "draft_model": "claude-sonnet-5",
-            "score_model": "claude-opus-5", "n_prompts": 500,
-        }}}
-        assert publish_hf.models_used(manifest, "sdf") == (
-            "claude-sonnet-5", ["claude-opus-5"])
-
-    def test_no_overrides_gives_empty_list(self):
-        manifest = {"model": "claude-sonnet-5", "config": {"sdf": {"n_prompts": 500}}}
-        assert publish_hf.models_used(manifest, "sdf") == ("claude-sonnet-5", [])
-
-    def test_dad_baseline_model_is_excluded(self):
-        """The baseline arm is a plain-model control that is never trained on
-        and never reaches the published corpus, so it must not be listed as a
-        model that generated the dataset."""
-        manifest = {"model": "claude-sonnet-5", "config": {"dad": {
-            "constitution_rewrite_model": "claude-opus-4-8",
-            "baseline": {"enabled": True, "model": "claude-haiku-4-5"},
-        }}}
-        default, overrides = publish_hf.models_used(manifest, "dad")
-        assert default == "claude-sonnet-5"
-        assert overrides == ["claude-opus-4-8"]
-        assert "claude-haiku-4-5" not in overrides
-
-    def test_missing_manifest_fields_do_not_crash(self):
-        assert publish_hf.models_used({}, "sdf") == (None, [])
-
-    def test_points_to_html_report_and_lists_extra_files(self, tmp_path):
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=["compliance_report.json"],
-            extra_audit_files={"custom_eval.json": {"foo": "bar"}},
-        )
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        # pointers are subdir-qualified so they resolve on the Hub
-        assert "`sdf/audit/corpus_report.html`" in card
-        assert "`custom_eval.json`" in card
-        # compliance_report.json got its own metrics-table row — must not also
-        # be duplicated into the catch-all "additional files" line
-        extra_line = next(l for l in card.splitlines() if l.startswith("Additional"))
-        assert "compliance_report.json" not in extra_line
-
-    def test_no_generator_files_are_listed_as_extra_not_dropped(self, tmp_path):
-        """card_fidelity_report.json/realism_ablation.json/vendi_curve.json get
-        no metrics row (no committed generator reproduces them), but must
-        still be visible in the card — otherwise they'd be uploaded yet
-        invisible to anyone reading only the README."""
-        run_dir, corpus_name = make_run_dir(tmp_path)  # default: all seven fixture files + html
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        extra_line = next(l for l in card.splitlines() if l.startswith("Additional"))
-        assert "`card_fidelity_report.json`" in extra_line
-        assert "`realism_ablation.json`" in extra_line
-        assert "`vendi_curve.json`" in extra_line
-        # compliance_report.json DID get a row — must not be duplicated here
-        assert "compliance_report.json" not in extra_line
-
-    def test_known_file_with_unexpected_schema_still_listed_as_extra(self, tmp_path):
-        """A known filename whose fields don't match what build_metrics_rows
-        expects must not go silently invisible — it still surfaces in the
-        catch-all line rather than disappearing from both sections."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"compliance_report.json": {"unexpected": "shape"}},
-        )
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        assert publish_hf.build_metrics_rows(dataset_dir) == []
-        card = _one_card(dataset_dir, staged)
-        assert "`compliance_report.json`" in card
-
-    def test_dad_run_counts_examples_not_documents(self, tmp_path):
-        """DAD ships chat examples, not documents, and its audit generator
-        reports n_prompts where SDF's reports n_docs."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, pipeline="dad", docs=40, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {"n_prompts": 40}},
-        )
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        rows = publish_hf.build_metrics_rows(dataset_dir)
-        assert [(l, v) for l, v, _ in rows] == [("Examples (offline audit)", "40")]
-        card = _one_card(dataset_dir, staged)
-        assert "40 chat examples." in card
-        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
-
-
-class TestMultiDatasetCard:
-    """The card covers the whole repo, so both datasets must survive one
-    publish — this is what keeps a DAD publish from blanking SDF's section."""
-
-    def _two(self, tmp_path):
-        sdf_run, sdf_corpus = make_run_dir(tmp_path / "s", pipeline="sdf")
-        dad_run, dad_corpus = make_run_dir(
-            tmp_path / "d", pipeline="dad", docs=40, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {"n_prompts": 40}},
-        )
-        sdf_staged, sdf_dir = _stage(sdf_run, sdf_corpus, tmp_path / "stage_s")
-        dad_staged, dad_dir = _stage(dad_run, dad_corpus, tmp_path / "stage_d")
-        return [
-            {"pipeline": "sdf", "dir": sdf_dir, "staged": sdf_staged, "content": None},
-            {"pipeline": "dad", "dir": dad_dir, "staged": dad_staged, "content": None},
-        ]
-
-    def test_intro_leads_with_what_it_is_and_where_it_came_from(self, tmp_path):
-        # The card's hand-written half lives in build_card because the card is
-        # regenerated whole on every publish; the Hub's editor would be overwritten.
-        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        assert "Synthetic training data that teaches a model to reason carefully" in card
-        assert "pretraining-style documents" in card
-        assert "single-turn chat exchanges" in card
-        assert "Teaching Claude Why" in card
-        # source names the repo, and leads rather than trailing the audit sections
-        assert f"[{publish_hf.REPO_NAME}]({publish_hf.REPO_URL})" in card
-        first_section = min(card.index(publish_hf.PIPELINE_NAMES[t])
-                            for t in ("sdf", "dad"))
-        assert card.index("## Source") < first_section
-
-    def test_intro_names_only_the_corpora_being_published(self, tmp_path):
-        # a publish whose sibling is absent (or a --dry-run, which cannot see it)
-        run, corpus = make_run_dir(tmp_path, pipeline="dad")
-        staged, ddir = _stage(run, corpus, tmp_path / "stage_solo")
-        card = _one_card(ddir, staged)
-        assert "single-turn chat exchanges" in card
-        assert "pretraining-style documents" not in card
-
-    def test_declares_both_configs_with_sdf_default(self, tmp_path):
-        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
-        assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
-        assert fm["configs"][1]["data_files"][0]["path"] == "dad/dad_corpus.jsonl"
-        # only the first entry is the viewer's default
-        assert fm["configs"][0].get("default") is True
-        assert "default" not in fm["configs"][1]
-        assert "sdf" in fm["tags"] and "dad" in fm["tags"]
-
-    def test_norwegian_code_survives_yaml_round_trip(self, tmp_path):
-        """Regression (found on the live published card): hand-built
-        frontmatter lines emitted a bare `- no` for Norwegian, which YAML
-        parses as the boolean False — so the published language list was
-        malformed. The whole block goes through a real YAML emitter now."""
-        run_dir, corpus_name = make_run_dir(
-            tmp_path, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {
-                "n_docs": 5,
-                "composition": {"language": {"Norwegian": 3, "English": 2}},
-            }},
-        )
-        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
-        card = _one_card(dataset_dir, staged)
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert fm["language"] == ["en", "no"]
-        assert all(isinstance(c, str) for c in fm["language"]), fm["language"]
-        assert False not in fm["language"]
-
-    def test_language_is_the_union_across_datasets(self, tmp_path):
-        """language: is repo-wide. SDF spans 16 languages and DAD is English
-        only — declaring either alone would misdescribe the repo."""
-        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        fm = yaml.safe_load(card.split("---\n")[1])
-        # sdf fixture contributes en/es/ur/zh; dad contributes en
-        assert fm["language"] == ["en", "es", "ur", "zh"]
-
-    def test_both_sections_present_with_own_provenance(self, tmp_path):
-        card = publish_hf.build_card(self._two(tmp_path), "cc-by-4.0", "repo-name")
-        assert "## Synthetic documents (`synthetic documents` config)" in card
-        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
-        assert "3 documents." in card       # sdf fixture default docs=3
-        assert "40 chat examples." in card
-        assert card.index("`synthetic documents` config") < card.index("`difficult advice Q&A` config")
 
 
 class TestHubApiWrappers:
@@ -1475,7 +1030,6 @@ class TestMainEndToEnd:
                   "--repo-id", "sentientfutures/sdf-corpus", "--dry-run")
         out = capsys.readouterr().out
         assert "no Hub API calls made" in out
-        assert "README.md" in out
 
     def test_dry_run_refuses_a_foreign_staging_dir(self, tmp_path, monkeypatch, stub_hf):
         """The ownership check runs inside stage_run, which --dry-run calls
@@ -1512,20 +1066,26 @@ class TestMainEndToEnd:
         try:
             assert staged_path.is_dir()
             assert (staged_path / "sdf" / corpus_name).exists()
-            assert (staged_path / "README.md").exists()
         finally:
             shutil.rmtree(staged_path.parent, ignore_errors=True)
 
-    def test_dry_run_warns_the_sibling_is_not_fetched(self, tmp_path, monkeypatch,
-                                                     stub_hf, capsys):
-        """--dry-run makes no network calls, so it cannot know about a sibling
-        already on the Hub. It must say so rather than let the preview imply
-        the sibling would be dropped."""
-        run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[], include_html=False)
+    def test_dry_run_stages_no_card_and_prints_none(
+        self, tmp_path, monkeypatch, stub_hf, capsys
+    ):
+        """--dry-run used to build and print a card unconditionally, as an
+        operator preview. There is no card to preview any more, and printing
+        one would be worse than printing nothing: it would show the operator
+        prose that is not on the Hub and never will be."""
+        run_dir, _ = make_run_dir(tmp_path)
         stub_hf(raise_on_call=True)
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo", "--dry-run")
+        staging_dir = tmp_path / "staged"
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--dry-run", "--staging-dir", str(staging_dir))
+
+        assert not (staging_dir / "README.md").exists()
         out = capsys.readouterr().out
-        assert "'sdf' dataset already on the Hub is not fetched" in out
+        assert "pretty_name:" not in out and "config_name:" not in out
+        assert "hand-written and edited on the Hub" in out
 
     def test_publish_calls_hf_api_with_expected_args(self, tmp_path, monkeypatch, stub_hf):
         run_dir, corpus_name = make_run_dir(tmp_path)
@@ -1546,19 +1106,28 @@ class TestMainEndToEnd:
                     for p in staging_dir.rglob("*") if p.is_file()}
         assert f"sdf/{corpus_name}" in uploaded
         assert "sdf/run_manifest.json" in uploaded
-        # The card is NOT staged by default: it is hand-written and edited on
-        # the Hub, and upload_folder overwrites every path it finds, so leaving
-        # README.md out of the staging dir is what protects that edit.
-        assert "README.md" not in uploaded
         assert not any("report_content.json" in u for u in uploaded)
 
-    def test_regenerate_card_stages_the_card_for_upload(self, tmp_path, monkeypatch, stub_hf):
-        run_dir, _ = make_run_dir(tmp_path)
-        stub_hf()
-        staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir),
-                  "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
-        assert (staging_dir / "README.md").exists()
+    def test_publish_never_stages_a_card(self, tmp_path, monkeypatch, stub_hf):
+        """The contract that replaced card generation, and the only thing
+        protecting a card edited on the Hub.
+
+        upload_folder overwrites every path it finds and deletes every path
+        matching delete_patterns, so a README.md that is neither staged nor
+        matched is one it cannot touch. Both halves are asserted: there is no
+        flag or run shape that puts a card back in the staging dir, and no
+        delete pattern reaches the repo root."""
+        for pipeline in ("sdf", "dad"):
+            run_dir, _ = make_run_dir(tmp_path / pipeline, pipeline=pipeline)
+            staging_dir = tmp_path / pipeline / "staged"
+            calls = stub_hf()
+            _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                      "--staging-dir", str(staging_dir))
+
+            assert not (staging_dir / "README.md").exists()
+            upload = next(c for c in calls if c["fn"] == "upload_folder")
+            assert all(p.startswith(f"{pipeline}/")
+                       for p in upload["delete_patterns"])
 
     def test_delete_patterns_are_scoped_to_the_published_pipeline(
         self, tmp_path, monkeypatch, stub_hf
@@ -1580,41 +1149,23 @@ class TestMainEndToEnd:
         # every pattern must stay under this pipeline's own prefix
         assert all(p.startswith("dad/") for p in upload["delete_patterns"])
 
-    def test_card_meta_is_cleared_so_a_stale_heading_cannot_survive(
+    def test_legacy_card_meta_is_cleared_and_never_rewritten(
         self, tmp_path, monkeypatch, stub_hf
     ):
-        """Regression: card_meta.json lives outside audit/, so the audit-only
-        delete pattern left it behind. Publish run A with a curated title, then
-        run B without one, and run A's sidecar would linger on the Hub — the
-        next sibling publish would restore a title that is no longer what's
-        published. It must be in delete_patterns even on a run that writes no
-        sidecar of its own.
+        """card_meta.json fed the removed card generator, and `sdf/` still has
+        one on the Hub from the last publish that wrote it.
 
-        Deleting unconditionally is safe because upload_folder drops any
-        deletion whose path is also being added (verified against the installed
-        huggingface_hub), so a freshly staged sidecar still survives."""
-        # run B: no report_content.json, so no sidecar is staged
-        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staging_dir = tmp_path / "staged"
-        calls = stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-        assert not (staging_dir / "sdf" / "card_meta.json").exists()
-        upload = next(c for c in calls if c["fn"] == "upload_folder")
-        assert "sdf/card_meta.json" in upload["delete_patterns"]
-
-    def test_card_meta_still_uploaded_when_the_run_has_one(
-        self, tmp_path, monkeypatch, stub_hf
-    ):
-        """The other half of the above: the delete pattern is present, but the
-        sidecar is also staged, so upload_folder's add-wins-over-delete rule
-        keeps it."""
+        Nothing stages that path now, so upload_folder's add-wins-over-delete
+        rule no longer suppresses the deletion and the next publish clears the
+        orphan. Both halves matter: the run below carries a
+        report_content.json (the input the sidecar used to be derived from) and
+        must still write no sidecar."""
         run_dir, _ = make_run_dir(tmp_path)  # includes report_content.json
         staging_dir = tmp_path / "staged"
         calls = stub_hf()
         _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
-        assert (staging_dir / "sdf" / "card_meta.json").exists()
+        assert not (staging_dir / "sdf" / "card_meta.json").exists()
         upload = next(c for c in calls if c["fn"] == "upload_folder")
         assert "sdf/card_meta.json" in upload["delete_patterns"]
 
@@ -1629,244 +1180,39 @@ class TestMainEndToEnd:
                                             include_html=False)
         staging_dir = tmp_path / "staged"
         stub_hf()
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
         assert (staging_dir / "dad" / "dad_corpus.jsonl").exists()
-        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in (staging_dir / "README.md").read_text()
 
-    def test_pretty_name_defaults_to_repo_id_last_segment(self, tmp_path, monkeypatch, stub_hf):
+    @pytest.mark.parametrize("flag, value", [
+        ("--regenerate-card", None),
+        ("--license", "cc0-1.0"),
+        ("--pretty-name", "Animal-welfare training dataset"),
+    ])
+    def test_the_removed_card_flags_are_gone(self, tmp_path, monkeypatch, stub_hf,
+                                             flag, value):
+        """These three only ever fed the card builder. They must ERROR rather
+        than be silently accepted and ignored — --license especially, whose
+        default would otherwise read as the published licence while declaring
+        nothing at all."""
         run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staging_dir = tmp_path / "staged"
-        stub_hf()
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir),
-                  "--repo-id", "sentientfutures/animal-welfare-training-claude",
-                  "--staging-dir", str(staging_dir))
-        card = (staging_dir / "README.md").read_text()
-        assert "pretty_name: animal-welfare-training-claude" in card
-
-    def test_explicit_pretty_name_wins(self, tmp_path, monkeypatch, stub_hf):
-        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staging_dir = tmp_path / "staged"
-        stub_hf()
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--pretty-name", "Animal-welfare midtraining datasets",
-                  "--staging-dir", str(staging_dir))
-        card = (staging_dir / "README.md").read_text()
-        assert "pretty_name: Animal-welfare midtraining datasets" in card
-
-
-# What a already-published SDF dataset looks like from list_repo_files' side.
-SIBLING_SDF_FILES = {
-    "sdf/sdf_corpus.jsonl": None,       # listed but never downloaded
-    "sdf/run_manifest.json": MANIFEST,
-    "sdf/card_meta.json": {"title": REPORT_CONTENT["title"],
-                           "subtitle": REPORT_CONTENT["subtitle"]},
-    "sdf/audit/audit_report.json": AUDIT_REPORT,
-    "sdf/audit/diversity_report.json": DIVERSITY,
-    "sdf/audit/corpus_report.html": None,   # listed but never downloaded
-}
-
-
-class TestSiblingPreservation:
-    """Publishing one dataset regenerates the whole card, so the other
-    dataset's section and config entry must be rebuilt from the Hub."""
-
-    def _publish_dad(self, tmp_path, monkeypatch, stub_hf, repo_files):
-        run_dir, _ = make_run_dir(
-            tmp_path, pipeline="dad", docs=40, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {"n_prompts": 40}},
-        )
-        staging_dir = tmp_path / "staged"
-        calls = stub_hf(repo_files=repo_files)
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-        return calls, staging_dir, (staging_dir / "README.md").read_text()
-
-    def test_dad_publish_keeps_sdf_config_and_section(self, tmp_path, monkeypatch, stub_hf):
-        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
-        assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
-        # sdf keeps default even though dad is the one being published
-        assert fm["configs"][0].get("default") is True
-        # curated heading restored from the card_meta.json sidecar
-        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
-        assert "## Difficult advice Q&A (`difficult advice Q&A` config)" in card
-        # sdf's own measured numbers, read from its Hub-side audit files
-        assert "477 documents." in card
-        assert "40 chat examples." in card
-        # union of both, not just dad's ["en"]
-        assert fm["language"] == ["en", "es", "ur", "zh"]
-
-    def test_sibling_corpus_and_html_are_never_downloaded(self, tmp_path, monkeypatch, stub_hf):
-        """Only small metadata is fetched — the sibling's multi-MB corpus and
-        its HTML report stay on the Hub untouched."""
-        calls, _, _ = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        downloaded = [c["filename"] for c in calls if c["fn"] == "download_file"]
-        assert set(downloaded) == {
-            "sdf/run_manifest.json",
-            "sdf/card_meta.json",
-            "sdf/audit/audit_report.json",
-            "sdf/audit/diversity_report.json",
-        }
-        assert not any(f.endswith((".jsonl", ".html")) for f in downloaded)
-
-    def test_sibling_keeps_its_curated_heading(self, tmp_path, monkeypatch, stub_hf):
-        """Regression (seen on the live card): report_content.json is never
-        uploaded, so without the card_meta.json sidecar the sibling's curated
-        title and subtitle were unrecoverable and its section silently
-        downgraded to the generic 'SDF corpus' every time DAD was published."""
-        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
-        assert REPORT_CONTENT["subtitle"] in card
-
-    def test_sibling_without_card_meta_falls_back_to_generic_heading(
-        self, tmp_path, monkeypatch, stub_hf
-    ):
-        """A sibling published before the sidecar existed has no card_meta.json;
-        it must still render, just with the generic heading."""
-        files = {k: v for k, v in SIBLING_SDF_FILES.items() if k != "sdf/card_meta.json"}
-        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, files)
-        assert "## Synthetic documents (`synthetic documents` config)" in card
-
-    def test_card_meta_sidecar_is_written_for_the_published_pipeline(
-        self, tmp_path, monkeypatch, stub_hf
-    ):
-        """The pipeline being published writes its own sidecar so the NEXT
-        publish of the other pipeline can restore this heading."""
-        run_dir, _ = make_run_dir(tmp_path)  # sdf, includes report_content.json
-        staging_dir = tmp_path / "staged"
-        stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-        meta = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert meta == {"title": REPORT_CONTENT["title"],
-                        "subtitle": REPORT_CONTENT["subtitle"]}
-        # the large editorial source itself still never ships
-        assert not (staging_dir / "sdf" / "audit" / "report_content.json").exists()
-
-    def test_no_card_meta_written_when_run_has_no_report_content(
-        self, tmp_path, monkeypatch, stub_hf
-    ):
-        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        staging_dir = tmp_path / "staged"
-        stub_hf()
-        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-        assert not (staging_dir / "sdf" / "card_meta.json").exists()
-
-    def test_sibling_metadata_never_enters_the_upload(self, tmp_path, monkeypatch, stub_hf):
-        """The sibling is fetched OUTSIDE the staged tree, so neither its files
-        nor hf_hub_download's .cache bookkeeping dir get uploaded as content."""
-        _, staging_dir, _ = self._publish_dad(
-            tmp_path, monkeypatch, stub_hf, SIBLING_SDF_FILES)
-        staged_paths = {str(p.relative_to(staging_dir))
-                        for p in staging_dir.rglob("*") if p.is_file()}
-        assert not any(p.startswith("sdf/") for p in staged_paths)
-        assert not any(".cache" in p for p in staged_paths)
-        # STAGING_MARKER is local bookkeeping (proves this script owns the
-        # staging dir on reuse) — excluded from the upload itself by
-        # _upload_folder's ignore_patterns, see
-        # test_upload_folder_never_uploads_the_staging_marker.
-        assert staged_paths == {"README.md", "dad/dad_corpus.jsonl",
-                                "dad/run_manifest.json", "dad/audit/audit_report.json",
-                                publish_hf.STAGING_MARKER}
-
-    def test_no_sibling_yet_gives_a_single_config_card(self, tmp_path, monkeypatch, stub_hf):
-        """First publish into a fresh repo: nothing to preserve, and the card
-        must still be valid rather than declaring a config for missing data."""
-        _, _, card = self._publish_dad(tmp_path, monkeypatch, stub_hf, {})
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
-        assert fm["configs"][0].get("default") is True
-        assert "## Synthetic documents" not in card
-
-    def test_sibling_download_failure_keeps_config_and_does_not_abort(
-        self, tmp_path, monkeypatch, stub_hf, capsys
-    ):
-        """A transient failure fetching the sibling's metadata must not abort
-        the publish (create_repo has already run and this pipeline's corpus is
-        staged and valid) and must not drop the sibling's config entry either —
-        its files stay on the Hub, so removing the config would leave them
-        present but unloadable. Only the prose detail may degrade."""
-        calls = stub_hf(repo_files=SIBLING_SDF_FILES)
-
-        from evals import publish_hf as ph
-        real_download = ph._download_file
-
-        def flaky(repo_id, filename, local_dir):
-            if filename.endswith("audit_report.json"):
-                raise OSError("transient network blip")
-            return real_download(repo_id, filename, local_dir)
-
-        monkeypatch.setattr(ph, "_download_file", flaky)
-
-        run_dir, _ = make_run_dir(
-            tmp_path, pipeline="dad", docs=40, audit_files=[], include_html=False,
-            extra_audit_files={"audit_report.json": {"n_prompts": 40}},
-        )
-        staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-
-        out = capsys.readouterr().out
-        assert "could not fetch" in out and "OSError" in out
-        # the publish still completed
-        assert any(c["fn"] == "upload_folder" for c in calls)
-
-        card = (staging_dir / "README.md").read_text()
-        fm = yaml.safe_load(card.split("---\n")[1])
-        # sdf's config entry survives — that's what keeps its data loadable
-        assert [c["config_name"] for c in fm["configs"]] == ["synthetic documents", "difficult advice Q&A"]
-        assert fm["configs"][0]["data_files"][0]["path"] == "sdf/sdf_corpus.jsonl"
-        # card_meta.json downloaded fine, so the curated heading survives
-        assert f"## {REPORT_CONTENT['title']} (`synthetic documents` config)" in card
-        # the metrics row sourced from the file that failed is gone...
-        assert "Documents (offline audit)" not in card
-        # ...the file that DID download still contributes its row...
-        assert "Vendi 34.5" in card
-        # ...and the record count survives anyway, because fetch_sibling falls
-        # back from audit_report.json's n_docs to diversity_report's n_records
-        assert "477 documents." in card
-
-    def test_sibling_listing_failure_treats_it_as_absent(self, tmp_path, monkeypatch, stub_hf):
-        """If the repo can't even be listed (e.g. it doesn't exist yet on a
-        first publish) there's nothing to preserve, so proceed single-config."""
-        calls = stub_hf(repo_files=SIBLING_SDF_FILES)
-
-        from evals import publish_hf as ph
-
-        def boom(repo_id):
-            raise OSError("cannot reach hub")
-
-        monkeypatch.setattr(ph, "_list_repo_files", boom)
-
-        run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
-                                  include_html=False)
-        staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
-        assert any(c["fn"] == "upload_folder" for c in calls)
-        card = (staging_dir / "README.md").read_text()
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
-
-    def test_sibling_dir_without_a_corpus_is_skipped(self, tmp_path, monkeypatch, stub_hf):
-        """A partial sibling dir with metadata but no corpus can't be declared
-        as a config — better to omit it than point a config at nothing."""
-        _, _, card = self._publish_dad(
-            tmp_path, monkeypatch, stub_hf,
-            {"sdf/run_manifest.json": MANIFEST, "sdf/audit/audit_report.json": AUDIT_REPORT},
-        )
-        fm = yaml.safe_load(card.split("---\n")[1])
-        assert [c["config_name"] for c in fm["configs"]] == ["difficult advice Q&A"]
+        stub_hf(raise_on_call=True)
+        extra = [flag] if value is None else [flag, value]
+        with pytest.raises(SystemExit):
+            _run_main(monkeypatch, *extra, "--input", str(run_dir),
+                      "--repo-id", "org/repo", "--dry-run")
 
 
 class TestUnmergedGuard:
     """The pre-flight provenance gate. It warns and asks rather than refusing:
     the HF write token lives on contributors' laptops, so a hard block would
     push an unmerged publish out of this script — and out of the only place
-    that records provenance at all. What makes it stick is the card stamp.
+    that records provenance at all.
+
+    What makes it stick is the Hub COMMIT MESSAGE. It used to be a stamp on
+    the generated dataset card; that card is hand-edited on the Hub now and
+    this script no longer writes it, so the stamp went where an edit cannot
+    reach it. Every test below asserts on the commit message for that reason.
     """
 
     def _unmerged(self, monkeypatch, **over):
@@ -1881,15 +1227,11 @@ class TestUnmergedGuard:
         run_dir, _ = make_run_dir(tmp_path)
         calls = stub_hf()
         staging_dir = tmp_path / "staged"
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir))
 
         err = capsys.readouterr().err
         assert "NOT been merged" not in err
-        card = (staging_dir / "README.md").read_text()
-        assert "unmerged branch" not in card.lower()
-        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert "unmerged" not in sidecar
         upload = next(c for c in calls if c["fn"] == "upload_folder")
         assert upload["commit_message"] == \
             "Publish sdf: 2026-07-25_15-57_fullscale-500-opus5"
@@ -1934,58 +1276,54 @@ class TestUnmergedGuard:
     def test_allow_unmerged_publishes_and_stamps_everything(
         self, tmp_path, monkeypatch, stub_hf, capsys
     ):
-        """The durable half of the guard: the card, the persisted sidecar, and
-        the Hub commit message all record that this was unmerged."""
+        """The durable half of the guard: the warning reaches the operator's
+        terminal, and the Hub commit message records it where nobody can edit
+        it away afterwards."""
         run_dir, _ = make_run_dir(tmp_path)
         calls = stub_hf()
         staging_dir = tmp_path / "staged"
         self._unmerged(monkeypatch, branch="declan/wip", commit="deadbee")
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
                   "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         err = capsys.readouterr().err
         assert "NOT been merged" in err
         assert "declan/wip" in err
 
-        card = (staging_dir / "README.md").read_text()
-        assert "Unmerged code warning" in card
-        assert "`declan/wip`" in card and "`deadbee`" in card
+        upload = next(c for c in calls if c["fn"] == "upload_folder")
+        assert "unmerged run(s): 2026-07-25_15-57_fullscale-500-opus5" \
+            in upload["commit_message"]
 
-        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert sidecar["unmerged"]["runs"] == [{
-            "run_id": "2026-07-25_15-57_fullscale-500-opus5",
-            "branch": "declan/wip", "commit": "deadbee"}]
+    def test_stamp_survives_a_run_with_no_audit_files(
+        self, tmp_path, monkeypatch, stub_hf
+    ):
+        """The record must not depend on what the run happens to have produced.
+        It once rode in a sidecar written only when a run had a curated
+        title, so a run without report_content.json published unlabelled; the
+        commit message is derived from the merge check alone."""
+        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
+        calls = stub_hf()
+        staging_dir = tmp_path / "staged"
+        self._unmerged(monkeypatch)
+
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(staging_dir), "--allow-unmerged")
 
         upload = next(c for c in calls if c["fn"] == "upload_folder")
         assert "unmerged run(s): 2026-07-25_15-57_fullscale-500-opus5" \
             in upload["commit_message"]
 
-    def test_stamp_survives_a_run_with_no_curated_title(
-        self, tmp_path, monkeypatch, stub_hf
-    ):
-        """The sidecar used to be written only when a run had a curated
-        title/subtitle. The stamp has to be written regardless, or a run
-        without report_content.json publishes with no warning on its card."""
-        run_dir, _ = make_run_dir(tmp_path, audit_files=[], include_html=False)
-        stub_hf()
-        staging_dir = tmp_path / "staged"
-        self._unmerged(monkeypatch)
-
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir), "--allow-unmerged")
-
-        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert sidecar["unmerged"]["runs"][0]["branch"] == "declan/wip"
-        assert "title" not in sidecar
-        assert "Unmerged code warning" in \
-            (staging_dir / "README.md").read_text()
-
     def test_dry_run_shows_the_warning_and_stamp_without_prompting(
         self, tmp_path, monkeypatch, stub_hf, capsys
     ):
         """A preview that hid the warning would be the wrong preview — but
-        --dry-run publishes nothing, so there is nothing to confirm."""
+        --dry-run publishes nothing, so there is nothing to confirm.
+
+        Both halves have to show: the terminal warning, and the commit message
+        the publish would leave on the Hub. The record used to be previewable
+        as part of the card; showing only the warning would preview the half
+        that doesn't outlive the terminal."""
         run_dir, _ = make_run_dir(tmp_path)
         stub_hf(raise_on_call=True)
         self._unmerged(monkeypatch)
@@ -1998,7 +1336,9 @@ class TestUnmergedGuard:
 
         captured = capsys.readouterr()
         assert "NOT been merged" in captured.err
-        assert "Unmerged code warning" in captured.out
+        assert "Would commit as: Publish sdf: " in captured.out
+        assert "unmerged run(s): 2026-07-25_15-57_fullscale-500-opus5 " \
+               "(branch declan/wip, commit deadbee)" in captured.out
 
     def test_dry_run_does_not_contact_the_remote(self, tmp_path, monkeypatch, stub_hf):
         """--dry-run is documented as making zero network calls, and a git fetch
@@ -2065,34 +1405,31 @@ class TestUnmergedGuard:
         self, tmp_path, monkeypatch, stub_hf
     ):
         """A run generated on one branch can be published from another, and the
-        card must keep the two straight: the RUN entry names the branch the data
-        came from (v3 manifests' git_branch), while an unmerged checkout is
-        reported separately as the publish branch. Collapsing them would let a
-        reader think the corpus was generated by whatever happens to be checked
-        out now."""
+        commit message must keep the two straight: the RUN entry names the
+        branch the data came from (v3 manifests' git_branch), while an unmerged
+        checkout is reported separately as the publish branch. Collapsing them
+        would let a reader think the corpus was generated by whatever happens
+        to be checked out now."""
         run_dir, _ = make_run_dir(
             tmp_path,
             manifest={**MANIFEST, "git_branch": "aidan/local-only",
                       "git_commit": "cafe123"},
         )
-        stub_hf()
-        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
         self._unmerged(monkeypatch, branch="declan/publishing-from-here",
                        commit="cafe123")
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir), "--allow-unmerged")
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
 
-        card = (staging_dir / "README.md").read_text()
-        # The run's own line credits where the data was generated...
-        assert "Run `2026-07-25_15-57_fullscale-500-opus5` (branch " \
-               "`aidan/local-only`, commit `cafe123`)" in card
-        # ...and the publish branch is a separate statement, not conflated with it.
-        assert "Published from branch `declan/publishing-from-here`" in card
-
-        sidecar = json.loads((staging_dir / "sdf" / "card_meta.json").read_text())
-        assert sidecar["unmerged"]["runs"][0]["branch"] == "aidan/local-only"
-        assert sidecar["unmerged"]["publish_branch"] == "declan/publishing-from-here"
+        message = next(c for c in calls
+                       if c["fn"] == "upload_folder")["commit_message"]
+        # The run's own entry credits where the data was generated...
+        assert "2026-07-25_15-57_fullscale-500-opus5 " \
+               "(branch aidan/local-only, commit cafe123)" in message
+        # ...and the publish branch is a separate clause, not conflated with it.
+        assert "published from unmerged branch declan/publishing-from-here" \
+            in message
 
     def test_pre_v3_manifest_falls_back_to_the_live_branch(
         self, tmp_path, monkeypatch, stub_hf
@@ -2100,13 +1437,14 @@ class TestUnmergedGuard:
         """No existing manifest records git_branch, so the fallback is the
         common case, not an edge case."""
         run_dir, _ = make_run_dir(tmp_path)   # MANIFEST has no git_branch
-        stub_hf()
-        staging_dir = tmp_path / "staged"
+        calls = stub_hf()
         self._unmerged(monkeypatch, branch="declan/wip")
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir), "--allow-unmerged")
-        assert "`declan/wip`" in (staging_dir / "README.md").read_text()
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--allow-unmerged")
+        message = next(c for c in calls
+                       if c["fn"] == "upload_folder")["commit_message"]
+        assert "branch declan/wip" in message
 
     def _dad_runs(self, tmp_path, *specs):
         """Several DAD run dirs, one per (run_name, commit, branch) spec."""
@@ -2146,25 +1484,23 @@ class TestUnmergedGuard:
 
         monkeypatch.setattr(publish_hf, "merge_state", per_run)
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", *[str(r) for r in runs],
+        calls = stub_hf()
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
                   "--repo-id", "org/repo", "--staging-dir", str(staging_dir),
                   "--allow-unmerged")
 
-        sidecar = json.loads((staging_dir / "dad" / "card_meta.json").read_text())
-        assert [r["run_id"] for r in sidecar["unmerged"]["runs"]] == [
-            "2026-07-02_10-00_wip", "2026-07-03_10-00_other"]
-        # HEAD was merged, so there is no publish-branch line to add.
-        assert "publish_branch" not in sidecar["unmerged"]
-
-        card = (staging_dir / "README.md").read_text()
-        warning = [ln for ln in card.splitlines() if ln.startswith(">")]
-        assert any("`aidan/wip`" in ln for ln in warning)
-        assert any("`constance/other`" in ln for ln in warning)
-        # The merged run is not smeared with the warning...
-        assert not any("2026-07-01_10-00_merged" in ln for ln in warning)
-        # ...but still appears in the per-run provenance table, which covers all
-        # three regardless of merge status.
-        assert "| `2026-07-01_10-00_merged` |" in card
+        message = next(c for c in calls
+                       if c["fn"] == "upload_folder")["commit_message"]
+        assert "2026-07-02_10-00_wip (branch aidan/wip, commit bbbbbbb)" in message
+        assert "2026-07-03_10-00_other (branch constance/other, commit ccccccc)" \
+            in message
+        # The merged run is not smeared with the warning — it is named in the
+        # "Publish dad: ..." half of the message, never in the unmerged clause.
+        unmerged_clause = message.split("unmerged run(s): ", 1)[1]
+        assert "2026-07-01_10-00_merged" not in unmerged_clause
+        assert "2026-07-01_10-00_merged" in message
+        # HEAD was merged, so there is no publish-branch clause to add.
+        assert "published from unmerged branch" not in message
 
     def test_combined_publish_stays_silent_when_every_run_is_merged(
         self, tmp_path, monkeypatch, stub_hf, capsys
@@ -2175,16 +1511,15 @@ class TestUnmergedGuard:
             ("2026-07-02_10-00_b", "bbbbbbb", "main"),
         )
         staging_dir = tmp_path / "staged"
-        stub_hf()
+        calls = stub_hf()
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", *[str(r) for r in runs],
+        _run_main(monkeypatch, "--input", *[str(r) for r in runs],
                   "--repo-id", "org/repo", "--staging-dir", str(staging_dir))
 
         assert "NOT been merged" not in capsys.readouterr().err
-        # These runs have no curated title either, so with nothing to stamp the
-        # sidecar is correctly never written at all.
-        assert not (staging_dir / "dad" / "card_meta.json").exists()
-        assert "Unmerged code warning" not in (staging_dir / "README.md").read_text()
+        message = next(c for c in calls
+                       if c["fn"] == "upload_folder")["commit_message"]
+        assert "unmerged" not in message
 
     def test_combined_publish_fetches_the_remote_only_once(
         self, tmp_path, monkeypatch, stub_hf
@@ -2210,28 +1545,23 @@ class TestUnmergedGuard:
                   "--repo-id", "org/repo", "--staging-dir", str(tmp_path / "s"))
         assert fetches == [True, False, False]
 
-    def test_siblings_own_stamp_survives_the_other_pipeline_publishing(
+    def test_a_publish_only_stamps_the_pipeline_it_publishes(
         self, tmp_path, monkeypatch, stub_hf
     ):
-        """The card is regenerated whole from the sibling's Hub metadata. A
-        stamp derived from live git would both mislabel the sibling and erase
-        its own warning — which is why it rides in card_meta.json."""
+        """Each publish's record is its own Hub commit, so a sibling's earlier
+        unmerged stamp is a different commit in the same history and cannot be
+        overwritten or extended by this one. The stamp used to be regenerated
+        whole on every publish, which is why it needed a persisted sidecar to
+        survive; a commit message needs nothing."""
         run_dir, _ = make_run_dir(tmp_path, pipeline="dad", audit_files=[],
                                   include_html=False)
-        staging_dir = tmp_path / "staged"
-        sibling = dict(SIBLING_SDF_FILES)
-        sibling["sdf/card_meta.json"] = {
-            **SIBLING_SDF_FILES["sdf/card_meta.json"],
-            "unmerged": {"runs": [{"run_id": "sdf-run",
-                                   "branch": "aidan/experiment",
-                                   "commit": "cafe123"}]},
-        }
-        stub_hf(repo_files=sibling)
+        calls = stub_hf()
 
-        _run_main(monkeypatch, "--regenerate-card", "--input", str(run_dir), "--repo-id", "org/repo",
-                  "--staging-dir", str(staging_dir))
+        _run_main(monkeypatch, "--input", str(run_dir), "--repo-id", "org/repo",
+                  "--staging-dir", str(tmp_path / "staged"))
 
-        card = (staging_dir / "README.md").read_text()
-        assert "`aidan/experiment`" in card
-        # ...and the dad section being published, which IS merged, stays clean.
-        assert card.count("Unmerged code warning") == 1
+        message = next(c for c in calls
+                       if c["fn"] == "upload_folder")["commit_message"]
+        assert message.startswith("Publish dad:")
+        assert "sdf" not in message
+        assert "unmerged" not in message

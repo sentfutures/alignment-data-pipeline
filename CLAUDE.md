@@ -88,33 +88,31 @@ python evals/diversity.py --input outputs/dad/latest
 
 That one repo holds **both** corpora as separate HF *configs* (each gets its own selector in the dataset viewer), staged under per-pipeline subdirectories — `sdf/` and `dad/`, each with its corpus jsonl, `run_manifest.json`, and `audit/`. Consequences worth knowing before running it:
 
-- Publishing one pipeline **regenerates the whole card**, so the script fetches the sibling's metadata off the Hub (`fetch_sibling`) to rebuild its section. Its corpus and HTML are never downloaded or re-uploaded.
+- **The script never writes the dataset card.** `README.md` on the Hub is hand-written and edited there, by the team, and no copy of it lives in this repo. A publish stages `<pipeline>/…` only and `delete_patterns` is scoped to the same prefix, so the card is a path the upload can neither overwrite nor delete. The generator that used to rebuild it from each run's audit files was removed (along with `--regenerate-card`, `--license` and `--pretty-name`) because it replaced every hand-edit. **Two things on that card are load-bearing and nothing here can check them**: the `configs:` block in its frontmatter is what makes the two corpora loadable as separate viewer configs, and `website/page.py`'s `HF_SDF`/`HF_DAD` deep-links are built from those config names verbatim. See "The dataset card" in `evals/README.md`.
 - `delete_patterns` is scoped to `<pipeline>/audit/*`. A bare `audit/*` would delete the *sibling* dataset's audit files on every publish.
-- **Published rows are ordered English first**, because the Hub viewer opens on whatever is first in the file and both corpora are written in matrix-deal order (the live SDF config opened on Spanish, DAD on Hindi). **Only the staged copy is reordered — never the run's own `final/` corpus**, which five evals stride-sample (`compliance_sdf.py`, `audit_sdf.py`, `diversity.py`, `score_sdf.py`) and which layer 5's greedy near-dup cull already ordered. It is a stable binary partition, not a sort by language: English block first, everything else after, each in the run's own order. The pass sorts raw lines, so the Hub file is a **permutation** of the run's — `diff <(sort hub.jsonl) <(sort final.jsonl)` is the equivalence check, not `cmp`. A run whose language cannot be read (no `language` field; a DAD run with no `step3/rewrites.jsonl` or no `cultural_setting` on its cards, e.g. `archetype10`) is published in the order it was written, and stdout says so. DAD rows carry a `language` column derived the same way — the language the scenario was **dealt**, null where a row does not join.
+- **Published rows are ordered English first**, because the Hub viewer opens on whatever is first in the file and both corpora are written in matrix-deal order (the live SDF config opened on Spanish, DAD on Hindi). **Only the staged copy is reordered — never the run's own `final/` corpus**, which five evals stride-sample (`compliance_sdf.py`, `audit_sdf.py`, `diversity.py`, `score_sdf.py`) and which layer 5's greedy near-dup cull already ordered. It is a stable binary partition, not a sort by language: English block first, everything else after, each in the run's own order. The pass sorts raw lines, so the Hub file is a **permutation** of the run's — `diff <(sort hub.jsonl) <(sort final.jsonl)` is the equivalence check, not `cmp`. A run whose language cannot be read (no `language` field; a DAD run with no `step3/rewrites.jsonl` or no `cultural_setting` on its cards, e.g. `archetype10`) is published in the order it was written, and stdout says so. DAD rows carry a `language` column derived the same way — the language the scenario was **dealt**, null where a row does not join. Publishing prints the resulting language breakdown, which is now the only thing telling a publisher what the hand-maintained card ought to declare — **neither corpus is English-only**, and a card that says otherwise is a false claim on a public dataset.
 - **Tags are repo-wide**, so prefix them per dataset (`sdf-v1-…`, `dad-v1-…`). The pre-multi-config `v1-fullscale-500-opus5` tag predates this convention. `_create_tag` passes `exist_ok=True` and **never moves an existing tag**, so a revision pinned by an old tag keeps the old row order for ever — publishing a reordered corpus at a pinned revision needs a **new** tag.
-- `--dry-run` makes zero network calls, so it cannot see a sibling already on the Hub and says so — the preview shows only the pipeline being published. (It therefore also skips the `git fetch` the merge check would otherwise do, and says `origin/main` may be stale.)
+- `--dry-run` makes zero network calls: it stages, prints what would be uploaded and the commit message it would leave, and stops. (It therefore also skips the `git fetch` the merge check would otherwise do, and says `origin/main` may be stale.)
 - `--staging-dir` is wiped before staging, so the script refuses any existing non-empty directory it did not create (marker `.publish_hf_staging`), in `--dry-run` too.
-- **An unmerged publish warns and asks, and is recorded on the card.** Before staging, the script checks whether the current `HEAD` and the run's own `git_commit` are reachable from `origin/main` (`utils.merge_state`). If either isn't — or can't be verified — it prints what's unmerged and requires a typed `yes`; with no TTY it exits telling you to pass `--allow-unmerged`. Proceeding stamps "published from an unmerged branch" into the dataset card's provenance block and into the Hub commit message. The stamp persists in `<pipeline>/card_meta.json`, so it survives the sibling's next publish regenerating the card, and clears itself once that pipeline publishes something merged. A **dirty tree at run time is context, never a trigger** — every run so far has been dirty, and a warning that fires on all of them is one people learn to ignore. This is a guardrail against accidents, not an access control: the write token is on contributors' laptops, so anyone can bypass the script entirely — which is exactly why the card, not the terminal, carries the record.
+- **An unmerged publish warns and asks, and is recorded in the Hub commit message.** Before staging, the script checks whether the current `HEAD` and the run's own `git_commit` are reachable from `origin/main` (`utils.merge_state`). If either isn't — or can't be verified — it prints what's unmerged and requires a typed `yes`; with no TTY it exits telling you to pass `--allow-unmerged`. Proceeding appends `_unmerged_summary`'s clause to the commit message, naming each unverified run with the branch it was **generated** on and its commit, and separately the branch it was **published** from. That was a stamp on the generated card until the card became hand-edited; a commit message is the better home anyway, since nobody can edit it afterwards. A **dirty tree at run time is context, never a trigger** — every run so far has been dirty, and a warning that fires on all of them is one people learn to ignore. This is a guardrail against accidents, not an access control: the write token is on contributors' laptops, so anyone can bypass the script entirely — which is exactly why the Hub's own history, not the terminal, carries the record.
 
 ```bash
 # Stages final/{sdf,dad}_corpus.jsonl (English rows first; DAD also flattened to
 # example_gid/language/user_prompt/assistant_response) + run_manifest.json +
 # audit/*.{json,jsonl,html}
 # into <pipeline>/ (report_content.json excluded — editorial, already baked into
-# corpus_report.html) and writes a dataset card built entirely from the audit
-# files' own measured fields. Provenance lists the per-stage `*_model` overrides,
-# not just the manifest's top-level `model` (which reads claude-sonnet-5 even on
-# runs whose real generation stages were all Opus). Requires a Hub token with
-# write access to the target repo/org, one time (`huggingface-cli login`, or
-# HF_TOKEN in .env); --dry-run stages + prints the card with no network calls.
+# corpus_report.html) and uploads exactly that. The dataset card is NOT written:
+# it is hand-edited on the Hub. Requires a Hub token with write access to the
+# target repo/org, one time (`huggingface-cli login`, or HF_TOKEN in .env);
+# --dry-run stages + prints what would be uploaded with no network calls.
 # An unmerged run prompts for confirmation first (--allow-unmerged skips the
-# prompt; the card records it either way).
+# prompt; the commit message records it either way).
 REPO=sentientfutures/animal-welfare-training-claude
 python evals/publish_hf.py --input outputs/sdf/latest --repo-id $REPO --dry-run
 python evals/publish_hf.py --input outputs/sdf/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare training dataset" --tag sdf-v1-<run-label>
+    --tag sdf-v1-<run-label>
 python evals/publish_hf.py --input outputs/dad/runs/<run_id> --repo-id $REPO \
-    --pretty-name "Animal-welfare training dataset" --tag dad-v1-<run-label>
+    --tag dad-v1-<run-label>
 ```
 
 ## Run Organization
@@ -571,9 +569,10 @@ stay declared, and nothing in that block re-places a child or reaches for `!impo
 Measured in Chromium at 390×844: panel 358px in a 390px viewport, prose at ~45 characters
 a line, no horizontal page scroll, bar one row at 57px.
 
-**Open TODOs.** The datasets are CC-BY-4.0 — set by `evals/publish_hf.py`'s `--license`
-default and carried in the Hugging Face card's frontmatter, beside the files it governs — and
-the page deliberately says nothing about it, the licence row having been removed. **The
+**Open TODOs.** The datasets are CC0-1.0 — declared by hand in the Hugging Face card's
+frontmatter, beside the files it governs, which is the only place it is stated — and
+the page deliberately says nothing about it, the licence row having been removed. (Not to
+be confused with this repo's own Apache-2.0 `LICENSE`, which covers the pipeline code.) **The
 pinned DAD run is `2026-07-29_12-26_archetype200`** (191 examples), a matrix-dealt Opus-5
 run that carries `step1/scenario_deals.jsonl` and `step1/scenarios.jsonl` and is on
 `main`. It replaced `2026-07-20_20-51_bedrock-40`, which PR #108 pruned along with the

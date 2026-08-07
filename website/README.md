@@ -126,8 +126,9 @@ The `description` those tags use is prose, authored in `content_page.md` under t
 `description` id like every other word on the page. It is the one id that never renders in
 the document, so it is flat text — `render.plain_md()` strips the markdown subset.
 
-The datasets' licence is **not** on the page: CC-BY-4.0 is set by `evals/publish_hf.py` and
-lives in the Hugging Face card's frontmatter, beside the files it governs.
+The datasets' licence is **not** on the page: CC0-1.0 is declared by hand in the Hugging
+Face card's frontmatter, beside the files it governs. (The pipeline code is Apache-2.0 —
+a separate licence, on a separate thing.)
 
 Deploy from `main` rather than from a laptop, so the repo stays the source of truth and the
 hosted copy is never edited in place.
