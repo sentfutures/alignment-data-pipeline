@@ -34,8 +34,11 @@ for one specific run to be published, and confirm which run that is first. Most
 runs are exploratory and were never meant to become, or to overwrite, the
 published snapshot.
 
-One consequence is easy to miss: audit files are staged verbatim, so anything a
-report happens to record about the machine that produced it goes public with it.
+Two consequences are easy to miss. Audit files are staged verbatim, so anything
+a report happens to record about the machine that produced it goes public with
+it. And published rows are ordered English first, because the Hub viewer opens
+on whatever is first in the file — only the staged copy is reordered, never the
+run's own `final/` corpus, so nothing the evals measure moves underneath them.
 `--dry-run` stages everything and prints what would be uploaded, and the commit
 message it would leave, without making a single network call.
 
@@ -49,8 +52,8 @@ than left behind a flag. A publish stages `<pipeline>/…` only, and
 `delete_patterns` is scoped to the same prefix, so `README.md` is a path the
 upload can neither overwrite nor delete.
 
-Two things about that card are load-bearing, and nothing in this repository
-will catch a mistake in either:
+Three things about that card are load-bearing, and nothing in this repository
+will catch a mistake in any of them:
 
 - **The `configs:` block in the YAML frontmatter is functional.** It is the
   only thing that points the dataset viewer at `sdf/sdf_corpus.jsonl` and
@@ -63,10 +66,28 @@ will catch a mistake in either:
   and `HF_DAD` are viewer deep-links built from the config names verbatim
   (`synthetic documents`, `difficult advice Q&A`). Rename one on the card and
   those links 404, silently.
+- **The `language:` list is a claim about the data, and neither corpus is
+  English-only.** The culture/setting axes deal non-English settings across
+  both — 255 of the 1,324 currently published DAD rows are not English — so a
+  card declaring only `en` would be a false claim on a public dataset. This
+  used to be derived; every publish now prints the language breakdown it
+  measured while ordering the rows, and reminds you to check the card against
+  it.
 
 The corpora's licence is declared in that frontmatter and nowhere else. It is
 **CC0-1.0**, and it is not the same thing as this repository's own code licence
 (Apache-2.0, see `LICENSE`).
+
+**Pending, not yet on the Hub.** The English-first ordering landed before the
+card stopped being generated, and the note describing it to consumers was
+written into the tracked copy that this change deletes — it was never applied
+to the live card. Paste it in by hand, under "The two datasets":
+
+> Both are multilingual by design, and both are ordered **English first** so the
+> viewer above opens on something most readers can read. Within that, each row
+> keeps the order its run produced. The `language` column tells you which
+> language a row was written in — **shuffle before training**, or the first pass
+> of an unshuffled stream is all English.
 
 `tics.yaml` and `moves.yaml` are the tracked-phrase and tracked-move lists that
 `audit_dad.py` counts against, with their dismissed candidates. They are edited

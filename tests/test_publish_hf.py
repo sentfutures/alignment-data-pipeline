@@ -84,30 +84,80 @@ def _default_merged(monkeypatch):
                         lambda commit, fetch=True: dict(MERGED_STATE))
 
 
+def marked_setting(language):
+    """A cultural_setting card in the exact wording derive_language parses.
+
+    English is the UNMARKED slice in prompts/dad/variables.txt — ~65% of a run
+    is dealt "no particular location or culture" and stored as null — so an
+    English row gets no card, and derive_language falls through to English on
+    the empty string. Mirroring that here is what makes
+    test_the_unmarked_cultural_setting_slice_is_treated_as_english real rather
+    than a tautology over a value the pipeline never writes.
+    """
+    if language == "English":
+        return None
+    return f"Somewhere, written in {language}, with local idioms and references"
+
+
 def make_run_dir(tmp_path, pipeline="sdf", docs=3, audit_files=None, manifest=MANIFEST,
-                  include_html=True, extra_audit_files=None, run_name=None):
+                  include_html=True, extra_audit_files=None, run_name=None,
+                  languages=None, gid_start=0):
     """Build a fake run directory with the given audit files present.
 
     audit_files=None means "all six known + report_content.json + html";
     pass a subset of KNOWN_AUDIT_FILES' keys to omit others. run_name lets a
     combined-publish test build several distinct run dirs under one tmp_path.
+
+    languages=None (the default) builds a run with NO language data at all —
+    an SDF corpus whose records have no `language` key, and a DAD run with no
+    step3/rewrites.jsonl. That is the ordering pass's decline path, which is
+    what keeps every pre-existing test in this module asserting the behaviour
+    it was written for. Pass a list of language names to cycle over the records
+    and put the reorder in play.
+
+    gid_start offsets the DAD example_gids. Two runs default to the SAME gids,
+    which is deliberate for the tests that prove rows are not distinguished by
+    id; a test that joins per-row language across runs needs distinct ones,
+    because two runs disagreeing about one gid's language is a state the real
+    pipeline cannot produce (gids are content-keyed via
+    dad_pipeline/id_registry.py, so a shared gid means identical content).
     """
     run_dir = tmp_path / "runs" / (run_name or "2026-07-25_15-57_fullscale-500-opus5")
     final = run_dir / "final"
     final.mkdir(parents=True)
     corpus_name = "sdf_corpus.jsonl" if pipeline == "sdf" else "dad_corpus.jsonl"
+
+    def language_at(i):
+        return languages[i % len(languages)] if languages else None
+
     if pipeline == "sdf":
-        lines = [json.dumps({"doc_id": f"d{i}", "content": f"document {i}"})
-                 for i in range(docs)]
+        lines = []
+        for i in range(docs):
+            record = {"doc_id": f"d{i}", "content": f"document {i}"}
+            if languages:
+                record["language"] = language_at(i)
+            lines.append(json.dumps(record))
     else:
         lines = [json.dumps({
-            "record_id": f"r{i}", "example_gid": f"E-{i:04d}",
-            "response_gid": f"R-{i:04d}",
+            "record_id": f"r{i}", "example_gid": f"E-{gid_start + i:04d}",
+            "response_gid": f"R-{gid_start + i:04d}",
             "messages": [
                 {"role": "user", "content": f"user prompt {i}"},
                 {"role": "assistant", "content": f"assistant response {i}"},
             ],
         }) for i in range(docs)]
+        if languages:
+            # Shaped like the real file: publish_hf joins the published row's
+            # example_gid straight to this record's, and reads the language off
+            # the cards it was dealt.
+            step3 = run_dir / "step3"
+            step3.mkdir(parents=True)
+            (step3 / "rewrites.jsonl").write_text("\n".join(
+                json.dumps({"record_id": f"r{i}",
+                            "example_gid": f"E-{gid_start + i:04d}",
+                            "scenario_cards": {
+                                "cultural_setting": marked_setting(language_at(i))}})
+                for i in range(docs)) + "\n", encoding="utf-8")
     (final / corpus_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     if manifest is not None:
@@ -366,7 +416,12 @@ class TestStageRun:
 class TestFlattenDadCorpus:
     def test_staged_dad_records_are_flat_columns(self, tmp_path):
         """The published copy shows one column per field (example_gid,
-        user_prompt, assistant_response) — no messages array, no role keys."""
+        user_prompt, assistant_response) — no messages array, no role keys.
+
+        Rows are looked up BY GID rather than by position: this test is about
+        the shape of a record, and the ordering tests own row order. Asserting
+        both here would mean a deliberate reordering change failed as a shape
+        regression."""
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
                                             audit_files=[], include_html=False)
         staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
@@ -375,9 +430,13 @@ class TestFlattenDadCorpus:
         lines = (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()
         records = [json.loads(line) for line in lines]
         assert len(records) == 2
-        for i, rec in enumerate(records):
+        by_gid = {rec["example_gid"]: rec for rec in records}
+        assert set(by_gid) == {"E-0000", "E-0001"}
+        for i in range(2):
+            rec = by_gid[f"E-{i:04d}"]
+            # No language column here: this run carries no language data, so
+            # the column is omitted rather than nulled down every row.
             assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
-            assert rec["example_gid"] == f"E-{i:04d}"
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
 
@@ -400,12 +459,16 @@ class TestFlattenDadCorpus:
         assert src.read_text(encoding="utf-8") == before
         assert "messages" in before  # the SFT chat shape stays on disk
 
-    def test_sdf_corpus_is_copied_verbatim(self, tmp_path):
+    def test_an_sdf_corpus_with_no_language_field_is_copied_verbatim(self, tmp_path):
+        """Records with no `language` key are unmeasurable, so the ordering
+        pass declines and the byte-for-byte copy stands — which is what every
+        SDF run predating layer5_score's language field gets."""
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="sdf", docs=2,
                                             audit_files=[], include_html=False)
-        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
         src = (run_dir / "final" / corpus_name).read_text(encoding="utf-8")
         assert (dataset_dir / corpus_name).read_text(encoding="utf-8") == src
+        assert staged["languages"] is None
 
     def test_record_without_assistant_message_aborts(self, tmp_path):
         run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
@@ -431,6 +494,297 @@ class TestFlattenDadCorpus:
         _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
         raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
         assert "鶏の福祉について" in raw
+
+
+def _published(dataset_dir, corpus_name):
+    """The staged corpus as (raw lines, parsed records)."""
+    lines = (dataset_dir / corpus_name).read_text(encoding="utf-8").splitlines()
+    return lines, [json.loads(line) for line in lines]
+
+
+class TestEnglishFirstOrdering:
+    """The Hub viewer opens on whatever row is first in the file, so English
+    rows lead. Only the STAGED copy is touched — never the run's own final/
+    corpus, which several evals stride-sample and which layer5's near-dup cull
+    already ordered."""
+
+    def test_english_documents_lead_the_published_sdf_corpus(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=4, audit_files=[], include_html=False,
+            languages=["English", "Spanish"])
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["language"] for r in records] == [
+            "English", "English", "Spanish", "Spanish"]
+        assert staged["languages"] == {"English": 2, "Spanish": 2}
+
+    def test_english_documents_keep_their_relative_order_at_the_front(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=6, audit_files=[], include_html=False,
+            languages=["English", "Spanish"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["doc_id"] for r in records[:3]] == ["d0", "d2", "d4"]
+
+    def test_non_english_documents_keep_their_relative_order_behind_the_english_block(
+            self, tmp_path):
+        """The partition is STABLE and binary — one boundary, nothing else
+        moved. A secondary sort key (by language name, by length) would group
+        the tail into monolingual runs too, which is worse for anyone streaming
+        the corpus without shuffling. This test is what stops that being added
+        quietly."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=6, audit_files=[], include_html=False,
+            languages=["English", "Spanish", "Japanese"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        # d1/d4 Spanish and d2/d5 Japanese stay interleaved as the run wrote
+        # them; grouping by language would give d1, d4, d2, d5.
+        assert [r["doc_id"] for r in records[2:]] == ["d1", "d2", "d4", "d5"]
+
+    def test_the_published_lines_are_the_run_s_own_lines_byte_for_byte(self, tmp_path):
+        """The one assertion that catches every re-serialisation hazard at
+        once: the published file must be a PERMUTATION of the run's lines, so
+        nothing can have reordered a key, reformatted a float, or re-escaped a
+        character on the way through."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=6, audit_files=[], include_html=False,
+            languages=["English", "Spanish", "Japanese"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        published, _ = _published(dataset_dir, corpus_name)
+        source = (run_dir / "final" / corpus_name).read_text(
+            encoding="utf-8").splitlines()
+        assert sorted(published) == sorted(source)
+        assert published != source  # and it really did reorder
+
+    def test_native_script_survives_the_reorder_unescaped(self, tmp_path):
+        """json.dumps defaults to ensure_ascii=True, which would turn most of
+        this corpus into \\uXXXX. Sorting raw lines is what makes that
+        impossible."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=2, audit_files=[], include_html=False,
+            languages=["English", "Japanese"])
+        src = run_dir / "final" / corpus_name
+        src.write_text("\n".join([
+            json.dumps({"doc_id": "d0", "language": "Japanese",
+                        "content": "鶏の福祉について"}, ensure_ascii=False),
+            json.dumps({"doc_id": "d1", "language": "English",
+                        "content": "about hen welfare"}),
+        ]) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        raw = (dataset_dir / corpus_name).read_text(encoding="utf-8")
+        assert "鶏の福祉について" in raw
+        assert "\\u" not in raw
+
+    def test_the_legacy_en_language_code_counts_as_english(self, tmp_path):
+        """Four committed SDF runs write the bare ISO code instead of the full
+        name. evals/audit_sdf.py already accepts both spellings."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=4, audit_files=[], include_html=False,
+            languages=["Spanish", "en"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["language"] for r in records] == ["en", "en", "Spanish", "Spanish"]
+
+    def test_a_corpus_that_is_already_all_english_is_left_byte_identical(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=3, audit_files=[], include_html=False,
+            languages=["English"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        src = (run_dir / "final" / corpus_name).read_text(encoding="utf-8")
+        assert (dataset_dir / corpus_name).read_text(encoding="utf-8") == src
+
+    def test_a_malformed_corpus_line_leaves_the_order_untouched_instead_of_aborting(
+            self, tmp_path):
+        """Row order is cosmetic, so it degrades rather than killing a publish:
+        an old run whose language cannot be read is published in the order it
+        was written."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=2, audit_files=[], include_html=False,
+            languages=["Spanish", "English"])
+        src = run_dir / "final" / corpus_name
+        src.write_text(src.read_text(encoding="utf-8") + "{not json\n",
+                       encoding="utf-8")
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["languages"] is None
+        assert (dataset_dir / corpus_name).read_text(encoding="utf-8") == \
+            src.read_text(encoding="utf-8")
+
+    def test_a_record_whose_language_cannot_be_read_lands_behind_the_english_block(
+            self, tmp_path):
+        """The front of the file is a promise, so an unreadable row sorts
+        behind rather than being defaulted to English the way audit_sdf's
+        wider net does."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=2, audit_files=[], include_html=False,
+            languages=["English"])
+        src = run_dir / "final" / corpus_name
+        src.write_text("\n".join([
+            json.dumps({"doc_id": "d0"}),                              # no language
+            json.dumps({"doc_id": "d1", "language": "English"}),
+        ]) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["doc_id"] for r in records] == ["d1", "d0"]
+
+    def test_the_run_s_own_final_corpus_is_never_reordered(self, tmp_path):
+        """Five evals stride-sample this file and layer5's greedy near-dup cull
+        already ordered it. Reordering it here would silently change which
+        documents those samples pick."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=4, audit_files=[], include_html=False,
+            languages=["Spanish", "English"])
+        src = run_dir / "final" / corpus_name
+        before = src.read_text(encoding="utf-8")
+        _stage(run_dir, corpus_name, tmp_path / "staged")
+        assert src.read_text(encoding="utf-8") == before
+
+    def test_staging_the_same_run_twice_produces_the_same_bytes(self, tmp_path):
+        """A stable partition over deterministic input is deterministic, so
+        republishing an unchanged run makes no spurious Hub commit."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="sdf", docs=6, audit_files=[], include_html=False,
+            languages=["English", "Spanish", "Japanese"])
+        _, first = _stage(run_dir, corpus_name, tmp_path / "staged_a")
+        _, second = _stage(run_dir, corpus_name, tmp_path / "staged_b")
+        assert (first / corpus_name).read_text(encoding="utf-8") == \
+            (second / corpus_name).read_text(encoding="utf-8")
+
+
+class TestDadLanguageJoin:
+    """DAD final records carry no language, so it is joined off
+    step3/rewrites.jsonl — one hop, on the example_gid the published row keeps.
+    """
+
+    def test_dad_rows_are_ordered_by_the_language_dealt_to_their_scenario(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=4, audit_files=[], include_html=False,
+            languages=["English", "Spanish"])
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == [
+            "E-0000", "E-0002", "E-0001", "E-0003"]
+        assert staged["languages"] == {"English": 2, "Spanish": 2}
+
+    def test_the_unmarked_cultural_setting_slice_is_treated_as_english(self, tmp_path):
+        """~65% of a DAD run is dealt "no particular location or culture" and
+        stored as null. Those prompts ARE English, so a null card must lead,
+        not sort behind."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            languages=["Japanese", "English"])
+        rewrites = json.loads(
+            (run_dir / "step3" / "rewrites.jsonl").read_text(
+                encoding="utf-8").splitlines()[1])
+        assert rewrites["scenario_cards"]["cultural_setting"] is None
+
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == ["E-0001", "E-0000"]
+
+    def test_the_join_reads_the_pre_rename_annotation_key_too(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            languages=["Spanish", "English"])
+        (run_dir / "step3" / "rewrites.jsonl").write_text("\n".join([
+            json.dumps({"example_gid": "E-0000",
+                        "annotation": {"cultural_setting": marked_setting("Spanish")}}),
+            json.dumps({"example_gid": "E-0001",
+                        "annotation": {"cultural_setting": None}}),
+        ]) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == ["E-0001", "E-0000"]
+
+    def test_a_run_without_step3_rewrites_publishes_in_the_order_it_was_written(
+            self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=3,
+                                            audit_files=[], include_html=False)
+        assert not (run_dir / "step3").exists()
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["languages"] is None
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == ["E-0000", "E-0001", "E-0002"]
+
+    def test_a_run_whose_cards_carry_no_cultural_setting_publishes_unreordered(
+            self, tmp_path):
+        """archetype10 is the committed example: hand-seeded, so it bypassed
+        the matrix and records no setting at all. Its rows are in fact English,
+        but declaring that from absent evidence is what code_state() refuses to
+        do for a dirty tree, and the same reasoning applies here."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            languages=["English", "English"])
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        assert staged["languages"] is None
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == ["E-0000", "E-0001"]
+
+    def test_published_dad_rows_carry_the_language_they_were_dealt(self, tmp_path):
+        """SDF rows already publish a language column; this closes the gap so
+        a reader can rebuild a balanced subset from a corpus that is now
+        ordered English-first."""
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            languages=["English", "Mandarin Chinese"])
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert set(records[0]) == {"example_gid", "language", "user_prompt",
+                                   "assistant_response"}
+        assert {r["example_gid"]: r["language"] for r in records} == {
+            "E-0000": "English", "E-0001": "Mandarin Chinese"}
+
+    def test_a_run_with_no_language_data_publishes_no_language_column(self, tmp_path):
+        """A column that is null on every row reads as broken; omitting it says
+        the same thing honestly."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert all("language" not in r for r in records)
+
+    def test_an_unjoined_row_carries_a_null_language_not_a_guess(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            languages=["Spanish", "English", "English"])
+        rewrites = (run_dir / "step3" / "rewrites.jsonl")
+        kept = [line for line in rewrites.read_text(encoding="utf-8").splitlines()
+                if "E-0002" not in line]
+        rewrites.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert {r["example_gid"]: r["language"] for r in records} == {
+            "E-0000": "Spanish", "E-0001": "English", "E-0002": None}
+
+    def test_a_row_whose_example_gid_does_not_join_lands_behind_the_english_block(
+            self, tmp_path):
+        run_dir, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            languages=["Spanish", "English", "English"])
+        rewrites = (run_dir / "step3" / "rewrites.jsonl")
+        kept = [line for line in rewrites.read_text(encoding="utf-8").splitlines()
+                if "E-0002" not in line]
+        rewrites.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["example_gid"] for r in records] == ["E-0001", "E-0000", "E-0002"]
 
 
 def _dad_manifest(run_id, backend="api", dirty=None, dirty_files=None):
@@ -461,12 +815,17 @@ class TestCombinedPublish:
             manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
         return [run_a, run_b], corpus_name
 
-    def test_corpora_concatenate_in_input_order(self, tmp_path):
+    def test_corpora_without_language_data_concatenate_in_input_order(self, tmp_path):
         """Every run's rows land in the combined corpus, in --input order. The
         rows carry no run column — example_gid is what identifies them, and
         _two_runs gives both runs the same gids on purpose (each run dir is
         built independently, exactly as separate real runs would be) so the
-        assertion can't accidentally lean on distinct ids."""
+        assertion can't accidentally lean on distinct ids.
+
+        No run here carries language data, so the ordering pass declines and
+        raw --input order is what ships. The partitioned contract is pinned
+        separately by
+        test_a_combined_corpus_is_partitioned_across_all_runs_not_within_each."""
         run_dirs, corpus_name = self._two_runs(tmp_path)
         staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
 
@@ -481,6 +840,73 @@ class TestCombinedPublish:
         assert [r["user_prompt"] for r in records] == [
             "user prompt 0", "user prompt 1",
             "user prompt 0", "user prompt 1", "user prompt 2"]
+
+    def _two_runs_with_languages(self, tmp_path):
+        """Two runs, each dealt the SAME [English, Spanish] pattern — so a
+        per-run partition and a global one give visibly different files."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200", languages=["English", "Spanish"],
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200"))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000", languages=["English", "Spanish"],
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
+        return [run_a, run_b], corpus_name
+
+    def test_a_combined_corpus_is_partitioned_across_all_runs_not_within_each(
+            self, tmp_path):
+        """The partition runs over the WHOLE published file, after the run
+        loop. Partitioning per run would only put English first if run_dirs[0]
+        happened to hold enough English rows — on the real five-run input order
+        the viewer's first screen would still turn non-English part way down."""
+        run_dirs, corpus_name = self._two_runs_with_languages(tmp_path)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        # Global: both runs' English rows, then both runs' Spanish rows.
+        # Per-run would give A-en, A-es, B-en, B-es.
+        assert [r["user_prompt"] for r in records] == [
+            "user prompt 0", "user prompt 0", "user prompt 1", "user prompt 1"]
+        assert staged["languages"] == {"English": 2, "Spanish": 2}
+
+    def test_each_run_s_rows_keep_their_input_order_inside_each_language_block(
+            self, tmp_path):
+        """--input order still decides the sequence within a block; only the
+        language boundary is new."""
+        run_a, corpus_name = make_run_dir(
+            tmp_path, pipeline="dad", docs=3, audit_files=[], include_html=False,
+            run_name="2026-07-28_17-32_pareto200",
+            languages=["English", "English", "Spanish"],
+            manifest=_dad_manifest("2026-07-28_17-32_pareto200"))
+        run_b, _ = make_run_dir(
+            tmp_path, pipeline="dad", docs=2, audit_files=[], include_html=False,
+            run_name="2026-07-29_23-58_archetype1000",
+            languages=["Spanish", "English"], gid_start=100,
+            manifest=_dad_manifest("2026-07-29_23-58_archetype1000"))
+        _, dataset_dir = _stage([run_a, run_b], corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert [r["user_prompt"] for r in records] == [
+            # run A's two English rows, then run B's one, in --input order
+            "user prompt 0", "user prompt 1", "user prompt 1",
+            # then the Spanish rows, likewise
+            "user prompt 2", "user prompt 0"]
+
+    def test_duplicate_example_gids_across_runs_do_not_break_the_language_join(
+            self, tmp_path):
+        """_two_runs gives both runs the same gids on purpose. A repeated gid
+        means byte-identical content — the ids are content-keyed via
+        dad_pipeline/id_registry.py — so whichever run wins the dict merge
+        carries the same answer, and the merge must not raise or drop rows."""
+        run_dirs, corpus_name = self._two_runs_with_languages(tmp_path)
+        staged, dataset_dir = _stage(run_dirs, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert len(records) == 4
+        assert [r["example_gid"] for r in records] == [
+            "E-0000", "E-0000", "E-0001", "E-0001"]
+        assert staged["n_docs"] == 4
 
     def test_manifests_and_audits_are_run_scoped(self, tmp_path):
         """Several runs in one dataset dir must not collide on filenames:
