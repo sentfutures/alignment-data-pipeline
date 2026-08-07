@@ -71,6 +71,16 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared import utils
+# The one regex that reads a writing language out of a dealt culture/setting
+# card ("China, written in Mandarin Chinese, ..." -> "Mandarin Chinese").
+# Imported rather than copied: it is a contract with the wording in
+# prompts/{sdf,dad}/variables.txt, and a second copy drifts the first time
+# someone rewords a value. evals/ already reaches into pipeline packages for
+# pure helpers this way (audit_dad.py, diversity.py both import from
+# dad_pipeline.id_registry). Cheap: compose_prompts pulls only shared.matrix
+# and shared.entity_pools, and entity_pools imports faker lazily inside a
+# function, so nothing heavy loads.
+from sdf_pipeline.compose_prompts import derive_language
 
 load_dotenv()
 
@@ -107,6 +117,12 @@ LANGUAGE_CODES = {
     "Korean": "ko", "Indonesian": "id", "Vietnamese": "vi", "Arabic": "ar",
 }
 
+# Both spellings the corpora actually use: the full name derive_language
+# produces (written into every SDF record by sdf_pipeline/layer5_score.py) and
+# the bare ISO code four early SDF runs carry instead. evals/audit_sdf.py
+# already accepts both when it filters to English-only documents.
+ENGLISH_SPELLINGS = frozenset({"en", "english"})
+
 
 def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     """Return (run_dir, corpus_filename) for an SDF or DAD run directory."""
@@ -121,11 +137,156 @@ def resolve_corpus_file(input_arg: str) -> tuple[Path, str]:
     )
 
 
-def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
+def is_english(language: str | None) -> bool:
+    """True only for a language value we can READ as English.
+
+    Unlike evals/audit_sdf.py's English filter this does NOT default a missing
+    value to English. There a wider net only over-counts a measurement; here
+    the front of the published file is a promise, so a row whose language we
+    cannot read belongs BEHIND the English block rather than in front of it. A
+    corpus where no row at all is readable is handled once and separately, by
+    order_english_first declining to reorder.
+    """
+    return str(language or "").strip().lower() in ENGLISH_SPELLINGS
+
+
+def dad_languages(run_dir: Path) -> dict[str, str]:
+    """{example_gid: language} for one DAD run, or {} when it cannot be read.
+
+    Final DAD records carry no language field, but the run does. Each
+    step3/rewrites.jsonl record holds the example_gid that reaches the
+    published row AND the scenario_cards it was dealt, whose `cultural_setting`
+    names the writing language ("China, written in Mandarin Chinese, with
+    Chinese idioms and references"). derive_language reads that clause; the
+    unmarked ~65% slice stores null, has no clause, and falls through to
+    English — which is what those prompts are.
+
+    ONE hop, not two: the same cards also sit on step1/dilemmas.jsonl, but
+    step3 carries them next to the id the published row keeps, so the join
+    needs one file and one key. Checked against the step1 route on all five
+    committed runs — the same answer for all 1,324 records, no misses either
+    way.
+
+    This is the language the scenario was DEALT, not one detected from the
+    text. Validated by script on the pinned run: none of the rows it calls
+    English carry CJK/Devanagari/Arabic/Hangul, so the error direction is a
+    non-English row landing behind the block, never an unreadable row landing
+    in front of it.
+
+    Returns {} when the file is missing, or when no record carries a
+    cultural_setting at all (a pre-matrix run such as archetype10). The caller
+    then leaves the corpus order alone rather than declaring every row English
+    on absent evidence.
+    """
+    path = run_dir / "step3" / "rewrites.jsonl"
+    if not path.exists():
+        return {}
+    languages: dict[str, str] = {}
+    any_dealt = False
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            gid = record.get("example_gid")
+            if not gid:
+                continue
+            # `annotation` is the pre-rename spelling of scenario_cards.
+            # dad_pipeline/step1_dilemmas.py's dealt_cards() is the canonical
+            # accessor, deliberately not imported: it pulls shared.api ->
+            # anthropic into a script that makes no model calls.
+            cards = record.get("scenario_cards") or record.get("annotation") or {}
+            setting = cards.get("cultural_setting") if isinstance(cards, dict) else None
+            if setting:
+                any_dealt = True
+            languages[gid] = derive_language(setting or "")
+    return languages if any_dealt else {}
+
+
+def order_english_first(corpus_path: Path, language_of) -> dict[str, int] | None:
+    """Rewrite a staged corpus jsonl with its English rows first, returning the
+    {language: count} breakdown measured on the way — or None when it declined
+    to reorder, leaving the file exactly as staged.
+
+    Sorts the RAW LINES. Each line is parsed only to read its language, and the
+    original line is written back unchanged, so no re-serialisation can reorder
+    keys, reformat a float, or re-escape non-ASCII — json.dumps defaults to
+    ensure_ascii=True, which would turn most of a non-English corpus into
+    \\uXXXX escapes (flatten_dad_corpus already passes ensure_ascii=False for
+    exactly that reason). The published rows are therefore a permutation of the
+    run's own lines, which is checkable:
+    `diff <(sort published) <(sort final)` is empty.
+
+    A STABLE binary partition, not a sort by language: English rows first in
+    their original order, then every other row in its original order. Sorting
+    by language name would make every prefix of the file monolingual rather
+    than just the first screen — worse for anyone streaming the corpus without
+    shuffling, and no better in the viewer.
+
+    Declines (returns None, file untouched) on a blank line, a line that is not
+    a JSON object, or a corpus where no row's language could be read at all.
+    Row order is cosmetic, so an old run we cannot measure is published in the
+    order it was written rather than aborting a publish over it — the same way
+    build_metrics_rows drops a row and fetch_sibling drops a section.
+
+    Line terminators are normalised: every written line ends in \\n. That is a
+    correctness requirement, not tidying — a source whose last line lacked a
+    newline would otherwise glue two records onto one line once that line moved
+    out of last place.
+    """
+    lines = corpus_path.read_text(encoding="utf-8").splitlines()
+    if not lines:
+        return None
+    tagged: list[tuple[str, str | None]] = []
+    counts: dict[str, int] = {}
+    for line in lines:
+        if not line.strip():
+            return None
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(record, dict):
+            return None
+        language = language_of(record)
+        tagged.append((line, language))
+        if language:
+            counts[language] = counts.get(language, 0) + 1
+    if not counts:
+        return None
+    # sorted() is stable, so a two-valued key partitions the list without
+    # disturbing the order within either side.
+    tagged.sort(key=lambda pair: not is_english(pair[1]))
+    # One write of the whole joined string: a failure part way through must not
+    # leave a half-written corpus where a complete one was staged.
+    corpus_path.write_text("\n".join(line for line, _ in tagged) + "\n",
+                           encoding="utf-8")
+    return counts
+
+
+def flatten_dad_corpus(src: Path, dst: Path, languages: dict[str, str] | None = None,
+                       append: bool = False) -> int:
     """Write the published form of a DAD corpus: one flat record per example
-    (example_gid, user_prompt, assistant_response) instead of the training
-    format's messages array, so the Hub viewer shows one readable column per
-    field with no role/content nesting.
+    (example_gid, language, user_prompt, assistant_response) instead of the
+    training format's messages array, so the Hub viewer shows one readable
+    column per field with no role/content nesting.
+
+    `language` is the language the scenario was DEALT (see dad_languages), not
+    one detected from the text, and it is emitted only when the map is
+    non-empty — a run we cannot measure would otherwise grow a column that is
+    null on every row and reads as broken. A single row that does not join
+    carries null rather than a guessed "English": a visible gap is honest, an
+    invented value is not.
+
+    That this column is worth its width, while the old source_run column was
+    not, is not a contradiction. A short language cell against two very wide
+    text columns costs almost nothing on the viewer's first screen, and unlike
+    a run id repeated down every row it carries information no other column
+    holds — which is exactly what a reader needs once the corpus is ordered
+    English-first and a balanced sample has to be rebuilt.
 
     Deliberately carries NO per-row run column, even when several runs are
     concatenated into one published corpus (append=True for every run after
@@ -161,11 +322,12 @@ def flatten_dad_corpus(src: Path, dst: Path, append: bool = False) -> int:
                     f"{src}: record {rid} has no user+assistant message pair "
                     f"— refusing to publish a mangled row"
                 )
-            fout.write(json.dumps({
-                "example_gid": record.get("example_gid"),
-                "user_prompt": by_role["user"],
-                "assistant_response": by_role["assistant"],
-            }, ensure_ascii=False) + "\n")
+            row = {"example_gid": record.get("example_gid")}
+            if languages:
+                row["language"] = languages.get(record.get("example_gid"))
+            row["user_prompt"] = by_role["user"]
+            row["assistant_response"] = by_role["assistant"]
+            fout.write(json.dumps(row, ensure_ascii=False) + "\n")
             n += 1
     return n
 
@@ -243,7 +405,17 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
     multi = len(run_dirs) > 1
     staged: dict = {"pipeline": pipeline_tag, "corpus_file": None,
                     "manifest_file": None, "audit_files": [], "n_docs": 0,
-                    "runs": []}
+                    "runs": [], "languages": None}
+
+    # Built BEFORE the loop, because the flatten writes the language column as
+    # it goes. Merged across runs since a combined corpus is one published
+    # file; a gid repeated across runs means byte-identical content (the ids
+    # are content-keyed via dad_pipeline/id_registry.py), so whichever run
+    # wins the merge carries the same answer.
+    dad_language_map: dict[str, str] = {}
+    if corpus_name == "dad_corpus.jsonl":
+        for run_dir in run_dirs:
+            dad_language_map.update(dad_languages(run_dir))
 
     corpus_dst = dataset_dir / corpus_name
     for i, run_dir in enumerate(run_dirs):
@@ -252,7 +424,8 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
 
         corpus_src = run_dir / "final" / corpus_name
         if corpus_name == "dad_corpus.jsonl":
-            n = flatten_dad_corpus(corpus_src, corpus_dst, append=(i > 0))
+            n = flatten_dad_corpus(corpus_src, corpus_dst, dad_language_map,
+                                   append=(i > 0))
         else:
             shutil.copy2(corpus_src, corpus_dst)
             with open(corpus_dst, encoding="utf-8") as f:
@@ -283,6 +456,21 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
                     shutil.copy2(f, audit_dst / f.name)
                     staged["audit_files"].append(
                         f"{run_id}/{f.name}" if multi else f.name)
+
+    # AFTER the run loop, so a combined DAD corpus is partitioned across the
+    # WHOLE published file rather than once per run. Per-run partitioning would
+    # only put English first if run_dirs[0] happened to hold enough English
+    # rows — on the real input order the viewer's first screen would still turn
+    # non-English part way down. Run order survives inside each language block
+    # (the sort is stable), and the card's per-run table reports counts, never
+    # row ranges, so it stays true either way.
+    # Both pipelines now publish the language on the row itself — SDF writes it
+    # upstream, DAD gets it from the flatten above — so the ordering reads the
+    # very column a visitor sees. That also makes the decline path fall out for
+    # free: a run with no measurable language emits no column, every row reads
+    # None, and order_english_first leaves the file alone.
+    staged["languages"] = order_english_first(
+        corpus_dst, lambda record: record.get("language"))
 
     staged["corpus_file"] = corpus_name
     return staged
@@ -370,23 +558,33 @@ def build_metrics_rows(dataset_dir: Path,
     return rows
 
 
-def detected_languages(dataset_dir: Path, pipeline_tag: str) -> list[str]:
+def detected_languages(dataset_dir: Path, pipeline_tag: str,
+                       measured: dict[str, int] | None = None) -> list[str]:
     """ISO 639-1 codes actually present in this ONE dataset, not a hardcoded
     guess. The card's repo-wide `language:` field is the UNION over datasets.
 
-    SDF runs get this from audit_report.json's own composition.language
-    breakdown (evals/audit_sdf.py, keyed by the same full names
-    LANGUAGE_CODES maps) — the culture matrix deliberately samples mostly
-    non-English documents, so hardcoding "en" would misdeclare the card's
-    language metadata for every real SDF run. DAD's audit_report.json has no
-    such breakdown (dilemmas are English-only by the dad.language_distribution
-    default), so DAD runs — and any SDF run missing the file or whose
-    language names don't map — fall back to ["en"] rather than guessing.
+    `measured` is the breakdown the ordering pass counted while staging
+    (stage_run's staged["languages"]), and is preferred when present because
+    it is read off the rows being published rather than off a report about
+    them. DAD needs it: its audit_report.json carries no composition breakdown
+    at all, and DAD is NOT English-only — the ~35% marked slice of the
+    cultural_setting axis deals settings like "China, written in Mandarin
+    Chinese", and roughly a fifth of a real run's rows are not English.
+    Without this the card would declare `language: [en]` over them, which is
+    invisible today only because the repo-wide union takes SDF's 16 codes.
+
+    SDF also has audit_report.json's own composition.language breakdown
+    (evals/audit_sdf.py, keyed by the same full names LANGUAGE_CODES maps),
+    kept as the fallback — it still covers a sibling fetched off the Hub,
+    which arrives with no staging metadata. Anything unmeasurable, or whose
+    language names don't map (the legacy bare "en" code four early SDF runs
+    write is not a LANGUAGE_CODES key), falls back to ["en"] rather than
+    guessing.
     """
-    if pipeline_tag != "sdf":
-        return ["en"]
-    d = _load_json(dataset_dir / "audit" / "audit_report.json")
-    names = _get(d, "composition", "language", default={}) if d else {}
+    names: dict = measured or {}
+    if not names and pipeline_tag == "sdf":
+        d = _load_json(dataset_dir / "audit" / "audit_report.json")
+        names = _get(d, "composition", "language", default={}) if d else {}
     codes = sorted({LANGUAGE_CODES[n] for n in names if n in LANGUAGE_CODES})
     return codes or ["en"]
 
@@ -610,13 +808,15 @@ def build_card(datasets: list[dict], license_id: str, pretty_name: str) -> str:
     whole on each publish, so every dataset that should survive must be
     present here (see fetch_sibling).
     """
-    # language: is repo-wide, so it must be the union across datasets — SDF
-    # spans 16 languages while DAD is English-only, and declaring either one
-    # alone would misdescribe the repo.
+    # language: is repo-wide, so it must be the union across datasets. Both
+    # pipelines are multilingual — SDF spans 16 languages by construction, and
+    # DAD's cultural_setting axis marks about a third of a run — so declaring
+    # either one alone would misdescribe the repo.
     languages = sorted({
         code
         for ds in datasets
-        for code in detected_languages(ds["dir"], ds["pipeline"])
+        for code in detected_languages(ds["dir"], ds["pipeline"],
+                                       ds["staged"].get("languages"))
     }) or ["en"]
 
     configs = []
@@ -1040,6 +1240,30 @@ def main() -> None:
         print(f"Staged {pipeline_tag}/{corpus_name} ({staged['n_docs']} records "
               f"from {len(staged['runs'])} run(s): {run_names}), "
               f"{len(staged['audit_files'])} audit file(s): {', '.join(staged['audit_files']) or '(none)'}")
+        # Say what the ordering pass did, either way. A publish whose rows
+        # could not be measured looks identical from the outside otherwise,
+        # and the whole point of the pass is what a visitor lands on.
+        if staged["languages"]:
+            by_count = sorted(staged["languages"].items(),
+                              key=lambda kv: (-kv[1], kv[0]))
+            n_en = sum(n for name, n in by_count if is_english(name))
+            others = ", ".join(f"{name} {n}" for name, n in by_count
+                               if not is_english(name))
+            # Rows whose language could not be read sort behind the English
+            # block as well, but they are NOT evidence of a non-English
+            # corpus — they are evidence of a run that recorded no card
+            # (archetype10 is the committed example). Counting them into the
+            # language tally would misreport both numbers, so name them apart.
+            unmeasured = staged["n_docs"] - sum(n for _, n in by_count)
+            note = (f"  Ordered English first: {n_en} of {staged['n_docs']} "
+                    f"rows lead, then {others or '(none)'}")
+            if unmeasured:
+                note += (f"; {unmeasured} row(s) carry no recorded language "
+                         f"and sort behind the block too")
+            print(note)
+        else:
+            print("  Not reordered: no readable language on these records — "
+                  "publishing in the order the run wrote them.")
 
         dataset_dir = staging_dir / pipeline_tag
         # Persist the two strings this dataset's section heading uses, so the

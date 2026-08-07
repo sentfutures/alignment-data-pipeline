@@ -68,6 +68,12 @@ Following that research, we built pipelines for a subject currently absent from 
 | **Format** | Blogs, interviews, encyclopedia entries, forum threads | One user dilemma in, one assistant answer out |
 | **Intended use** | Midtraining | Supervised finetuning Q&A |
 
+Both are multilingual by design, and both are ordered **English first** so the
+viewer above opens on something most readers can read. Within that, each row
+keeps the order its run produced. The `language` column tells you which
+language a row was written in — **shuffle before training**, or the first pass
+of an unshuffled stream is all English.
+
 ## Generating your own
 
 These corpora are specific to Anthropic since they have the only publicly available alignment doc at the time of data generation. They were generated with Claude models, Opus 5 on the alignment-critical stages, and grounded in Claude's constitution.
