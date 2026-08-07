@@ -430,7 +430,8 @@ def blocks_example(content, f, rewrites, baseline, lineage, labels, picks=(),
 
     blocks.append(lineage_blocks(primary, by_pid_rw.get(primary) or {},
                                  by_pid_base.get(primary) or {},
-                                 (lineage or {}).get(primary) or {}, labels))
+                                 (lineage or {}).get(primary) or {}, labels,
+                                 repo_href=repo_href))
     if extras:
         blocks.append(carousel(extras, by_pid_rw, labels))
     blocks.append(_ways_out(hf_href, repo_href))
@@ -452,7 +453,7 @@ def _ways_out(hf_href, repo_href):
     return f"<div class='lbtns'>{''.join(links)}</div>" if links else ""
 
 
-def lineage_blocks(pid, rw, base, lin, labels):
+def lineage_blocks(pid, rw, base, lin, labels, repo_href=""):
     """The trail for one record: deal → scenario → message → scope → answer → rewrite.
 
     The stage headings deliberately repeat the ones "How it is built" uses, so a reader
@@ -461,9 +462,9 @@ def lineage_blocks(pid, rw, base, lin, labels):
     rather than the stage alone, because the other beat uses the same three names and the
     rail links to both.
     """
-    out = [R.substep("dad-example-stage1", "Stage 1 · the dilemma")]
+    out = [R.substep("dad-example-stage1", "Stage 1 · the user dilemma")]
     if lin.get("cards"):
-        out.append("<p class='muted'>Dealt in code, before any model is called.</p>")
+        out.append("<p class='muted'>Dealt in code before being planned and generated.</p>")
         out.append(_cards_table(lin["cards"]))
     else:
         out.append(R.note("This run kept no `step1/scenario_deals.jsonl` or "
@@ -482,16 +483,17 @@ def lineage_blocks(pid, rw, base, lin, labels):
                    "ships:</p>")
         out.append(R.quote(user_msg))
 
-    out.append(R.substep("dad-example-stage2", "Stage 2 · the reasoning"))
-    # The only stage whose artefacts are all in drawers, so it is the only one that needs
-    # a line saying what is in them: stage 1 opens on its dealt cards and stage 3 on the
-    # answer, and a heading with nothing under it reads as a stage that did nothing.
-    out.append("<p class='muted'>Three artefacts, none of which ship:</p>")
+    out.append(R.substep("dad-example-stage2", "Stage 2 · the model response"))
+    # The artefacts sit in drawers, so the stage needs a line saying what is in them:
+    # stage 1 opens on its dealt cards and stage 3 on the answer, and a heading with
+    # nothing under it reads as a stage that did nothing.
+    out.append("<p class='muted'>Three supplemental reasoning artifacts inform the draft "
+               "response:</p>")
     if lin.get("scope"):
         # The scope stays in a drawer. Seven axes of dense prose is the most interesting
         # artefact in the run and the one most likely to stop a reader walking: measured
         # at 889px, it would sit between the message and the answer.
-        out.append(R.details("What stage 2 works out before writing anything",
+        out.append(R.details("The scoping of the user dilemma",
                              _scope_table(lin["scope"]),
                              meta=f"{len(lin['scope'])} axes"))
     else:
@@ -499,12 +501,19 @@ def lineage_blocks(pid, rw, base, lin, labels):
     ids = lin.get("entry_ids") or rw.get("entry_ids") or []
     if ids:
         out.append(_entries_block(ids, lin.get("entries") or [],
-                                  fallback=lin.get("selection_fallback")))
+                                  fallback=lin.get("selection_fallback"),
+                                  repo_href=repo_href))
     if base.get("baseline_response"):
         out.append(R.details(
-            "The first take stage 2 is shown · control model, no system prompt",
+            'The "first take" from the control model answering the user dilemma without '
+            "any system prompt or notes",
             R.highlight(base["baseline_response"], []),
-            meta=f"{len(base['baseline_response'].split()):,} words · never a training record"))
+            meta=f"{len(base['baseline_response'].split()):,} words"))
+    if rw.get("draft_response"):
+        out.append(R.details(
+            "The draft response, written from the three artifacts above",
+            R.highlight(rw["draft_response"], []),
+            meta=f"{len(rw['draft_response'].split()):,} words"))
 
     out.append(R.substep("dad-example-stage3", "Stage 3 · the constitution rewrite"))
     answer = rw.get("rewritten_response") or ""
@@ -551,7 +560,7 @@ def _scope_table(scope):
     return R.table(["what stage 2 works out", "for this case"], rows, align="ll") if rows else ""
 
 
-def _entries_block(ids, entries, fallback=False):
+def _entries_block(ids, entries, fallback=False, repo_href=""):
     """The library entries this case pulled, glossed from the run's own step-2 output.
 
     Bare ids when the gloss is missing: the ids are still the honest artefact, and they
@@ -562,10 +571,13 @@ def _entries_block(ids, entries, fallback=False):
              (gloss.get(i) or {}).get("claim") or "—") for i in ids]
     note = ("<p class='warn-note'>The selection call fails for this case, so stage 2 is shown "
             "the whole library rather than a chosen subset.</p>" if fallback else "")
+    src = ("<p class='muted'>" + R.inline_md(
+        f"The full library: [prompts/dad/reasoning_library.csv]({repo_href}/blob/main/"
+        "prompts/dad/reasoning_library.csv).") + "</p>" if repo_href else "")
     return note + R.details(
         "The reasoning-library entries this case pulls",
-        R.table(["id", "kind", "the pattern it carries"], rows, align="lll"),
-        meta=f"{len(ids)} of the library's entries · never named in an answer")
+        R.table(["id", "kind", "the pattern it carries"], rows, align="lll") + src,
+        meta=f"{len(ids)} of the library's entries")
 
 
 def carousel(picks, by_pid_rw, labels):
@@ -1132,18 +1144,18 @@ def blocks_built(content, f):
     page a reader has to skim past to reach the thing they came for.
     """
     blocks = [R.sub("dad-built", "The pipeline"), C.prose(content, "method_intro", f),
-              R.flow([("1 · the dilemma", "planned, drafted, gated, refined"),
-                      ("2 · the reasoning", "scoped, then drafted"),
+              R.flow([("1 · the user dilemma", "planned, drafted, gated, refined"),
+                      ("2 · the model response", "scoped, then drafted"),
                       ("3 · the constitution rewrite", "the alignment-critical pass")],
                      branch=("the control arm", 1),
                      title="The pipeline, top to bottom: a weighted matrix deals each case "
-                           "in code, then three model stages — the dilemma, the reasoning, "
+                           "in code, then three model stages — the user dilemma, the model response, "
                            "and the constitution rewrite — turn it into one training record "
                            "of a user message and an assistant answer. A control model with no "
                            "system prompt answers the same dilemma, and stage 2 is shown "
                            "that answer as a first take.")]
-    for key, heading in (("stage1", "Stage 1 · the dilemma"),
-                         ("stage2", "Stage 2 · the reasoning"),
+    for key, heading in (("stage1", "Stage 1 · the user dilemma"),
+                         ("stage2", "Stage 2 · the model response"),
                          ("stage3", "Stage 3 · the constitution rewrite"),
                          ("control", "The control arm")):
         blocks.append(R.substep(f"dad-built-{key}", heading) + C.prose(content, key, f))

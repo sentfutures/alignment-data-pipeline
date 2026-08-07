@@ -41,11 +41,11 @@ And no deks — the page allows two in total and both are spent elsewhere.
 
 <!-- id: dad_what -->
 
-A fictional user brings a query that could help or harm animals — resembling dilemmas AIs themselves might encounter in the future, according to AI x Animal Welfare experts. A wise AI assistant coaches the user through responsible conduct, reasoning skillfully about tradeoffs without being overbearing.
+A fictional user brings a query that could help or harm animals. A wise AI assistant coaches the user through responsible conduct, reasoning skillfully about tradeoffs without being overbearing.
 
 <!-- id: method_intro -->
 
-Three stages, each a short chain of [model calls](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code deals a weighted mix of variables (you can adjust the weights); stage 1 turns it into a user message; stage 2 prompts a model to answer it without special guidance; stage 3 revises the answer using your alignment documents and expert-generated reasoning guidance.
+Three stages, each a short chain of [model calls](https://github.com/sentfutures/animal-welfare-data-pipeline/tree/main/prompts/dad). Code deals a weighted mix of variables (you can adjust the weights); stage 1 turns it into a user message; stage 2 prompts a model to respond using generated and conditionally triggered supplemental reasoning; stage 3 revises the answer using your alignment documents.
 
 <!-- id: stage1 -->
 

@@ -51,6 +51,11 @@ HF_URL = ("https://huggingface.co/datasets/sentientfutures/"
 # `dad`. The `&` in the difficult-advice one is escaped to `&amp;` by `esc()` when the href is
 # written, which is what makes it a valid attribute — so a test comparing against these
 # constants has to escape them too.
+#
+# These names are HAND-MAINTAINED, in the `configs:` block of the dataset card's
+# frontmatter, which is edited on the Hub. Nothing in this repository generates
+# them or can check them: rename a config there and these two links 404 in
+# silence. See "The dataset card" in evals/README.md.
 HF_DAD = f"{HF_URL}/viewer/difficult%20advice%20Q&A"
 HF_SDF = f"{HF_URL}/viewer/synthetic%20documents"
 
@@ -195,8 +200,15 @@ AUTHORS = (
     ("Arda Enfiyeci", "Sentient Futures"),
 )
 
+# Technical contributors, credited under the authors with the same numbered-affiliation
+# treatment. Separate tuple, separate line: a contribution is not an authorship claim.
+CONTRIBUTORS = (
+    ("Jasmine Brazilek", "Compassion Aligned Machine Learning"),
+    ("Miles Tidmarsh", "Compassion Aligned Machine Learning"),
+)
 
-def byline(authors=AUTHORS):
+
+def byline(authors=AUTHORS, contributors=CONTRIBUTORS):
     """The author list and its numbered affiliation key, paper-style.
 
     One number per institution, assigned by first appearance — the convention a reader
@@ -209,19 +221,31 @@ def byline(authors=AUTHORS):
     names its institution in a ``title`` for a hover.
     """
     seen = []
-    for _, inst in authors:
+    for _, inst in (*authors, *contributors):
         if inst not in seen:
             seen.append(inst)
     num = {inst: i + 1 for i, inst in enumerate(seen)}
     names = ", ".join(f"{R.esc(name)}<sup title='{R.esc(inst)}'>{num[inst]}</sup>"
                       for name, inst in authors)
     key = "".join(f"<span><sup>{num[inst]}</sup>{R.esc(inst)}</span>" for inst in seen)
+    contrib = ""
+    if contributors:
+        c_names = ", ".join(f"{R.esc(name)}<sup title='{R.esc(inst)}'>{num[inst]}</sup>"
+                            for name, inst in contributors)
+        contrib = f"<p class='foot-authors'>with technical contributions from {c_names}</p>"
     return (f"<div class='foot-by'><p class='foot-authors'>{names}</p>"
-            f"<p class='foot-affil'>{key}</p></div>")
+            f"{contrib}<p class='foot-affil'>{key}</p></div>")
 
 
-def footer(maker_icon=""):
-    """Who made it and where to go.
+def footer():
+    """Two rows: the credit, then who made it on the left and where to go on the right.
+
+    TWO ROWS, NOT FOUR THINGS IN ONE. The footer used to be a single ``space-between`` row
+    that four children had outgrown — the byline claimed a full-width line, the feedback
+    sentence and the maker's name split the next, and the two destinations wrapped alone
+    onto a third — so it read as three rows with three different alignments. The split is
+    kept and given exactly two items a side, inside its own ``.foot-row``; the byline, which
+    belongs to neither half, has the line above to itself.
 
     No run ids, no commits, no dirty flag, no backend. This was restored once on the
     grounds that provenance had otherwise "appeared nowhere" — untrue: ``common.run_note()``
@@ -230,18 +254,23 @@ def footer(maker_icon=""):
     reader can act on, and "+ uncommitted changes" on the last line of a handoff page reads
     as an unfinished draft.
     """
-    mark = (f"<img class='ico-img' src='{R.esc(maker_icon)}' alt=''>" if maker_icon else "")
     return (byline()
-            + f"<p>A project by <a class='maker' href='{MAKER_URL}'{R.NEW_TAB}>{mark}{R.esc(MAKER)}"
-            f"{R.EXT_ARROW}</a></p>"
+            + "<div class='foot-row'>"
+            # Two spans and no glyph between them: the separating is column-gap's job here
+            # exactly as it is in the affiliation key, so nothing a screen reader has to
+            # read out sits between two links.
+            + f"<p class='foot-colophon'><span>A project by "
+            f"<a href='{MAKER_URL}'{R.NEW_TAB}>{R.esc(MAKER)}{R.EXT_ARROW}</a></span>"
+            f"<span><a href='{REPO_URL}/issues'{R.NEW_TAB}>Give feedback{R.EXT_ARROW}</a>"
+            f"</span></p>"
             f"<p class='foot-links'>{R.iconlink(HF_URL, 'Datasets', 'hf')}"
-            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p>")
+            f"{R.iconlink(REPO_URL, 'Pipelines', 'github')}</p></div>")
 
 
 # ------------------------------------------------------------------ assembly
 
 def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example=None,
-         illustration="", maker_icon="", icons=(), site_url="", preview_url=""):
+         illustration="", icons=(), site_url="", preview_url=""):
     """The masthead and the sections. Pure: no filesystem, no argv."""
     dad_kwargs, sdf_kwargs = dad_inputs or {}, sdf_inputs or {}
     f = dict(PAGE_FACTS)
@@ -285,7 +314,7 @@ def body(*, content, dad_inputs=None, sdf_inputs=None, example=None, sdf_example
         "preview_url": preview_url,
         "icons": icons,
         "masthead": R.hero(title, R.illustration(illustration, alt=HERO_ALT), intro=intro),
-        "footer": footer(maker_icon),
+        "footer": footer(),
     }
     return "".join(sections), head
 

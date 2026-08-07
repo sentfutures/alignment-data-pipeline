@@ -108,6 +108,21 @@ class TestStep1Run:
         assert "<draft_prompt>" in refine_call
         assert "Drafted user message" in refine_call
 
+    def test_every_dealt_card_is_a_published_variable(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        """DEALT_CARD_FIELDS is what reaches the corpus and the Hub column, and
+        it is a second list — so a card added to the record and not to it would
+        be dealt, and steered on, and invisible to anyone reading the dataset."""
+        stub_claude(_dad_step1_dispatch)
+        examples = step1_dilemmas.run(tiny_config, prompts_dad, tmp_path)
+
+        cards = set(step1_dilemmas.dealt_cards(examples[0]))
+        # the pre-2026-07 annotation write-up fields are normalized onto every
+        # record and are deliberately not published (see DEALT_CARD_FIELDS)
+        legacy = {"claims", "values_in_tension", "moral_patients", "dilemma_anatomy"}
+        assert cards - legacy == set(compose_scenarios.DEALT_CARD_FIELDS)
+
     def test_unusable_gate_reply_is_retried_once_and_raw_kept(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
@@ -1181,6 +1196,34 @@ class TestStep2Run:
         assert "FIRST TAKE (reference only):" in calls[2]["user_message"]
         assert "Plain first-take answer." not in calls[2]["user_message"]
 
+    @pytest.mark.parametrize("ending", [
+        "Hope that helps,\n\n— Claude",
+        "Dr. Amara Okonkwo | Senior Veterinary Officer | National Animal Welfare Board",
+        "Further reading: stocking density; thermal comfort in transit; on-farm handling",
+    ], ids=["signoff", "letterhead", "reading-list"])
+    def test_a_draft_ending_on_a_signoff_is_checkpointed(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, ending
+    ):
+        # 2b's counterpart of the step-3 test: an answer whose final line carries
+        # no terminal punctuation is complete, and the guard here reads
+        # stop_reason (plus the transcript-echo shape), never the closing line.
+        body = f"Here is the reasoning about the welfare trade-off.\n\n{ending}"
+
+        def signoff_draft(user_message, **kw):
+            blob = _sysuser(user_message, kw)
+            if "build the full map of the case" in blob:
+                return GOOD_SCOPE
+            if "retrieving reasoning modules" in blob:
+                return "C1"
+            return body
+
+        stub_claude(signoff_draft)
+        results = step2_responses.run(tiny_config, prompts_dad, tmp_path, [_dilemma()])
+
+        assert len(results) == 1
+        assert results[0]["assistant_response"] == body
+        assert utils.load_jsonl(tmp_path / "responses.jsonl") == results
+
     def test_echoed_draft_skips_without_checkpoint(
         self, tiny_config, prompts_dad, tmp_path, stub_claude
     ):
@@ -1399,8 +1442,13 @@ class TestStep3Run:
 
         assert len(final) == 1
         # training records carry the user + assistant messages plus lineage
-        # ids only — no annotation, scope, or library scaffolding
-        assert set(final[0].keys()) == {"record_id", "example_gid", "response_gid", "messages"}
+        # ids and the dealt cards — no scope, library, or annotation write-up
+        assert set(final[0].keys()) == {"record_id", "example_gid", "response_gid",
+                                        "variables", "messages"}
+        # this record carries only a legacy annotation, so nothing was dealt —
+        # but the column keeps its full shape rather than going missing
+        assert set(final[0]["variables"]) == set(compose_scenarios.DEALT_CARD_FIELDS)
+        assert all(v in (None, []) for v in final[0]["variables"].values())
         assert [m["role"] for m in final[0]["messages"]] == ["user", "assistant"]
         assert final[0]["messages"][1]["content"] == "Rewritten careful answer."
         # the stable example id is minted here; the response id rides in from step 2
@@ -1414,6 +1462,64 @@ class TestStep3Run:
         assert "CONSTITUTION PRINCIPLES" in calls[0]["system_prompt"]
         assert "Direction: Mixed" not in calls[0]["user_message"]
         assert "Direction: Mixed" not in (calls[0]["system_prompt"] or "")
+
+    def test_the_dealt_cards_ride_into_the_training_record(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude
+    ):
+        """The corpus record says which slice of the matrix the example came
+        from — the projection the publisher turns into a `variables` column."""
+        calls = stub_claude(["Rewritten careful answer."])
+        resp = _response_record()
+        resp["scenario_cards"] = {
+            "domain": ["procurement"], "taxa_category": "insect-at-scale",
+            "user_attitude": "unaware", "cultural_setting": None,
+            "conflict": "",
+            # legacy write-up fields ride along on every committed run
+            "claims": [], "dilemma_anatomy": {}, "moral_patients": "",
+        }
+        final = step3_rewrite.run(
+            tiny_config, prompts_dad, tmp_path / "step3", tmp_path / "final", [resp]
+        )
+
+        variables = final[0]["variables"]
+        assert variables["domain"] == ["procurement"]
+        assert variables["taxa_category"] == "insect-at-scale"
+        assert variables["user_attitude"] == "unaware"
+        # every field is present whether or not it was dealt, and "not dealt"
+        # has one spelling whether the card was absent, None, or ""
+        assert set(variables) == set(compose_scenarios.DEALT_CARD_FIELDS)
+        assert variables["cultural_setting"] is None
+        assert variables["conflict"] is None
+        assert variables["length_class"] is None
+        assert variables["user_goal"] == []
+        # the write-up fields are not dealt cards and are not published
+        assert not {"claims", "dilemma_anatomy", "moral_patients"} & set(variables)
+        # the cards are metadata on the record, never text the rewrite reads
+        assert "insect-at-scale" not in calls[0]["user_message"]
+        assert "insect-at-scale" not in (calls[0]["system_prompt"] or "")
+
+    @pytest.mark.parametrize("ending", [
+        "Hope that helps,\n\n— Claude",
+        "Dr. Amara Okonkwo | Senior Veterinary Officer | National Animal Welfare Board",
+        "Further reading: stocking density; thermal comfort in transit; on-farm handling",
+    ], ids=["signoff", "letterhead", "reading-list"])
+    def test_a_rewrite_ending_on_a_signoff_becomes_a_training_record(
+        self, tiny_config, prompts_dad, tmp_path, stub_claude, ending
+    ):
+        # The false-positive direction: step 3 decides truncation from
+        # stop_reason, never from how the answer's last line looks, so an answer
+        # closing on an unpunctuated sign-off or label row must ship verbatim.
+        # The audit-side version of this misjudgement was only a wrong number
+        # (shared/textstats.py); here it would silently drop a paid record.
+        body = f"Here is the careful reasoning about the welfare trade-off.\n\n{ending}"
+        stub_claude([body])
+        final = step3_rewrite.run(
+            tiny_config, prompts_dad, tmp_path / "step3", tmp_path / "final", [_response_record()]
+        )
+
+        assert len(final) == 1
+        assert final[0]["messages"][1]["content"] == body
+        assert utils.load_jsonl(tmp_path / "step3" / "rewrite_failures.jsonl") == []
 
     def test_capped_rewrite_retries_once_at_higher_budget(
         self, tiny_config, prompts_dad, tmp_path, stub_claude

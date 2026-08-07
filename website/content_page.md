@@ -47,10 +47,11 @@ description and the text of a link preview, so it is one flat sentence — markd
 stripped by `render.plain_md()`, and it should read to someone who has not opened the page
 yet. It is not a dek and it is not the intro's first line.
 
-The datasets are CC-BY-4.0 (set by `evals/publish_hf.py` and carried in the Hugging Face
-card's frontmatter, beside the files it governs) and the page deliberately says nothing
-about it — the row that would have carried it was removed. If it ever belongs here it
-belongs in the comparison, as a row in `page.section_datasets()`, not as prose.
+The datasets are CC0-1.0 (declared by hand in the Hugging Face card's frontmatter, beside
+the files it governs — not the same thing as the pipeline code's Apache-2.0) and the page
+deliberately says nothing about it — the row that would have carried it was removed. If it
+ever belongs here it belongs in the comparison, as a row in `page.section_datasets()`, not
+as prose.
 
 Each report's own prose lives in its own file — `content_dad.md` and `content_sdf.md`.
 Moving an id between prose files is a rename, never a copy: the build fails if both files
@@ -63,7 +64,7 @@ Teaching models to reason about harm to animals
 
 <!-- id: description -->
 
-Two open midtraining datasets that teach a model to reason carefully about the welfare of animals and other sentient beings, with the pipeline that produced them.
+Two open pipelines for alignment finetuning data teaching AI models to reason responsibly about the welfare of animals and other sentient beings, with sample datasets.
 
 <!-- id: intro -->
 
@@ -75,17 +76,17 @@ Two complementary techniques proved especially effective:
 
 <!-- id: sdf_technique -->
 
-**Synthetic document finetuning** Uses pretraining-style documents from a world where the target model is *already* aligned to a wide variety of aligned behaviors. This reinforces the existence of an aligned persona for the model in training while increasing the number of aligned propensities associated with it.
+**Synthetic document finetuning** Pretraining-style documents from a world where the target model is *already* aligned to certain behaviors. This reinforces the existence of an aligned persona.
 
 <!-- id: dad_technique -->
 
-**Difficult advice Q&A** Depicts an AI assistant coaching users through ethical dilemmas analogous to those the target model might eventually encounter in deployment. This teaches ethical reasoning skills while teaching the model to identify with the responsible persona.
+**Difficult advice Q&A** Depictions of an AI assistant advising users on realistic and complex dilemmas. This teaches the application of reasoning across a range of possible scenarios.
 
 <!-- id: intro_close -->
 
-Following this research, we built pipelines for synthesizing training data on a subject currently absent from the training corpus: welfare considerations of nonhuman sentient beings.
+Following this research, we built pipelines for synthesizing training data on a subject that is currently underrepresented in training data: welfare considerations of nonhuman sentient beings.
 
-We developed scenarios and reasoning principles in consultation with leading animal ethicists to create a robust training set that mirrors situations where real AI systems will take actions beneficial or detrimental to animal welfare.
+The outputs show models acting beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
 
 <!-- id: dad_desc -->
 
@@ -93,7 +94,7 @@ AI coaching users through ethical dilemmas involving disenfranchised third parti
 
 <!-- id: sdf_desc -->
 
-Diverse artifacts from a world where your model already reasons responsibly about animal welfare.
+Diverse artifacts from a world where a model already reasons responsibly about animal welfare.
 
 <!-- id: dad_use -->
 
