@@ -87,6 +87,9 @@ from shared import utils
 # and shared.entity_pools, and entity_pools imports faker lazily inside a
 # function, so nothing heavy loads.
 from sdf_pipeline.compose_prompts import derive_language
+# The offline composer, not step1_dilemmas: see dad_dealt_cards on why this
+# script must not reach anything that pulls shared.api -> anthropic.
+from dad_pipeline.compose_scenarios import dealt_variables
 
 load_dotenv()
 
@@ -143,39 +146,26 @@ def is_english(language: str | None) -> bool:
     return str(language or "").strip().lower() in ENGLISH_SPELLINGS
 
 
-def dad_languages(run_dir: Path) -> dict[str, str]:
-    """{example_gid: language} for one DAD run, or {} when it cannot be read.
+def dad_dealt_cards(run_dir: Path) -> dict[str, dict]:
+    """{example_gid: the cards its scenario was dealt} for one DAD run, or {}
+    when the run cannot be read.
 
-    Final DAD records carry no language field, but the run does. Each
-    step3/rewrites.jsonl record holds the example_gid that reaches the
-    published row AND the scenario_cards it was dealt, whose `cultural_setting`
-    names the writing language ("China, written in Mandarin Chinese, with
-    Chinese idioms and references"). derive_language reads that clause; the
-    unmarked ~65% slice stores null, has no clause, and falls through to
-    English — which is what those prompts are.
+    Both published DAD columns that the final corpus predates — `language` and
+    `variables` — are derived from this one map, so they describe the same
+    records or neither of them does. Each step3/rewrites.jsonl record holds the
+    example_gid that reaches the published row AND the scenario_cards it was
+    dealt.
 
     ONE hop, not two: the same cards also sit on step1/dilemmas.jsonl, but
     step3 carries them next to the id the published row keeps, so the join
     needs one file and one key. Checked against the step1 route on all five
     committed runs — the same answer for all 1,324 records, no misses either
     way.
-
-    This is the language the scenario was DEALT, not one detected from the
-    text. Validated by script on the pinned run: none of the rows it calls
-    English carry CJK/Devanagari/Arabic/Hangul, so the error direction is a
-    non-English row landing behind the block, never an unreadable row landing
-    in front of it.
-
-    Returns {} when the file is missing, or when no record carries a
-    cultural_setting at all (a pre-matrix run such as archetype10). The caller
-    then leaves the corpus order alone rather than declaring every row English
-    on absent evidence.
     """
     path = run_dir / "step3" / "rewrites.jsonl"
     if not path.exists():
         return {}
-    languages: dict[str, str] = {}
-    any_dealt = False
+    cards_by_gid: dict[str, dict] = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
@@ -190,12 +180,44 @@ def dad_languages(run_dir: Path) -> dict[str, str]:
             # `annotation` is the pre-rename spelling of scenario_cards.
             # dad_pipeline/step1_dilemmas.py's dealt_cards() is the canonical
             # accessor, deliberately not imported: it pulls shared.api ->
-            # anthropic into a script that makes no model calls.
+            # anthropic into a script that makes no model calls. (The
+            # projection dealt_variables applies below has no such dependency,
+            # which is why it lives in the offline composer.)
             cards = record.get("scenario_cards") or record.get("annotation") or {}
-            setting = cards.get("cultural_setting") if isinstance(cards, dict) else None
-            if setting:
-                any_dealt = True
-            languages[gid] = derive_language(setting or "")
+            cards_by_gid[gid] = cards if isinstance(cards, dict) else {}
+    return cards_by_gid
+
+
+def dad_languages(cards_by_gid: dict[str, dict]) -> dict[str, str]:
+    """{example_gid: language} for one run's dealt cards, or {} when the run
+    carries no language evidence at all.
+
+    Final DAD records carry no language field, but the run does: a scenario's
+    `cultural_setting` card names the writing language ("China, written in
+    Mandarin Chinese, with Chinese idioms and references"). derive_language
+    reads that clause; the unmarked ~65% slice stores null, has no clause, and
+    falls through to English — which is what those prompts are.
+
+    This is the language the scenario was DEALT, not one detected from the
+    text. Validated by script on the pinned run: none of the rows it calls
+    English carry CJK/Devanagari/Arabic/Hangul, so the error direction is a
+    non-English row landing behind the block, never an unreadable row landing
+    in front of it.
+
+    Returns {} when no record carries a cultural_setting at all (a pre-matrix
+    run such as archetype10). The caller then leaves the corpus order alone
+    rather than declaring every row English on absent evidence — which is why
+    this gate stays PER RUN, and why it cannot be folded into
+    dad_dealt_cards: such a run still has cards worth publishing under
+    `variables`, it just has no language among them.
+    """
+    languages: dict[str, str] = {}
+    any_dealt = False
+    for gid, cards in cards_by_gid.items():
+        setting = cards.get("cultural_setting")
+        if setting:
+            any_dealt = True
+        languages[gid] = derive_language(setting or "")
     return languages if any_dealt else {}
 
 
@@ -260,11 +282,12 @@ def order_english_first(corpus_path: Path, language_of) -> dict[str, int] | None
 
 
 def flatten_dad_corpus(src: Path, dst: Path, languages: dict[str, str] | None = None,
+                       cards: dict[str, dict] | None = None,
                        append: bool = False) -> int:
     """Write the published form of a DAD corpus: one flat record per example
-    (example_gid, language, user_prompt, assistant_response) instead of the
-    training format's messages array, so the Hub viewer shows one readable
-    column per field with no role/content nesting.
+    (example_gid, language, user_prompt, assistant_response, variables) instead
+    of the training format's messages array, so the Hub viewer shows one
+    readable column per field with no role/content nesting.
 
     `language` is the language the scenario was DEALT (see dad_languages), not
     one detected from the text, and it is emitted only when the map is
@@ -272,6 +295,19 @@ def flatten_dad_corpus(src: Path, dst: Path, languages: dict[str, str] | None = 
     null on every row and reads as broken. A single row that does not join
     carries null rather than a guessed "English": a visible gap is honest, an
     invented value is not.
+
+    `variables` is the one nested column and the DAD counterpart of the SDF
+    corpus's own: the whole hand this example's scenario was dealt, so a reader
+    can tell which slice of the matrix a prompt/response pair came from rather
+    than only which language it is in. It follows `language`'s two rules for
+    the same reasons — emitted only when something resolves, null on a row that
+    does not join — and sits LAST because it is the widest cell on the row and
+    the two text columns are what a visitor came to read.
+
+    Both are joined off the run rather than read from the corpus record, even
+    though the record now carries `variables` itself: every committed run
+    predates that field, and one source means the column cannot mean different
+    things on either side of the change.
 
     That this column is worth its width, while the old source_run column was
     not, is not a contradiction. A short language cell against two very wide
@@ -314,11 +350,14 @@ def flatten_dad_corpus(src: Path, dst: Path, languages: dict[str, str] | None = 
                     f"{src}: record {rid} has no user+assistant message pair "
                     f"— refusing to publish a mangled row"
                 )
-            row = {"example_gid": record.get("example_gid")}
+            gid = record.get("example_gid")
+            row = {"example_gid": gid}
             if languages:
-                row["language"] = languages.get(record.get("example_gid"))
+                row["language"] = languages.get(gid)
             row["user_prompt"] = by_role["user"]
             row["assistant_response"] = by_role["assistant"]
+            if cards:
+                row["variables"] = dealt_variables(cards[gid]) if gid in cards else None
             fout.write(json.dumps(row, ensure_ascii=False) + "\n")
             n += 1
     return n
@@ -399,15 +438,21 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
                     "manifest_file": None, "audit_files": [], "n_docs": 0,
                     "runs": [], "languages": None}
 
-    # Built BEFORE the loop, because the flatten writes the language column as
+    # Built BEFORE the loop, because the flatten writes the joined columns as
     # it goes. Merged across runs since a combined corpus is one published
     # file; a gid repeated across runs means byte-identical content (the ids
     # are content-keyed via dad_pipeline/id_registry.py), so whichever run
-    # wins the merge carries the same answer.
+    # wins the merge carries the same answer. The language is derived per run,
+    # not from the merged map: its "no evidence, no column" gate is a statement
+    # about one run's cards, and a run that carries none must not be handed a
+    # language because a sibling run had some.
     dad_language_map: dict[str, str] = {}
+    dad_cards_map: dict[str, dict] = {}
     if corpus_name == "dad_corpus.jsonl":
         for run_dir in run_dirs:
-            dad_language_map.update(dad_languages(run_dir))
+            run_cards = dad_dealt_cards(run_dir)
+            dad_cards_map.update(run_cards)
+            dad_language_map.update(dad_languages(run_cards))
 
     corpus_dst = dataset_dir / corpus_name
     for i, run_dir in enumerate(run_dirs):
@@ -417,7 +462,7 @@ def stage_run(run_dirs: list[Path], corpus_name: str, staging_dir: Path,
         corpus_src = run_dir / "final" / corpus_name
         if corpus_name == "dad_corpus.jsonl":
             n = flatten_dad_corpus(corpus_src, corpus_dst, dad_language_map,
-                                   append=(i > 0))
+                                   dad_cards_map, append=(i > 0))
         else:
             shutil.copy2(corpus_src, corpus_dst)
             with open(corpus_dst, encoding="utf-8") as f:

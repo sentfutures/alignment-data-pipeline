@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from evals import publish_hf
+from dad_pipeline.compose_scenarios import DEALT_CARD_FIELDS
 
 COMPLIANCE = {"judged": 100, "clean_documents": 98, "clean_frac": 0.98}
 CARD_FIDELITY = {
@@ -434,8 +435,9 @@ class TestFlattenDadCorpus:
         assert set(by_gid) == {"E-0000", "E-0001"}
         for i in range(2):
             rec = by_gid[f"E-{i:04d}"]
-            # No language column here: this run carries no language data, so
-            # the column is omitted rather than nulled down every row.
+            # No language or variables column here: this run has no
+            # step3/rewrites.jsonl to join, so both are omitted rather than
+            # nulled down every row.
             assert set(rec) == {"example_gid", "user_prompt", "assistant_response"}
             assert rec["user_prompt"] == f"user prompt {i}"
             assert rec["assistant_response"] == f"assistant response {i}"
@@ -744,7 +746,7 @@ class TestDadLanguageJoin:
 
         _, records = _published(dataset_dir, corpus_name)
         assert set(records[0]) == {"example_gid", "language", "user_prompt",
-                                   "assistant_response"}
+                                   "assistant_response", "variables"}
         assert {r["example_gid"]: r["language"] for r in records} == {
             "E-0000": "English", "E-0001": "Mandarin Chinese"}
 
@@ -785,6 +787,109 @@ class TestDadLanguageJoin:
 
         _, records = _published(dataset_dir, corpus_name)
         assert [r["example_gid"] for r in records] == ["E-0001", "E-0000", "E-0002"]
+
+
+def write_dealt_cards(run_dir, cards_by_gid):
+    """Overwrite a DAD run's step3/rewrites.jsonl with the given dealt cards.
+
+    make_run_dir's own step3 file carries only cultural_setting, which is all
+    the language join reads; the variables column publishes the whole hand, so
+    these tests deal a fuller one.
+    """
+    step3 = run_dir / "step3"
+    step3.mkdir(parents=True, exist_ok=True)
+    (step3 / "rewrites.jsonl").write_text("\n".join(
+        json.dumps({"record_id": f"r{i}", "example_gid": gid,
+                    "scenario_cards": cards})
+        for i, (gid, cards) in enumerate(cards_by_gid.items())) + "\n",
+        encoding="utf-8")
+
+
+class TestDadVariablesColumn:
+    """The dealt cards reach the published row as one nested column, the DAD
+    counterpart of the SDF corpus's own `variables`. Same join as the language
+    column, one file read, so the two cannot describe different records."""
+
+    DEALT = {"domain": ["procurement"], "user_goal": ["drafting"],
+             "taxa_category": "insect-at-scale", "user_attitude": "unaware",
+             "cultural_setting": None, "conflict": "",
+             # legacy write-up fields ride along on every committed run
+             "claims": [], "dilemma_anatomy": {}, "moral_patients": ""}
+
+    def test_published_rows_carry_the_cards_their_scenario_was_dealt(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        write_dealt_cards(run_dir, {"E-0000": self.DEALT, "E-0001": self.DEALT})
+
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        for rec in records:
+            variables = rec["variables"]
+            assert variables["domain"] == ["procurement"]
+            assert variables["taxa_category"] == "insect-at-scale"
+            # every field present whether or not it was dealt, and "not dealt"
+            # has one spelling whether the card was absent, None, or ""
+            assert set(variables) == set(DEALT_CARD_FIELDS)
+            assert variables["cultural_setting"] is None
+            assert variables["conflict"] is None
+            assert variables["length_class"] is None
+            # the write-up fields are not dealt cards and are not published
+            assert not {"claims", "dilemma_anatomy", "moral_patients"} & set(variables)
+
+    def test_the_widest_column_sits_last(self, tmp_path):
+        """The two text columns are what a visitor came to read; a 19-field
+        struct in front of them owns the viewer's first screen."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=1,
+                                            audit_files=[], include_html=False)
+        # a marked setting, so the language column is in play too
+        write_dealt_cards(run_dir, {"E-0000": {**self.DEALT,
+                                               "cultural_setting": marked_setting("Spanish")}})
+
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert list(records[0]) == ["example_gid", "language", "user_prompt",
+                                    "assistant_response", "variables"]
+        assert records[0]["language"] == "Spanish"
+
+    def test_a_run_with_no_dealt_cards_publishes_no_variables_column(self, tmp_path):
+        """Same rule as the language column: a column null on every row reads
+        as broken, and omitting it says the same thing honestly."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert all("variables" not in rec for rec in records)
+
+    def test_an_unjoined_row_carries_a_null_cell_not_a_guess(self, tmp_path):
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        write_dealt_cards(run_dir, {"E-0000": self.DEALT})
+
+        _, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        by_gid = {rec["example_gid"]: rec for rec in records}
+        assert by_gid["E-0000"]["variables"]["taxa_category"] == "insect-at-scale"
+        assert by_gid["E-0001"]["variables"] is None
+
+    def test_a_run_with_cards_but_no_language_still_publishes_them(self, tmp_path):
+        """The hand-seeded archetype10 run deals no cultural_setting, so the
+        language gate declines for it — but it has cards worth publishing, and
+        the two columns are gated separately for exactly that reason."""
+        run_dir, corpus_name = make_run_dir(tmp_path, pipeline="dad", docs=2,
+                                            audit_files=[], include_html=False)
+        write_dealt_cards(run_dir, {"E-0000": self.DEALT, "E-0001": self.DEALT})
+
+        staged, dataset_dir = _stage(run_dir, corpus_name, tmp_path / "staged")
+
+        _, records = _published(dataset_dir, corpus_name)
+        assert all("language" not in rec for rec in records)
+        assert staged["languages"] is None          # nothing to order by
+        assert all(rec["variables"]["taxa_category"] == "insect-at-scale"
+                   for rec in records)
 
 
 def _dad_manifest(run_id, backend="api", dirty=None, dirty_files=None):
