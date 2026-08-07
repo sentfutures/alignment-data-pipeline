@@ -67,6 +67,8 @@ Two open midtraining datasets that teach a model to reason carefully about the w
 
 <!-- id: intro -->
 
+Humans are starting to use AIs to help make a wide range of decisions. Some of these decisions could harm or benefit animals. AI should take animal welfare into account along with other ethical considerations, but current training data [does not teach this skill](https://mantabench.org/).
+
 Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) finds that teaching AI models the reasons behind aligned behaviors is just as important as the behaviors themselves.
 
 Two complementary techniques proved especially effective:

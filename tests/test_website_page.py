@@ -273,11 +273,12 @@ class TestShape:
         assert "aspect-ratio:1318/425" in rule
         assert "object-fit:cover" in rule and "object-position:50% 48.5%" in rule
 
-    def test_the_intro_stops_after_four_paragraphs(self):
-        """Four paragraphs of intro prose and it stops: the finding, the sentence that
-        introduces the pair, then what we built on it in two. A bulleted list here is the
-        two DATASETS listed a second time within a screen of the comparison's mastheads,
-        and `<ul>` staying out is what stops that coming back.
+    def test_the_intro_stops_after_five_paragraphs(self):
+        """Five paragraphs of intro prose and it stops: why this matters, the finding,
+        the sentence that introduces the pair, then what we built on it in two. A
+        bulleted list here is the two DATASETS listed a second time within a screen of
+        the comparison's mastheads, and `<ul>` staying out is what stops that coming
+        back.
 
         The two TECHNIQUES are a different thing from the two datasets, which is why an
         `<ol>` is allowed where a `<ul>` is not — and it is a FIGURE between the second
@@ -287,10 +288,10 @@ class TestShape:
         hero = re.search(r"<header class='hero'>.*?</header>", html, re.S).group(0)
         assert "<ul>" not in hero
         assert hero.count("<ol class='npair'>") == 1 and hero.count("<li>") == 2
-        # Two before the pair, one after, and nothing inside it: the body and tie lines are
-        # divs, so a paragraph in here is authored prose and can be counted as such.
+        # Three before the pair, two after, and nothing inside it: the body and tie lines
+        # are divs, so a paragraph in here is authored prose and can be counted as such.
         before, after = hero.split("<ol class='npair'>")
-        assert before.count("<p>") == 2 and after.count("<p>") == 2
+        assert before.count("<p>") == 3 and after.count("<p>") == 2
         assert "<p>" not in after[:after.index("</ol>")]
 
     def test_the_two_techniques_read_in_the_page_s_own_order(self):
