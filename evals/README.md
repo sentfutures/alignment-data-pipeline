@@ -34,12 +34,39 @@ for one specific run to be published, and confirm which run that is first. Most
 runs are exploratory and were never meant to become, or to overwrite, the
 published snapshot.
 
-Two consequences are easy to miss. Publishing one pipeline regenerates the
-whole dataset card, so the script reads the other pipeline's metadata back off
-the Hub to rebuild its half. And audit files are staged verbatim, so anything a
+One consequence is easy to miss: audit files are staged verbatim, so anything a
 report happens to record about the machine that produced it goes public with it.
-`--dry-run` stages everything and prints the card without making a single
-network call.
+`--dry-run` stages everything and prints what would be uploaded, and the commit
+message it would leave, without making a single network call.
+
+## The dataset card
+
+**The card is hand-written and edited on the Hub. `publish_hf.py` does not
+write it, and no copy of it lives in this repository.** It used to be
+regenerated from each run's audit files on every publish, which silently
+replaced whatever had been edited on the Hub; the generator was removed rather
+than left behind a flag. A publish stages `<pipeline>/…` only, and
+`delete_patterns` is scoped to the same prefix, so `README.md` is a path the
+upload can neither overwrite nor delete.
+
+Two things about that card are load-bearing, and nothing in this repository
+will catch a mistake in either:
+
+- **The `configs:` block in the YAML frontmatter is functional.** It is the
+  only thing that points the dataset viewer at `sdf/sdf_corpus.jsonl` and
+  `dad/dad_corpus.jsonl` and splits them into two selectable configs. Without
+  it the two files — which have incompatible schemas — fall into Hugging Face's
+  catch-all single-split resolution. It must keep naming both paths, and it
+  must keep `default: true` on the first entry. Editing the card in the Hub's
+  web editor means editing this by hand.
+- **Renaming a config breaks the project page.** `website/page.py`'s `HF_SDF`
+  and `HF_DAD` are viewer deep-links built from the config names verbatim
+  (`synthetic documents`, `difficult advice Q&A`). Rename one on the card and
+  those links 404, silently.
+
+The corpora's licence is declared in that frontmatter and nowhere else. It is
+**CC0-1.0**, and it is not the same thing as this repository's own code licence
+(Apache-2.0, see `LICENSE`).
 
 `tics.yaml` and `moves.yaml` are the tracked-phrase and tracked-move lists that
 `audit_dad.py` counts against, with their dismissed candidates. They are edited
