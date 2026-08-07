@@ -68,15 +68,15 @@ Two open pipelines for alignment finetuning data teaching AI models to reason re
 
 <!-- id: intro -->
 
-Humans are starting to use AIs to help make a wide range of decisions, some of which could harm or benefit animals. AI should take animal welfare into account along with other ethical considerations, but current training data does not teach them how.
+Humans are starting to use AIs to help make a wide range of decisions, some of which **could harm or benefit animals**. AI should take animal welfare into account along with other ethical considerations, but current training data [does not teach them how](https://mantabench.org).
 
-Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) shows how it can be taught: the reasons behind aligned behaviors matter just as much as the behaviors themselves.
+Research on alignment finetuning[^Teaching Claude Why](https://alignment.anthropic.com/2026/teaching-claude-why/)[^Synthetic document finetuning for instilling positive traits](https://www.lesswrong.com/posts/GTYJRLhqztxKF2v5R/synthetic-document-finetuning-for-instilling-positive-traits) shows how it can be taught: the reasons *behind* aligned behaviors matter just as much as the behaviors themselves.
 
 Two complementary techniques proved especially effective:
 
 <!-- id: sdf_technique -->
 
-**Synthetic document finetuning** Pretraining-style documents from a world where the target model is _already_ aligned to certain behaviors. This reinforces the existence of an aligned persona.
+**Synthetic document finetuning** Pretraining-style documents from a world where the target model is *already* aligned to certain behaviors. This reinforces the existence of an aligned persona.
 
 <!-- id: dad_technique -->
 
@@ -84,7 +84,7 @@ Two complementary techniques proved especially effective:
 
 <!-- id: intro_close -->
 
-Following this research, we built two pipelines that synthesize the missing training data for welfare considerations of animals and other sentient beings.
+Following this research, **we built two pipelines** that synthesize the missing training data for welfare considerations of animals and other sentient beings.
 
 The outputs show models acting beneficially towards morally relevant animals while still adhering to broader alignment guidelines and respecting user autonomy.
 

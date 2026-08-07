@@ -464,10 +464,10 @@ that opens it. `.choice[aria-expanded=true]` is what the accent fill hangs off.
 **The comparison's heading is heard, not seen** (`<h2 class='vh'>`). The two mastheads are
 the visible title; with no heading at all, pressing `H` went from the page title to the
 chooser, past both datasets. **A masthead is a name and nothing else.** The six rows are
-`result` · `result format` · `what it is for` · `pipeline` · `prompt templates` ·
+`output` · `output format` · `what it is for` · `pipeline` · `prompt templates` ·
 `example dataset`, and each says which side of the data/pipeline line it is on — the table is
 where the page draws that line first. What each dataset *is* was the masthead's subtitle
-(`.cmp-d`, now gone); it is the `result` row, because it was the only unlabelled claim in a
+(`.cmp-d`, now gone); it is the `output` row, because it was the only unlabelled claim in a
 table whose every other line said what it was answering. The `pipeline` row is a stage chain
 in the same shape on both sides, and `test_the_pipeline_row_names_the_stages_the_report_goes_on_to_walk`
 checks **both** halves against the stage names in that report's own flow SVG, so the table
